@@ -40,7 +40,8 @@
         "Pristine source inventory passed: https://github.com/sguzman/vulpra/actions/runs/40125494649 (483770 regular files, 3633991406 bytes)",
         "Full-native Linux configuration (non-artifact, Vulpra app basename) passed: https://github.com/sguzman/vulpra/actions/runs/40126134453",
         "Release-like native configuration with --disable-tests confirmed: https://github.com/sguzman/vulpra/actions/runs/40126662777",
-        "Native full build run 40126828007 terminated around 55-minute compilation timeout; compile succeeded through many C/C++ and Rust units before shutdown. No browser success credited."
+        "Native full build run 40126828007 terminated around 55-minute compilation timeout; compile succeeded through many C/C++ and Rust units before shutdown. No browser success credited.",
+        "Native size and elapsed-time reporting verified on mock browser package: https://github.com/sguzman/vulpra/actions/runs/40132561502 (no real browser measurements yet)"
       ],
       "verified_preparatory_tasks": [
         {
@@ -67,6 +68,11 @@
           "id": "native-linux-configure",
           "percent": 100,
           "evidence": "https://github.com/sguzman/vulpra/actions/runs/40126662777"
+        },
+        {
+          "id": "portable-build-metrics-mock",
+          "percent": 100,
+          "evidence": "https://github.com/sguzman/vulpra/actions/runs/40132561502"
         }
       ],
       "status_note": "One of five product-stage acceptance gates passed: full-native configure. Native compilation/runtime remain unverified.",

@@ -24,7 +24,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 - [ ] 🤖 Establish CI smoke testing for startup, browsing, navigation, extension functionality, security basics and Wayland behavior.
 
 ### 📏 Phase 2 — Baseline
-- [ ] 📦 Capture source files/bytes, compiled size and build time.
+- [ ] 📦 Capture source files/bytes, compiled size and build time. Source files/bytes measured in CI 40125494649; native-build JSON metric generator and archive test pass in CI 40132561502. Real executable and duration data remain pending native compilation.
 - [ ] 📊 Capture startup time, memory and representative page behavior on a declared environment.
 
 ## ✂️ M3 — User-specific debloating
