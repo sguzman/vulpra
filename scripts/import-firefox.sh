@@ -41,10 +41,18 @@ echo "::endgroup::"
 echo "::group::Unpack and check source paths"
 mkdir -p "$work/source"
 tar -xJf "$work/$archive" --strip-components=1 -C "$work/source"
-test -f "$work/source/mach"
-test -f "$work/source/toolkit/content/license.html"
-test -f "$work/source/LICENSE"
-test -f "$work/source/Cargo.toml"
+echo "Unpacked root entries:"
+ls -la "$work/source" | sed -n '1,45p'
+echo "Directory sizes:"
+du -sh "$work/source"
+echo "Candidate mach/license paths:"
+find "$work/source" -maxdepth 4 \( -name mach -o -name LICENSE -o -name Cargo.toml \) -print | sed -n '1,40p'
+for p in mach toolkit/content/license.html LICENSE Cargo.toml; do
+  if [[ ! -f "$work/source/$p" ]]; then
+    echo "Missing required file: $p" >&2
+    exit 1
+  fi
+done
 echo "::endgroup::"
 
 echo "::group::Commit pristine release snapshot into upstream-base"
