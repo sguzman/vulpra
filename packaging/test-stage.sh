@@ -12,7 +12,7 @@ printf '%s\n' "$@" > "$ARGS_CAPTURE"
 MOCK
 chmod +x "$work/in/firefox/firefox"
 ln -s firefox "$work/in/firefox/browser-link"
-original_binary_sha="$(sha256sum "$work/in/firefox/firefox")"
+original_binary_sha="$(sha256sum "$work/in/firefox/firefox" | cut -d' ' -f1)"
 tar -cJf "$work/moz.tar.xz" -C "$work/in" .
 bash "$here/stage.sh" "$work/moz.tar.xz" "$work/vulpra.tar.xz"
 [[ -s "$work/vulpra.tar.xz" && -s "$work/vulpra.tar.xz.sha256" ]]
@@ -29,7 +29,7 @@ mkdir "$work/unpack"
 tar -xf "$work/vulpra.tar.xz" -C "$work/unpack"
 [[ -x "$work/unpack/firefox/vulpra" ]]
 # Staging must add only Vulpra's launcher, not alter Firefox engine bits.
-test "$(sha256sum "$work/unpack/firefox/firefox")" = "$original_binary_sha"
+test "$(sha256sum "$work/unpack/firefox/firefox" | cut -d' ' -f1)" = "$original_binary_sha"
 cmp -- "$work/in/firefox/application.ini" "$work/unpack/firefox/application.ini"
 [[ -L "$work/unpack/firefox/browser-link" ]]
 [[ "$(readlink "$work/unpack/firefox/browser-link")" == firefox ]]
