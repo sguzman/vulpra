@@ -123,6 +123,16 @@ jobs:
           (cd obj-vulpra-linux/dist && sha256sum --check vulpra-1590b5-linux-ci-preview.tar.xz.sha256)
           tar -tf obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz | grep -E '/vulpra$'
 
+      - name: Upload preliminary CI-only package
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-1590b5-linux-ci-preview
+          path: |
+            obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz
+            obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Smoke-test isolated packaged Vulpra in headless mode
         shell: bash
         run: |
@@ -156,19 +166,12 @@ jobs:
           test "$(sha256sum "$tmp/home/.mozilla/firefox/profiles.ini")" = "$original_firefox_hash"
           echo "PASS: packaged Vulpra started headlessly, rendered a screenshot, and used its isolated profile"
 
-      - name: Upload preliminary CI-only package
-        uses: actions/upload-artifact@v4
-        with:
-          name: vulpra-1590b5-linux-ci-preview
-          path: |
-            obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz
-            obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz.sha256
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Report resources
+      - name: Report native compiler cache and runner resources
         if: always()
         shell: bash
         run: |
+          if command -v sccache >/dev/null 2>&1; then
+            sccache --show-stats || true
+          fi
           df -h .
           free -h
