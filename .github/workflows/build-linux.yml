@@ -119,9 +119,18 @@ jobs:
           test -x "$appdir/vulpra"
           test -x "$appdir/firefox"
           grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
+          cat > "$tmp/smoke.html" <<'HTML'
+          <!doctype html>
+          <html lang="en"><meta charset="utf-8">
+          <title>Vulpra native CI browser smoke test</title>
+          <main><h1>Vulpra rendered a local page</h1></main>
+          <script>document.querySelector('h1').textContent += ' with JavaScript';</script>
+          </html>
+          HTML
           HOME="$tmp/home" XDG_DATA_HOME="$tmp/home/.local/share" MOZ_HEADLESS=1 \
-            timeout 120 "$appdir/vulpra" --headless --screenshot "$tmp/screenshot.png" about:blank
+            timeout 120 "$appdir/vulpra" --headless --screenshot "$tmp/screenshot.png" "file://$tmp/smoke.html"
           test -s "$tmp/screenshot.png"
+          file --mime-type "$tmp/screenshot.png" | grep -Fq 'image/png'
           test -d "$tmp/home/.local/share/vulpra/default"
           test ! -e "$tmp/home/.mozilla"
           echo "PASS: packaged Vulpra started headlessly, rendered a screenshot, and used its isolated profile"
