@@ -19,7 +19,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 - [x] 🧪 Implement private-profile launch contract and mocked executable regression tests. Evidence: passing CI 40124539256.
 - [x] 📦 Stage a separate Vulpra launcher in a tarball and verify mock package/checksum/profile behavior. Evidence: passing CI 40125061263. Real native packaging remains unverified.
 - [x] 🏷️ Configure independent Vulpra display strings and an upstream-supported app basename, retaining Gecko extension compatibility ID. Evidence: passing audit CI 40124841263. Actual compiled identity and icons remain unverified.
-- [x] 🧱 Configure full native Linux x86-64 build with the pinned source and documented GitHub Actions toolchain. Evidence: passing configure-only run 40126134453; no compiled binary yet.
+- [x] 🧱 Configure full native Linux x86-64 build with the pinned source and documented GitHub Actions toolchain. Evidence: configure-only runs 40126134453 and 40126662777 (--disable-tests); no compiled binary yet.
 - [ ] 🛡️ Produce independently branded packaged browser with dedicated profile; no changes to installed Firefox Developer Edition. Mock-tested launcher and archive are only prerequisites, not final shipping evidence.
 - [ ] 🤖 Establish CI smoke testing for startup, browsing, navigation, extension functionality, security basics and Wayland behavior.
 
