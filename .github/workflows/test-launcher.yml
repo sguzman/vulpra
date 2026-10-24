@@ -24,6 +24,10 @@ jobs:
         run: |
           bash -n packaging/vulpra
           bash -n packaging/test-launcher.sh
+          bash -n packaging/stage.sh
+          bash -n packaging/test-stage.sh
       - name: Run launcher mock integration test
         shell: bash
-        run: bash packaging/test-launcher.sh
+        run: |
+          bash packaging/test-launcher.sh
+          bash packaging/test-stage.sh
