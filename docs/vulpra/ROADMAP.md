@@ -6,7 +6,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 
 ### 🌱 Phase 1 — Provenance
 - [x] 🔎 Confirm exact upstream tag and source archive SHA-256; extracted critical paths verified. Evidence: import run 40119418469, provenance ledger. Full tree equivalence is a separate remaining gate.
-- [ ] 📥 Import full source into `upstream-base` and verify the **whole** file tree matches Mozilla's source archive. Branch and protected workflow files are present; full file-by-file equivalence audit remains.
+- [x] 📥 Import source to `upstream-base` and verify all source file contents, paths and symlinks. Evidence: passed CI 40120947358, with verified Git CRLF normalization and empty directory exceptions.
 - [x] 🌿 Merge the baseline ancestry into `main`, preserve project rules and verify essential Firefox build paths. Evidence: commit 58802537 and GitHub file checks.
 
 ### 🛠️ Phase 2 — Execution

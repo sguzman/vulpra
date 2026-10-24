@@ -24,3 +24,7 @@ The new repository was created with a template MIT license covering only appropr
 ## Update discipline
 
 For every future upstream revision: document its source tag and commit, review security advisories, produce a clean new upstream reference, compare and reapply personal patches, compile and test before shipping. Pinned release does not mean permanent abandonment of security updates.
+
+## Full source-tree verification
+
+The [full source audit](https://github.com/sguzman/vulpra/actions/runs/40120947358) passed on 2026-10-24. It compared file contents, paths and symlink targets against the SHA-256-verified source release archive. Two narrowly documented serialization exceptions apply: Git converted CRLF to LF for `dom/webgpu/tests/cts/checkout/node.tsconfig.json` (byte-identity after only that normalization was verified), and Git cannot store empty `__pycache__` directories from the archive. All other source paths compared without unexpected differences.
