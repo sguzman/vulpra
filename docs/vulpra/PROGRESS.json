@@ -39,7 +39,8 @@
         "Staged archive with checksum and private-profile wrapper passed: https://github.com/sguzman/vulpra/actions/runs/40125061263 (mock package only)",
         "Pristine source inventory passed: https://github.com/sguzman/vulpra/actions/runs/40125494649 (483770 regular files, 3633991406 bytes)",
         "Full-native Linux configuration (non-artifact, Vulpra app basename) passed: https://github.com/sguzman/vulpra/actions/runs/40126134453",
-        "Release-like native configuration with --disable-tests confirmed: https://github.com/sguzman/vulpra/actions/runs/40126662777"
+        "Release-like native configuration with --disable-tests confirmed: https://github.com/sguzman/vulpra/actions/runs/40126662777",
+        "Native full build run 40126828007 terminated around 55-minute compilation timeout; compile succeeded through many C/C++ and Rust units before shutdown. No browser success credited."
       ],
       "verified_preparatory_tasks": [
         {
@@ -106,6 +107,7 @@
     "M2 mock launcher, mock package and independent source strings are passing. Native build still pending; no product success credited.",
     "Full native build 40120428907 failed at native compilation with unavailable job logs at this check; failure cause undetermined. Rebranded build 40124841229 continues.",
     "Linux full-native configure passed 40126134453. M2 20% reflects one of five explicit gates; overall shipped/browser-functionality percentage remains zero.",
-    "CI 40126662777 passed native configure with optional test binaries disabled; separate browser runtime tests remain required."
+    "CI 40126662777 passed native configure with optional test binaries disabled; separate browser runtime tests remain required.",
+    "Build 40126828007 failed after SIGTERM/143 near explicitly configured 55-minute timeout (not a demonstrated compiler error). Removed premature timeout; enabled Mozilla sccache-action v0.0.11 with Firefox --with-ccache=sccache and GitHub cache backend for retry. This optimization is pending CI verification."
   ]
 }

@@ -7,3 +7,6 @@ ac_add_options --with-app-basename=Vulpra
 
 # Packaged browser builds omit test-only native binaries; test source is retained.
 ac_add_options --disable-tests
+
+# Cache Rust and C/C++ outputs across full native CI builds.
+ac_add_options --with-ccache=sccache

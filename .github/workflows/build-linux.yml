@@ -33,6 +33,8 @@ jobs:
       MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux
       DEBIAN_FRONTEND: noninteractive
       MOZ_HEADLESS: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-linux-v1"
     steps:
       - name: Check out imported Firefox source
         uses: actions/checkout@v4
@@ -51,6 +53,18 @@ jobs:
           df -h .
           free -h
 
+      - name: Set up shared Mozilla sccache compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Pass GitHub Actions cache credentials to sccache
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Bootstrap Firefox desktop native build dependencies
         shell: bash
         run: |
@@ -63,8 +77,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Bound compilation before runner termination so failure artifacts can upload.
-          timeout --signal=INT --kill-after=120s 55m ./mach build 2>&1 | tee "$RUNNER_TEMP/vulpra-native-build.log"
+          # No artificial 55-minute cutoff: Firefox needs a full native build.
+          # GitHub hosted runners allow jobs for up to six hours; the job
+          # timeout above leaves time for packaging, smoke tests and diagnostics.
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/vulpra-native-build.log"
 
       - name: Preserve bounded native-build failure diagnostics
         if: failure()
