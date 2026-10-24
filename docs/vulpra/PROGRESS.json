@@ -31,13 +31,14 @@
     {
       "id": "M2",
       "name": "Working Linux browser",
-      "percent": 0,
+      "percent": 20,
       "status": "in-progress",
       "evidence": [
         "Isolated launcher contract passed: https://github.com/sguzman/vulpra/actions/runs/40124539256 (mock executable only)",
         "Independent source branding strings passed: https://github.com/sguzman/vulpra/actions/runs/40124841263 (not a compiled binary)",
         "Staged archive with checksum and private-profile wrapper passed: https://github.com/sguzman/vulpra/actions/runs/40125061263 (mock package only)",
-        "Pristine source inventory passed: https://github.com/sguzman/vulpra/actions/runs/40125494649 (483770 regular files, 3633991406 bytes)"
+        "Pristine source inventory passed: https://github.com/sguzman/vulpra/actions/runs/40125494649 (483770 regular files, 3633991406 bytes)",
+        "Full-native Linux configuration (non-artifact, Vulpra app basename) passed: https://github.com/sguzman/vulpra/actions/runs/40126134453"
       ],
       "verified_preparatory_tasks": [
         {
@@ -59,9 +60,24 @@
           "id": "pristine-source-metrics",
           "percent": 100,
           "evidence": "https://github.com/sguzman/vulpra/actions/runs/40125494649"
+        },
+        {
+          "id": "native-linux-configure",
+          "percent": 100,
+          "evidence": "https://github.com/sguzman/vulpra/actions/runs/40126134453"
         }
       ],
-      "status_note": "Native compiled/browser-runtime acceptance is not satisfied; mock-only tasks do not count as browser functionality."
+      "status_note": "One of five product-stage acceptance gates passed: full-native configure. Native compilation/runtime remain unverified.",
+      "acceptance_gates": {
+        "passed": 1,
+        "total": 5,
+        "remaining": [
+          "Produce compiled native Linux binary and isolated Vulpra package",
+          "Verify packaged runtime startup and browser behavior",
+          "Verify extension/security/Wayland smoke gates",
+          "Record compiled size, build time and runtime metrics"
+        ]
+      }
     },
     {
       "id": "M3",
@@ -87,6 +103,7 @@
     "Source tree verified against archive, modulo exact checked CRLF normalization for one upstream JSON file and empty cache folders unrepresentable in Git.",
     "M1 source foundation complete: audit verifies source licensing inventory and flags unresolved Nightly branding as M2 shipping block; no distributable Vulpra binary claim.",
     "M2 mock launcher, mock package and independent source strings are passing. Native build still pending; no product success credited.",
-    "Full native build 40120428907 failed at native compilation with unavailable job logs at this check; failure cause undetermined. Rebranded build 40124841229 continues."
+    "Full native build 40120428907 failed at native compilation with unavailable job logs at this check; failure cause undetermined. Rebranded build 40124841229 continues.",
+    "Linux full-native configure passed 40126134453. M2 20% reflects one of five explicit gates; overall shipped/browser-functionality percentage remains zero."
   ]
 }
