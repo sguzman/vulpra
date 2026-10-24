@@ -4,3 +4,6 @@ ac_add_options --with-branding=browser/branding/unofficial
 
 # Separate application.ini name; Gecko extension compatibility ID is unchanged.
 ac_add_options --with-app-basename=Vulpra
+
+# Packaged browser builds omit test-only native binaries; test source is retained.
+ac_add_options --disable-tests

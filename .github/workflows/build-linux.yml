@@ -13,6 +13,8 @@ on:
       - '!README.md'
       - '!AGENTS.md'
       - '!scripts/import-firefox.sh'
+      - 'ci/mozconfig-linux'
+      - '.github/workflows/build-linux.yml'
   workflow_dispatch:
 
 permissions:

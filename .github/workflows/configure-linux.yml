@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/configure-linux.yml
+      - ci/mozconfig-linux
   workflow_dispatch:
 
 permissions:
@@ -37,6 +38,7 @@ jobs:
           test -s ci/mozconfig-linux
           grep -Fxq 'ac_add_options --with-app-basename=Vulpra' ci/mozconfig-linux
           grep -Fxq 'ac_add_options --with-branding=browser/branding/unofficial' ci/mozconfig-linux
+          grep -Fxq 'ac_add_options --disable-tests' ci/mozconfig-linux
           ./mach configure
           test -s obj-vulpra-linux/config.status
           grep -q 'Vulpra' obj-vulpra-linux/config.status
