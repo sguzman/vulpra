@@ -33,7 +33,29 @@
       "name": "Working Linux browser",
       "percent": 0,
       "status": "in-progress",
-      "evidence": []
+      "evidence": [
+        "Isolated launcher contract passed: https://github.com/sguzman/vulpra/actions/runs/40124539256 (mock executable only)",
+        "Independent source branding strings passed: https://github.com/sguzman/vulpra/actions/runs/40124841263 (not a compiled binary)",
+        "Staged archive with checksum and private-profile wrapper passed: https://github.com/sguzman/vulpra/actions/runs/40125061263 (mock package only)"
+      ],
+      "verified_preparatory_tasks": [
+        {
+          "id": "isolated-launcher-mock",
+          "percent": 100,
+          "evidence": "https://github.com/sguzman/vulpra/actions/runs/40124539256"
+        },
+        {
+          "id": "independent-source-branding",
+          "percent": 100,
+          "evidence": "https://github.com/sguzman/vulpra/actions/runs/40124841263"
+        },
+        {
+          "id": "mock-package-staging",
+          "percent": 100,
+          "evidence": "https://github.com/sguzman/vulpra/actions/runs/40125061263"
+        }
+      ],
+      "status_note": "Native compiled/browser-runtime acceptance is not satisfied; mock-only tasks do not count as browser functionality."
     },
     {
       "id": "M3",
@@ -57,6 +79,7 @@
     "No compiled Linux browser or actual behavior fix has been verified.",
     "Overall product percentage remains zero until browser functionality is demonstrated.",
     "Source tree verified against archive, modulo exact checked CRLF normalization for one upstream JSON file and empty cache folders unrepresentable in Git.",
-    "M1 source foundation complete: audit verifies source licensing inventory and flags unresolved Nightly branding as M2 shipping block; no distributable Vulpra binary claim."
+    "M1 source foundation complete: audit verifies source licensing inventory and flags unresolved Nightly branding as M2 shipping block; no distributable Vulpra binary claim.",
+    "M2 mock launcher, mock package and independent source strings are passing. Native build still pending; no product success credited."
   ]
 }

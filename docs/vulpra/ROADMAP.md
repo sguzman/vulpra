@@ -16,8 +16,11 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 ## 🐧 M2 — Working Linux browser
 
 ### ⚙️ Phase 1 — Build
+- [x] 🧪 Implement private-profile launch contract and mocked executable regression tests. Evidence: passing CI 40124539256.
+- [x] 📦 Stage a separate Vulpra launcher in a tarball and verify mock package/checksum/profile behavior. Evidence: passing CI 40125061263. Real native packaging remains unverified.
+- [x] 🏷️ Configure independent Vulpra display strings and an upstream-supported app basename, retaining Gecko extension compatibility ID. Evidence: passing audit CI 40124841263. Actual compiled identity and icons remain unverified.
 - [ ] 🧱 Configure reproducible release-like Linux x86-64 build with a documented toolchain.
-- [ ] 🛡️ Ship separately named binary with a dedicated profile; no changes to installed Firefox Developer Edition.
+- [ ] 🛡️ Produce independently branded packaged browser with dedicated profile; no changes to installed Firefox Developer Edition. Mock-tested launcher and archive are only prerequisites, not final shipping evidence.
 - [ ] 🤖 Establish CI smoke testing for startup, browsing, navigation, extension functionality, security basics and Wayland behavior.
 
 ### 📏 Phase 2 — Baseline
