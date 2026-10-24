@@ -1,0 +1,65 @@
+name: Verify pristine upstream source snapshot
+
+on:
+  push:
+    paths:
+      - .github/workflows/verify-upstream.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vulpra-upstream-verification
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout pristine upstream-base source
+        uses: actions/checkout@v4
+        with:
+          ref: upstream-base
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Compare every source file and symlink with official release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="159.0b5"
+          filename="firefox-$version.source.tar.xz"
+          release="https://archive.mozilla.org/pub/firefox/releases/$version"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          curl --fail --location --retry 3 "$release/SHA256SUMS" -o "$tmp/SHA256SUMS"
+          curl --fail --location --retry 3 "$release/source/$filename" -o "$tmp/$filename"
+          expected="$(awk -v a="$filename" '$NF == a || $NF == ("source/" a) || $NF == ("./source/" a) {print $1}' "$tmp/SHA256SUMS")"
+          [[ "$expected" == "9145b8811cbb77108cdfc797e9119b69074aac6491b0df1fccd2c998ce706eb9" ]] || {
+            echo "Mozilla release checksum differs from pinned digest" >&2
+            exit 1
+          }
+          printf '%s  %s\n' "$expected" "$tmp/$filename" | sha256sum --check
+          mkdir "$tmp/source"
+          tar -xJf "$tmp/$filename" --strip-components=1 -C "$tmp/source"
+          test -f "$tmp/source/toolkit/content/license.html.mako"
+          test -f .github/workflows/README
+          test -f .github/workflows/pr-handler.yml
+          echo "::group::Content and symlink comparison"
+          # -r recursive, -c SHA-like whole-file checksum comparison,
+          # -l preserve/compare symlinks, -n dry-run, -i itemize.
+          # Do not treat different checkout timestamps or ownership as mismatches.
+          rsync -rclni --delete --exclude='/.git/'             "$tmp/source/" "$GITHUB_WORKSPACE/" > "$tmp/diff.txt"
+          if [[ -s "$tmp/diff.txt" ]]; then
+            echo "Source tree differs from verified release archive" >&2
+            echo "Changed/missing/extra paths (first 120):"
+            sed -n '1,120p' "$tmp/diff.txt"
+            printf 'Total changed paths: '
+            wc -l < "$tmp/diff.txt"
+            exit 1
+          fi
+          echo "PASS: source archive and upstream-base have identical paths, file contents and symlink targets."
+          echo "::endgroup::"
