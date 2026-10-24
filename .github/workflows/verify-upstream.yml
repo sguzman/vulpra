@@ -49,17 +49,31 @@ jobs:
           test -f .github/workflows/README
           test -f .github/workflows/pr-handler.yml
           echo "::group::Content and symlink comparison"
-          # -r recursive, -c SHA-like whole-file checksum comparison,
-          # -l preserve/compare symlinks, -n dry-run, -i itemize.
-          # Do not treat different checkout timestamps or ownership as mismatches.
-          rsync -rclni --delete --exclude='/.git/'             "$tmp/source/" "$GITHUB_WORKSPACE/" > "$tmp/diff.txt"
+          # Git normalizes the one upstream CRLF file below to LF. Require
+          # the two versions to match after only that single transformation.
+          path="dom/webgpu/tests/cts/checkout/node.tsconfig.json"
+          if ! cmp -s "$tmp/source/$path" "$GITHUB_WORKSPACE/$path"; then
+            sed 's/\r$//' "$tmp/source/$path" > "$tmp/normalized"
+            cmp -s "$tmp/normalized" "$GITHUB_WORKSPACE/$path" || {
+              echo "Unexpected mismatch in $path (not just CRLF)" >&2
+              exit 1
+            }
+            cp "$tmp/normalized" "$tmp/source/$path"
+            echo "Verified exact CRLF-to-LF normalization for $path"
+          fi
+          # -r files recursively, -c content checksum, -l symlinks, -n dry run,
+          # -i itemize. Only empty __pycache__ folders are excluded from diff:
+          # Git cannot preserve empty directories from Mozilla's tar archive.
+          rsync -rclni --delete --exclude='/.git/' \
+            "$tmp/source/" "$GITHUB_WORKSPACE/" > "$tmp/all-diff.txt"
+          awk '!($1=="cd+++++++++" && $2 ~ /(^|\/)__pycache__\/$/)' \
+            "$tmp/all-diff.txt" > "$tmp/diff.txt"
           if [[ -s "$tmp/diff.txt" ]]; then
-            echo "Source tree differs from verified release archive" >&2
-            echo "Changed/missing/extra paths (first 120):"
+            echo "Unexpected source content or path differences" >&2
             sed -n '1,120p' "$tmp/diff.txt"
-            printf 'Total changed paths: '
+            printf 'Unexpected changed paths: '
             wc -l < "$tmp/diff.txt"
             exit 1
           fi
-          echo "PASS: source archive and upstream-base have identical paths, file contents and symlink targets."
+          echo "PASS: source file contents, paths and symlinks match, modulo verified CRLF and empty-directory exceptions."
           echo "::endgroup::"
