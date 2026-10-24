@@ -63,7 +63,15 @@ git -C "$work/baseline" init -q -b upstream-base
 git -C "$work/baseline" config user.name "github-actions[bot]"
 git -C "$work/baseline" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 git -C "$work/baseline" config core.autocrlf false
-git -C "$work/baseline" add --all --force
+# The workflow token cannot write .github/workflows paths on GitHub.
+# Exclude ONLY those two upstream files from this first push. The steward
+# restores them through the connected GitHub API after the branch exists.
+# Do not interpret this intermediate branch as a verified pristine baseline.
+git -C "$work/baseline" add --all --force -- . ':(exclude).github/workflows/**'
+if git -C "$work/baseline" ls-files '.github/workflows/**' | grep -q .; then
+  echo "Unexpected workflow files staged by the Actions token" >&2
+  exit 1
+fi
 git -C "$work/baseline" commit -qm "Import pristine Mozilla Firefox $version source archive ($tag)"
 git -C "$work/baseline" fsck --no-reflogs
 git -C "$work/baseline" remote add origin "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git"
@@ -92,4 +100,4 @@ git commit -m "Import Firefox $version as Vulpra development base"
 git fsck --no-reflogs
 git push --porcelain origin HEAD:refs/heads/main
 echo "::endgroup::"
-echo "Source imported. Verify remote branch contents and build before marking browser working."
+echo "Source staged; source workflow files must be restored through GitHub API before upstream-base counts as pristine."
