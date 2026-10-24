@@ -41,7 +41,8 @@
         "Full-native Linux configuration (non-artifact, Vulpra app basename) passed: https://github.com/sguzman/vulpra/actions/runs/40126134453",
         "Release-like native configuration with --disable-tests confirmed: https://github.com/sguzman/vulpra/actions/runs/40126662777",
         "Native full build run 40126828007 terminated around 55-minute compilation timeout; compile succeeded through many C/C++ and Rust units before shutdown. No browser success credited.",
-        "Native size and elapsed-time reporting verified on mock browser package: https://github.com/sguzman/vulpra/actions/runs/40132561502 (no real browser measurements yet)"
+        "Native size and elapsed-time reporting verified on mock browser package: https://github.com/sguzman/vulpra/actions/runs/40132561502 (no real browser measurements yet)",
+        "Wayland Weston independent harness and early-exit detection passed: https://github.com/sguzman/vulpra/actions/runs/40133023153 (mock browser only)"
       ],
       "verified_preparatory_tasks": [
         {
@@ -73,6 +74,11 @@
           "id": "portable-build-metrics-mock",
           "percent": 100,
           "evidence": "https://github.com/sguzman/vulpra/actions/runs/40132561502"
+        },
+        {
+          "id": "wayland-compositor-test-harness",
+          "percent": 100,
+          "evidence": "https://github.com/sguzman/vulpra/actions/runs/40133023153"
         }
       ],
       "status_note": "One of five product-stage acceptance gates passed: full-native configure. Native compilation/runtime remain unverified.",
@@ -114,6 +120,7 @@
     "Full native build 40120428907 failed at native compilation with unavailable job logs at this check; failure cause undetermined. Rebranded build 40124841229 continues.",
     "Linux full-native configure passed 40126134453. M2 20% reflects one of five explicit gates; overall shipped/browser-functionality percentage remains zero.",
     "CI 40126662777 passed native configure with optional test binaries disabled; separate browser runtime tests remain required.",
-    "Build 40126828007 failed after SIGTERM/143 near explicitly configured 55-minute timeout (not a demonstrated compiler error). Removed premature timeout; enabled Mozilla sccache-action v0.0.11 with Firefox --with-ccache=sccache and GitHub cache backend for retry. This optimization is pending CI verification."
+    "Build 40126828007 failed after SIGTERM/143 near explicitly configured 55-minute timeout (not a demonstrated compiler error). Removed premature timeout; enabled Mozilla sccache-action v0.0.11 with Firefox --with-ccache=sccache and GitHub cache backend for retry. This optimization is pending CI verification.",
+    "Vulpra-maintained GitHub Actions workflows passed actionlint 1.7.12: https://github.com/sguzman/vulpra/actions/runs/40133272668. This is CI correctness evidence, not browser runtime evidence."
   ]
 }

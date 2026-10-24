@@ -21,7 +21,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 - [x] 🏷️ Configure independent Vulpra display strings and an upstream-supported app basename, retaining Gecko extension compatibility ID. Evidence: passing audit CI 40124841263. Actual compiled identity and icons remain unverified.
 - [x] 🧱 Configure full native Linux x86-64 build with the pinned source and documented GitHub Actions toolchain. Evidence: configure-only runs 40126134453 and 40126662777 (--disable-tests); no compiled binary yet.
 - [ ] 🛡️ Produce independently branded packaged browser with dedicated profile; no changes to installed Firefox Developer Edition. Mock-tested launcher and archive are only prerequisites, not final shipping evidence.
-- [ ] 🤖 Establish CI smoke testing for startup, browsing, navigation, extension functionality, security basics and Wayland behavior.
+- [ ] 🤖 Establish CI smoke testing for startup, browsing, navigation, extension functionality, security basics and Wayland behavior. Weston compositor harness verified in CI 40133023153 (mock executable only), and experimental real Wayland step connected in commit 8dc8aa7; actual browser behavior remains unverified.
 
 ### 📏 Phase 2 — Baseline
 - [ ] 📦 Capture source files/bytes, compiled size and build time. Source files/bytes measured in CI 40125494649; native-build JSON metric generator and archive test pass in CI 40132561502. Real executable and duration data remain pending native compilation.
