@@ -47,7 +47,7 @@ echo "Directory sizes:"
 du -sh "$work/source"
 echo "Candidate mach/license paths:"
 find "$work/source" -maxdepth 4 \( -name mach -o -name LICENSE -o -name Cargo.toml \) -print | sed -n '1,40p'
-for p in mach toolkit/content/license.html LICENSE Cargo.toml; do
+for p in mach toolkit/content/license.html.mako LICENSE Cargo.toml; do
   if [[ ! -f "$work/source/$p" ]]; then
     echo "Missing required file: $p" >&2
     exit 1
