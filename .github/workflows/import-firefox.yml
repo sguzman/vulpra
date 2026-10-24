@@ -24,7 +24,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check available runner storage
+      - name: Check available runner storage (diagnostic rerun)
         shell: bash
         run: df -h . /tmp
 
