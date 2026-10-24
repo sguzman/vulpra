@@ -50,11 +50,12 @@ echo "PASS: native CI explicitly selects unofficial upstream branding"
 
 # This is expected for the imported release and remains a release blocker:
 # unofficial ≠ independently branded. Verify rather than silently ignore it.
-if grep -Fxq 'MOZ_APP_DISPLAYNAME=Nightly' browser/branding/unofficial/configure.sh; then
-  echo "NOTICE: upstream unofficial display name is still Nightly. Do not ship as Vulpra yet."
-fi
-if grep -Fq -- '-brand-short-name = Nightly' browser/branding/unofficial/locales/en-US/brand.ftl; then
-  echo "NOTICE: upstream localization is still Nightly. Do not ship as Vulpra yet."
-fi
+grep -Fxq 'MOZ_APP_DISPLAYNAME=Vulpra' browser/branding/unofficial/configure.sh
+grep -Fxq 'ac_add_options --with-app-basename=Vulpra' ci/mozconfig-linux
+for key in shorter-name short-name shortcut-name full-name product-name; do
+  grep -Fxq -- "-brand-$key = Vulpra" browser/branding/unofficial/locales/en-US/brand.ftl
+done
+grep -Fxq -- '-vendor-short-name = Vulpra' browser/branding/unofficial/locales/en-US/brand.ftl
+echo "PASS: Vulpra app basename and displayed strings are independent of Nightly/Firefox"
 
-echo "PASS: technical license and branding inventory checks. Shipping/standalone-profile acceptance is NOT granted."
+echo "PASS: technical license and branding inventory checks. Unreviewed image assets, binary app ID and real-browser QA remain distribution blockers."

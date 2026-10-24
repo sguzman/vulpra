@@ -1,3 +1,6 @@
 # Vulpra CI: full native Firefox build, not artifact mode.
 mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux
 ac_add_options --with-branding=browser/branding/unofficial
+
+# Separate application.ini name; Gecko extension compatibility ID is unchanged.
+ac_add_options --with-app-basename=Vulpra

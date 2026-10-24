@@ -11,8 +11,8 @@ This is a **technical source and packaging audit**, not legal advice or a tradem
 | Third-party licenses | `toolkit/content/licenses/`, `other-licenses/`, `third_party/` | Preserve; license obligations depend on individual included components, not only the top-level MPL |
 | Browser license page | `toolkit/content/license.html.mako` and `LICENSES` collected into `licenses.json` | Preserve generation mechanism and the eventual packaged license page |
 | Unofficial build selection | `ci/mozconfig-linux` chooses `browser/branding/unofficial` | Avoid selecting official Mozilla branding in Vulpra builds |
-| **Unfinished independent branding** | `browser/branding/unofficial/configure.sh` still sets `MOZ_APP_DISPLAYNAME=Nightly` | **Release blocker:** change Vulpra's visible name and package identity only after source baseline compiles |
-| **Unfinished localized brand** | `browser/branding/unofficial/locales/en-US/brand.ftl` contains `Nightly`, `Firefox`, `Mozilla` | **Release blocker:** distinguish proper software attribution from brand claims and localize Vulpra name appropriately |
+| **Unfinished independent branding** | `browser/branding/unofficial/configure.sh` originally set `MOZ_APP_DISPLAYNAME=Nightly`; Vulpra now overrides this in `main` | **Partially addressed:** main uses the Vulpra display name and app basename. Still verify compiled metadata, launcher and packaged identity |
+| **Unfinished localized brand** | `browser/branding/unofficial/locales/en-US/brand.ftl` originally contained `Nightly`, `Firefox`, `Mozilla` | **Partially addressed:** main uses independent Vulpra Fluent display names; verify other visible references before release |
 | Assets and executable identity | `browser/branding/unofficial/` contains upstream icons; launcher/profile are not yet isolated | **Release blocker:** review icons/trademarks; create independently named launcher, executable, app ID, desktop file and dedicated profile |
 
 ## Policy for the first usable personal build
@@ -29,3 +29,7 @@ This is a **technical source and packaging audit**, not legal advice or a tradem
 `ci/audit-licenses-branding.sh` checks the root LICENSE against `upstream-base`, representative upstream per-file licenses, license-generation infrastructure, third-party inventory locations, and the CI's nonofficial branding selection. GitHub Actions runs it on changes to license/branding/configuration files. The check **does not prove comprehensive third-party license compliance** and explicitly flags the remaining release blockers.
 
 **Acceptance boundary:** This audit addresses the M1 source licensing/branding-plan task. It does **not** complete M2's independent binary, profile isolation, full compilation, or package distribution criteria.
+
+## 2026-10-24 — independent visible identity (pending compiled acceptance)
+
+The source's unofficial `configure.sh` and English Fluent brand strings now identify Vulpra. The Linux mozconfig explicitly uses upstream-supported `--with-app-basename=Vulpra`, intended to separate application.ini naming and system integration. This is source-level work, **not** proof that packaged UI or icons are independent. The Mozilla-defined Gecko application compatibility ID is deliberately unchanged until extension compatibility and migration behavior can be tested. Upstream icon assets, executable identity and isolated packaged application still require review and runtime evidence.
