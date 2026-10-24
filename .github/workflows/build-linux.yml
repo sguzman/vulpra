@@ -122,7 +122,7 @@ jobs:
           test -x "$appdir/firefox"
           grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
           mkdir -p "$tmp/home/.mozilla/firefox"
-          printf '[Profile0]\\nName=existing-firefox\\nPath=existing-profile\\n' > "$tmp/home/.mozilla/firefox/profiles.ini"
+          printf '[Profile0]\nName=existing-firefox\nPath=existing-profile\n' > "$tmp/home/.mozilla/firefox/profiles.ini"
           original_firefox_hash="$(sha256sum "$tmp/home/.mozilla/firefox/profiles.ini")"
           cat > "$tmp/smoke.html" <<'HTML'
           <!doctype html>
