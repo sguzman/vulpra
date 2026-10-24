@@ -175,6 +175,20 @@ jobs:
           test "$(sha256sum "$tmp/home/.mozilla/firefox/profiles.ini")" = "$original_firefox_hash"
           echo "PASS: packaged Vulpra started headlessly, rendered a screenshot, and used its isolated profile"
 
+      - name: Probe packaged Vulpra graphical Wayland startup (experimental)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y weston wayland-utils
+          work="$(mktemp -d)"
+          trap 'rm -rf -- "$work"' EXIT
+          tar -xf obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz -C "$work"
+          mapfile -d '' -t inis < <(find "$work" -maxdepth 4 -type f -name application.ini -print0)
+          [[ "${#inis[@]}" -eq 1 ]] || { echo "Expected one Vulpra application.ini" >&2; exit 1; }
+          appdir="$(dirname "${inis[0]}")"
+          VULPRA_WAYLAND_TEST_SECONDS=10 bash packaging/test-wayland.sh "$appdir"
+
       - name: Report native compiler cache and runner resources
         if: always()
         shell: bash
