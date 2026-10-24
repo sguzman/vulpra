@@ -70,13 +70,20 @@ jobs:
           ./mach package
           du -sh obj-vulpra-linux/dist
           find obj-vulpra-linux/dist -maxdepth 2 -type f -size +20M -print
+          test -s obj-vulpra-linux/dist/bin/application.ini
+          grep -E '^(Name|Vendor|Version)=' obj-vulpra-linux/dist/bin/application.ini
+          if grep -Fxq 'ac_add_options --with-app-basename=Vulpra' ci/mozconfig-linux; then
+            grep -Fxq 'Name=Vulpra' obj-vulpra-linux/dist/bin/application.ini
+            echo 'PASS: compiled package reports independent Vulpra application basename'
+          fi
+          find obj-vulpra-linux/dist -maxdepth 1 -type f -name '*.tar.*' -print | sort
 
       - name: Upload preliminary CI-only package
         uses: actions/upload-artifact@v4
         with:
           name: vulpra-1590b5-linux-baseline
           path: |
-            obj-vulpra-linux/dist/firefox*.tar.*
+            obj-vulpra-linux/dist/*.tar.*
           if-no-files-found: error
           retention-days: 7
 
