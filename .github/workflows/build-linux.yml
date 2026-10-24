@@ -81,6 +81,27 @@ jobs:
           # GitHub hosted runners allow jobs for up to six hours; the job
           # timeout above leaves time for packaging, smoke tests and diagnostics.
           start_epoch="$(date +%s)"
+          # The previous non-timeout run was force-terminated after ~38 minutes.
+          # Record bounded diagnostics periodically even if the runner dies
+          # before post-job steps can execute. Never print process command lines.
+          (
+            while :; do
+              printf '\n--- Vulpra resource heartbeat %s ---\n' "$(date -u +%FT%TZ)"
+              free -h
+              df -h . "$RUNNER_TEMP"
+              if [[ -f /sys/fs/cgroup/memory.current ]]; then
+                echo "cgroup memory.current: $(cat /sys/fs/cgroup/memory.current)"
+              fi
+              if [[ -f /sys/fs/cgroup/memory.events ]]; then
+                echo 'cgroup memory.events:'
+                cat /sys/fs/cgroup/memory.events
+              fi
+              ps -eo comm,rss --sort=-rss | head -n 8 || true
+              sleep 45
+            done
+          ) &
+          resource_monitor_pid=$!
+          trap 'kill "$resource_monitor_pid" 2>/dev/null || true' EXIT
           ./mach build 2>&1 | tee "$RUNNER_TEMP/vulpra-native-build.log"
           end_epoch="$(date +%s)"
           printf '%s\n' "$((end_epoch - start_epoch))" > "$RUNNER_TEMP/vulpra-build-seconds"

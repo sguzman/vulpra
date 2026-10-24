@@ -17,3 +17,9 @@ This was **not** evidence that Vulpra compiles successfully; no binary was packa
 - Kept `--disable-tests`, Vulpra app basename and the full-native (non-artifact) engine build.
 
 The first cache-enabled build may be slower due to its cold cache. No speedup or successful retry should be claimed until actual CI evidence exists. Do not change the percentage for the working-browser milestone on the basis of this remediation alone.
+
+## 2026-10-24: second SIGTERM without an explicit timeout
+
+[Native build 40131775964](https://github.com/sguzman/vulpra/actions/runs/40131775964) also ended with **runner shutdown / process exit 143** at 21:31:56 UTC, although the 55-minute process timeout was already removed. It was compiling `dom/cache` at 30:29 build-elapsed and did not report a compiler error. This disconfirms the previous assumption that the original 55-minute command timeout fully explained the shutdown. The run configured **four parallel jobs** based on the hosted runner's four cores / ~15.6 GiB RAM. Memory pressure is a **hypothesis**, not yet an observed OOM event; no kernel or cgroup OOM evidence was captured.
+
+A new experiment caps `MOZ_PARALLEL_BUILD=2` (upstream-supported mozconfig knob) to reduce peak simultaneous compiler usage. The native-build step now prints UTC resource heartbeats every 45 seconds: `free`, `df`, cgroup `memory.current` / `memory.events`, and top process command names and RSS. The monitor ends with the build step; it avoids process argument lists to reduce accidental disclosure. If another runner stops unexpectedly, examine these heartbeats before changing build options or citing any root cause. Do not mark the build gate passed until an actual native package runs.

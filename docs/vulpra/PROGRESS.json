@@ -121,6 +121,7 @@
     "Linux full-native configure passed 40126134453. M2 20% reflects one of five explicit gates; overall shipped/browser-functionality percentage remains zero.",
     "CI 40126662777 passed native configure with optional test binaries disabled; separate browser runtime tests remain required.",
     "Build 40126828007 failed after SIGTERM/143 near explicitly configured 55-minute timeout (not a demonstrated compiler error). Removed premature timeout; enabled Mozilla sccache-action v0.0.11 with Firefox --with-ccache=sccache and GitHub cache backend for retry. This optimization is pending CI verification.",
-    "Vulpra-maintained GitHub Actions workflows passed actionlint 1.7.12: https://github.com/sguzman/vulpra/actions/runs/40133272668. This is CI correctness evidence, not browser runtime evidence."
+    "Vulpra-maintained GitHub Actions workflows passed actionlint 1.7.12: https://github.com/sguzman/vulpra/actions/runs/40133272668. This is CI correctness evidence, not browser runtime evidence.",
+    "Build 40131775964 terminated by runner shutdown with exit 143 despite removal of 55-minute timeout; no compiler error/confirmed OOM. Added two-job concurrency experiment and 45-second resource monitoring for following run. M2 remains unchanged."
   ]
 }
