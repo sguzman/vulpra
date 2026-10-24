@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "project": "Vulpra",
+  "baseline_ref": "FIREFOX_159_0b5_RELEASE",
+  "baseline_commit": "0e324402e3e69b0b46e1d04452efe079c11a3794",
+  "measured_on": "2026-10-24",
+  "workflow_run": "https://github.com/sguzman/vulpra/actions/runs/40125494649",
+  "full_report_sha256": "f027ff50a4601be0a1f99160a8e7d4bf98c1ede38a7ecbe4fd7958000c78e85e",
+  "measurement": "Regular source-tree files in checked-out upstream-base; file lengths in bytes. Excludes directory overhead, symlinks, Git objects and compiled outputs.",
+  "files": 483770,
+  "bytes": 3633991406,
+  "top_directories": [
+    {
+      "name": "third_party",
+      "files": 54647,
+      "bytes": 942679171
+    },
+    {
+      "name": "testing",
+      "files": 201089,
+      "bytes": 776796490
+    },
+    {
+      "name": "dom",
+      "files": 32406,
+      "bytes": 271653539
+    },
+    {
+      "name": "security",
+      "files": 7357,
+      "bytes": 234319326
+    },
+    {
+      "name": "js",
+      "files": 72934,
+      "bytes": 220218929
+    },
+    {
+      "name": "toolkit",
+      "files": 11541,
+      "bytes": 173502732
+    },
+    {
+      "name": "intl",
+      "files": 8172,
+      "bytes": 172053735
+    },
+    {
+      "name": "mobile",
+      "files": 15570,
+      "bytes": 133583277
+    },
+    {
+      "name": "browser",
+      "files": 11649,
+      "bytes": 119068827
+    },
+    {
+      "name": "devtools",
+      "files": 9725,
+      "bytes": 95216242
+    },
+    {
+      "name": "layout",
+      "files": 24349,
+      "bytes": 71610307
+    },
+    {
+      "name": "gfx",
+      "files": 6829,
+      "bytes": 70432581
+    },
+    {
+      "name": "media",
+      "files": 3517,
+      "bytes": 66212230
+    },
+    {
+      "name": "taskcluster",
+      "files": 1267,
+      "bytes": 65479425
+    },
+    {
+      "name": "netwerk",
+      "files": 2521,
+      "bytes": 22586145
+    }
+  ],
+  "top_extensions": [
+    {
+      "name": "js",
+      "files": 157330,
+      "bytes": 541381979
+    },
+    {
+      "name": "png",
+      "files": 6085,
+      "bytes": 277820549
+    },
+    {
+      "name": "html",
+      "files": 112017,
+      "bytes": 240525947
+    },
+    {
+      "name": "rs",
+      "files": 15756,
+      "bytes": 223048891
+    },
+    {
+      "name": "h",
+      "files": 20455,
+      "bytes": 206232009
+    },
+    {
+      "name": "cpp",
+      "files": 9727,
+      "bytes": 193064699
+    },
+    {
+      "name": "json",
+      "files": 3413,
+      "bytes": 156438700
+    },
+    {
+      "name": "txt",
+      "files": 6468,
+      "bytes": 138868085
+    },
+    {
+      "name": "c",
+      "files": 4223,
+      "bytes": 138566427
+    },
+    {
+      "name": "py",
+      "files": 10983,
+      "bytes": 76657352
+    }
+  ]
+}
