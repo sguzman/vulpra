@@ -34,5 +34,9 @@ if [[ -e "$app_dir/vulpra" ]]; then
 fi
 install -m 0755 "$script_dir/vulpra" "$app_dir/vulpra"
 tar -cJf "$output" -C "$work" .
-sha256sum "$output" > "$output.sha256"
+# Store relative filename so the checksum survives artifact downloads/moves.
+(
+  cd -- "$(dirname -- "$output")"
+  sha256sum -- "$(basename -- "$output")" > "$(basename -- "$output").sha256"
+)
 printf 'stage: packaged isolated Vulpra launcher in %s\n' "$output"

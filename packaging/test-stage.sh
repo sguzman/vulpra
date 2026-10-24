@@ -15,6 +15,14 @@ tar -cJf "$work/moz.tar.xz" -C "$work/in" .
 bash "$here/stage.sh" "$work/moz.tar.xz" "$work/vulpra.tar.xz"
 [[ -s "$work/vulpra.tar.xz" && -s "$work/vulpra.tar.xz.sha256" ]]
 (cd "$work" && sha256sum --check vulpra.tar.xz.sha256)
+# Downloading the archive into a different directory must not invalidate SHA-256.
+mkdir -p "$work/download"
+cp "$work/vulpra.tar.xz" "$work/vulpra.tar.xz.sha256" "$work/download/"
+(cd "$work/download" && sha256sum --check vulpra.tar.xz.sha256)
+if grep -Fq "$work/" "$work/download/vulpra.tar.xz.sha256"; then
+  echo "Checksum leaks build-machine absolute path" >&2
+  exit 1
+fi
 mkdir "$work/unpack"
 tar -xf "$work/vulpra.tar.xz" -C "$work/unpack"
 [[ -x "$work/unpack/firefox/vulpra" ]]
