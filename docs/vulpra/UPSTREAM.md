@@ -7,7 +7,7 @@
 - Exact Git tag: `FIREFOX_159_0b5_RELEASE`
 - Verified tag target via GitHub API on 2026-10-24: `34ac0671eb25f31f8c56ace36e1c413dd471eb8d`
 - Release archive source: https://archive.mozilla.org/pub/firefox/releases/159.0b5/source/firefox-159.0b5.source.tar.xz
-- Archive digest: **not yet recorded**; populate only after verifying Mozilla's release checksum.
+- Archive digest (SHA-256): `9145b8811cbb77108cdfc797e9119b69074aac6491b0df1fccd2c998ce706eb9`; populate only after verifying Mozilla's release checksum.
 - Actual imported tree: **not yet imported**.
 
 ## Licensing

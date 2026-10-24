@@ -1,0 +1,37 @@
+[DEFAULT]
+tags = "addons"
+support-files = ["action_server.sjs"]
+head = "head.js"
+
+["browser_ActionsManager.js"]
+
+["browser_BaseAction.js"]
+
+["browser_CleanupManager.js"]
+
+["browser_ClientEnvironment.js"]
+skip-if = [
+  "verify-standalone",
+]
+
+["browser_EventEmitter.js"]
+
+["browser_Heartbeat.js"]
+
+["browser_LegacyHeartbeat.js"]
+
+["browser_LogManager.js"]
+
+["browser_Normandy.js"]
+
+["browser_NormandyMigrations.js"]
+
+["browser_RecipeRunner.js"]
+tags = "remote-settings"
+
+["browser_about_preferences.js"]
+
+["browser_about_studies.js"]
+https_first_disabled = true
+
+["browser_actions_ShowHeartbeatAction.js"]

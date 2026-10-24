@@ -1,0 +1,25 @@
+{
+  "include": ["*.sys.mjs", "content/*.mjs", "types/*.ts"],
+  "exclude": [
+    "content/tab-hover-preview.mjs",
+    "content/tab.mjs",
+    "content/tabgroup.mjs",
+    "content/tabs.mjs",
+    "content/tabsplitview.mjs",
+    "SmartTabGrouping.sys.mjs",
+    "TabsList.sys.mjs"
+  ],
+  "extends": "../../../tools/@types/tsconfig.json",
+  "compilerOptions": {
+    "checkJs": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "plugins": [
+      {
+        "transform": "../../../tools/ts/plugins/checkRootOnly.js",
+        "transformProgram": true
+      }
+    ]
+  }
+}
