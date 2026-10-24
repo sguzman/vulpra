@@ -12,7 +12,7 @@
 
 ## Licensing
 
-Mozilla's source-tree `LICENSE` directs readers to `toolkit/content/license.html`, which includes licensing terms applicable to individual files and third-party components. The imported tree must preserve that file, `LICENSE`, notices, `other-licenses` and per-file licenses. The Mozilla Firefox wordmark and logo are not granted by its code licenses.
+Mozilla's source-tree `LICENSE` refers to a generated `toolkit/content/license.html` license page. Its source template is `toolkit/content/license.html.mako`; the actual source tree must preserve that template, `toolkit/content/licenses`, `LICENSE`, notices, `other-licenses` and per-file licenses. The Mozilla Firefox wordmark and logo are not granted by its code licenses.
 
 The new repository was created with a template MIT license covering only appropriate originally authored Vulpra material before the import. Once the source import is complete, replace root `LICENSE` with Mozilla's upstream `LICENSE`. Do not pretend the old MIT template relicenses Mozilla code. Any unique Vulpra original material should be explicitly licensed and documented separately.
 
