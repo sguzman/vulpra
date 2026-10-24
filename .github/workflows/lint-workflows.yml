@@ -1,0 +1,37 @@
+name: Lint Vulpra GitHub Actions workflows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            .github/workflows
+      - name: Check Vulpra workflows and embedded shell
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: >-
+            -color
+            .github/workflows/build-linux.yml
+            .github/workflows/configure-linux.yml
+            .github/workflows/test-launcher.yml
+            .github/workflows/test-wayland-harness.yml
+            .github/workflows/audit-license-branding.yml
+            .github/workflows/verify-upstream.yml
+            .github/workflows/import-firefox.yml
+            .github/workflows/source-metrics.yml
+            .github/workflows/lint-workflows.yml
