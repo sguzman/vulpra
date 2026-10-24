@@ -24,11 +24,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check available runner storage (diagnostic rerun)
+      - name: Check available runner storage
         shell: bash
         run: df -h . /tmp
 
-      - name: Import source with corrected license-template check
+      - name: Import source with protected-workflow staging
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
