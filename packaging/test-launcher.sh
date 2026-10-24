@@ -13,6 +13,9 @@ printf '%s\n' "$@" > "$MOCK_ARGS_FILE"
 MOCK
 chmod +x "$temp/package/firefox"
 export HOME="$temp/home" XDG_DATA_HOME="$temp/data" MOCK_ARGS_FILE="$temp/args"
+mkdir -p "$HOME/.mozilla/firefox"
+printf '[Profile0]\nName=existing-firefox\nPath=existing-profile\n' > "$HOME/.mozilla/firefox/profiles.ini"
+original_hash="$(sha256sum "$HOME/.mozilla/firefox/profiles.ini")"
 "$temp/package/vulpra" "https://example.org/page" --headless
 mapfile -t args < "$MOCK_ARGS_FILE"
 [[ "${#args[@]}" -eq 6 ]]
@@ -23,7 +26,7 @@ mapfile -t args < "$MOCK_ARGS_FILE"
 [[ "${args[4]}" == 'https://example.org/page' ]]
 [[ "${args[5]}" == '--headless' ]]
 [[ -d "${args[3]}" && "$(stat -c '%a' "${args[3]}")" == 700 ]]
-[[ ! -e "$HOME/.mozilla" ]]
+[[ "$(sha256sum "$HOME/.mozilla/firefox/profiles.ini")" == "$original_hash" ]]
 for banned in -P --profile -profile=other --profile=/tmp/foo -ProfileManager; do
   if "$temp/package/vulpra" "$banned" > "$temp/stdout" 2> "$temp/stderr"; then
     echo "Unexpected profile escape acceptance: $banned" >&2

@@ -121,6 +121,9 @@ jobs:
           test -x "$appdir/vulpra"
           test -x "$appdir/firefox"
           grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
+          mkdir -p "$tmp/home/.mozilla/firefox"
+          printf '[Profile0]\\nName=existing-firefox\\nPath=existing-profile\\n' > "$tmp/home/.mozilla/firefox/profiles.ini"
+          original_firefox_hash="$(sha256sum "$tmp/home/.mozilla/firefox/profiles.ini")"
           cat > "$tmp/smoke.html" <<'HTML'
           <!doctype html>
           <html lang="en"><meta charset="utf-8">
@@ -134,7 +137,7 @@ jobs:
           test -s "$tmp/screenshot.png"
           file --mime-type "$tmp/screenshot.png" | grep -Fq 'image/png'
           test -d "$tmp/home/.local/share/vulpra/default"
-          test ! -e "$tmp/home/.mozilla"
+          test "$(sha256sum "$tmp/home/.mozilla/firefox/profiles.ini")" = "$original_firefox_hash"
           echo "PASS: packaged Vulpra started headlessly, rendered a screenshot, and used its isolated profile"
 
       - name: Upload preliminary CI-only package
