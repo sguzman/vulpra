@@ -2,8 +2,15 @@ name: Build Linux baseline
 
 on:
   push:
+    branches:
+      - main
     paths:
-      - .github/workflows/build-linux.yml
+      - '**'
+      - '!.github/**'
+      - '!docs/vulpra/**'
+      - '!README.md'
+      - '!AGENTS.md'
+      - '!scripts/import-firefox.sh'
   workflow_dispatch:
 
 permissions:
