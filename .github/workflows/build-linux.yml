@@ -84,7 +84,7 @@ jobs:
           fi
           bash packaging/stage.sh "${native_archives[0]}" obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz
           (cd obj-vulpra-linux/dist && sha256sum --check vulpra-1590b5-linux-ci-preview.tar.xz.sha256)
-          tar -tf obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz | grep -E '/vulpra
+          tar -tf obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz | grep -E '/vulpra$'
 
       - name: Upload preliminary CI-only package
         uses: actions/upload-artifact@v4
