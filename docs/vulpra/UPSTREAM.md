@@ -7,8 +7,13 @@
 - Exact Git tag: `FIREFOX_159_0b5_RELEASE`
 - Verified tag target via GitHub API on 2026-10-24: `34ac0671eb25f31f8c56ace36e1c413dd471eb8d`
 - Release archive source: https://archive.mozilla.org/pub/firefox/releases/159.0b5/source/firefox-159.0b5.source.tar.xz
-- Archive digest (SHA-256): `9145b8811cbb77108cdfc797e9119b69074aac6491b0df1fccd2c998ce706eb9`; populate only after verifying Mozilla's release checksum.
-- Actual imported tree: **not yet imported**.
+- Archive digest (SHA-256), verified against Mozilla's release SHA256SUMS in CI: `9145b8811cbb77108cdfc797e9119b69074aac6491b0df1fccd2c998ce706eb9`.
+- GitHub Actions source import: **passed**, [run 40119418469](https://github.com/sguzman/vulpra/actions/runs/40119418469).
+- Pristine snapshot initial import commit: `5cbd6ba4b6ba11caa1cefed9fe5e9be0fdaf2783` (root commit).
+- `upstream-base` head after restoring original Mozilla workflow files: `0e324402e3e69b0b46e1d04452efe079c11a3794`.
+- `main` integration commit: `58802537b337be6c1bf7a084f9ec51ab7f941a58` (contains a merge parent linking original Vulpra history to the source import root).
+- Source paths `mach`, `LICENSE`, `Cargo.toml` and license template checked in CI. `mach` and `LICENSE` independently checked on `main` via GitHub.
+- The source archive versus complete remote branch file-by-file equivalence check has **not yet run**. Do not equate the pinned release archive with the full upstream Git tree without verifying differences.
 
 ## Licensing
 

@@ -1,0 +1,79 @@
+name: Build Linux baseline
+
+on:
+  push:
+    paths:
+      - .github/workflows/build-linux.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vulpra-linux-build
+  cancel-in-progress: false
+
+jobs:
+  build-linux:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux
+      DEBIAN_FRONTEND: noninteractive
+      MOZ_HEADLESS: "1"
+    steps:
+      - name: Check out imported Firefox source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Preflight source, build config and runner resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f mach
+          test -f toolkit/content/license.html.mako
+          test -f ci/mozconfig-linux
+          test -f browser/branding/unofficial/configure.sh
+          uname -a
+          df -h .
+          free -h
+
+      - name: Bootstrap Firefox desktop native build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv python3-dev git curl make
+          ./mach --no-interactive bootstrap --application-choice browser
+
+      - name: Build full Linux browser (no prebuilt engine artifact mode)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach build
+
+      - name: Package baseline build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          du -sh obj-vulpra-linux/dist
+          find obj-vulpra-linux/dist -maxdepth 2 -type f -size +20M -print
+
+      - name: Upload preliminary CI-only package
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-1590b5-linux-baseline
+          path: |
+            obj-vulpra-linux/dist/firefox*.tar.*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Report resources
+        if: always()
+        shell: bash
+        run: |
+          df -h .
+          free -h

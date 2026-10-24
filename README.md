@@ -2,7 +2,7 @@
 
 **Vulpra** is a personal, Linux-first Firefox-derived browser project. It targets x86-64 Linux with native Wayland/Hyprland use. It is independent of Mozilla and is not an official Firefox product.
 
-> **Status:** repository bootstrap. No Firefox source has been imported, no browser has been built, and no Vulpra-specific bug fix has been verified.
+> **Status:** pinned Firefox 159.0b5 source imported successfully on GitHub; reproducible browser compilation and functional testing remain unverified. No Vulpra-specific browser fixes have been verified.
 
 ## Direction
 
@@ -22,7 +22,7 @@ Avoid deleting security foundations, extension support, essential web standards 
 - Tag target: `34ac0671eb25f31f8c56ace36e1c413dd471eb8d`
 - Release source: https://archive.mozilla.org/pub/firefox/releases/159.0b5/source/
 
-The `upstream-base` branch is intended to contain the unmodified source snapshot. `main` is the development branch. **Until those branches and the build are verified, no browser-completion claim is warranted.**
+The `upstream-base` branch contains the original release source snapshot with Mozilla's two original workflow files restored. `main` contains that source and Vulpra's own governance files. **A source import is not a working browser. The compiled build is still unverified.**
 
 ## Project records
 

@@ -13,9 +13,21 @@
     {
       "id": "M1",
       "name": "Reproducible source foundation",
-      "percent": 0,
+      "percent": 60,
       "status": "in-progress",
-      "evidence": []
+      "evidence": [
+        "Tag and SHA-256 verified: https://github.com/sguzman/vulpra/actions/runs/40119418469",
+        "Main imported and ancestry verified: https://github.com/sguzman/vulpra/commit/58802537b337be6c1bf7a084f9ec51ab7f941a58",
+        "Workflow import finished successfully: https://github.com/sguzman/vulpra/actions/runs/40119418469"
+      ],
+      "acceptance_gates": {
+        "passed": 3,
+        "total": 5,
+        "remaining": [
+          "Complete archive-to-upstream-base full tree check",
+          "Complete third-party licenses and branding audit"
+        ]
+      }
     },
     {
       "id": "M2",
@@ -40,9 +52,10 @@
     }
   ],
   "notes": [
-    "GitHub repository was initialized with MIT LICENSE only.",
-    "Upstream tag target checked via GitHub API.",
-    "No Firefox source has been imported, compiled or tested.",
-    "Percentages will change only with accepted implementation evidence; work that is only planned remains 0."
+    "Source import passed on GitHub Actions run 40119418469; source archive hash verified.",
+    "Original Mozilla .github/workflows/README and pr-handler.yml restored to upstream-base with matching blob SHAs.",
+    "main source ancestry includes pristine release root import commit; critical source/license paths verified.",
+    "No compiled Linux browser or actual behavior fix has been verified.",
+    "Overall product percentage remains zero until browser functionality is demonstrated."
   ]
 }
