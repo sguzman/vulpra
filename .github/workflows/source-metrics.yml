@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/source-metrics.yml
-      - tools/source-metrics.lua
+      - ci/source-metrics.lua
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
           path: inspector
           filter: blob:none
           sparse-checkout: |
-            tools
+            ci
       - name: Install Lua and verify source scope
         shell: bash
         run: |
@@ -38,7 +38,7 @@ jobs:
           sudo apt-get install -y -qq lua5.4
           test -f baseline/mach
           test -f baseline/LICENSE
-          test -f inspector/tools/source-metrics.lua
+          test -f inspector/ci/source-metrics.lua
           lua5.4 -v
       - name: Measure real file sizes on pristine upstream-base
         shell: bash
@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           find baseline -path 'baseline/.git' -prune -o -type f -printf '%s\t%P\0' |
-            lua5.4 inspector/tools/source-metrics.lua > source-metrics.json
+            lua5.4 inspector/ci/source-metrics.lua > source-metrics.json
           jq -e '.schema_version==1 and .files>100000 and .bytes>1000000000' source-metrics.json
           jq '{ref, files, bytes, largest_directories: (.top_level[:15]), largest_extensions: (.extensions[:15])}' source-metrics.json
           sha256sum source-metrics.json
