@@ -77,6 +77,32 @@ jobs:
             echo 'PASS: compiled package reports independent Vulpra application basename'
           fi
           find obj-vulpra-linux/dist -maxdepth 1 -type f -name '*.tar.*' -print | sort
+          mapfile -t native_archives < <(find obj-vulpra-linux/dist -maxdepth 1 -type f -name '*.tar.*' ! -name 'vulpra-*.tar.*' | sort)
+          if [[ "${#native_archives[@]}" -ne 1 ]]; then
+            echo "Expected exactly one Linux package archive, found ${#native_archives[@]}" >&2
+            exit 1
+          fi
+          bash packaging/stage.sh "${native_archives[0]}" obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz
+          (cd obj-vulpra-linux/dist && sha256sum --check vulpra-1590b5-linux-ci-preview.tar.xz.sha256)
+          tar -tf obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz | grep -E '/vulpra
+
+      - name: Upload preliminary CI-only package
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-1590b5-linux-ci-preview
+          path: |
+            obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz
+            obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Report resources
+        if: always()
+        shell: bash
+        run: |
+          df -h .
+          free -h
+
 
       - name: Upload preliminary CI-only package
         uses: actions/upload-artifact@v4
