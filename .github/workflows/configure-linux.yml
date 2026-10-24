@@ -1,0 +1,49 @@
+name: Verify Linux native configuration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/configure-linux.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-configure:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Checkout Vulpra Firefox source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Install and bootstrap Firefox native dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv python3-dev git curl make
+          ./mach --no-interactive bootstrap --application-choice browser
+      - name: Configure full native Linux build and verify app basename
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s ci/mozconfig-linux
+          grep -Fxq 'ac_add_options --with-app-basename=Vulpra' ci/mozconfig-linux
+          grep -Fxq 'ac_add_options --with-branding=browser/branding/unofficial' ci/mozconfig-linux
+          ./mach configure
+          test -s obj-vulpra-linux/config.status
+          grep -q 'Vulpra' obj-vulpra-linux/config.status
+          echo 'PASS: non-artifact Linux build configured with Vulpra basename.'
+      - name: Show resource usage
+        if: always()
+        shell: bash
+        run: |
+          df -h .
+          free -h
