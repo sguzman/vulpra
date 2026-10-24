@@ -61,7 +61,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./mach build 2>&1 | tee "$RUNNER_TEMP/vulpra-native-build.log"
+          # Bound compilation before runner termination so failure artifacts can upload.
+          timeout --signal=INT --kill-after=120s 55m ./mach build 2>&1 | tee "$RUNNER_TEMP/vulpra-native-build.log"
 
       - name: Preserve bounded native-build failure diagnostics
         if: failure()
