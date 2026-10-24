@@ -11,6 +11,8 @@ set -euo pipefail
 printf '%s\n' "$@" > "$ARGS_CAPTURE"
 MOCK
 chmod +x "$work/in/firefox/firefox"
+ln -s firefox "$work/in/firefox/browser-link"
+original_binary_sha="$(sha256sum "$work/in/firefox/firefox")"
 tar -cJf "$work/moz.tar.xz" -C "$work/in" .
 bash "$here/stage.sh" "$work/moz.tar.xz" "$work/vulpra.tar.xz"
 [[ -s "$work/vulpra.tar.xz" && -s "$work/vulpra.tar.xz.sha256" ]]
@@ -26,6 +28,11 @@ fi
 mkdir "$work/unpack"
 tar -xf "$work/vulpra.tar.xz" -C "$work/unpack"
 [[ -x "$work/unpack/firefox/vulpra" ]]
+# Staging must add only Vulpra's launcher, not alter Firefox engine bits.
+test "$(sha256sum "$work/unpack/firefox/firefox")" = "$original_binary_sha"
+cmp -- "$work/in/firefox/application.ini" "$work/unpack/firefox/application.ini"
+[[ -L "$work/unpack/firefox/browser-link" ]]
+[[ "$(readlink "$work/unpack/firefox/browser-link")" == firefox ]]
 export ARGS_CAPTURE="$work/args" HOME="$work/user"
 mkdir "$HOME"
 "$work/unpack/firefox/vulpra" https://example.org
@@ -33,6 +40,12 @@ mapfile -t args < "$ARGS_CAPTURE"
 [[ "${args[0]}" == --no-remote && "${args[1]}" == --new-instance && "${args[2]}" == --profile ]]
 [[ "${args[3]}" == "$HOME/.local/share/vulpra/default" && "${args[4]}" == https://example.org ]]
 [[ ! -e "$HOME/.mozilla" ]]
+# Refuse a package which already contains a Vulpra launch wrapper.
+touch "$work/in/firefox/vulpra"
+tar -cJf "$work/already-vulpra.tar.xz" -C "$work/in" .
+if bash "$here/stage.sh" "$work/already-vulpra.tar.xz" "$work/repack.tar.xz" >/dev/null 2>&1; then
+  echo "Unexpected overwrite of existing Vulpra executable" >&2; exit 1
+fi
 if bash "$here/stage.sh" "$work/moz.tar.xz" "$work/moz.tar.xz" >/dev/null 2>&1; then
   printf 'stage: incorrectly accepted same input and output\n' >&2; exit 1
 fi
