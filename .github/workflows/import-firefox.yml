@@ -1,0 +1,42 @@
+name: Import pinned Firefox source
+
+on:
+  push:
+    paths:
+      - .github/workflows/import-firefox.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vulpra-source-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out Vulpra repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check available runner storage
+        shell: bash
+        run: df -h . /tmp
+
+      - name: Import pinned upstream source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/import-firefox.sh
+
+      - name: Summarize Git refs
+        if: always()
+        shell: bash
+        run: |
+          git ls-remote --heads origin main upstream-base
+          df -h . /tmp
