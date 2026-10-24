@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: df -h . /tmp
 
-      - name: Import pinned upstream source
+      - name: Import source with corrected license-template check
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
