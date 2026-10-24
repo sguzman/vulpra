@@ -9,6 +9,7 @@ on:
       - '!.github/**'
       - '!docs/vulpra/**'
       - '!ci/**'
+      - '!packaging/**'
       - '!README.md'
       - '!AGENTS.md'
       - '!scripts/import-firefox.sh'

@@ -1,0 +1,29 @@
+name: Test isolated Vulpra launcher
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/test-launcher.yml
+      - packaging/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  launch:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            packaging
+      - name: Check launcher syntax
+        shell: bash
+        run: |
+          bash -n packaging/vulpra
+          bash -n packaging/test-launcher.sh
+      - name: Run launcher mock integration test
+        shell: bash
+        run: bash packaging/test-launcher.sh

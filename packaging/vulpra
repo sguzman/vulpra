@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Vulpra launcher: isolate all invocations from installed Firefox profiles.
+set -euo pipefail
+umask 077
+if [[ -z "${HOME:-}" ]]; then
+  printf 'vulpra: HOME must be set\n' >&2
+  exit 2
+fi
+for argument in "$@"; do
+  case "$argument" in
+    -P|-P?*|-p|-p?*|--profile|--profile=*|-profile|-profile=*|--ProfileManager|-ProfileManager|--profilemanager|-profilemanager)
+      printf 'vulpra: profile-selection arguments are not supported by the isolated launcher: %s\n' "$argument" >&2
+      exit 2
+      ;;
+  esac
+done
+package_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+browser="$package_dir/firefox"
+if [[ ! -x "$browser" ]]; then
+  printf 'vulpra: packaged browser is not executable: %s\n' "$browser" >&2
+  exit 1
+fi
+user_data="${XDG_DATA_HOME:-$HOME/.local/share}"
+if [[ "$user_data" != /* ]]; then
+  printf 'vulpra: XDG_DATA_HOME must be an absolute path\n' >&2
+  exit 2
+fi
+profile_root="$user_data/vulpra"
+profile_dir="$profile_root/default"
+if [[ -L "$profile_root" || -L "$profile_dir" ]]; then
+  printf 'vulpra: refusing a symbolic link for the private profile directory\n' >&2
+  exit 2
+fi
+mkdir -p -m 0700 -- "$profile_root" "$profile_dir"
+chmod 0700 -- "$profile_root" "$profile_dir"
+exec "$browser" --no-remote --new-instance --profile "$profile_dir" "$@"
