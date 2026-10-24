@@ -1,0 +1,63 @@
+name: Test Wayland startup harness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/test-wayland-harness.yml
+      - packaging/test-wayland.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  headless-compositor-harness:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            packaging
+      - name: Install compositor and registry tools
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y weston wayland-utils
+      - name: Check script syntax and exercise independent harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n packaging/test-wayland.sh
+          temp="$(mktemp -d)"
+          trap 'rm -rf -- "$temp"' EXIT
+          mkdir -p "$temp/package"
+          cp packaging/vulpra "$temp/package/vulpra"
+          chmod +x "$temp/package/vulpra"
+          cat > "$temp/package/firefox" <<'MOCK'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+          sleep 30
+          MOCK
+          chmod +x "$temp/package/firefox"
+          VULPRA_WAYLAND_TEST_SECONDS=2 bash packaging/test-wayland.sh "$temp/package"
+      - name: Reject a browser which crashes on startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(mktemp -d)"
+          trap 'rm -rf -- "$temp"' EXIT
+          mkdir -p "$temp/package"
+          cp packaging/vulpra "$temp/package/vulpra"
+          chmod +x "$temp/package/vulpra"
+          printf '#!/bin/bash\nexit 19\n' > "$temp/package/firefox"
+          chmod +x "$temp/package/firefox"
+          if VULPRA_WAYLAND_TEST_SECONDS=1 bash packaging/test-wayland.sh "$temp/package"; then
+            echo 'Harness incorrectly accepted a crashing binary' >&2
+            exit 1
+          fi
+          echo 'PASS: failed startup was rejected'
