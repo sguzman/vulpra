@@ -8,6 +8,7 @@ on:
       - '**'
       - '!.github/**'
       - '!docs/vulpra/**'
+      - '!ci/**'
       - '!README.md'
       - '!AGENTS.md'
       - '!scripts/import-firefox.sh'

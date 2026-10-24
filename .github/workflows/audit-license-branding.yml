@@ -1,0 +1,33 @@
+name: Audit upstream licenses and branding
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/audit-license-branding.yml
+      - ci/audit-licenses-branding.sh
+      - ci/mozconfig-linux
+      - LICENSE
+      - browser/branding/**
+      - toolkit/content/license.html.mako
+      - docs/vulpra/LICENSING-BRANDING.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve immutable source baseline
+        shell: bash
+        run: git fetch --no-tags origin upstream-base:refs/remotes/origin/upstream-base
+      - name: Check upstream license integrity and branding safety gates
+        shell: bash
+        run: bash ci/audit-licenses-branding.sh
