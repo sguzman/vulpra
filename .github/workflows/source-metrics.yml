@@ -1,0 +1,59 @@
+name: Measure pristine Firefox source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/source-metrics.yml
+      - tools/source-metrics.lua
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout frozen Mozilla source
+        uses: actions/checkout@v4
+        with:
+          ref: upstream-base
+          path: baseline
+          fetch-depth: 1
+      - name: Checkout Vulpra inventory script
+        uses: actions/checkout@v4
+        with:
+          path: inspector
+          filter: blob:none
+          sparse-checkout: |
+            tools
+      - name: Install Lua and verify source scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.4
+          test -f baseline/mach
+          test -f baseline/LICENSE
+          test -f inspector/tools/source-metrics.lua
+          lua5.4 -v
+      - name: Measure real file sizes on pristine upstream-base
+        shell: bash
+        env:
+          VULPRA_SOURCE_REF: FIREFOX_159_0b5_RELEASE
+        run: |
+          set -euo pipefail
+          find baseline -path 'baseline/.git' -prune -o -type f -printf '%s\t%P\0' |
+            lua5.4 inspector/tools/source-metrics.lua > source-metrics.json
+          jq -e '.schema_version==1 and .files>100000 and .bytes>1000000000' source-metrics.json
+          jq '{ref, files, bytes, largest_directories: (.top_level[:15]), largest_extensions: (.extensions[:15])}' source-metrics.json
+          sha256sum source-metrics.json
+      - name: Save baseline measurement artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-1590b5-upstream-source-metrics
+          path: source-metrics.json
+          retention-days: 30
