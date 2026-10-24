@@ -91,6 +91,7 @@ jobs:
           grep -E '^(Name|Vendor|Version)=' obj-vulpra-linux/dist/bin/application.ini
           if grep -Fxq 'ac_add_options --with-app-basename=Vulpra' ci/mozconfig-linux; then
             grep -Fxq 'Name=Vulpra' obj-vulpra-linux/dist/bin/application.ini
+            grep -Fxq 'Vendor=Vulpra' obj-vulpra-linux/dist/bin/application.ini
             echo 'PASS: compiled package reports independent Vulpra application basename'
           fi
           find obj-vulpra-linux/dist -maxdepth 1 -type f -name '*.tar.*' -print | sort

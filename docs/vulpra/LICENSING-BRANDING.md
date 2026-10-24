@@ -33,3 +33,7 @@ This is a **technical source and packaging audit**, not legal advice or a tradem
 ## 2026-10-24 — independent visible identity (pending compiled acceptance)
 
 The source's unofficial `configure.sh` and English Fluent brand strings now identify Vulpra. The Linux mozconfig explicitly uses upstream-supported `--with-app-basename=Vulpra`, intended to separate application.ini naming and system integration. This is source-level work, **not** proof that packaged UI or icons are independent. The Mozilla-defined Gecko application compatibility ID is deliberately unchanged until extension compatibility and migration behavior can be tested. Upstream icon assets, executable identity and isolated packaged application still require review and runtime evidence.
+
+## Independent application vendor
+
+The Vulpra development branch changes Firefox desktop's `MOZ_APP_VENDOR` implication from `Mozilla` to `Vulpra`, alongside the application basename and displayed brand strings. CI now requires `Vendor=Vulpra` in the generated `application.ini` before considering the packaged identity verified. The Gecko application compatibility GUID is left unchanged pending an extension-compatibility audit: it is not a substitute for independent trademarks and logos. No Mozilla endorsement is claimed.

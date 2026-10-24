@@ -51,6 +51,7 @@ echo "PASS: native CI explicitly selects unofficial upstream branding"
 # This is expected for the imported release and remains a release blocker:
 # unofficial ≠ independently branded. Verify rather than silently ignore it.
 grep -Fxq 'MOZ_APP_DISPLAYNAME=Vulpra' browser/branding/unofficial/configure.sh
+grep -Fxq 'imply_option("MOZ_APP_VENDOR", "Vulpra")' browser/moz.configure
 grep -Fxq 'ac_add_options --with-app-basename=Vulpra' ci/mozconfig-linux
 for key in shorter-name short-name shortcut-name full-name product-name; do
   grep -Fxq -- "-brand-$key = Vulpra" browser/branding/unofficial/locales/en-US/brand.ftl
