@@ -86,6 +86,27 @@ jobs:
           (cd obj-vulpra-linux/dist && sha256sum --check vulpra-1590b5-linux-ci-preview.tar.xz.sha256)
           tar -tf obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz | grep -E '/vulpra$'
 
+      - name: Smoke-test isolated packaged Vulpra in headless mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf -- "$tmp"' EXIT
+          mkdir -p "$tmp/package" "$tmp/home"
+          tar -xf obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz -C "$tmp/package"
+          mapfile -d '' -t inis < <(find "$tmp/package" -maxdepth 4 -type f -name application.ini -print0)
+          [[ "${#inis[@]}" -eq 1 ]] || { echo "Missing/ambiguous packaged application.ini" >&2; exit 1; }
+          appdir="$(dirname "${inis[0]}")"
+          test -x "$appdir/vulpra"
+          test -x "$appdir/firefox"
+          grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
+          HOME="$tmp/home" XDG_DATA_HOME="$tmp/home/.local/share" MOZ_HEADLESS=1 \
+            timeout 120 "$appdir/vulpra" --headless --screenshot "$tmp/screenshot.png" about:blank
+          test -s "$tmp/screenshot.png"
+          test -d "$tmp/home/.local/share/vulpra/default"
+          test ! -e "$tmp/home/.mozilla"
+          echo "PASS: packaged Vulpra started headlessly, rendered a screenshot, and used its isolated profile"
+
       - name: Upload preliminary CI-only package
         uses: actions/upload-artifact@v4
         with:
