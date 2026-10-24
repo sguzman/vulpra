@@ -13,7 +13,7 @@
 - `upstream-base` head after restoring original Mozilla workflow files: `0e324402e3e69b0b46e1d04452efe079c11a3794`.
 - `main` integration commit: `58802537b337be6c1bf7a084f9ec51ab7f941a58` (contains a merge parent linking original Vulpra history to the source import root).
 - Source paths `mach`, `LICENSE`, `Cargo.toml` and license template checked in CI. `mach` and `LICENSE` independently checked on `main` via GitHub.
-- The source archive versus complete remote branch file-by-file equivalence check has **not yet run**. Do not equate the pinned release archive with the full upstream Git tree without verifying differences.
+- Full file/content/symlink equivalence check **passed** in [run 40120947358](https://github.com/sguzman/vulpra/actions/runs/40120947358), subject only to documented Git CRLF normalization and empty-directory handling.
 
 ## Licensing
 
@@ -24,6 +24,10 @@ The new repository was created with a template MIT license covering only appropr
 ## Update discipline
 
 For every future upstream revision: document its source tag and commit, review security advisories, produce a clean new upstream reference, compare and reapply personal patches, compile and test before shipping. Pinned release does not mean permanent abandonment of security updates.
+
+## License/branding audit
+
+Technical license integrity and upstream unofficial-branding selection checked in [run 40122675149](https://github.com/sguzman/vulpra/actions/runs/40122675149). This is not legal sign-off or clearance to distribute with Nightly/Firefox names; see [the dedicated audit](LICENSING-BRANDING.md).
 
 ## Full source-tree verification
 

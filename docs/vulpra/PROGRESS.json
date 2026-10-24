@@ -13,27 +13,26 @@
     {
       "id": "M1",
       "name": "Reproducible source foundation",
-      "percent": 80,
-      "status": "in-progress",
+      "percent": 100,
+      "status": "complete",
       "evidence": [
         "Tag and SHA-256 verified: https://github.com/sguzman/vulpra/actions/runs/40119418469",
         "Main imported and ancestry verified: https://github.com/sguzman/vulpra/commit/58802537b337be6c1bf7a084f9ec51ab7f941a58",
         "Workflow import finished successfully: https://github.com/sguzman/vulpra/actions/runs/40119418469",
-        "Full source archive equivalence: https://github.com/sguzman/vulpra/actions/runs/40120947358 (one verified CRLF normalization, empty cache directories)"
+        "Full source archive equivalence: https://github.com/sguzman/vulpra/actions/runs/40120947358 (one verified CRLF normalization, empty cache directories)",
+        "Source-licensing/branding technical audit passed: https://github.com/sguzman/vulpra/actions/runs/40122675149"
       ],
       "acceptance_gates": {
-        "passed": 4,
+        "passed": 5,
         "total": 5,
-        "remaining": [
-          "Complete third-party licenses and branding audit"
-        ]
+        "remaining": []
       }
     },
     {
       "id": "M2",
       "name": "Working Linux browser",
       "percent": 0,
-      "status": "blocked-on-M1",
+      "status": "in-progress",
       "evidence": []
     },
     {
@@ -57,6 +56,7 @@
     "main source ancestry includes pristine release root import commit; critical source/license paths verified.",
     "No compiled Linux browser or actual behavior fix has been verified.",
     "Overall product percentage remains zero until browser functionality is demonstrated.",
-    "Source tree verified against archive, modulo exact checked CRLF normalization for one upstream JSON file and empty cache folders unrepresentable in Git."
+    "Source tree verified against archive, modulo exact checked CRLF normalization for one upstream JSON file and empty cache folders unrepresentable in Git.",
+    "M1 source foundation complete: audit verifies source licensing inventory and flags unresolved Nightly branding as M2 shipping block; no distributable Vulpra binary claim."
   ]
 }

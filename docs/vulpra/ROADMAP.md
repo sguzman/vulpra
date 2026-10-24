@@ -11,7 +11,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 
 ### 🛠️ Phase 2 — Execution
 - [x] 🔧 Execute importer under GitHub Actions and resolve permission failures. Evidence: successful run 40119418469.
-- [ ] 🔐 Review licensing, notices and branding plan. Evidence: source audit and documented result.
+- [x] 🔐 Review licensing, notices and branding plan. Evidence: passed audit CI 40122675149 and docs/vulpra/LICENSING-BRANDING.md. Independent Vulpra branding remains an M2 release gate.
 
 ## 🐧 M2 — Working Linux browser
 
