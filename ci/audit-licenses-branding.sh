@@ -58,5 +58,17 @@ for key in shorter-name short-name shortcut-name full-name product-name; do
 done
 grep -Fxq -- '-vendor-short-name = Vulpra' browser/branding/unofficial/locales/en-US/brand.ftl
 echo "PASS: Vulpra app basename and displayed strings are independent of Nightly/Firefox"
+# Only point users to this fork's release surface, never Mozilla Nightly.
+for pref in app.update.url.manual app.update.url.details; do
+  grep -Fq "pref(\"$pref\", \"https://github.com/sguzman/vulpra/releases\");" browser/branding/unofficial/pref/firefox-branding.js || {
+    echo "Invalid Vulpra updater help link: $pref" >&2
+    exit 1
+  }
+done
+if grep -Fq 'nightly.mozilla.org' browser/branding/unofficial/pref/firefox-branding.js; then
+  echo 'Upstream Nightly update-link regression' >&2
+  exit 1
+fi
+echo "PASS: manual update help and detail links target Vulpra releases"
 
 echo "PASS: technical license and branding inventory checks. Unreviewed image assets, binary app ID and real-browser QA remain distribution blockers."

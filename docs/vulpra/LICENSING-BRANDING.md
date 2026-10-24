@@ -37,3 +37,7 @@ The source's unofficial `configure.sh` and English Fluent brand strings now iden
 ## Independent application vendor
 
 The Vulpra development branch changes Firefox desktop's `MOZ_APP_VENDOR` implication from `Mozilla` to `Vulpra`, alongside the application basename and displayed brand strings. CI now requires `Vendor=Vulpra` in the generated `application.ini` before considering the packaged identity verified. The Gecko application compatibility GUID is left unchanged pending an extension-compatibility audit: it is not a substitute for independent trademarks and logos. No Mozilla endorsement is claimed.
+
+## Vulpra update-help URLs
+
+The manual-update and update-details browser preferences now point to the Vulpra GitHub releases page rather than `nightly.mozilla.org`. Automated source audit verifies this. These two preferences are *help links*, not the automatic update service URL. No automatic security updater has been implemented or verified for Vulpra; packaged distribution remains gated on an independent, tested update policy and upstream security maintenance.
