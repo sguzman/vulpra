@@ -36,4 +36,13 @@ mapfile -t args < "$ARGS_CAPTURE"
 if bash "$here/stage.sh" "$work/moz.tar.xz" "$work/moz.tar.xz" >/dev/null 2>&1; then
   printf 'stage: incorrectly accepted same input and output\n' >&2; exit 1
 fi
+mkdir -p "$work/mock-dist/bin"
+cp "$work/in/firefox/application.ini" "$work/mock-dist/bin/"
+cp "$work/in/firefox/firefox" "$work/mock-dist/bin/"
+bash "$here/measure-build.sh" "$work/mock-dist" "$work/vulpra.tar.xz" 123 "$work/baseline.json"
+jq -e '.application == "Vulpra" and .native_build_seconds == 123 and .archive_bytes > 0 and .native_executable_bytes > 0' "$work/baseline.json" >/dev/null
+test "$(jq -r '.archive_sha256' "$work/baseline.json")" = "$(sha256sum "$work/vulpra.tar.xz" | cut -d' ' -f1)"
+if bash "$here/measure-build.sh" "$work/mock-dist" "$work/vulpra.tar.xz" arbitrary "$work/invalid.json" >/dev/null 2>&1; then
+  echo 'Invalid build duration unexpectedly accepted' >&2; exit 1
+fi
 echo 'PASS: staged package has a private-profile Vulpra launcher and verified archive checksum.'

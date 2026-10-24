@@ -26,6 +26,7 @@ jobs:
           bash -n packaging/test-launcher.sh
           bash -n packaging/stage.sh
           bash -n packaging/test-stage.sh
+          bash -n packaging/measure-build.sh
       - name: Run launcher mock integration test
         shell: bash
         run: |

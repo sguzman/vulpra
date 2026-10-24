@@ -70,7 +70,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y python3 python3-venv python3-dev git curl make
+          sudo apt-get install -y python3 python3-venv python3-dev git curl make jq
           ./mach --no-interactive bootstrap --application-choice browser
 
       - name: Build full Linux browser (no prebuilt engine artifact mode)
@@ -80,7 +80,10 @@ jobs:
           # No artificial 55-minute cutoff: Firefox needs a full native build.
           # GitHub hosted runners allow jobs for up to six hours; the job
           # timeout above leaves time for packaging, smoke tests and diagnostics.
+          start_epoch="$(date +%s)"
           ./mach build 2>&1 | tee "$RUNNER_TEMP/vulpra-native-build.log"
+          end_epoch="$(date +%s)"
+          printf '%s\n' "$((end_epoch - start_epoch))" > "$RUNNER_TEMP/vulpra-build-seconds"
 
       - name: Preserve bounded native-build failure diagnostics
         if: failure()
@@ -121,6 +124,11 @@ jobs:
           fi
           bash packaging/stage.sh "${native_archives[0]}" obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz
           (cd obj-vulpra-linux/dist && sha256sum --check vulpra-1590b5-linux-ci-preview.tar.xz.sha256)
+          bash packaging/measure-build.sh \
+            obj-vulpra-linux/dist \
+            obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz \
+            "$(cat "$RUNNER_TEMP/vulpra-build-seconds")" \
+            obj-vulpra-linux/dist/vulpra-build-metrics.json
           tar -tf obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz | grep -E '/vulpra$'
 
       - name: Upload preliminary CI-only package
@@ -130,6 +138,7 @@ jobs:
           path: |
             obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz
             obj-vulpra-linux/dist/vulpra-1590b5-linux-ci-preview.tar.xz.sha256
+            obj-vulpra-linux/dist/vulpra-build-metrics.json
           if-no-files-found: error
           retention-days: 7
 
