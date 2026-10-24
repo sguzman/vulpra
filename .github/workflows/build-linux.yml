@@ -61,7 +61,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./mach build
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/vulpra-native-build.log"
+
+      - name: Preserve bounded native-build failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/vulpra-native-build.log" ]]; then
+            tail -n 5000 "$RUNNER_TEMP/vulpra-native-build.log" > "$RUNNER_TEMP/vulpra-build-failure-tail.log"
+          fi
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-build-failure-tail
+          path: ${{ runner.temp }}/vulpra-build-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Package baseline build
         shell: bash
