@@ -1,0 +1,13 @@
+# Vulpra M3 isolated *experimental* native configure/build.
+# Never use the existing obj-vulpra-linux or overwrite the verified M2 package.
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux-normandy-experiment
+ac_add_options --with-branding=browser/branding/unofficial
+ac_add_options --with-app-basename=Vulpra
+ac_add_options --disable-tests
+ac_add_options --with-ccache=sccache
+mk_add_options MOZ_PARALLEL_BUILD=2
+
+# Opt-in: remove Normandy recipe-runner module from the generated browser.
+# This flag is local to this alternate build. A feature being disabled does
+# not count as accepted debloat until native runtime tests and size deltas pass.
+export VULPRA_EXPERIMENT_NO_NORMANDY=1
