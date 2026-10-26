@@ -57,6 +57,33 @@ with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
         assert "browser.runtime.sendMessage" in z.read("content.js").decode()
         assert "browser.storage.local" in z.read("background.js").decode()
     print("PASS: generated XPI includes content, background and storage interfaces")
+
+    # Reject delayed extension reinjection, not only immediate post-uninstall
+    # leftovers. Check multiple observations before accepting an uninstall.
+    no_proof = []
+    def absent():
+        no_proof.append(None)
+        return None
+    samples = m.verify_uninstall_stays_uninstalled(absent, seconds=0.03)
+    assert samples >= 2 and len(no_proof) == samples
+    pending = [None, token]
+    def late_injection():
+        return pending.pop(0)
+    try:
+        m.verify_uninstall_stays_uninstalled(late_injection, seconds=0.03)
+    except RuntimeError as error:
+        assert "still injected" in str(error)
+    else:
+        raise AssertionError("Delayed post-uninstall extension injection accepted")
+    try:
+        m.verify_uninstall_stays_uninstalled(absent, seconds=0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Zero-length uninstall observation accepted")
+    print("PASS: repeated uninstall guard detects delayed reinjection")
+
+
     repo = base / "repo"
     pkgdir = repo / ".git/vulpra-native-build/packages"
     pkgdir.mkdir(parents=True)
