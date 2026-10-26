@@ -176,7 +176,7 @@
         "toolkit/components/moz.build: includes normandy when MOZ_BUILD_APP=browser",
         "toolkit/moz.configure: data_reporting dependency"
       ],
-      "next": "Inspect hosted native candidate build outcome, packaged resource whitelist and headless/Wayland smoke. Run identical M2 navigation/WebExtension acceptance with isolated lean package and compare same-toolchain archive sizes before granting M3 progress.",
+      "next": "Observe pinned full native candidate job result. On success, gated packaged JavaScript navigation and WebExtension checks execute; on those passing, matched-source full-Normandy native package is compiled for reliable same-toolchain byte delta. No completion percentage until acceptance evidence.",
       "observed_actual_config": "MOZ_NORMANDY=\"1\" and MOZ_SERVICES_HEALTHREPORT=\"1\"",
       "experimental_compile_variant": {
         "feature": "Exclude Normandy recipe runner and studies frontend; retain Nimbus and shared Normandy helper imports",
@@ -206,7 +206,7 @@
         "measured_size_delta_bytes": null,
         "accepted_m3_removal": false,
         "risk": "Lean source passes isolated configure but has not passed actual native build/package/runtime. Nimbus still shares Normandy helper classes and NimbusBootstrap has not been runtime-accepted. Hosted Ubuntu size is not matched to target workstation Arch size.",
-        "next": "Inspect hosted native candidate build outcome, packaged resource whitelist and headless/Wayland smoke. Run identical M2 navigation/WebExtension acceptance with isolated lean package and compare same-toolchain archive sizes before granting M3 progress.",
+        "next": "Observe pinned full native candidate job result. On success, gated packaged JavaScript navigation and WebExtension checks execute; on those passing, matched-source full-Normandy native package is compiled for reliable same-toolchain byte delta. No completion percentage until acceptance evidence.",
         "full_repository_reference_audit": {
           "ci": "https://github.com/sguzman/vulpra/actions/runs/40382641564",
           "artifact": "m3-normandy-references",
@@ -215,7 +215,15 @@
           "evidence_issue": "https://github.com/sguzman/vulpra/issues/1",
           "status": "passed and manually inspected; source-reference audit only, dynamic usage and runtime proof separate"
         },
-        "native_candidate_ci_workflow": "https://github.com/sguzman/vulpra/actions/workflows/build-m3-normandy.yml"
+        "native_candidate_ci_workflow": "https://github.com/sguzman/vulpra/actions/workflows/build-m3-normandy.yml",
+        "runtime_acceptance_workflow": "https://github.com/sguzman/vulpra/actions/workflows/verify-m3-normandy-runtime.yml",
+        "matched_package_comparison_workflow": "https://github.com/sguzman/vulpra/actions/workflows/compare-m3-normandy-size.yml",
+        "matched_baseline_mozconfig": "ci/mozconfig-linux-m3-baseline",
+        "native_candidate_compiled": false,
+        "native_candidate_package_verified": false,
+        "actual_webextension_acceptance": false,
+        "actual_localhost_js_acceptance": false,
+        "matched_linux_size_delta_bytes": null
       }
     },
     {
