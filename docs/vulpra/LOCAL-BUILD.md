@@ -92,8 +92,10 @@ Requires `weston` and `wayland-info`. If either is unavailable the probe
 explicitly reports NOT VERIFIED before touching the archive. It chooses the
 latest verified `vulpra-local-*.tar.xz` package and its SHA-256 sidecar,
 extracts privately, runs Weston with a private Wayland socket, starts
-`vulpra-launch` with private HOME, waits for a real `xdg_surface` protocol
-interaction and checks the browser remains alive. Logs live under
+`vulpra-launch` with private HOME, checks for actual Wayland buffer attachment and frame commit in the client
+protocol log (`wl_surface#13` on modern libwayland, as well as `@` object-ID
+formatting), and checks the browser remains alive. Mere process uptime is not
+accepted as a graphical test. Logs live under
 `.git/vulpra-native-build/`. `Ctrl+C` cleans up child processes and the
 temporary extracted archive. This still does not prove navigation,
 extensions, security or visual accuracy.
