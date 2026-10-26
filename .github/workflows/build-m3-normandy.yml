@@ -1,0 +1,259 @@
+name: M3 Build Isolated Normandy-Free Linux Candidate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-m3-normandy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: vulpra-normandy-native-candidate
+  cancel-in-progress: false
+
+jobs:
+  native-candidate:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-normandy-experiment
+      DEBIAN_FRONTEND: noninteractive
+      MOZ_HEADLESS: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+    steps:
+      - name: Check out pinned full Firefox source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Prepare Mozilla compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Export Actions cache backend credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Bootstrap Linux native toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv python3-dev git curl make jq weston wayland-utils
+          ./mach --no-interactive bootstrap --application-choice browser
+
+      - name: Configure isolated Normandy-free GTK target
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq 'export VULPRA_EXPERIMENT_NO_NORMANDY=1' "$MOZCONFIG"
+          grep -Fxq 'mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux-normandy-experiment' "$MOZCONFIG"
+          ./mach configure
+          test -s obj-vulpra-linux-normandy-experiment/config.status
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("obj-vulpra-linux-normandy-experiment/config.statusd/substs")
+          def flag(key):
+              p=root/key
+              return json.loads(p.read_text()) if p.exists() else None
+          assert flag("MOZ_NORMANDY") in (None, False, 0), flag("MOZ_NORMANDY")
+          assert flag("MOZ_WIDGET_TOOLKIT") == "gtk"
+          assert flag("MOZ_DEVTOOLS") == "all"
+          for key in ("MOZ_SANDBOX", "MOZ_WAYLAND", "MOZ_SERVICES_SYNC"):
+              assert str(flag(key)) in ("1", "True"), (key, flag(key))
+          print("PASS: opt-in GTK configure excludes Normandy client and preserves protected flags")
+          PY
+
+      - name: Compile full isolated native variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          start="$(date +%s)"
+          (
+            while :; do
+              echo "--- Native-build resources $(date -u +%FT%TZ) ---"
+              free -h
+              df -h .
+              if [[ -r /sys/fs/cgroup/memory.events ]]; then
+                cat /sys/fs/cgroup/memory.events
+              fi
+              sleep 90
+            done
+          ) &
+          monitor=$!
+          trap 'kill "$monitor" 2>/dev/null || true' EXIT
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-native-build.log"
+          echo "$(( $(date +%s) - start ))" > "$RUNNER_TEMP/m3-build-seconds.txt"
+          echo "PASS: real native compilation exited successfully"
+
+      - name: Package and independently stage the alternate browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist=obj-vulpra-linux-normandy-experiment/dist
+          mapfile -d '' -t archives < <(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print0)
+          if [[ "${#archives[@]}" -ne 1 ]]; then
+            echo "Expected exactly one native Linux tar.xz, found ${#archives[@]}" >&2
+            exit 1
+          fi
+          bash packaging/stage.sh "${archives[0]}" "$RUNNER_TEMP/vulpra-normandy-candidate.tar.xz"
+          (cd "$RUNNER_TEMP" && sha256sum -c vulpra-normandy-candidate.tar.xz.sha256)
+          echo "PASS: separately staged checksum-verified experiment"
+
+      - name: Verify physical package contents and omitted Normandy runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import io, json, os, tarfile, zipfile
+          from hashlib import sha256
+          from pathlib import Path
+          archive=Path(os.environ["RUNNER_TEMP"])/"vulpra-normandy-candidate.tar.xz"
+          digest=sha256(archive.read_bytes()).hexdigest()
+          entries=set()
+          jars=0
+          with tarfile.open(archive, "r:xz") as tf:
+              for member in tf:
+                  if member.isfile() and member.name.endswith("/omni.ja"):
+                      jars += 1
+                      with zipfile.ZipFile(io.BytesIO(tf.extractfile(member).read())) as jar:
+                          entries.update(jar.namelist())
+          if jars < 2:
+              raise RuntimeError(f"Expected browser/toolkit omni.ja, saw {jars}")
+          required=("res/normandy/lib/ClientEnvironment.sys.mjs",
+                    "res/normandy/lib/NormandyUtils.sys.mjs",
+                    "res/normandy/lib/NormandyApi.sys.mjs",
+                    "res/normandy/schemas/LegacyHeartbeat.schema.json",
+                    "NimbusBootstrap.sys.mjs")
+          forbidden=("res/normandy/Normandy.sys.mjs",
+                     "res/normandy/lib/RecipeRunner.sys.mjs",
+                     "res/normandy/content/about-studies/about-studies.html",
+                     "res/normandy/content/ShieldFrameParent.sys.mjs")
+          missing=[name for name in required if not any(path.endswith(name) for path in entries)]
+          present=[name for name in forbidden if any(path.endswith(name) for path in entries)]
+          if missing or present:
+              raise RuntimeError(f"Package resource mismatch, missing={missing}, forbidden={present}")
+          info={"schema_version":1,"source_commit":os.environ["GITHUB_SHA"],
+                "sha256":digest,"compressed_bytes":archive.stat().st_size,
+                "omni_jar_count":jars,"required_resource_matches":list(required),
+                "forbidden_resource_absent":list(forbidden),
+                "scope":"CI candidate archive only; NOT comparable with local Arch baseline",
+                "remaining":"Full native Wayland/JS/WebExtension regression and same-toolchain size comparison"}
+          path=Path(os.environ["RUNNER_TEMP"])/"m3-normandy-package.json"
+          path.write_text(json.dumps(info,indent=2)+"\n")
+          print(json.dumps(info,indent=2))
+          print("PASS: lean package retains shared modules and omits recipe runner")
+          PY
+
+      - name: Isolated packaged Vulpra headless smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -p "$work/package" "$work/home/.mozilla/firefox"
+          printf 'Firefox sentinel must survive\n' > "$work/home/.mozilla/firefox/profiles.ini"
+          baseline="$(sha256sum "$work/home/.mozilla/firefox/profiles.ini")"
+          tar -xf "$RUNNER_TEMP/vulpra-normandy-candidate.tar.xz" -C "$work/package"
+          mapfile -d '' -t inis < <(find "$work/package" -maxdepth 5 -type f -name application.ini -print0)
+          [[ "${#inis[@]}" -eq 1 ]] || { echo "Ambiguous package application.ini" >&2; exit 1; }
+          appdir="$(dirname "${inis[0]}")"
+          grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
+          test -x "$appdir/vulpra"
+          echo '<!doctype html><title>Vulpra M3 smoke</title><h1>Local page</h1><script>document.querySelector("h1").textContent="JS executed";</script>' > "$work/check.html"
+          HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" MOZ_HEADLESS=1 \
+            timeout 120 "$appdir/vulpra" --headless --screenshot "$work/screenshot.png" "file://$work/check.html"
+          test -s "$work/screenshot.png"
+          file --mime-type "$work/screenshot.png" | grep -Fq 'image/png'
+          test "$(sha256sum "$work/home/.mozilla/firefox/profiles.ini")" = "$baseline"
+          echo "PASS: experimental package started, rendered PNG and preserved Firefox profile"
+          echo "$appdir" > "$RUNNER_TEMP/m3-unpacked-appdir"
+          # Keep the extracted browser available for the following Weston probe.
+          mv "$work/package" "$RUNNER_TEMP/m3-normandy-unpacked"
+
+      - name: Probe packaged Wayland session in private Weston
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' -t inis < <(find "$RUNNER_TEMP/m3-normandy-unpacked" -maxdepth 5 -type f -name application.ini -print0)
+          [[ "${#inis[@]}" -eq 1 ]]
+          bash packaging/test-wayland.sh "$(dirname "${inis[0]}")"
+          echo "PASS: isolated Weston window-lifecycle smoke (not full UI acceptance)"
+
+      - name: Preserve candidate and machine-readable package report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-m3-normandy-linux-candidate
+          path: |
+            ${{ runner.temp }}/vulpra-normandy-candidate.tar.xz
+            ${{ runner.temp }}/vulpra-normandy-candidate.tar.xz.sha256
+            ${{ runner.temp }}/m3-normandy-package.json
+            ${{ runner.temp }}/m3-build-seconds.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Save bounded native compilation diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/m3-native-build.log" ]]; then
+            tail -n 4000 "$RUNNER_TEMP/m3-native-build.log" > "$RUNNER_TEMP/m3-native-build-failure-tail.log"
+          fi
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-m3-native-build-diagnostics
+          path: ${{ runner.temp }}/m3-native-build-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Record CI result on the M3 evidence issue
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VULPRA_JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          {
+            printf '## M3 Normandy native variant CI\n\n'
+            printf 'Commit: `%s`\n' "$GITHUB_SHA"
+            printf 'Run: https://github.com/sguzman/vulpra/actions/runs/%s\n' "$GITHUB_RUN_ID"
+            printf 'Result: **%s**\n\n' "$VULPRA_JOB_STATUS"
+            if [[ -s "$RUNNER_TEMP/m3-normandy-package.json" ]]; then
+              python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          d=json.loads((Path(os.environ["RUNNER_TEMP"])/"m3-normandy-package.json").read_text())
+          print(f"CI candidate tarball: {d['compressed_bytes']} bytes")
+          print("Required shared resources present and former runner resources absent.")
+          PY
+            else
+              echo "No checksum-verified variant package report: do not claim a successful debloat."
+            fi
+            echo
+            echo "A hosted Ubuntu build is not a same-toolchain comparison to the local Arch baseline."
+            echo "Do not credit M3 without full M2 runtime acceptance and measured matched-toolchain savings."
+          } > "$RUNNER_TEMP/m3-native-summary.md"
+          gh issue comment 1 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/m3-native-summary.md"
+
+      - name: Report resources
+        if: always()
+        run: |
+          free -h
+          df -h .
