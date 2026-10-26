@@ -161,6 +161,31 @@ as Sync and the DevTools client. Even an option that reports `false` may
 leave runtime code in `libxul` or `omni.ja`; use package content and
 before/after native tests to prove a real reduction.
 
+## Actual M2 package baseline (workstation, 2026-10-26 12:28 local)
+
+The real native package census ran successfully after the independent SHA-256
+sidecar verification (report in the private workstation Git metadata):
+
+| Metric | Verified measurement | Meaning |
+| --- | ---: | --- |
+| Compressed Vulpra tar.xz | **84,044,920 bytes** | Real shipped archive before debloating |
+| Sum of regular-file tar member sizes | **324,566,909 bytes** | Logical bytes inside tar, not allocated disk space |
+| Resource JARs (`omni.ja`) located | **2** | Candidate indexes for targeted bundled-feature investigation |
+| Source Git blob bytes | 3,633,358,256 bytes | Source-only census, **not** package size |
+
+The SHA-256 and full per-member/omni index reside in
+`.git/vulpra-debloat/m3-package-footprint.json` and
+`.git/vulpra-debloat/m3-package-footprint.md`. The uploaded terminal output
+shows successful checksum validation and the aggregates above; it **does
+not show** any per-feature path hints, exact libxul bytes, or resource sizes.
+Do not manufacture numeric savings for Sync, Normandy, DevTools, or GenAI.
+
+This 84,044,920-byte compressed archive is the **pre-removal baseline**
+for any later same-target native build. Neither source-only pruning nor a
+configure-only test earns package-size credit. A meaningful reduction
+requires another independently staged archive, passing M2 functional tests
+and a comparable size measurement.
+
 ## Actual native configuration results (workstation, 2026-10-26 12:14 local)
 
 The user ran the no-rebuild configuration probe on the *real original object
