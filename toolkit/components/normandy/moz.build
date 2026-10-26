@@ -5,12 +5,9 @@
 with Files("**"):
     BUG_COMPONENT = ("Firefox", "Normandy Client")
 
-# The experimental Linux variant retains only shared Nimbus/targeting helpers.
-# Normal browser builds continue to package the full upstream Normandy client.
-if CONFIG["MOZ_NORMANDY"]:
-    JAR_MANIFESTS += ["jar.mn"]
-else:
-    JAR_MANIFESTS += ["vulpra-shared.jar.mn"]
+# The original jar.mn preprocesses full Normandy for standard builds and
+# only shared helpers for the opt-in no-Normandy build.
+JAR_MANIFESTS += ["jar.mn"]
 
 TESTING_JS_MODULES += [
     "test/NormandyTestUtils.sys.mjs",
