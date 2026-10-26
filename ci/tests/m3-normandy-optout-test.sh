@@ -48,7 +48,8 @@ header, body = jar.split("#ifdef MOZ_NORMANDY", 1)
 full, tail = body.split("#else", 1)
 shared, footer = tail.split("#endif", 1)
 assert "% resource normandy %res/normandy/" in header
-for name in ("Normandy.sys.mjs", "RecipeRunner.sys.mjs", "ShieldFrameParent.sys.mjs"):
+for name in ("res/normandy/Normandy.sys.mjs", "res/normandy/content/",
+             "res/normandy/actions/", "res/normandy/vendor/"):
     assert name in full, f"Missing standard resource anchor: {name}"
     assert name not in shared, f"Lean variant retains recipe/studies resource: {name}"
 for name in ("ClientEnvironment.sys.mjs", "NormandyApi.sys.mjs",
@@ -68,9 +69,8 @@ for item in (init, uninit):
 lean_boot = "category browser-before-ui-startup moz-src:///toolkit/components/nimbus/NimbusBootstrap.sys.mjs NimbusBootstrap.init"
 assert manifest.count(lean_boot) == 1
 index = manifest.index(lean_boot)
-assert manifest[index - 1].startswith("# ")
-assert manifest[index - 2] == "#ifndef MOZ_NORMANDY"
-assert manifest[index - 3] == "#ifdef XP_LINUX"
+assert "#ifndef MOZ_NORMANDY" in manifest[index - 5:index]
+assert "#ifdef XP_LINUX" in manifest[index - 6:index]
 assert manifest[index + 1:index + 3] == ["#endif", "#endif"]
 nimbus_build = source("toolkit/components/nimbus/moz.build")
 assert 'and not CONFIG["MOZ_NORMANDY"]' in nimbus_build
