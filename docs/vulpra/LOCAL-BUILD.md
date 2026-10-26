@@ -177,27 +177,37 @@ Rust-only browser.
 
 ## Safe synchronization after the first workstation build
 
-**Do not assume a successful build or a read-only source inventory updated
-Git.** As of 2026-10-26 GitHub `main` was 79 commits ahead, zero behind the
-last-confirmed build-tested local commit `ee223921`. This means it is a
-fast-forward history **if the workstation still points at that commit**, not
-that the working tree is clean.
+The workstation status on 2026-10-26 confirmed `main` at
+`ee22392142889ed2d8f7d3953332901cafd964ef` with **exactly two dirty
+tracked files**: `python/mozbuild/mozbuild/frontend/emitter.py` and
+`python/mozbuild/mozbuild/testing.py`. Both are native-build patches that
+are also changed on remote `main`. A blind `git pull` risks a worktree
+overwrite refusal even though GitHub history is fast-forward-compatible.
 
-Before any merge/pull, inspect local state from inside the workstation repo:
+Use the tested, standalone, **one-time** guarded source synchronization:
 
 ```fish
-cd ~/Code/Apps/vulpra
-git status --short --branch
-git rev-parse HEAD
-git config --bool core.sparseCheckout
+curl -fL --retry 20 --retry-all-errors -o ~/vulpra-sync-local-safe.sh https://raw.githubusercontent.com/sguzman/vulpra/main/ci/sync-local-safe.sh
+and bash ~/vulpra-sync-local-safe.sh
 ```
 
-A status containing modifications (including local build-system patches),
-untracked conflicts or an unexpected branch needs review before updating.
-Never discard working changes, run `git reset --hard`, or delete the object
-directory just to sync. After checking the status, use **`git pull --ff-only`**
-rather than an implicit merge or rebase when a clean, complete fast-forward is
-confirmed. A fast-forward updates source history; it does not retroactively
-certify the new HEAD's compiled runtime. Keep the verified native tarball and
-its acceptance evidence intact until another build is tested.
+The runner validates origin, `main`, non-sparse checkout, no staged/untracked
+or unrelated edits, then fetches remote `main` without modifying source files.
+It checks that each local build patch **byte-for-byte matches the fetched
+remote content**. If a difference exists it stops before changing any source.
+If all checks pass, the original files and binary patch are backed up under
+`.git/vulpra-native-build/sync-backups/`. Only the two proven-matching local
+modifications are temporarily restored to their prior checkout versions,
+followed by `git merge --ff-only`, then exact bytes are reverified against
+the original files. A failed merge restores the source copies.
 
+It never runs `git reset --hard`, a rebase, a full build or a package
+installation, and never deletes the known-good native artifacts. Synthetic
+success, mismatch, unrelated-dirty-worktree and later fast-forward regressions
+passed https://github.com/sguzman/vulpra/actions/runs/40369168618.
+
+**After the script reports PASS**, ordinary `git pull --ff-only` can be
+used for future clean fast-forwards. The existing compiled Vulpra tarball and
+runtime evidence are still tied to the original build-tested commit;
+fast-forwarding *source* does not certify a rebuilt binary or permit
+unverified source removal.
