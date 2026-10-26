@@ -1,0 +1,272 @@
+name: M3 Compare Matched Normandy Packages
+
+on:
+  workflow_run:
+    workflows: ["M3 Verify Native Candidate Runtime"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: vulpra-m3-size-comparison
+  cancel-in-progress: false
+
+jobs:
+  paired-package-comparison:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      MOZ_HEADLESS: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+    steps:
+      - name: Download checksum-verified lean package from successful M3 runtime run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNTIME_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/lean"
+          gh run download "$RUNTIME_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-runtime-evidence --dir "$RUNNER_TEMP/lean"
+          mapfile -d '' -t archives < <(find "$RUNNER_TEMP/lean" -type f -name 'vulpra-local-m3-normandy-ci.tar.xz' -print0)
+          mapfile -d '' -t reports < <(find "$RUNNER_TEMP/lean" -type f -name 'm3-normandy-package.json' -print0)
+          [[ "${#archives[@]}" -eq 1 && "${#reports[@]}" -eq 1 ]] || {
+            echo "Missing/ambiguous saved lean package and source metadata" >&2; exit 1;
+          }
+          cp "${archives[0]}" "$RUNNER_TEMP/lean-package.tar.xz"
+          cp "${reports[0]}" "$RUNNER_TEMP/lean-metadata.json"
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          report=json.loads((root/"lean-metadata.json").read_text())
+          archive=root/"lean-package.tar.xz"
+          digest=hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert digest==report["sha256"], (digest,report["sha256"])
+          assert archive.stat().st_size==report["compressed_bytes"]
+          assert len(report["source_commit"])==40
+          print("PASS: lean archive matches native source-attributed SHA-256 and byte count")
+          print("Paired source commit:",report["source_commit"])
+          PY
+
+      - name: Check out exact candidate source commit for matched baseline
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Preserve comparison mozconfig outside source before pinning code
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp ci/mozconfig-linux-m3-baseline "$RUNNER_TEMP/m3-baseline.mozconfig"
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          report=json.loads((root/"lean-metadata.json").read_text())
+          sha=report["source_commit"]
+          assert re.fullmatch(r"[a-f0-9]{40}",sha),sha
+          subprocess.run(["git","fetch","--no-tags","--depth=1","origin",sha],check=True)
+          subprocess.run(["git","checkout","--detach",sha],check=True)
+          actual=subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()
+          assert actual==sha,(actual,sha)
+          baseline=(root/"m3-baseline.mozconfig").read_text()
+          assert "obj-vulpra-linux-m3-baseline" in baseline
+          assert "VULPRA_EXPERIMENT_NO_NORMANDY=1" not in baseline
+          print("PASS: identical Git source and isolated, Normandy-enabled mozconfig")
+          PY
+          echo "MOZCONFIG=$RUNNER_TEMP/m3-baseline.mozconfig" >> "$GITHUB_ENV"
+
+      - name: Configure native compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Export Actions compiler cache environment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Bootstrap pinned Firefox Linux dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv python3-dev git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+
+      - name: Configure full-Normandy Vulpra with protected feature equality
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach configure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("obj-vulpra-linux-m3-baseline/config.statusd/substs")
+          def get(k):
+              p=root/k
+              return json.loads(p.read_text()) if p.exists() else None
+          assert str(get("MOZ_NORMANDY")) in ("1","True"),get("MOZ_NORMANDY")
+          assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
+          assert get("MOZ_APP_BASENAME")=="Vulpra"
+          assert get("MOZ_DEVTOOLS")=="all"
+          for k in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC"):
+              assert str(get(k)) in ("1","True"),(k,get(k))
+          print("PASS: native matched baseline includes Normandy and protected Linux features")
+          PY
+
+      - name: Compile independent full-Normandy baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            while :; do
+              echo "--- Full baseline resource heartbeat $(date -u +%FT%TZ) ---"
+              free -h
+              df -h .
+              sleep 90
+            done
+          ) &
+          monitor=$!
+          trap 'kill "$monitor" 2>/dev/null || true' EXIT
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-baseline-build.log"
+
+      - name: Package and stage verified comparison browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist=obj-vulpra-linux-m3-baseline/dist
+          mapfile -d '' -t archives < <(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print0)
+          [[ "${#archives[@]}" -eq 1 ]] || { echo "Expected exactly one full baseline tarball" >&2; exit 1; }
+          bash packaging/stage.sh "${archives[0]}" "$RUNNER_TEMP/full-normandy-baseline.tar.xz"
+          (cd "$RUNNER_TEMP" && sha256sum --check full-normandy-baseline.tar.xz.sha256)
+
+      - name: Measure matched packages and required feature boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,io,json,os,tarfile,zipfile
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          source=json.loads((root/"lean-metadata.json").read_text())
+          def audit(path):
+              found=set()
+              logical=0
+              regular=0
+              with tarfile.open(path,"r:xz") as tf:
+                  for item in tf:
+                      if not item.isfile():
+                          continue
+                      regular+=1
+                      logical+=item.size
+                      if item.name.endswith("/omni.ja"):
+                          with zipfile.ZipFile(io.BytesIO(tf.extractfile(item).read())) as jar:
+                              found.update(jar.namelist())
+              return {"compressed_bytes":path.stat().st_size,
+                      "sum_regular_logical_bytes":logical,
+                      "regular_files":regular,"sha256":hashlib.sha256(path.read_bytes()).hexdigest(),
+                      "resources":found}
+          lean=audit(root/"lean-package.tar.xz")
+          full=audit(root/"full-normandy-baseline.tar.xz")
+          assert lean["sha256"]==source["sha256"]
+          assert lean["compressed_bytes"]==source["compressed_bytes"]
+          assert any(p.endswith("res/normandy/Normandy.sys.mjs") for p in full["resources"])
+          assert not any(p.endswith("res/normandy/Normandy.sys.mjs") for p in lean["resources"])
+          for key in ("ClientEnvironment.sys.mjs","NormandyUtils.sys.mjs","NormandyApi.sys.mjs"):
+              target="res/normandy/lib/"+key
+              assert any(p.endswith(target) for p in lean["resources"]),target
+          saved=full["compressed_bytes"]-lean["compressed_bytes"]
+          percent=saved*100/full["compressed_bytes"]
+          report={"schema_version":1,"source_commit":source["source_commit"],
+                  "runner":"ubuntu-24.04", "comparison":"full-Normandy versus opt-in Normandy-free, matched source/build options",
+                  "full_compressed_bytes":full["compressed_bytes"],
+                  "lean_compressed_bytes":lean["compressed_bytes"],
+                  "compressed_saved_bytes":saved, "compressed_reduction_percent":round(percent,3),
+                  "full_regular_logical_bytes":full["sum_regular_logical_bytes"],
+                  "lean_regular_logical_bytes":lean["sum_regular_logical_bytes"],
+                  "full_sha256":full["sha256"],"lean_sha256":lean["sha256"],
+                  "feature_boundary":"Normandy runner absent in lean, shared Nimbus helpers preserved",
+                  "requires_prior_acceptance":"upstream runtime suite must have concluded success",
+                  "limits":["No literal comparison to Arch pre-debloat tarball",
+                            "No guarantee all future browser workflows or security updates are safe"]}
+          (root/"m3-matched-package-comparison.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          if saved<=0:
+              raise RuntimeError("No positive packaged-byte saving. M3 must remain uncredited.")
+          print("PASS: real positive native package reduction under matched Linux build options")
+          PY
+
+      - name: Preserve verified matched-package comparison
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-normandy-matched-package-comparison
+          path: ${{ runner.temp }}/m3-matched-package-comparison.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Preserve bounded baseline failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/m3-baseline-build.log" ]]; then
+            tail -n 3000 "$RUNNER_TEMP/m3-baseline-build.log" > "$RUNNER_TEMP/m3-baseline-failure-tail.log"
+          fi
+
+      - name: Upload baseline build failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-normandy-matched-comparison-failure
+          path: ${{ runner.temp }}/m3-baseline-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Post comparison outcome to M3 evidence issue
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VULPRA_JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## M3 full-versus-lean matched Linux package size comparison"
+            echo
+            echo "Evidence: https://github.com/sguzman/vulpra/actions/runs/$GITHUB_RUN_ID"
+            echo "Result: **$VULPRA_JOB_STATUS**"
+            if [[ -s "$RUNNER_TEMP/m3-matched-package-comparison.json" ]]; then
+              python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          d=json.loads((Path(os.environ["RUNNER_TEMP"])/"m3-matched-package-comparison.json").read_text())
+          print()
+          print(f"Full: {d['full_compressed_bytes']:,} bytes")
+          print(f"Lean: {d['lean_compressed_bytes']:,} bytes")
+          print(f"Delta: {d['compressed_saved_bytes']:,} bytes ({d['compressed_reduction_percent']:.3f}%)")
+          print("Matched source: `"+d["source_commit"]+"`")
+          PY
+            else
+              echo
+              echo "No verified package delta. Do not award M3 completion credit."
+            fi
+            echo
+            echo "This is matched Ubuntu CI source/configuration evidence, not a workstation Arch size measurement."
+          } > "$RUNNER_TEMP/m3-matched-comment.md"
+          gh issue comment 1 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/m3-matched-comment.md"
