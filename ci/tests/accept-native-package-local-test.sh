@@ -22,7 +22,7 @@ set -Eeuo pipefail
 for argument in "$@"; do
   case "$argument" in
     --profile|-profile|-P|--profile=*|-profile=*) 
-      if [[ "${MOCK_ACCEPT_OVERRIDE:-0}" != 1 ]]; then exit 2; fi ;;
+      if [[ "${MOCK_ACCEPT_OVERRIDE:-0}" == 1 ]]; then exit 0; else exit 2; fi ;;
   esac
 done
 mkdir -p "$XDG_DATA_HOME/vulpra/default"
