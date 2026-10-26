@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "project": "Vulpra",
+  "phase": "M3",
+  "source": "Firefox 159.0b5",
+  "basis_local_commit": "ee22392142889ed2d8f7d3953332901cafd964ef",
+  "as_of": "2026-10-26",
+  "definitions": {
+    "source_only": "Candidate changes only Git-tracked source footprint; compiled/runtime benefit not established",
+    "compile_condition": "There is a manifest/configuration gate, but behavior and actual configured value still require measurement",
+    "runtime_bundled": "Sources appear in unconditional application/component manifests; disabling prefs is not a code removal",
+    "protected": "Must be preserved unless replaced and reverified"
+  },
+  "measurements": {
+    "local_git_files": 483753,
+    "local_git_blob_bytes": 3633358256,
+    "package_bytes": null,
+    "libxul_bytes": null,
+    "context": "Exact numeric packaged sizes are in private workstation acceptance JSON, not in uploaded stdout; do not invent them"
+  },
+  "evidence_policy": "Never claim safe deletion or improvement from manifest text alone. Require dependency/reference scan, native build and post-change real package, Wayland, JS and WebExtension tests, before/after metrics.",
+  "candidates": [
+    {
+      "id": "gtk_and_webextensions",
+      "decision": "protected",
+      "surface": "protected",
+      "paths": [
+        "widget/gtk/",
+        "toolkit/mozapps/extensions/"
+      ],
+      "source_files": 767,
+      "source_bytes": 6833041,
+      "why": "GTK/Wayland and add-on runtime passed native M2 acceptance",
+      "evidence": [
+        "widget/moz.build: GTK conditional selection",
+        "toolkit/moz.build: unconditional mozapps/extensions",
+        "real workstation Wayland + WebExtension smoke PASS"
+      ],
+      "next": "Retain"
+    },
+    {
+      "id": "windows_widget_installer",
+      "decision": "review",
+      "surface": "source_only",
+      "paths": [
+        "widget/windows/",
+        "browser/installer/windows/"
+      ],
+      "source_files": 283,
+      "source_bytes": 4652137,
+      "why": "widget/moz.build adds only selected platform subdir; browser/moz.build adds Windows installer only if MAKENSISU. Global references not exhaustively scanned",
+      "evidence": [
+        "widget/moz.build: toolkit selector",
+        "browser/moz.build: conditional MAKENSISU"
+      ],
+      "next": "Search cross-tree references and generator inputs; isolated source-prune experiment; no binary-size claim"
+    },
+    {
+      "id": "macos_cocoa_widget",
+      "decision": "review",
+      "surface": "source_only",
+      "paths": [
+        "widget/cocoa/"
+      ],
+      "source_files": 178,
+      "source_bytes": 1626834,
+      "why": "Only selected by widget toolkit for Cocoa, not GTK; shared Cocoa-named includes outside this path need scanning",
+      "evidence": [
+        "widget/moz.build: toolkit selector"
+      ],
+      "next": "Check all generated bindings and cross-tree references before source removal"
+    },
+    {
+      "id": "android_mobile",
+      "decision": "review",
+      "surface": "source_only",
+      "paths": [
+        "mobile/android/",
+        "widget/android/"
+      ],
+      "source_files": 15441,
+      "source_bytes": 133228752,
+      "why": "Android application and platform widget material; shared cross-platform dependencies and tooling may still reference generated assets",
+      "evidence": [
+        "mobile/android/moz.build: Android app and GeckoView generated files",
+        "widget/moz.build: toolkit selector"
+      ],
+      "next": "Trace app/build/generator references, not wholesale removal"
+    },
+    {
+      "id": "source_testing",
+      "decision": "retain_pending_dependency_proof",
+      "surface": "source_only",
+      "paths": [
+        "testing/"
+      ],
+      "source_files": 201076,
+      "source_bytes": 776789044,
+      "why": "Root moz.build always includes testing; toolkit/toolkit.mozbuild includes testing/gtest even when optional suites are disabled",
+      "evidence": [
+        "root moz.build: DIRS includes testing",
+        "toolkit/toolkit.mozbuild: unconditional /testing/gtest; optional harnesses guarded by ENABLE_TESTS",
+        "actual M2 build needed disabled-test manifest workaround"
+      ],
+      "next": "Map generators/support files needed for successful native build before any selective test-data prune"
+    },
+    {
+      "id": "sync_services",
+      "decision": "evaluate_compile_optout",
+      "surface": "compile_condition",
+      "paths": [
+        "services/sync/"
+      ],
+      "source_files": 223,
+      "source_bytes": 2059832,
+      "why": "browser/moz.configure implies MOZ_SERVICES_SYNC=True; services/moz.build includes sync if configured. Disabling can affect UI, tabs, bookmark and extension Sync",
+      "evidence": [
+        "browser/moz.configure: imply_option MOZ_SERVICES_SYNC True",
+        "toolkit/moz.configure: project_flag MOZ_SERVICES_SYNC",
+        "services/moz.build: conditional DIRS += sync",
+        "browser/components/AccountsGlue.sys.mjs: references resource://services-sync/UIState.sys.mjs"
+      ],
+      "next": "Confirm actual local CONFIG value; analyze AccountsGlue/UI consumers; consider a tested opt-out rather than deleting source"
+    },
+    {
+      "id": "firefox_accounts",
+      "decision": "retain_pending_dependency_proof",
+      "surface": "runtime_bundled",
+      "paths": [
+        "services/fxaccounts/"
+      ],
+      "source_files": 53,
+      "source_bytes": 833077,
+      "why": "services/moz.build includes fxaccounts for all non-Android toolkits independently of Sync; AccountsGlue imports FxAccounts modules",
+      "evidence": [
+        "services/moz.build: non-Android includes fxaccounts",
+        "browser/components/AccountsGlue.sys.mjs: imports FxAccounts.sys.mjs and FxAccountsCommands.sys.mjs"
+      ],
+      "next": "Must map account/OAuth/login dependencies before changing module packaging"
+    },
+    {
+      "id": "telemetry_internals",
+      "decision": "retain_pending_dependency_proof",
+      "surface": "runtime_bundled",
+      "paths": [
+        "toolkit/components/telemetry/"
+      ],
+      "source_files": 259,
+      "source_bytes": 3775176,
+      "why": "Telemetry reporting preference/configuration is distinct from native telemetry code linked into xul; reporting default depends on mozilla_official but runtime configuration not measured",
+      "evidence": [
+        "toolkit/moz.configure: MOZ_TELEMETRY_REPORTING option defaults to mozilla_official",
+        "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces"
+      ],
+      "next": "Measure actual reporting config; distinguish privacy reduction from binary reduction; protect crash/security requirements"
+    },
+    {
+      "id": "normandy_and_healthreport",
+      "decision": "evaluate_feature_optout",
+      "surface": "compile_condition",
+      "paths": [
+        "toolkit/components/normandy/"
+      ],
+      "source_files": null,
+      "source_bytes": null,
+      "why": "Desktop browser/moz.configure implies MOZ_NORMANDY and MOZ_SERVICES_HEALTHREPORT; toolkit/components/moz.build adds normandy for browser, and data-reporting config mixes reporting, crashreporter, Normandy",
+      "evidence": [
+        "browser/moz.configure: implied project flags",
+        "toolkit/components/moz.build: includes normandy when MOZ_BUILD_APP=browser",
+        "toolkit/moz.configure: data_reporting dependency"
+      ],
+      "next": "Trace user-visible remote experiments and data-reporting defaults; do not conflate with sandbox/security/crash code"
+    },
+    {
+      "id": "devtools_client",
+      "decision": "retain_until_user_scope_and_qa",
+      "surface": "compile_condition",
+      "paths": [
+        "devtools/client/"
+      ],
+      "source_files": null,
+      "source_bytes": null,
+      "why": "Browser implies MOZ_DEVTOOLS=all; client is built only in all, while server/shared/startup still compile. Removing client could break F12/inspector/debugging",
+      "evidence": [
+        "browser/moz.configure: imply_option MOZ_DEVTOOLS all",
+        "toolkit/moz.configure: MOZ_DEVTOOLS all/server",
+        "devtools/moz.build: client conditional; platform/server/shared/startup unconditional"
+      ],
+      "next": "Measure packaged DevTools client footprint and preserve user debugging workflows unless explicitly excluded"
+    },
+    {
+      "id": "browser_genai",
+      "decision": "review",
+      "surface": "runtime_bundled",
+      "paths": [
+        "browser/components/genai/"
+      ],
+      "source_files": null,
+      "source_bytes": null,
+      "why": "browser/components/moz.build unconditionally includes genai, whose moz.build packages GenAI and associated modules into browser resources",
+      "evidence": [
+        "browser/components/moz.build: DIRS includes genai",
+        "browser/components/genai/moz.build: MOZ_SRC_FILES GenAI, page/link preview, actors"
+      ],
+      "next": "Inspect frontend integration and dependencies; test pref gating and actual packaged difference before disabling"
+    },
+    {
+      "id": "newtab_and_messaging",
+      "decision": "review",
+      "surface": "runtime_bundled",
+      "paths": [
+        "browser/components/newtab/",
+        "browser/components/asrouter/",
+        "browser/components/aboutwelcome/"
+      ],
+      "source_files": null,
+      "source_bytes": null,
+      "why": "Components included in desktop browser; they handle about:newtab, onboarding and messaging. Whole-directory deletion can break startup, new tabs or browser UI",
+      "evidence": [
+        "browser/components/moz.build: unconditional dirs",
+        "browser/components/newtab/moz.build: browsercomps resources and registrants",
+        "browser/components/asrouter/moz.build: actors/modules",
+        "browser/components/aboutwelcome/moz.build: actors/modules"
+      ],
+      "next": "Trace per-component service dependencies and UI fallback before experimentation"
+    },
+    {
+      "id": "core_web_security",
+      "decision": "protected",
+      "surface": "protected",
+      "paths": [
+        "security/",
+        "js/",
+        "dom/",
+        "netwerk/",
+        "toolkit/components/antitracking/"
+      ],
+      "source_files": null,
+      "source_bytes": null,
+      "why": "Certificates, JavaScript, DOM, network stack, sandbox/security and web protections are core browser dependencies",
+      "evidence": [
+        "toolkit/toolkit.mozbuild: core security/netwerk/js/dom directories",
+        "M2 actual Javascript/WebExtension/browser startup smoke"
+      ],
+      "next": "Retain; any equivalent replacement belongs to long-horizon audited rewrite"
+    }
+  ]
+}
