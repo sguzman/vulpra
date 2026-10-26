@@ -92,9 +92,30 @@ fi
 # A process that merely stays alive is insufficient; require a committed
 # non-null pixel buffer on an actual Wayland surface. Accept both common
 # libwayland object-ID renderings (wl_surface#1 and wl_surface@1).
-if ! grep -Eq 'wl_surface[#@][0-9]+\.attach\(wl_buffer[#@][0-9]+' "$work/browser.log" || \
-   ! grep -Eq 'wl_surface[#@][0-9]+\.commit\(' "$work/browser.log"; then
-  echo "Vulpra did not attach and commit a graphical Wayland frame" >&2
+# Only an attach followed by a commit *on the same surface* is
+# evidence of a submitted Wayland frame. Independent grep checks could
+# accidentally match separate surfaces and falsely accept blank startup.
+if ! python3 - "$work/browser.log" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+attached = set()
+attach = re.compile(r"wl_surface([#@][0-9]+)\\.attach\\(wl_buffer[#@][0-9]+")
+commit = re.compile(r"wl_surface([#@][0-9]+)\\.commit\\(")
+for line in Path(sys.argv[1]).open(encoding="utf-8", errors="replace"):
+    found_attach = attach.search(line)
+    if found_attach:
+        attached.add(found_attach.group(1))
+    found_commit = commit.search(line)
+    if found_commit and found_commit.group(1) in attached:
+        break
+else:
+    print("Vulpra has not attached and committed a buffer on the same Wayland surface", file=sys.stderr)
+    sys.exit(1)
+PY
+then
+  echo "Vulpra did not attach and commit a graphical Wayland frame on one surface" >&2
   tail -n 100 "$work/browser.log" >&2 || true
   exit 1
 fi
