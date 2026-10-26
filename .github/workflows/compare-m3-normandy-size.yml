@@ -84,6 +84,20 @@ jobs:
           baseline=(root/"m3-baseline.mozconfig").read_text()
           assert "obj-vulpra-linux-m3-baseline" in baseline
           assert "VULPRA_EXPERIMENT_NO_NORMANDY=1" not in baseline
+          # Excluding only the alternate OBJDIR and Normandy opt-out,
+          # both variants must pass exactly the same build-setting lines.
+          lean_config=Path("ci/mozconfig-linux-normandy-experiment").read_text()
+          def normalize_mozconfig(content):
+              return [
+                  line.strip() for line in content.splitlines()
+                  if line.strip() and not line.lstrip().startswith("#")
+                  and not line.startswith("mk_add_options MOZ_OBJDIR=")
+                  and line.strip() != "export VULPRA_EXPERIMENT_NO_NORMANDY=1"
+              ]
+          actual=normalize_mozconfig(baseline)
+          expected=normalize_mozconfig(lean_config)
+          assert actual==expected, ("Paired build settings differ", actual, expected)
+          print("PASS: matched build setting lines; only OBJDIR and Normandy flag differ")
           print("PASS: identical Git source and isolated, Normandy-enabled mozconfig")
           PY
           echo "MOZCONFIG=$RUNNER_TEMP/m3-baseline.mozconfig" >> "$GITHUB_ENV"
