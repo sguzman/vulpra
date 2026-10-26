@@ -17,6 +17,13 @@ category browser-before-ui-startup resource:///modules/BuiltInThemes.sys.mjs Bui
 #ifdef MOZ_NORMANDY
 category browser-before-ui-startup resource://normandy/Normandy.sys.mjs Normandy.init
 #endif
+#ifdef XP_LINUX
+#ifndef MOZ_NORMANDY
+# The opt-in Linux build initializes Nimbus after the UI without the
+# missing Normandy recipe runner. Keep the normal startup untouched.
+category browser-before-ui-startup moz-src:///toolkit/components/nimbus/NimbusBootstrap.sys.mjs NimbusBootstrap.init
+#endif
+#endif
 category browser-before-ui-startup moz-src:///browser/components/privatebrowsing/ResetPBMPanel.sys.mjs ResetPBMPanel.init
 #ifdef NIGHTLY_BUILD
 category browser-before-ui-startup moz-src:///browser/components/remotecontrol/RemoteControlPanel.sys.mjs RemoteControlPanel.init
