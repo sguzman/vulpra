@@ -81,8 +81,10 @@ jobs:
           set -euo pipefail
           python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
 
-      - name: Verify actual packaged WebExtension lifecycle
+      - name: Verify actual packaged WebExtension lifecycle and Nimbus initialization
         shell: bash
+        env:
+          VULPRA_M3_VERIFY_NIMBUS: "1"
         run: |
           set -euo pipefail
           geckodriver --version
