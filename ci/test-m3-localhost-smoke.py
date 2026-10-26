@@ -21,6 +21,11 @@ body = urlopen(url, timeout=5).read().decode()
 assert 'location.assign("/js-run")' in body, body
 final = urlopen(urljoin(url, "/js-run"), timeout=5).read().decode()
 assert "JavaScript navigation succeeded" in final, final
+# Real Firefox may fetch a favicon outside the scripted redirect chain.
+try:
+    urlopen(urljoin(url, "/favicon.ico"), timeout=5).read()
+except Exception:
+    pass
 screenshot.write_bytes(b"\x89PNG\r\n\x1a\nmock png body")
 '''
 
@@ -54,6 +59,8 @@ def main():
         result = json.loads(report.read_text())
         assert result["result"] == "pass"
         assert result["local_request_sequence"] == ["/start", "/js-run", "/page"]
+        assert result["incidental_favicon_requests"] == 1
+        assert result["observed_http_requests"] == ["/start", "/js-run", "/page", "/favicon.ico"]
         assert result["sha256"] == checksum
         assert result["profile_isolation"]
         sidecar.write_text("0" * 64 + "  " + archive.name + "\n")
