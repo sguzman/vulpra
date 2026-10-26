@@ -144,7 +144,11 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] not in ("android", "windows"):
     DIRS += ["aboutwebauthn"]
 
 if CONFIG["MOZ_BUILD_APP"] == "browser":
-    DIRS += ["messaging-system", "normandy"]
+    DIRS += ["messaging-system"]
+    # Opt-in Vulpra lean builds exclude the Normandy packaged resource tree;
+    # normal Firefox/Vulpra builds continue to include it by default.
+    if CONFIG["MOZ_NORMANDY"]:
+        DIRS += ["normandy"]
 
 if CONFIG["MOZ_BUILD_APP"] != "comm/mail":
     DIRS += ["ipprotection"]
