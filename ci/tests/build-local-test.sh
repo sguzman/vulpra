@@ -9,6 +9,7 @@ git init -q
 git config user.email test@example.invalid
 git config user.name 'Local build regression test'
 printf 'release mock\n' > ci/mozconfig-linux
+printf 'tracked supplemental file\n' > ci/test-file.txt
 printf 'local wasm sysroot mock\n' > "$R/home/.mozbuild/vulpra-local.mozconfig"
 cat > mach <<'MOCK'
 #!/usr/bin/env bash
@@ -23,7 +24,7 @@ fi
 exit "${MOCK_BUILD_EXIT:-0}"
 MOCK
 chmod +x mach
-git add mach ci/mozconfig-linux
+git add mach ci/mozconfig-linux ci/test-file.txt
 git commit -qm 'mock checkout'
 if HOME="$R/home" bash "$SCRIPT" "$R/repo" > "$R/pass.log" 2>&1; then
   grep -q 'PASS: ./mach build returned 0 and a Vulpra executable' "$R/pass.log" || exit 9
@@ -53,4 +54,27 @@ rc=$?
 set -e
 [[ "$rc" == 2 ]] || { cat "$R/missing.log"; echo "FAIL: missing file should refuse $rc"; exit 4; }
 echo 'PASS: refuses source with missing core file'
+# Verify that ordinary missing tracked sources block compilation too.
+git checkout -- mach
+git sparse-checkout disable >/dev/null
+rm ci/test-file.txt
+set +e
+HOME="$R/home" bash "$SCRIPT" "$R/repo" > "$R/missing-tracked.log" 2>&1
+rc=$?
+set -e
+[[ "$rc" == 3 ]] || { cat "$R/missing-tracked.log"; echo "FAIL: missing tracked source should refuse: $rc"; exit 5; }
+echo 'PASS: refuses missing ordinary tracked source'
+# Simulate another process holding the build lock, with intact checkout.
+git checkout HEAD -- ci/test-file.txt
+logdir="$R/repo/.git/vulpra-native-build"
+mkdir -p "$logdir"
+exec 8> "$logdir/build.lock"
+flock 8
+set +e
+HOME="$R/home" bash "$SCRIPT" "$R/repo" > "$R/locked.log" 2>&1
+rc=$?
+set -e
+[[ "$rc" == 7 ]] || { cat "$R/locked.log"; echo "FAIL: concurrent build should be refused: $rc"; exit 6; }
+flock -u 8
+echo 'PASS: refuses concurrent native build'
 echo 'PASS: all local-build wrapper regressions'
