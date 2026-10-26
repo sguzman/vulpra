@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   no-normandy-configure:
@@ -105,6 +106,17 @@ jobs:
           print("PASS: lean resources and preserved Nimbus startup have explicit source guards")
           print("CONFIGURE AND SOURCE ONLY: native package and runtime remain unverified")
           PY
+
+      - name: Post configure result to M3 evidence issue
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VULPRA_JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          printf '## M3 Normandy-free configure/source gate\n\nCommit: `%s`\nRun: https://github.com/sguzman/vulpra/actions/runs/%s\nResult: **%s**\n\nThis is not native compilation or a runtime/package acceptance.\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$VULPRA_JOB_STATUS" > "$RUNNER_TEMP/normandy-configure-summary.md"
+          gh issue comment 1 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/normandy-configure-summary.md"
 
       - name: Record runner resource diagnostics
         if: always()
