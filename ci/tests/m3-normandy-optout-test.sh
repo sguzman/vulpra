@@ -82,6 +82,15 @@ registry = source("browser/components/DesktopActorRegistry.sys.mjs")
 assert "if (!AppConstants.MOZ_NORMANDY)" in registry
 assert "delete JSWINDOWACTORS.ShieldFrame;" in registry
 
+# Graphical acceptance must observe a real committed buffer, not just
+# a process that remains alive while Weston is running.
+wayland = source("packaging/test-wayland.sh")
+assert "WAYLAND_DEBUG=client" in wayland
+assert "'xdg_wm_base'" in wayland
+assert "wl_surface[#@][0-9]+" in wayland
+assert ".attach" in wayland and ".commit" in wayland
+assert "wl_buffer[#@][0-9]+" in wayland
+
 print("PASS: standard Vulpra build default untouched; opt-in isolated object directory")
 print("PASS: original jar.mn retains shared Nimbus helper/schema resources only")
 print("PASS: Normandy startup/shutdown conditional; lean Nimbus bootstrap guarded")
