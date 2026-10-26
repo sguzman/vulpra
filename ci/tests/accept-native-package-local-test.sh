@@ -38,14 +38,14 @@ url = args[-1]
 if url.startswith("http://127.0.0.1:"):
     with urllib.request.urlopen(url, timeout=10) as r:
         start = r.read()
-    assert b'location.replace("/page")' in start
+    assert b'location.replace("/js-run")' in start
     root = url.rsplit("/", 1)[0]
-    with urllib.request.urlopen(root + "/page", timeout=10) as r:
-        page = r.read()
-    assert b"XMLHttpRequest()" in page
     if os.environ.get("MOCK_SKIP_JS", "0") != "1":
+        # urllib follows the 302 from /js-run to /page. This emulates the
+        # actual JS-triggered navigation without executing JS in the fixture.
         with urllib.request.urlopen(root + "/js-run", timeout=10) as r:
-            assert b"JavaScript network check successful" in r.read()
+            page = r.read()
+        assert b'getElementById("state")' in page
 png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlV3y8AAAAASUVORK5CYII=")
 pathlib.Path(args[args.index("--screenshot") + 1]).write_bytes(png)
 BROWSER
@@ -55,7 +55,7 @@ tar -cJf "$ARCHIVE" -C "$R/package" .
 (cd "$(dirname "$ARCHIVE")" && sha256sum "$(basename "$ARCHIVE")" > "$(basename "$ARCHIVE").sha256")
 echo 'Vulpra build exit code: 0 (elapsed 42s)' > "$R/repo/.git/vulpra-native-build/build-fixture.log"
 HOME="$R/home" python3 "$RUNNER" "$R/repo" > "$R/ok.log" 2>&1 || { cat "$R/ok.log"; exit 1; }
-grep -Fq 'PASS: Browser navigated local HTTP pages and executed JavaScript' "$R/ok.log"
+grep -Fq 'PASS: Browser completed JavaScript-triggered navigation and HTTP redirect' "$R/ok.log"
 JSON=$(find "$R/repo/.git/vulpra-native-build" -maxdepth 1 -type f -name 'acceptance-*.json' | head -1)
 python3 - "$JSON" <<'PY'
 import json, sys
@@ -64,18 +64,20 @@ assert j["status"] == "pass"
 assert j["native_executable_name"] == "vulpra"
 assert j["successful_incremental_build_seconds"] == 42
 assert j["assertions"]["profile_override_refused"]
-assert set(("/start", "/page", "/js-run")).issubset(j["navigation_requests"])
+assert j["navigation_requests"][:3] == ["/start", "/js-run", "/page"]
+assert j["assertions"]["javascript_triggered_navigation"]
+assert j["assertions"]["http_redirect_followed"]
 assert j["browser_startup_navigation_screenshot_seconds"] > 0
 assert j["package_size_bytes"] > 0
 PY
-echo 'PASS: fixture package navigation, JS, private profile and metrics written'
+echo 'PASS: fixture package JS-triggered navigation, HTTP redirect, private profile and metrics written'
 set +e
 HOME="$R/home" MOCK_SKIP_JS=1 python3 "$RUNNER" "$R/repo" > "$R/nojs.log" 2>&1
 status=$?
 set -e
 [[ "$status" == 1 ]] || { cat "$R/nojs.log"; echo "FAIL: no-JS case expected error, got $status"; exit 2; }
-grep -Fq 'Navigation or JavaScript failed' "$R/nojs.log"
-echo 'PASS: missing JavaScript network request correctly rejected'
+grep -Fq 'JavaScript-triggered navigation or HTTP redirect failed' "$R/nojs.log"
+echo 'PASS: missing JavaScript-triggered navigation correctly rejected'
 set +e
 HOME="$R/home" MOCK_ACCEPT_OVERRIDE=1 python3 "$RUNNER" "$R/repo" > "$R/override.log" 2>&1
 status=$?
