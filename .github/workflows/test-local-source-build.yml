@@ -95,11 +95,11 @@ jobs:
 
       - name: Validate classified M3 candidate register
         run: |
-          jq -e \'
+          jq -e '
             .schema_version == 1 and
             (.candidates | length) >= 10 and
             ((.candidates | map(.id) | unique | length) == (.candidates | length)) and
             (all(.candidates[]; (.evidence | length > 0) and (.paths | length > 0) and (.next | length > 0))) and
             ([.candidates[] | select(.decision == "protected")] | length >= 2) and
             (all(.candidates[]; .decision != "remove_now"))
-          \' docs/vulpra/DEBLOAT-CANDIDATES.json
+          ' docs/vulpra/DEBLOAT-CANDIDATES.json
