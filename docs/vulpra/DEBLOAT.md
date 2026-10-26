@@ -161,6 +161,55 @@ as Sync and the DevTools client. Even an option that reports `false` may
 leave runtime code in `libxul` or `omni.ja`; use package content and
 before/after native tests to prove a real reduction.
 
+## Actual native configuration results (workstation, 2026-10-26 12:14 local)
+
+The user ran the no-rebuild configuration probe on the *real original object
+directory*. It reported GTK/Linux and independent `vulpra` identity
+(159.0). The observed values are:
+
+| Configuration field | Generated value | Review consequence |
+| --- | --- | --- |
+| `MOZ_SERVICES_SYNC` | `"1"` | Sync is **compiled into the baseline**; disabling requires an experimental build and checking its UI/callers |
+| `MOZ_SERVICES_HEALTHREPORT` | `"1"` | Health reporting enabled; investigate configuration separately from crash/security infrastructure |
+| `MOZ_NORMANDY` | `"1"` | Remote recipe support enabled; candidate for an isolated disabled-feature trial |
+| `MOZ_DEVTOOLS` | `"all"` | Full DevTools client enabled; keep by default because local debugging matters |
+| `MOZ_TELEMETRY_REPORTING` | `(missing)` | **Unknown**, not proof of disabled reporting |
+| `MOZ_CRASHREPORTER` | `"1"` | Preserve until a verified equivalent exists; crash diagnostics are not synonymous with promotional telemetry |
+| `MOZ_UPDATER` | `"1"` | Built-in update subsystem enabled; **not** proof independent Vulpra upstream security updates work |
+| `MOZ_SANDBOX`, `MOZ_WAYLAND` | `"1"`, `"1"` | Protect Linux security and graphics baseline |
+| `MOZ_HAS_REMOTE`, `ENABLE_WEBDRIVER` | `"1"`, `"1"` | Keep for existing remote/automation acceptance until justified otherwise |
+| `MOZ_GECKODRIVER`, `ENABLE_TESTS` | `(missing)` | Unrecorded in these generated substitutions; cannot assume false |
+
+This is configuration evidence, **not a completed removal**. The object tree
+was built before the recent source-only Git fast-forward. No new compilation
+has been performed.
+
+## Measure real package contents before selecting feature cuts
+
+Source size alone can greatly exaggerate shipping impact. A new read-only
+native-package census uses the same independently staged package and SHA256
+sidecar already verified under M2:
+
+```fish
+curl -fL --retry 20 --retry-all-errors -o ~/vulpra-m3-package-footprint.py https://raw.githubusercontent.com/sguzman/vulpra/main/ci/m3-package-footprint-local.py
+and python ~/vulpra-m3-package-footprint.py
+```
+
+It measures the actual compressed tarball and unpacked regular-file sizes,
+groups archive contents, and attempts to index `omni.ja` entries (if readable)
+to find path-name clues for bundled features such as Sync, Normandy, GenAI,
+telemetry, and DevTools. It **never** extracts or executes the browser. Results
+stay under `.git/vulpra-debloat/m3-package-footprint.{json,md}`.
+
+The exact counts in this new report are still **pending the workstation run**.
+The synthetic fixture tested checksum validation, archive accounting, resource
+indexing, and corrupt/missing checksum refusal in
+https://github.com/sguzman/vulpra/actions/runs/40376689384.
+
+Path hints may overlap or omit dependencies. Only comparative package
+measurements after a compiled feature-off change and actual M2 runtime smoke
+can establish a successful binary debloat.
+
 ## Audited source anchors (Firefox 159.0b5)
 
 These directory names were verified against the source tree in GitHub on 2026-10-26. The labels below represent **review priorities, not deletion approval**.
