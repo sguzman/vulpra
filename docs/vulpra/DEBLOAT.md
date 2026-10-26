@@ -64,6 +64,28 @@ acceptance have NOT passed. Do not claim source size as package bloat.
 The working browser's tested package belongs to the original local HEAD,
 even after a future source-only Git fast-forward.
 
+## First manifest-level dependency findings (2026-10-26)
+
+The following are **verified references in the pinned release's build manifests**,
+not guesswork about names. These findings narrow future edits but do not yet
+demonstrate a successful native binary reduction.
+
+| Build manifest | Observed build condition | Implication for Linux Vulpra |
+| --- | --- | --- |
+| `widget/moz.build` | `DIRS += [toolkit]` for the selected `MOZ_WIDGET_TOOLKIT`; GTK-selected branches provide Linux sources | Windows/Cocoa widget directories are **not selected as widget compilation units** in a GTK build. Their tracked sources still require a reference scan before deletion |
+| `browser/moz.build` | `installer/windows` enters `DIRS` only if `MAKENSISU` | The Windows NSIS installer is excluded by default unless the Windows installer tool is configured |
+| `services/moz.build` | `DIRS += ["sync"]` only if `MOZ_SERVICES_SYNC` | Sync is gated by a real configure switch; inspect its selected value and consumer references before disabling |
+| `services/moz.build` | `fxaccounts` is selected for every toolkit except Android | **Do not conflate Accounts with Sync**. Disabling Sync alone does not establish FxAccounts is unused |
+| root `moz.build` | `testing` and `third_party/python` included in unconditional root `DIRS` | The tests source tree cannot simply be removed, even with `--disable-tests`; the pinned build previously needed manifest workarounds |
+| `toolkit/components/telemetry/moz.build` | Native telemetry units assigned to `FINAL_LIBRARY="xul"`, with generated interfaces and JS modules | Telemetry is not merely optional website reporting; removal can break core compilation/IPC consumers and must be scoped |
+| `browser/components/moz.build` | Unconditional component dirs include `newtab`, `screenshots`, `genai`, `search` and more | Feature-disabling requires a specific dependency and UI audit, not blanket directory deletion |
+
+**First low-risk review target:** Linux-unselected Windows/Cocoa desktop code
+for *source footprint* reduction, but not as a claim of package-size savings.
+For *binary-size* reductions, investigate actual packaged optional features
+and their configure guards separately. There have been no source edits
+or additional native builds at this stage.
+
 ## Audited source anchors (Firefox 159.0b5)
 
 These directory names were verified against the source tree in GitHub on 2026-10-26. The labels below represent **review priorities, not deletion approval**.
