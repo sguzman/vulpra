@@ -51,27 +51,32 @@ real Wayland UI behavior, extensions or security.
 
 ## 4. Package and smoke-test the compiled browser
 
-Only after the native build runner reports an actual compiled Vulpra executable,
-download and run the package/smoke runner from any directory (Fish-compatible):
+Only after the native headless startup probe passes, retrieve the standalone
+packaging runner. It uses the **existing native binary** and the pinned
+workstation source without requiring a Git pull or copying any newer files
+into that checkout:
 
 ```fish
 curl -fL --retry 20 --retry-all-errors -o ~/vulpra-package-smoke-local.sh https://raw.githubusercontent.com/sguzman/vulpra/main/ci/package-smoke-local.sh
 and bash ~/vulpra-package-smoke-local.sh
 ```
 
-This calls `./mach package`, stages the independent `vulpra` launcher, verifies
-the archive checksum and app identity, unpacks it under a temporary directory,
-launches its browser with a private HOME and XDG data directory, and checks for
-a PNG screenshot and isolated profile. The test also ensures the sentinel
-Firefox profile file it created stays unchanged; it never selects the user's
-real Firefox profile. If `weston` and `wayland-info` are already installed,
-it attempts a separate graphical Wayland smoke test; otherwise it explicitly
-reports Wayland as **not verified**. No automatic package installation occurs.
+The runner invokes incremental `./mach package`, selects a valid Vulpra
+archive, adds a **vulpra-launch** private-profile wrapper without overwriting
+a native executable named `vulpra`, creates an independent tar.xz archive,
+verifies SHA-256, and smoke-tests the packaged executable using a temporary
+HOME. The native executable might be named `firefox` or `vulpra`; the
+application.ini display identity must be `Vulpra`.
 
-Logs, preview packages and screenshots are stored under
-`.git/vulpra-native-build/` so failures leave their evidence intact. This
-runner does not substitute for detailed extension or security QA, and its
-mock regression tests are not evidence that native Vulpra itself has run.
+The output archive, checksum, screenshot and log persist under
+`.git/vulpra-native-build/`. Compilation artifacts and the system Firefox
+installation/profile remain untouched. Completed incremental packaging work
+can be reused if interrupted; an incomplete compression/archive job may need
+to repeat its unfinished work.
+
+**Limit:** This package runner does not verify graphical Wayland startup,
+extensions, navigation, security, or real runtime performance. Those remain
+separate gates. Its CI mocks are not a substitute for the real package run.
 
 ## 5. Later acceptance gates
 
