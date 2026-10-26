@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Verify isolated M3 experiment guards without compiling Firefox.
+# Verify the isolated M3 Normandy-free resource contract against Git HEAD.
+# Uses Git blobs so sparse CI checkouts still audit the complete pinned source.
 set -Eeuo pipefail
 repo="${1:-$PWD}"
 python3 - "$repo" <<'PY'
@@ -21,7 +22,8 @@ assert "obj-vulpra-linux-normandy-experiment" not in normal
 assert "export VULPRA_EXPERIMENT_NO_NORMANDY=1" in lean
 assert "obj-vulpra-linux-normandy-experiment" in lean
 assert "mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux" in normal
-assert "ac_add_options --with-app-basename=Vulpra" in normal and "ac_add_options --with-app-basename=Vulpra" in lean
+assert "ac_add_options --with-app-basename=Vulpra" in normal
+assert "ac_add_options --with-app-basename=Vulpra" in lean
 
 configure = source("browser/moz.configure")
 assert 'env="VULPRA_EXPERIMENT_NO_NORMANDY"' in configure
@@ -32,9 +34,27 @@ assert 'imply_option("MOZ_SERVICES_SYNC", True)' in configure
 
 build = source("toolkit/components/moz.build")
 assert 'DIRS += ["messaging-system"]' in build
-assert 'if CONFIG["MOZ_NORMANDY"]:' in build
-assert '    if CONFIG["MOZ_NORMANDY"]:\n        DIRS += ["normandy"]' in build
-assert 'DIRS += ["messaging-system", "normandy"]' not in build
+assert 'DIRS += ["normandy"]' in build
+assert 'if CONFIG["MOZ_NORMANDY"]:\n        DIRS += ["normandy"]' not in build
+
+# Mozilla's frontend requires the original jar.mn file to remain declared.
+jarbuild = source("toolkit/components/normandy/moz.build")
+assert 'JAR_MANIFESTS += ["jar.mn"]' in jarbuild
+assert "vulpra-shared.jar.mn" not in jarbuild
+jar = source("toolkit/components/normandy/jar.mn")
+assert jar.count("#ifdef MOZ_NORMANDY") == 1, "Expected one conditional jar section"
+assert jar.count("#else") == 1 and jar.count("#endif") == 1
+header, body = jar.split("#ifdef MOZ_NORMANDY", 1)
+full, tail = body.split("#else", 1)
+shared, footer = tail.split("#endif", 1)
+assert "% resource normandy %res/normandy/" in header
+for name in ("Normandy.sys.mjs", "RecipeRunner.sys.mjs", "ShieldFrameParent.sys.mjs"):
+    assert name in full, f"Missing standard resource anchor: {name}"
+    assert name not in shared, f"Lean variant retains recipe/studies resource: {name}"
+for name in ("ClientEnvironment.sys.mjs", "NormandyApi.sys.mjs",
+             "NormandyUtils.sys.mjs", "LegacyHeartbeat.schema.json"):
+    assert name in shared, f"Missing retained Nimbus dependency: {name}"
+assert not footer.strip()
 
 manifest = source("browser/components/BrowserComponents.manifest").splitlines()
 init = "category browser-before-ui-startup resource://normandy/Normandy.sys.mjs Normandy.init"
@@ -45,9 +65,26 @@ for item in (init, uninit):
     assert manifest[index - 1] == "#ifdef MOZ_NORMANDY"
     assert manifest[index + 1] == "#endif"
 
-print("PASS: standard Vulpra build defaults unchanged")
-print("PASS: opt-in Normandy experiment uses a distinct object directory")
-print("PASS: alternate configure gates optional resource inclusion")
-print("PASS: Normandy startup and shutdown registrations both gated")
-print("PASS: no source deletion, native build or runtime tests claimed")
+lean_boot = "category browser-before-ui-startup moz-src:///toolkit/components/nimbus/NimbusBootstrap.sys.mjs NimbusBootstrap.init"
+assert manifest.count(lean_boot) == 1
+index = manifest.index(lean_boot)
+assert manifest[index - 1].startswith("# ")
+assert manifest[index - 2] == "#ifndef MOZ_NORMANDY"
+assert manifest[index - 3] == "#ifdef XP_LINUX"
+assert manifest[index + 1:index + 3] == ["#endif", "#endif"]
+nimbus_build = source("toolkit/components/nimbus/moz.build")
+assert 'and not CONFIG["MOZ_NORMANDY"]' in nimbus_build
+assert 'MOZ_SRC_FILES += ["NimbusBootstrap.sys.mjs"]' in nimbus_build
+bootstrap = source("toolkit/components/nimbus/NimbusBootstrap.sys.mjs")
+assert 'UI_READY = "sessionstore-windows-restored"' in bootstrap
+assert "await ExperimentAPI.init();" in bootstrap
+registry = source("browser/components/DesktopActorRegistry.sys.mjs")
+assert "if (!AppConstants.MOZ_NORMANDY)" in registry
+assert "delete JSWINDOWACTORS.ShieldFrame;" in registry
+
+print("PASS: standard Vulpra build default untouched; opt-in isolated object directory")
+print("PASS: original jar.mn retains shared Nimbus helper/schema resources only")
+print("PASS: Normandy startup/shutdown conditional; lean Nimbus bootstrap guarded")
+print("PASS: disabled ShieldFrame actor absent; no source deletion performed")
+print("SOURCE TEST ONLY: native runtime and package-size savings remain unverified")
 PY
