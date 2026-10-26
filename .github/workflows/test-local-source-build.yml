@@ -10,6 +10,7 @@ on:
       - ci/smoke-native-local.sh
       - ci/smoke-wayland-package-local.sh
       - ci/accept-native-package-local.py
+      - ci/smoke-webextension-package-local.py
       - ci/tests/**
       - packaging/**
       - .github/workflows/test-local-source-build.yml
@@ -47,7 +48,9 @@ jobs:
           bash -n ci/tests/smoke-native-local-test.sh
           bash -n ci/tests/smoke-wayland-package-local-test.sh
           bash -n ci/tests/accept-native-package-local-test.sh
+          bash -n ci/tests/smoke-webextension-package-local-test.sh
           python3 -m py_compile ci/accept-native-package-local.py
+          python3 -m py_compile ci/smoke-webextension-package-local.py
 
       - name: Test restart-safe source retrieval
         run: bash ci/tests/vulpra-fetch-all-test.sh "$PWD/ci/vulpra-fetch-all.sh"
@@ -66,3 +69,6 @@ jobs:
 
       - name: Test packaged navigation, JavaScript and baseline probe
         run: bash ci/tests/accept-native-package-local-test.sh "$PWD/ci/accept-native-package-local.py"
+
+      - name: Test WebExtension package and WebDriver fixtures
+        run: bash ci/tests/smoke-webextension-package-local-test.sh "$PWD/ci/smoke-webextension-package-local.py"
