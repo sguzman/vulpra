@@ -4,6 +4,8 @@
 
 toolkit.jar:
 % resource normandy %res/normandy/
+
+#ifdef MOZ_NORMANDY
   res/normandy/Normandy.sys.mjs (./Normandy.sys.mjs)
   res/normandy/NormandyMigrations.sys.mjs (./NormandyMigrations.sys.mjs)
   res/normandy/lib/ (./lib/*)
@@ -17,3 +19,9 @@ toolkit.jar:
 
 % resource normandy-vendor %res/normandy/vendor/ contentaccessible=yes
   res/normandy/vendor/ (./vendor/*)
+#else
+  res/normandy/lib/ClientEnvironment.sys.mjs (./lib/ClientEnvironment.sys.mjs)
+  res/normandy/lib/NormandyApi.sys.mjs (./lib/NormandyApi.sys.mjs)
+  res/normandy/lib/NormandyUtils.sys.mjs (./lib/NormandyUtils.sys.mjs)
+  res/normandy/schemas/LegacyHeartbeat.schema.json (./schemas/LegacyHeartbeat.schema.json)
+#endif
