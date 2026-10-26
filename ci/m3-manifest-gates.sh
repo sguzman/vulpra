@@ -44,6 +44,12 @@ check browser/components/moz.build '"genai",' 'GenAI component directory include
 check browser/components/moz.build '"newtab",' 'newtab component directory included'
 check browser/components/newtab/moz.build 'FINAL_LIBRARY = "browsercomps"' 'newtab components in browsercomps'
 check browser/components/genai/moz.build 'MOZ_SRC_FILES += [' 'GenAI browser resource files packaged'
+check toolkit/modules/FirstStartup.sys.mjs 'if (AppConstants.MOZ_NORMANDY) {' 'FirstStartup optional Normandy call is guarded'
+check toolkit/components/nimbus/lib/ExperimentManager.sys.mjs 'ClientEnvironment: "resource://normandy/lib/ClientEnvironment.sys.mjs"' 'Nimbus depends on Normandy ClientEnvironment'
+check toolkit/components/nimbus/lib/ExperimentManager.sys.mjs 'NormandyUtils: "resource://normandy/lib/NormandyUtils.sys.mjs"' 'Nimbus depends on NormandyUtils'
+check toolkit/components/normandy/lib/ClientEnvironment.sys.mjs 'NormandyApi: "resource://normandy/lib/NormandyApi.sys.mjs"' 'shared ClientEnvironment loads NormandyApi'
+check toolkit/components/normandy/Normandy.sys.mjs 'await lazy.ExperimentAPI.init();' 'Normandy currently initiates Nimbus lifecycle'
+check toolkit/components/nimbus/FeatureManifest.yaml 'uri: "resource://normandy/schemas/LegacyHeartbeat.schema.json"' 'Nimbus legacy Heartbeat schema has Normandy URI'
 echo "PASS: $checks manifest rule checks against pinned Git HEAD $rev"
 echo "Report: $report"
 echo 'No source modification, configure change, compile or runtime regression performed.'
