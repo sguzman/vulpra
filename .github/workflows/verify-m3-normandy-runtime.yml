@@ -69,6 +69,8 @@ jobs:
           mkdir -p "$dest"
           cp "$RUNNER_TEMP/native-artifact/vulpra-normandy-candidate.tar.xz" "$dest/vulpra-local-m3-normandy-ci.tar.xz"
           (cd "$dest" && sha256sum vulpra-local-m3-normandy-ci.tar.xz > vulpra-local-m3-normandy-ci.tar.xz.sha256)
+          cp "$RUNNER_TEMP/native-artifact/m3-normandy-package.json" \
+            "$GITHUB_WORKSPACE/.git/vulpra-native-build/m3-normandy-package.json"
         env:
           GH_TOKEN: ${{ github.token }}
           NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -93,6 +95,9 @@ jobs:
         with:
           name: vulpra-m3-normandy-runtime-evidence
           path: |
+            .git/vulpra-native-build/packages/vulpra-local-m3-normandy-ci.tar.xz
+            .git/vulpra-native-build/packages/vulpra-local-m3-normandy-ci.tar.xz.sha256
+            .git/vulpra-native-build/m3-normandy-package.json
             .git/vulpra-native-build/m3-localhost-acceptance.json
             .git/vulpra-native-build/webextension-smoke-*.json
             .git/vulpra-native-build/webextension-geckodriver-*.log
