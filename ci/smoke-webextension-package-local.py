@@ -199,6 +199,28 @@ def verify_nimbus_ready(port: int, base: str) -> dict:
     return {"store_ready": True, "api_ready": True, "access": "CI-only isolated chrome context"}
 
 
+def verify_uninstall_stays_uninstalled(proof, seconds: float = 2.0) -> int:
+    """Require the removed extension to stay absent across an observation window.
+
+    A single immediate read after navigation can return None before a delayed
+    content script injects; it is not sufficient evidence that uninstall worked.
+    """
+    if seconds <= 0:
+        raise ValueError("The uninstall observation window must be positive")
+    deadline = time.monotonic() + seconds
+    samples = 0
+    while True:
+        if proof() is not None:
+            raise RuntimeError(
+                "WebExtension content script still injected after uninstall"
+            )
+        samples += 1
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return samples
+        time.sleep(min(0.25, remaining))
+
+
 def main() -> int:
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Code/Apps/vulpra").resolve()
     gecko = shutil.which("geckodriver")
@@ -310,9 +332,8 @@ def main() -> int:
                 print("PASS: Temporary unsigned WebExtension installed; content script, background messaging and storage.local executed", flush=True)
                 request(port, "POST", base + "/moz/addon/uninstall", {"id": addon_id})
                 navigate("uninstalled")
-                if proof() is not None:
-                    raise RuntimeError("WebExtension content script remained active after uninstall")
-                print("PASS: WebExtension uninstalled and no longer injects into new navigation", flush=True)
+                uninstall_samples = verify_uninstall_stays_uninstalled(proof)
+                print(f"PASS: WebExtension uninstall remained inactive across {uninstall_samples} repeated checks", flush=True)
                 nimbus_result = None
                 if nimbus_check:
                     nimbus_result = verify_nimbus_ready(port, base)
@@ -325,7 +346,9 @@ def main() -> int:
                     "package": archive.name,
                     "webextension": {"manifest_version": 2, "temporary_unsigned_install": True,
                                      "content_scripts": True, "background_messaging": True,
-                                     "storage_local": True, "uninstall": True},
+                                     "storage_local": True, "uninstall": True,
+                                     "post_uninstall_observation_seconds": 2.0,
+                                     "post_uninstall_samples": uninstall_samples},
                     "security": {"original_firefox_profile_preserved": True, "temporary_home": True},
                     "nimbus": nimbus_result,
                     "limits": ["Not a comprehensive security audit", "Does not test signed AMO extensions",
