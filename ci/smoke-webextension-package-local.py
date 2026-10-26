@@ -154,7 +154,7 @@ def main() -> int:
     if not gecko:
         raise RuntimeError(
             "Geckodriver not available. On EndeavourOS install official package "
-            "with: sudo pacman -S --needed geckodriver. No npm or pip required."
+            "with: yay -S --needed geckodriver. No npm or pip required."
         )
     archive = verified_archive(repo)
     print(f"PASS: Verified existing archive {archive.name}", flush=True)
