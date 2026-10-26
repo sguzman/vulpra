@@ -28,6 +28,7 @@ jobs:
       MOZ_HEADLESS: "1"
       SCCACHE_GHA_ENABLED: "true"
       SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
     steps:
       - name: Download checksum-verified lean package from successful M3 runtime run
         shell: bash
@@ -141,6 +142,35 @@ jobs:
           for k in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC"):
               assert str(get(k)) in ("1","True"),(k,get(k))
           print("PASS: native matched baseline includes Normandy and protected Linux features")
+          PY
+
+      - name: Match lean native build disk-backed swap capacity
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Firefox Rust codegen exhausted a 15 GiB hosted runner with its
+          # original 3 GiB swap. Mirror the lean build resource environment
+          # without changing the source or packaged browser functionality.
+          swap=/mnt/vulpra-m3-build.swap
+          bytes=$((24 * 1024 * 1024 * 1024))
+          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( available > bytes + 8 * 1024 * 1024 * 1024 )) || {
+            echo "Insufficient disk space for matched 24 GiB swap" >&2
+            exit 1
+          }
+          sudo fallocate -l 24G "$swap"
+          sudo chmod 0600 "$swap"
+          sudo mkswap "$swap"
+          sudo swapon "$swap"
+          sudo swapon --show
+          free -h
+          python3 - <<'PY'
+          from pathlib import Path
+          total_kib = next(int(line.split()[1]) for line in
+              Path("/proc/meminfo").read_text().splitlines()
+              if line.startswith("SwapTotal:"))
+          assert total_kib * 1024 >= 24 * 1024**3, total_kib
+          print("PASS: matched baseline uses active disk-backed swap and one Cargo job")
           PY
 
       - name: Compile independent full-Normandy baseline
