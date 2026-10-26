@@ -127,7 +127,9 @@
         "2026-10-26 11:15 local: User workstation ran read-only ci/m3-inventory-local.py successfully against its pinned checkout: 483753 Git-tracked blobs totaling 3633358256 bytes. Private inventory output: .git/vulpra-debloat/m3-source-inventory.json and .md. Output explicitly confirms no source writes/removal/build; group-level sizes and dependency reachability are not yet reviewed. Source-census subtask VERIFIED but no actual debloat removal or M3 acceptance gate claimed.",
         "2026-10-26: User supplied real M3 footprint tables from local Git HEAD ee223921: 483753 tracked files / 3633358256 Git blob bytes. Source top groups: third_party 942332791 B, testing 776789044 B, mobile 133582038 B, devtools 95216242 B. Full breakdown and interpretation recorded in docs/vulpra/DEBLOAT.md; inventory is not binary bloat or dependency reachability.",
         "2026-10-26: Classified 13 M3 code areas in docs/vulpra/DEBLOAT-CANDIDATES.json as protected, platform-source-only, compile-gated, or runtime-bundled; documented exact manifest evidence and unverified next dependencies. Read-only ci/m3-manifest-gates.sh confirmed 19 actual Git HEAD build-manifest invariants using partial Git blobs. Candidate-register validation, prior offline QA and workflow passed https://github.com/sguzman/vulpra/actions/runs/40372711439. No source removed or native package baseline comparison; M3 remains 0%.",
-        "2026-10-26: Read-only actual-config feature probe ci/m3-config-baseline-local.sh committed and passed synthetic flag/missing-key/no-writes tests in https://github.com/sguzman/vulpra/actions/runs/40373296581. Source-backed mechanism: Mozilla PartialConfigEnvironment reads obj-vulpra-linux/config.statusd/substs/<KEY> JSON values (python/mozbuild/mozbuild/backend/configenvironment.py). Target workstation flag values not yet supplied; no binary/feature-off result claimed."
+        "2026-10-26: Read-only actual-config feature probe ci/m3-config-baseline-local.sh committed and passed synthetic flag/missing-key/no-writes tests in https://github.com/sguzman/vulpra/actions/runs/40373296581. Source-backed mechanism: Mozilla PartialConfigEnvironment reads obj-vulpra-linux/config.statusd/substs/<KEY> JSON values (python/mozbuild/mozbuild/backend/configenvironment.py). Target workstation flag values not yet supplied; no binary/feature-off result claimed.",
+        "2026-10-26 12:14 America/Mexico_City user workstation: Real generated object-tree config values confirmed Linux/gtk/Vulpra 159.0, Sync=1, HealthReport=1, Normandy=1, DevTools=all, crashreporter=1, updater=1, sandbox=1, Wayland=1, has_remote=1, webdriver=1. MOZ_TELEMETRY_REPORTING, MOZ_GECKODRIVER, ENABLE_TESTS not recorded (unknown, not false). Read-only report .git/vulpra-debloat/m3-config-baseline.tsv. This is original built binary configuration; no new compile, no removals.",
+        "2026-10-26: Standalone read-only package census ci/m3-package-footprint-local.py staged on main. Synthetic tar.xz archive accounting, ZIP/omni feature-name indexing and bad/missing SHA refusal passed CI https://github.com/sguzman/vulpra/actions/runs/40376689384. Real workstation package-content metrics have not yet been supplied. No package or source changes made."
       ],
       "verified_preparatory_tasks": [
         {
@@ -144,9 +146,19 @@
           "id": "config-flag-reader-qa",
           "percent": 100,
           "evidence": "https://github.com/sguzman/vulpra/actions/runs/40373296581 verified Bash script parses representative config.statusd scalar metadata, respects missing/null keys and does not mutate source/build tree; real target config values outstanding."
+        },
+        {
+          "id": "real-native-config-flags",
+          "percent": 100,
+          "evidence": "Real workstation log 2026-10-26 12:14 from generated obj-vulpra-linux/config.statusd/substs via script; full flagged field results in DEBLOAT.md and DEBLOAT-CANDIDATES.json."
+        },
+        {
+          "id": "package-footprint-tool-qa",
+          "percent": 100,
+          "evidence": "CI run https://github.com/sguzman/vulpra/actions/runs/40376689384 uses synthetic checksum-verified Vulpra tarball with readable omni.ja and negative cases; real package audit pending."
         }
       ],
-      "status_note": "M3 source footprint and 13-group manifest-based classification verified. CI 40372711439 checked 19 actual build manifest conditions; CI 40373296581 passed read-only target-config parser synthetic tests. Target native config values, exhaustive reference scan, physical removals and before/after package measurements remain unverified. M3 percent remains 0 until eligible removals pass acceptance."
+      "status_note": "Actual Linux/GTK native configuration flags now observed from original built object tree (Sync, Normandy, health reporting, DevTools all, updater, crashreporter, Wayland, sandbox and remote automation included); telemetry reporting flag absent/unknown. 13-group candidate matrix and 19 manifest gates previously verified. Native package-content read-only audit runner passed synthetic CI and awaits actual tarball scan. No source changes, feature-off native rebuild or before/after package delta accepted. M3 remains 0% until first verified removal."
     },
     {
       "id": "M4",
@@ -184,6 +196,7 @@
     "2026-10-26: Initial actual M3 source census verified. The user's built local checkout remains pinned; on GitHub, main is 79 commits ahead and 0 behind the previously confirmed local built commit ee223921. This confirms ancestry only, NOT worktree cleanliness or permission to safely pull. Check local status before any fast-forward; avoid discarding known-good local build patches.",
     "2026-10-26: GitHub compared built local commit ee223921 to main: remote is 86 commits ahead, zero behind at check. Actual local status exactly 2 dirty build patches emitter.py/testing.py; normal blind git pull not yet safe. Standalone ci/sync-local-safe.sh backups + byte-identical remote patch precondition + ff-only. CI 40369168618 passed identity/mismatch/unrelated-dirty synthetic tests. Target workstation sync has NOT been run or verified.",
     "2026-10-26: M3 manifest-based classification advanced: 13 categories, 19 real Git-blob invariants verified in CI 40372711439; source paths selected for build are not equivalent to removable package bytes. No binary or source removals credited.",
-    "2026-10-26: Prepared no-rebuild source-of-truth target configuration baseline from Mozilla-generated JSON build substs; CI verified script, no workstation config output yet. No native debloat completed."
+    "2026-10-26: Prepared no-rebuild source-of-truth target configuration baseline from Mozilla-generated JSON build substs; CI verified script, no workstation config output yet. No native debloat completed.",
+    "2026-10-26: Target workstation native config flag observation closes preparation subtask, confirming actual optional features enabled; new package footprint auditor CI verified 40376689384. Unknown flags not treated as false. M3 0%, overall 33% because no feature removed and native binary re-tested."
   ]
 }
