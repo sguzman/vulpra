@@ -92,8 +92,8 @@ fi
 # A process that merely stays alive is insufficient; require a committed
 # non-null pixel buffer on an actual Wayland surface. Accept both common
 # libwayland object-ID renderings (wl_surface#1 and wl_surface@1).
-if ! grep -Eq 'wl_surface[#@][0-9]+\\.attach\\(wl_buffer[#@][0-9]+' "$work/browser.log" || \
-   ! grep -Eq 'wl_surface[#@][0-9]+\\.commit\\(' "$work/browser.log"; then
+if ! grep -Eq 'wl_surface[#@][0-9]+\.attach\(wl_buffer[#@][0-9]+' "$work/browser.log" || \
+   ! grep -Eq 'wl_surface[#@][0-9]+\.commit\(' "$work/browser.log"; then
   echo "Vulpra did not attach and commit a graphical Wayland frame" >&2
   tail -n 100 "$work/browser.log" >&2 || true
   exit 1
