@@ -2,7 +2,7 @@
 
 **Vulpra** is a personal, Linux-first Firefox-derived browser project. It targets x86-64 Linux with native Wayland/Hyprland use. It is independent of Mozilla and is not an official Firefox product.
 
-> **Status:** pinned Firefox 159.0b5 source imported successfully on GitHub; reproducible browser compilation and functional testing remain unverified. No Vulpra-specific browser fixes have been verified.
+> **Status (2026-10-26):** 🦊 **M2 working Linux browser 100% (5/5 gates)**. Native Vulpra 159.0b5 compiled successfully on the target EndeavourOS workstation and passed package/checksum, independent profile, headless rendering, Weston Wayland graphics, JavaScript/HTTP navigation, a recorded initial baseline and temporary WebExtension lifecycle (install/content/background/storage/uninstall) acceptance. **The personal baseline works; this is not yet a public distributable release, comprehensive security audit, automatic updater, debloated browser or Rust-only implementation.**
 
 ## Direction
 
@@ -14,6 +14,15 @@
 
 Avoid deleting security foundations, extension support, essential web standards or media functionality simply to make the source tree smaller. Track source size, packaged size, memory, startup time and build time separately.
 
+## Evidence-based progress
+
+- ✅ **M1 — Source foundation: 100%**
+- ✅ **M2 — Working Linux browser: 100%**, five actual acceptance gates complete on the target machine
+- 🔍 **M3 — Personal debloating: 0%**, read-only source inventory and candidate classification prepared, no removal credited
+- 🦀 **M4 — Defect fixes / Rust trajectory: 0%**, pending M3
+
+**Overall product roadmap: 33%** (equal-weight M2–M4; source scaffolding M1 excluded). Percentages are updated only for tested completion, not for roadmap or tooling preparation. Packaged size, source footprint, browser memory and startup measurements have separate provenance and must not be conflated. Upstream security maintenance and independent icon/trademark review remain necessary before distribution.
+
 ## Pinned source
 
 - Original project: [Mozilla Firefox source](https://github.com/mozilla-firefox/firefox)
@@ -22,7 +31,7 @@ Avoid deleting security foundations, extension support, essential web standards 
 - Tag target: `34ac0671eb25f31f8c56ace36e1c413dd471eb8d`
 - Release source: https://archive.mozilla.org/pub/firefox/releases/159.0b5/source/
 
-The `upstream-base` branch contains the original release source snapshot with Mozilla's two original workflow files restored. `main` contains that source and Vulpra's own governance files. **A source import is not a working browser. The compiled build is still unverified.**
+The `upstream-base` branch contains the original release source snapshot with Mozilla's two original workflow files restored. `main` contains that source and Vulpra's own governance files. The **first workstation browser build and runtime acceptance are now verified**; see the evidence in the progress ledger. The workstation source remains pinned at its build-tested commit rather than pulled forward merely to run small standalone QA scripts.
 
 ## Project records
 
@@ -30,6 +39,7 @@ The `upstream-base` branch contains the original release source snapshot with Mo
 - [Roadmap and acceptance gates](docs/vulpra/ROADMAP.md)
 - [Resumable source download and first local build](docs/vulpra/LOCAL-BUILD.md)
 - [Progress ledger](docs/vulpra/PROGRESS.json)
+- [M3 debloat candidates and measurement rules](docs/vulpra/DEBLOAT.md)
 - [Upstream provenance and license handling](docs/vulpra/UPSTREAM.md)
 - [Import procedure and recovery](docs/vulpra/IMPORT.md)
 - [Decisions](docs/vulpra/DECISIONS.md)
