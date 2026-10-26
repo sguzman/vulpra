@@ -34,6 +34,16 @@ MISSING="$STATE_DIR/missing-$COMMIT.txt"
 BATCH_DIR="$STATE_DIR/batches"
 mkdir -p "$BATCH_DIR"
 
+# Prevent concurrent runs from overwriting one another's inventory and batches.
+# The kernel releases this lock automatically when this process exits.
+LOCK="$STATE_DIR/download.lock"
+exec 9>"$LOCK"
+if ! flock -n 9; then
+  echo "ERROR: A Vulpra source download is already running for $REPO." >&2
+  echo "Do not start another copy; check the active download log: $LOG" >&2
+  exit 3
+fi
+
 log() {
   printf '%s\n' "$*" | tee -a "$LOG"
 }
