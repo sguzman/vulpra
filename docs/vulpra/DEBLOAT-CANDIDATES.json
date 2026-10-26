@@ -176,8 +176,36 @@
         "toolkit/components/moz.build: includes normandy when MOZ_BUILD_APP=browser",
         "toolkit/moz.configure: data_reporting dependency"
       ],
-      "next": "Both enabled. Inspect runtime bundle contents, remote experiments references, and selectively reconfigure in an isolated experiment; preserve crash/security reporting.",
-      "observed_actual_config": "MOZ_NORMANDY=\"1\" and MOZ_SERVICES_HEALTHREPORT=\"1\""
+      "next": "Review native omni.ja path-hint sizes from local baseline; map remaining resource://normandy callers. Compile alternate build only if justified; then package separately and run full M2 acceptance plus before/after byte comparison.",
+      "observed_actual_config": "MOZ_NORMANDY=\"1\" and MOZ_SERVICES_HEALTHREPORT=\"1\"",
+      "experimental_compile_variant": {
+        "feature": "Normandy only; health reporting remains unchanged",
+        "opt_in_flag": "VULPRA_EXPERIMENT_NO_NORMANDY=1",
+        "experimental_mozconfig": "ci/mozconfig-linux-normandy-experiment",
+        "experimental_objdir": "obj-vulpra-linux-normandy-experiment",
+        "source_changes": [
+          "browser/moz.configure conditional default-on implication",
+          "toolkit/components/moz.build conditional Normandy DIRS traversal",
+          "browser/components/BrowserComponents.manifest conditional startup and shutdown callbacks"
+        ],
+        "configure_ci": "https://github.com/sguzman/vulpra/actions/runs/40379371528",
+        "source_regression_ci": "https://github.com/sguzman/vulpra/actions/runs/40379675945",
+        "configured_normandy": false,
+        "protected_flags_preserved": [
+          "MOZ_WIDGET_TOOLKIT=gtk",
+          "MOZ_WAYLAND=1",
+          "MOZ_SANDBOX=1",
+          "MOZ_DEVTOOLS=all",
+          "MOZ_SERVICES_SYNC=1",
+          "MOZ_APP_BASENAME=Vulpra"
+        ],
+        "compiled_browser_verified": false,
+        "runtime_smoke_verified": false,
+        "measured_size_delta_bytes": null,
+        "accepted_m3_removal": false,
+        "risk": "Normandy module clients beyond manifest not globally reference-audited; feature-off binary may expose missing resource imports.",
+        "next": "Review native omni.ja path-hint sizes from local baseline; map remaining resource://normandy callers. Compile alternate build only if justified; then package separately and run full M2 acceptance plus before/after byte comparison."
+      }
     },
     {
       "id": "devtools_client",
