@@ -67,11 +67,20 @@ def wait_ready(port: int, proc: subprocess.Popen, seconds: float = 25) -> None:
 
 
 def select_binary(appdir: Path) -> Path:
+    """Select the actual Linux native executable, not the protective wrapper.
+
+    The staged candidate has a 'vulpra' Bash launcher that refuses --profile,
+    which is correct for end users. Geckodriver supplies its own isolated
+    temporary profile, so its automation executable must be the native ELF
+    alongside that wrapper. This test always uses a disposable HOME.
+    """
     for name in ("vulpra", "firefox"):
         binary = appdir / name
         if binary.is_file() and os.access(binary, os.X_OK):
-            return binary
-    raise RuntimeError("Packaged Vulpra binary missing")
+            with binary.open("rb") as stream:
+                if stream.read(4) == b"\\x7fELF":
+                    return binary
+    raise RuntimeError("No actual native ELF Vulpra browser found beside application.ini")
 
 
 def verified_archive(repo: Path) -> Path:
