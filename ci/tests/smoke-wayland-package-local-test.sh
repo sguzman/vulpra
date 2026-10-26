@@ -27,7 +27,15 @@ set -Eeuo pipefail
 mkdir -p "$XDG_DATA_HOME/vulpra/default"
 if [[ "${MOCK_GUI_EARLY_EXIT:-0}" == 1 ]]; then exit 9; fi
 if [[ "${MOCK_GUI_NO_SURFACE:-0}" != 1 ]]; then
-  echo '[00000] -> xdg_surface@19.get_toplevel(new id xdg_toplevel@22)' >&2
+  # The # form is the actual libwayland trace observed on EndeavourOS.
+  sep="#"
+  [[ "${MOCK_GUI_OBJECT_STYLE:-hash}" != at ]] || sep="@"
+  if [[ "${MOCK_GUI_NO_ATTACH:-0}" != 1 ]]; then
+    echo "[15:54:18.662104] -> wl_surface${sep}13.attach(wl_buffer${sep}45, 0, 0)" >&2
+  fi
+  if [[ "${MOCK_GUI_NO_COMMIT:-0}" != 1 ]]; then
+    echo "[15:54:18.662106] -> wl_surface${sep}13.commit()" >&2
+  fi
 fi
 sleep 15
 BROWSER
@@ -57,16 +65,36 @@ PATH="$R/bin:$PATH" VULPRA_WAYLAND_TEST_SECONDS=1 bash "$RUNNER" "$R/repo" > "$R
   cat "$R/pass.log"
   exit 1
 }
-grep -Fq 'PASS: Packaged Vulpra connected to private Weston' "$R/pass.log"
+grep -Fq 'PASS: Packaged Vulpra connected to private Weston, attached and committed Wayland buffers' "$R/pass.log"
 test "$(find "$R/repo/.git/vulpra-native-build" -name 'wayland-browser-*.log' | wc -l)" -eq 1
-echo 'PASS: graphical protocol surface and isolated profile gate passed'
+echo 'PASS: actual libwayland hash-ID buffer attach and commit, isolated profile gate passed'
 set +e
 PATH="$R/bin:$PATH" VULPRA_WAYLAND_TEST_SECONDS=1 MOCK_GUI_NO_SURFACE=1 bash "$RUNNER" "$R/repo" > "$R/nosurface.log" 2>&1
 result=$?
 set -e
 [[ "$result" == 5 ]] || { cat "$R/nosurface.log"; echo "FAIL: no-surface expected exit 5, received $result"; exit 2; }
-grep -Fq 'No graphical xdg_surface/toplevel' "$R/nosurface.log"
+grep -Fq 'No Wayland surface buffer attachment and frame commit' "$R/nosurface.log"
 echo 'PASS: rejects process that stays alive without creating a Wayland surface'
+# Alternate older Wayland debug object formatting must also be supported.
+PATH="$R/bin:$PATH" VULPRA_WAYLAND_TEST_SECONDS=1 MOCK_GUI_OBJECT_STYLE=at bash "$RUNNER" "$R/repo" > "$R/at-style.log" 2>&1 || {
+  cat "$R/at-style.log"; exit 5;
+}
+grep -Fq 'PASS: Packaged Vulpra connected to private Weston' "$R/at-style.log"
+echo 'PASS: old libwayland at-ID object formatting'
+# Surface creation alone is insufficient: require a non-null buffer attachment
+# and a committed frame. A browser can remain alive without drawing.
+set +e
+PATH="$R/bin:$PATH" VULPRA_WAYLAND_TEST_SECONDS=1 MOCK_GUI_NO_ATTACH=1 bash "$RUNNER" "$R/repo" > "$R/noattach.log" 2>&1
+result=$?
+set -e
+[[ "$result" == 5 ]] || { cat "$R/noattach.log"; echo "FAIL: no-attach expected 5, got $result"; exit 6; }
+echo 'PASS: alive process with only surface commits is rejected'
+set +e
+PATH="$R/bin:$PATH" VULPRA_WAYLAND_TEST_SECONDS=1 MOCK_GUI_NO_COMMIT=1 bash "$RUNNER" "$R/repo" > "$R/nocommit.log" 2>&1
+result=$?
+set -e
+[[ "$result" == 5 ]] || { cat "$R/nocommit.log"; echo "FAIL: no-commit expected 5, got $result"; exit 7; }
+echo 'PASS: attached but uncommitted buffer is rejected'
 set +e
 PATH="$R/bin:$PATH" VULPRA_WAYLAND_TEST_SECONDS=1 MOCK_GUI_EARLY_EXIT=1 bash "$RUNNER" "$R/repo" > "$R/earlyexit.log" 2>&1
 result=$?
