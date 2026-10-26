@@ -1,0 +1,178 @@
+name: M3 Prebuild Source-Matched Full Normandy Baseline
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/build-m3-normandy-matched-baseline.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vulpra-m3-prebuilt-full-normandy-286627af
+  cancel-in-progress: false
+jobs:
+  full-normandy-baseline:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      CANDIDATE_SHA: 286627afec2cb141a3d6e553eac41954847db5b4
+      MOZ_HEADLESS: "1"
+      DEBIAN_FRONTEND: noninteractive
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
+    steps:
+      - name: Check out exact candidate source for original full Normandy
+        uses: actions/checkout@v4
+        with:
+          ref: 286627afec2cb141a3d6e553eac41954847db5b4
+          fetch-depth: 1
+      - name: Verify pinned source and matched mozconfig options
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          echo "MOZCONFIG=$GITHUB_WORKSPACE/ci/mozconfig-linux-m3-baseline" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          from pathlib import Path
+          full=Path("ci/mozconfig-linux-m3-baseline").read_text()
+          lean=Path("ci/mozconfig-linux-normandy-experiment").read_text()
+          def norm(s):
+              return [line.strip() for line in s.splitlines()
+                      if line.strip() and not line.lstrip().startswith("#")
+                      and not line.startswith("mk_add_options MOZ_OBJDIR=")
+                      and line.strip() != "export VULPRA_EXPERIMENT_NO_NORMANDY=1"]
+          assert norm(full)==norm(lean)
+          assert "obj-vulpra-linux-m3-baseline" in full
+          assert "VULPRA_EXPERIMENT_NO_NORMANDY=1" not in full
+          print("PASS: same source and non-Normandy build options")
+          PY
+      - name: Prepare Mozilla compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+      - name: Export Actions compiler-cache credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - name: Bootstrap native Linux toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends python3 python3-venv python3-dev git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+      - name: Configure protected full-Normandy feature set
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach configure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("obj-vulpra-linux-m3-baseline/config.statusd/substs")
+          def get(k):
+              p=root/k
+              return json.loads(p.read_text()) if p.exists() else None
+          assert str(get("MOZ_NORMANDY")) in ("1","True"),get("MOZ_NORMANDY")
+          assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
+          assert get("MOZ_APP_BASENAME")=="Vulpra"
+          assert get("MOZ_DEVTOOLS")=="all"
+          for k in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC"):
+              assert str(get(k)) in ("1","True"),(k,get(k))
+          print("PASS: full Normandy and protected features")
+          PY
+      - name: Match native candidate 24 GiB swap and one Cargo job
+        shell: bash
+        run: |
+          set -euo pipefail
+          swap=/mnt/vulpra-m3-build.swap
+          bytes=$((24 * 1024 * 1024 * 1024))
+          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( available > bytes + 8 * 1024 * 1024 * 1024 ))
+          sudo fallocate -l 24G "$swap"
+          sudo chmod 0600 "$swap"
+          sudo mkswap "$swap"
+          sudo swapon "$swap"
+          python3 - <<'PY'
+          from pathlib import Path
+          kib=next(int(x.split()[1]) for x in Path("/proc/meminfo").read_text().splitlines() if x.startswith("SwapTotal:"))
+          assert kib*1024 >= 24*1024**3
+          print("PASS: same native-build swap/Cargo resources")
+          PY
+      - name: Compile original full-Normandy browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            while :; do
+              echo "--- Matched baseline $(date -u +%FT%TZ) ---"
+              free -h
+              df -h .
+              sleep 90
+            done
+          ) &
+          monitor=$!
+          trap 'kill "$monitor" 2>/dev/null || true' EXIT
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-full-baseline-build.log"
+      - name: Package original Normandy and produce source-pinned evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist=obj-vulpra-linux-m3-baseline/dist
+          mapfile -d '' -t packages < <(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print0)
+          [[ "${#packages[@]}" -eq 1 ]] || { echo "Expected one native baseline archive" >&2; exit 1; }
+          bash packaging/stage.sh "${packages[0]}" "$RUNNER_TEMP/full-normandy-baseline.tar.xz"
+          (cd "$RUNNER_TEMP" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          python3 - <<'PY'
+          import hashlib,io,json,os,tarfile,zipfile
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          archive=root/"full-normandy-baseline.tar.xz"
+          entries=set()
+          with tarfile.open(archive,"r:xz") as tf:
+              for item in tf:
+                  if item.isfile() and item.name.endswith("/omni.ja"):
+                      with zipfile.ZipFile(io.BytesIO(tf.extractfile(item).read())) as jar:
+                          entries.update(jar.namelist())
+          assert any(n.endswith("res/normandy/Normandy.sys.mjs") for n in entries)
+          report={"schema_version":1,"source_commit":os.environ["CANDIDATE_SHA"],
+                  "runner":"ubuntu-24.04","variant":"full-normandy",
+                  "sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),
+                  "compressed_bytes":archive.stat().st_size,
+                  "normandy_runner_present":True,
+                  "scope":"Baseline only; no savings accepted without source-pinned lean runtime"}
+          (root/"m3-full-normandy-baseline.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Preserve original matched baseline artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-m3-normandy-matched-full-baseline
+          path: |
+            ${{ runner.temp }}/full-normandy-baseline.tar.xz
+            ${{ runner.temp }}/full-normandy-baseline.tar.xz.sha256
+            ${{ runner.temp }}/m3-full-normandy-baseline.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve bounded build failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/m3-full-baseline-build.log" ]]; then
+            tail -n 3000 "$RUNNER_TEMP/m3-full-baseline-build.log" > "$RUNNER_TEMP/m3-full-baseline-failure-tail.log"
+          fi
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-m3-parallel-baseline-diagnostics
+          path: ${{ runner.temp }}/m3-full-baseline-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
