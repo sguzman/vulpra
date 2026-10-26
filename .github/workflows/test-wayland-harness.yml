@@ -83,8 +83,8 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
-          printf '%s\\n' '-> wl_surface#13.attach(wl_buffer#45, 0, 0)' >&2
-          printf '%s\\n' '-> wl_surface#99.commit()' >&2
+          printf '%s\n' '-> wl_surface#13.attach(wl_buffer#45, 0, 0)' >&2
+          printf '%s\n' '-> wl_surface#99.commit()' >&2
           sleep 30
           MOCK
           chmod +x "$temp/package/firefox"
