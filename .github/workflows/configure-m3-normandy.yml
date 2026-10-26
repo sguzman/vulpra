@@ -9,6 +9,11 @@ on:
       - browser/moz.configure
       - browser/components/BrowserComponents.manifest
       - toolkit/components/moz.build
+      - toolkit/components/normandy/moz.build
+      - toolkit/components/normandy/vulpra-shared.jar.mn
+      - toolkit/components/nimbus/moz.build
+      - toolkit/components/nimbus/NimbusBootstrap.sys.mjs
+      - browser/components/DesktopActorRegistry.sys.mjs
   workflow_dispatch:
 
 permissions:
@@ -70,6 +75,35 @@ jobs:
           assert value("MOZ_DEVTOOLS") == "all", value("MOZ_DEVTOOLS")
           print("PASS: Separate M3 native configure disabled Normandy while preserving GTK, sandbox, Sync, Wayland, DevTools, app identity")
           print("CONFIGURE ONLY: no alternate browser compiled, shipped, or runtime-tested.")
+          PY
+
+      - name: Validate lean source and Nimbus preservation invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          def data(path):
+              return Path(path).read_text()
+          shared = data("toolkit/components/normandy/vulpra-shared.jar.mn")
+          for name in ("ClientEnvironment.sys.mjs", "NormandyApi.sys.mjs",
+                       "NormandyUtils.sys.mjs", "LegacyHeartbeat.schema.json"):
+              assert name in shared, name
+          for name in ("Normandy.sys.mjs", "RecipeRunner.sys.mjs",
+                       "ShieldFrameParent.sys.mjs", "ShieldFrameChild.sys.mjs"):
+              assert name not in shared, name
+          assert 'JAR_MANIFESTS += ["jar.mn"]' in data("toolkit/components/normandy/moz.build")
+          assert 'JAR_MANIFESTS += ["vulpra-shared.jar.mn"]' in data("toolkit/components/normandy/moz.build")
+          assert 'DIRS += ["normandy"]' in data("toolkit/components/moz.build")
+          assert 'MOZ_SRC_FILES += ["NimbusBootstrap.sys.mjs"]' in data("toolkit/components/nimbus/moz.build")
+          manifest = data("browser/components/BrowserComponents.manifest")
+          assert "NimbusBootstrap.sys.mjs NimbusBootstrap.init" in manifest
+          actor = data("browser/components/DesktopActorRegistry.sys.mjs")
+          assert "if (!AppConstants.MOZ_NORMANDY)" in actor
+          assert "delete JSWINDOWACTORS.ShieldFrame;" in actor
+          assert "await ExperimentAPI.init();" in data("toolkit/components/nimbus/NimbusBootstrap.sys.mjs")
+          print("PASS: lean resources and preserved Nimbus startup have explicit source guards")
+          print("CONFIGURE AND SOURCE ONLY: native package and runtime remain unverified")
           PY
 
       - name: Record runner resource diagnostics
