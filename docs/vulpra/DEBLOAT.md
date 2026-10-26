@@ -282,6 +282,15 @@ was added to compile, package and smoke-test this branch in hosted Ubuntu.
 Hosted package metrics must not be misrepresented as a same-toolchain comparison
 with the known-good Arch workstation 84,044,920-byte baseline.
 
+The acceptance path is now wired without workstation commands:
+
+1. [Native candidate build](https://github.com/sguzman/vulpra/actions/workflows/build-m3-normandy.yml) compiles the experimental GTK target, stages/checksums the tarball, verifies resource presence/absence and runs headless/Weston startup probes.
+2. Only after that job succeeds, [packaged runtime acceptance](https://github.com/sguzman/vulpra/actions/workflows/verify-m3-normandy-runtime.yml) downloads the exact checksum-verified artifact and exercises localhost JS redirect, browser profile isolation and a temporary WebExtension lifecycle using geckodriver.
+3. Only after runtime acceptance succeeds, [matched source/build-size comparison](https://github.com/sguzman/vulpra/actions/workflows/compare-m3-normandy-size.yml) uses the same full source commit and Ubuntu build options in an *additional* isolated normal full-Normandy build. It records the compressed and unpacked byte deltas and refuses positive-debloat status if there are no compressed savings.
+
+The matched baseline uses `ci/mozconfig-linux-m3-baseline`; neither CI candidate object tree targets `obj-vulpra-linux`, and no CI step touches workstation files. A source-authenticated CI package is not proof of the local user's binary contents. All three stages require **actual passing workflow results** before this experiment can earn M3 completion. The workflows themselves are preparation and contribute zero percentage.
+
+
 **Status: M3 0% (delta 0 pp).** No independently accepted removal or package
 size savings. The lean binary, runtime Nimbus behavior, full WebExtension
 acceptance and matched-toolchain package delta remain unverified.
