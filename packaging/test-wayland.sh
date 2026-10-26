@@ -101,8 +101,8 @@ import sys
 from pathlib import Path
 
 attached = set()
-attach = re.compile(r"wl_surface([#@][0-9]+)\\.attach\\(wl_buffer[#@][0-9]+")
-commit = re.compile(r"wl_surface([#@][0-9]+)\\.commit\\(")
+attach = re.compile(r"wl_surface([#@][0-9]+)\.attach\(wl_buffer[#@][0-9]+")
+commit = re.compile(r"wl_surface([#@][0-9]+)\.commit\(")
 for line in Path(sys.argv[1]).open(encoding="utf-8", errors="replace"):
     found_attach = attach.search(line)
     if found_attach:
