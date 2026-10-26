@@ -175,8 +175,29 @@ upstream security update policy and broader security maintenance. M2
 completion is not a claim of comprehensive browser security or a finished
 Rust-only browser.
 
-**Git workflow:** Development is on `main`. The workstation checkout remains
-pinned to its existing HEAD and can retain uncommitted local build patches.
-Standalone runners are downloaded into the user's home directory; running
-them never requires a source reset, full rebuild or Git pull. The hosted full
-browser build remains manual-only.
+## Safe synchronization after the first workstation build
+
+**Do not assume a successful build or a read-only source inventory updated
+Git.** As of 2026-10-26 GitHub `main` was 79 commits ahead, zero behind the
+last-confirmed build-tested local commit `ee223921`. This means it is a
+fast-forward history **if the workstation still points at that commit**, not
+that the working tree is clean.
+
+Before any merge/pull, inspect local state from inside the workstation repo:
+
+```fish
+cd ~/Code/Apps/vulpra
+git status --short --branch
+git rev-parse HEAD
+git config --bool core.sparseCheckout
+```
+
+A status containing modifications (including local build-system patches),
+untracked conflicts or an unexpected branch needs review before updating.
+Never discard working changes, run `git reset --hard`, or delete the object
+directory just to sync. After checking the status, use **`git pull --ff-only`**
+rather than an implicit merge or rebase when a clean, complete fast-forward is
+confirmed. A fast-forward updates source history; it does not retroactively
+certify the new HEAD's compiled runtime. Keep the verified native tarball and
+its acceptance evidence intact until another build is tested.
+
