@@ -1,6 +1,6 @@
 # Vulpra native Linux build
 
-**Status (2026-10-26):** Native Vulpra was successfully compiled, launched headlessly, packaged into a separate tar.xz and launched again from that standalone package with checksum and private-profile checks on the target Linux workstation. Graphical Wayland, browser feature/security and real baseline measurement gates remain open.
+**Status (2026-10-26):** Native Vulpra was compiled and packaged successfully on the target Linux workstation, launched headlessly from its independent tar.xz with checksum/profile checks, and passed a real graphical startup test against isolated Weston (Wayland buffer attachments and commits). Actual automated navigation/JavaScript, extension/security smoke and real baseline measurement gates remain open.
 
 ## 1. Finish the full-source checkout
 
@@ -100,10 +100,40 @@ accepted as a graphical test. Logs live under
 temporary extracted archive. This still does not prove navigation,
 extensions, security or visual accuracy.
 
-## 6. Remaining acceptance gates
+## 6. Test packaged navigation, JavaScript, profile isolation and baseline
 
-Complete graphical Wayland startup, then automated navigation, extension
-compatibility, security/profile and actual size/runtime baseline measurements.
+Retrieve the one-shot offline/localhost-only acceptance probe. It reuses the
+existing staged package and requires no rebuild, Git pull, new dependencies,
+browser installation or manual QA:
+
+```fish
+curl -fL --retry 20 --retry-all-errors -o ~/vulpra-accept-native.py https://raw.githubusercontent.com/sguzman/vulpra/main/ci/accept-native-package-local.py
+and python ~/vulpra-accept-native.py
+```
+
+The probe verifies the tarball SHA-256, extracts to a temporary directory,
+asserts that the private `vulpra-launch` wrapper refuses an external profile
+override, and starts a loopback-only HTTP server on `127.0.0.1`. The real
+browser must follow an in-page JavaScript redirect, execute JavaScript on
+the target page that makes a local HTTP request, produce a PNG screenshot,
+and preserve a preexisting fake Firefox profile untouched. The real installed
+Firefox and its profile are not used.
+
+A successful run writes `acceptance-<date>.json`, browser startup logs and a
+PNG under `.git/vulpra-native-build/`. Baseline fields include the archive
+hash/bytes, executable size, optional libxul size, successfully completed
+incremental `mach build` duration from the existing logs, measured
+startup/navigation/screenshot wall time and sampled parent-process RSS.
+Do not mistake parent RSS for total multiprocess Firefox memory. An
+unsuccessful local run is not a product gate; only actual workstation PASS
+counts. Synthetic negative-case regression tests pass in
+https://github.com/sguzman/vulpra/actions/runs/40355994838.
+
+## 7. Remaining acceptance gates
+
+After actual navigation and baseline data, WebExtension loading/compatibility
+and the remaining security checks still need independent observable evidence.
+Passing the full gated suite is not a comprehensive browser security audit.
 Only observed native results count as product progress.
 
 **Git workflow:** Development is on `main`. The workstation checkout remains
