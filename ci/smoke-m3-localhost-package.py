@@ -17,6 +17,8 @@ import tarfile
 import tempfile
 import threading
 import time
+import struct
+import zlib
 
 class Page(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -61,6 +63,50 @@ def source_archive(repo):
     if not parts or digest.lower() != parts[0].lower():
         raise RuntimeError("Checksum mismatch; refusing package launch")
     return archive, digest
+
+
+def verify_png_screenshot(path):
+    """Validate a complete PNG container, not just its eight magic bytes.
+
+    This verifies screenshot framing and CRCs, not the visible page content.
+    """
+    if not path.is_file():
+        raise RuntimeError("Invalid screenshot PNG: file missing")
+    data = path.read_bytes()
+    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        raise RuntimeError("Invalid screenshot PNG: signature missing")
+    cursor = 8
+    dimensions = None
+    has_image_data = False
+    finished = False
+    while cursor + 12 <= len(data):
+        length = struct.unpack_from(">I", data, cursor)[0]
+        kind = data[cursor + 4:cursor + 8]
+        end = cursor + 12 + length
+        if end > len(data):
+            raise RuntimeError("Invalid screenshot PNG: truncated chunk")
+        content = data[cursor + 8:cursor + 8 + length]
+        crc = struct.unpack_from(">I", data, cursor + 8 + length)[0]
+        if zlib.crc32(kind + content) & 0xffffffff != crc:
+            raise RuntimeError("Invalid screenshot PNG: chunk CRC mismatch")
+        if dimensions is None:
+            if kind != b"IHDR" or length != 13:
+                raise RuntimeError("Invalid screenshot PNG: missing IHDR")
+            width, height = struct.unpack_from(">II", content)
+            if not width or not height:
+                raise RuntimeError("Invalid screenshot PNG: zero dimensions")
+            dimensions = [width, height]
+        if kind == b"IDAT":
+            has_image_data = True
+        if kind == b"IEND":
+            if length or not has_image_data or end != len(data):
+                raise RuntimeError("Invalid screenshot PNG: incomplete or trailing image data")
+            finished = True
+            break
+        cursor = end
+    if not finished:
+        raise RuntimeError("Invalid screenshot PNG: missing complete IEND")
+    return dimensions
 
 
 def main():
@@ -110,8 +156,7 @@ def main():
         elapsed = round(time.monotonic() - start, 3)
         if proc.returncode != 0:
             raise RuntimeError("Browser exited " + str(proc.returncode) + ": " + proc.stderr[-1200:])
-        if not png.is_file() or png.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
-            raise RuntimeError("No valid browser screenshot after JS redirect")
+        image_dimensions = verify_png_screenshot(png)
         # Firefox may independently request /favicon.ico while capturing the
         # screenshot. It is not evidence of JavaScript navigation and must
         # neither count as an extra functional step nor conceal unknown calls.
@@ -129,6 +174,8 @@ def main():
             "incidental_favicon_requests": server.paths.count("/favicon.ico"),
             "elapsed_seconds": elapsed,
             "profile_isolation": True, "screenshot_png_signature": True,
+            "screenshot_png_complete_and_crc_valid": True,
+            "screenshot_dimensions": image_dimensions,
             "limits": ["Does not prove full browser UI correctness",
                        "Does not prove Nimbus runtime integration",
                        "Not a same-toolchain package-size comparison"],
