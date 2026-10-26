@@ -16,6 +16,10 @@ on:
       - ci/m3-manifest-gates.sh
       - ci/m3-config-baseline-local.sh
       - ci/m3-package-footprint-local.py
+      - ci/mozconfig-linux-normandy-experiment
+      - browser/moz.configure
+      - browser/components/BrowserComponents.manifest
+      - toolkit/components/moz.build
       - docs/vulpra/DEBLOAT-CANDIDATES.json
       - docs/vulpra/DEBLOAT.md
       - ci/tests/**
@@ -63,6 +67,7 @@ jobs:
           bash -n ci/m3-config-baseline-local.sh
           bash -n ci/tests/m3-config-baseline-test.sh
           bash -n ci/tests/m3-package-footprint-test.sh
+          bash -n ci/tests/m3-normandy-optout-test.sh
           python3 -m py_compile ci/m3-package-footprint-local.py
           bash -n ci/tests/sync-local-safe-test.sh
           python3 -m py_compile ci/accept-native-package-local.py
@@ -104,6 +109,9 @@ jobs:
 
       - name: Test read-only archived Vulpra resource census
         run: bash ci/tests/m3-package-footprint-test.sh "$PWD/ci/m3-package-footprint-local.py"
+
+      - name: Test opt-in Normandy packaging and manifest conditionals
+        run: bash ci/tests/m3-normandy-optout-test.sh "$PWD"
 
       - name: Validate classified M3 candidate register
         run: |
