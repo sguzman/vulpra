@@ -1,0 +1,39 @@
+name: M3 Validate Packaged Runtime Harness
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/test-m3-localhost-smoke.py
+      - ci/smoke-m3-localhost-package.py
+      - ci/smoke-webextension-package-local.py
+      - .github/workflows/qa-m3-runtime-harness.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-runtime-fixtures:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout test harness only
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Check syntax of packaged browser acceptance scripts
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            ci/smoke-m3-localhost-package.py \
+            ci/test-m3-localhost-smoke.py \
+            ci/smoke-webextension-package-local.py
+      - name: Validate local JS redirect, private home and checksum refusal with mock package
+        run: |
+          set -euo pipefail
+          python3 ci/test-m3-localhost-smoke.py
+          echo "QA fixture only: native Firefox compilation/browser behavior are NOT tested here."
