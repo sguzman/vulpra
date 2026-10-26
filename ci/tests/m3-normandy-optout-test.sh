@@ -87,9 +87,12 @@ assert "delete JSWINDOWACTORS.ShieldFrame;" in registry
 wayland = source("packaging/test-wayland.sh")
 assert "WAYLAND_DEBUG=client" in wayland
 assert "'xdg_wm_base'" in wayland
-assert "wl_surface[#@][0-9]+" in wayland
-assert ".attach" in wayland and ".commit" in wayland
-assert "wl_buffer[#@][0-9]+" in wayland
+assert 'wl_surface([#@][0-9]+)' in wayland
+assert '.attach' in wayland and '.commit' in wayland
+assert 'wl_buffer[#@][0-9]+' in wayland
+assert 'found_commit.group(1) in attached' in wayland
+assert 'attached.add(found_attach.group(1))' in wayland
+print("PASS: Wayland frame evidence pairs real buffer attachment with a later commit on the same surface")
 
 # Do not claim matched source/toolchain without matched native resource policy.
 native_ci = source(".github/workflows/build-m3-normandy.yml")
