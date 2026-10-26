@@ -131,7 +131,8 @@
         "2026-10-26 12:14 America/Mexico_City user workstation: Real generated object-tree config values confirmed Linux/gtk/Vulpra 159.0, Sync=1, HealthReport=1, Normandy=1, DevTools=all, crashreporter=1, updater=1, sandbox=1, Wayland=1, has_remote=1, webdriver=1. MOZ_TELEMETRY_REPORTING, MOZ_GECKODRIVER, ENABLE_TESTS not recorded (unknown, not false). Read-only report .git/vulpra-debloat/m3-config-baseline.tsv. This is original built binary configuration; no new compile, no removals.",
         "2026-10-26: Standalone read-only package census ci/m3-package-footprint-local.py staged on main. Synthetic tar.xz archive accounting, ZIP/omni feature-name indexing and bad/missing SHA refusal passed CI https://github.com/sguzman/vulpra/actions/runs/40376689384. Real workstation package-content metrics have not yet been supplied. No package or source changes made.",
         "2026-10-26 12:28 user workstation: Real native packaged Vulpra baseline scanned and SHA-256 verified using ci/m3-package-footprint-local.py. Tarball compressed size exactly 84,044,920 B; sum of regular tar members 324,566,909 B; two omni.ja resource indexes found. Private report .git/vulpra-debloat/m3-package-footprint.{json,md}. Tool printed no source/build/output/profile modifications. Detailed per-feature resource table not in uploaded log; no savings or removal claimed.",
-        "2026-10-26: First opt-in experimental feature exclusion configured successfully on GitHub Actions (run https://github.com/sguzman/vulpra/actions/runs/40379371528): source main changed only so flag VULPRA_EXPERIMENT_NO_NORMANDY suppresses MOZ_NORMANDY implication, Normandy moz.build directory conditional, both startup/shutdown manifest registrations conditional, separate obj-vulpra-linux-normandy-experiment. Verified alternate configure without Normandy and with GTK/Wayland/sandbox/Sync/DevTools/Vulpra identity preserved. Offline source guards passed https://github.com/sguzman/vulpra/actions/runs/40379675945. NO alternate native browser compilation or runtime/package reduction verified; M3 stays 0%."
+        "2026-10-26: First opt-in experimental feature exclusion configured successfully on GitHub Actions (run https://github.com/sguzman/vulpra/actions/runs/40379371528): source main changed only so flag VULPRA_EXPERIMENT_NO_NORMANDY suppresses MOZ_NORMANDY implication, Normandy moz.build directory conditional, both startup/shutdown manifest registrations conditional, separate obj-vulpra-linux-normandy-experiment. Verified alternate configure without Normandy and with GTK/Wayland/sandbox/Sync/DevTools/Vulpra identity preserved. Offline source guards passed https://github.com/sguzman/vulpra/actions/runs/40379675945. NO alternate native browser compilation or runtime/package reduction verified; M3 stays 0%.",
+        "2026-10-26: Full-source Normandy dependency scanner ci/m3-normandy-reference-audit.py and push-triggered GitHub Actions workflow added. Synthetic complete-Git fixture passed locally (three matches: one Nimbus-type consumer, one removed-subtree, one docs). Confirmed pinned-source external dependencies: FirstStartup guard; Nimbus ExperimentManager -> Normandy ClientEnvironment, NormandyUtils -> NormandyApi; Nimbus FeatureManifest LegacyHeartbeat schema; Normandy currently initializes ExperimentAPI. Extended CI manifest safety checks by six. Issue https://github.com/sguzman/vulpra/issues/1 tracks full audit outcomes; hosted reference scan result and native feature-off build NOT independently inspected as of this commit. No reduction claimed."
       ],
       "verified_preparatory_tasks": [
         {
@@ -168,9 +169,14 @@
           "id": "normandy-optout-configure",
           "percent": 100,
           "evidence": "Actual GH Actions configure-only https://github.com/sguzman/vulpra/actions/runs/40379371528 and source regression suite https://github.com/sguzman/vulpra/actions/runs/40379675945. No browser built or package-size delta."
+        },
+        {
+          "id": "normandy-source-audit-harness",
+          "percent": 100,
+          "evidence": "Script ci/m3-normandy-reference-audit.py syntax tested and ran synthetic Git fixture PASS; Actions workflow committed to main, full real hosted scan pending verified results. Confirmed static dependent paths inspected directly in GitHub. No build credit."
         }
       ],
-      "status_note": "Verified local pre-debloat package 84,044,920 compressed B; real target flags. First optional compile-configuration experiment (Normandy opt-out, distinct object directory) passed actual Linux configure and CI source guards. Alternate executable, packaged resource reduction and browser acceptance NOT built/tested; no accepted removal M3=0%. Real per-feature omni.ja counts in workstation-private resource report remain unseen."
+      "status_note": "Working M2 archive baseline 84,044,920 compressed bytes. Isolated Normandy-free configure passes, but Nimbus still imports Normandy's shared helpers/schema and Normandy triggers ExperimentAPI initialization. Full-source reference audit now automated and tied to evidence issue #1; full real-source results pending review. No alternative binary/package/runtime acceptance or reduced bytes. M3 remains 0%."
     },
     {
       "id": "M4",
@@ -211,6 +217,7 @@
     "2026-10-26: Prepared no-rebuild source-of-truth target configuration baseline from Mozilla-generated JSON build substs; CI verified script, no workstation config output yet. No native debloat completed.",
     "2026-10-26: Target workstation native config flag observation closes preparation subtask, confirming actual optional features enabled; new package footprint auditor CI verified 40376689384. Unknown flags not treated as false. M3 0%, overall 33% because no feature removed and native binary re-tested.",
     "2026-10-26: M3 native pre-debloat package baseline recorded with actual archive SHA verification (84,044,920 compressed B, 324,566,909 uncompressed file B, 2 omni.ja). This completes another measurement prerequisite but not debloating; M3=0%, overall=33%.",
-    "2026-10-26: M3 moved beyond read-only inventory to an opt-in, source-controlled Normandy-free compile branch condition using separate object directory. Linux configure PASS 40379371528, static regression PASS 40379675945. Not credited as finished debloating before native build and runtime comparison."
+    "2026-10-26: M3 moved beyond read-only inventory to an opt-in, source-controlled Normandy-free compile branch condition using separate object directory. Linux configure PASS 40379371528, static regression PASS 40379675945. Not credited as finished debloating before native build and runtime comparison.",
+    "2026-10-26: M3 Normandy opt-out incomplete dependency boundary exposed, including Nimbus shared utility imports and bootstrap. Added full-source audit harness and 6 pinned-source invariants. No native removal credit; M3=0%, overall=33%."
   ]
 }
