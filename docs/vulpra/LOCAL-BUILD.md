@@ -114,9 +114,12 @@ and python ~/vulpra-accept-native.py
 The probe verifies the tarball SHA-256, extracts to a temporary directory,
 asserts that the private `vulpra-launch` wrapper refuses an external profile
 override, and starts a loopback-only HTTP server on `127.0.0.1`. The real
-browser must follow an in-page JavaScript redirect, execute JavaScript on
-the target page that makes a local HTTP request, produce a PNG screenshot,
-and preserve a preexisting fake Firefox profile untouched. The real installed
+browser must execute JavaScript on the initial page to navigate to
+`/js-run`, follow an HTTP 302 redirect to `/page`, produce a PNG screenshot,
+and preserve a preexisting fake Firefox profile untouched. All three HTTP
+requests must appear in that order. A separate fetch/XMLHttpRequest API test
+is not claimed: the previous synchronous XHR probe could finish too late for
+the short-lived screenshot process and falsely reject genuine navigation. The real installed
 Firefox and its profile are not used.
 
 A successful run writes `acceptance-<date>.json`, browser startup logs and a
