@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { ActorManagerParent } from "resource://gre/modules/ActorManagerParent.sys.mjs";
+import { AppConstants } from "resource://gre/modules/AppConstants.sys.mjs";
 
 const lazy = {};
 
@@ -1117,6 +1118,11 @@ let JSWINDOWACTORS = {
 
 export let DesktopActorRegistry = {
   init() {
+    // about:studies is omitted from no-Normandy builds; avoid registering
+    // an actor whose parent and child are absent from the lean package.
+    if (!AppConstants.MOZ_NORMANDY) {
+      delete JSWINDOWACTORS.ShieldFrame;
+    }
     ActorManagerParent.addJSProcessActors(JSPROCESSACTORS);
     ActorManagerParent.addJSWindowActors(JSWINDOWACTORS);
   },
