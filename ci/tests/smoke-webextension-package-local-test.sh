@@ -127,5 +127,41 @@ with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
     server.shutdown()
     server.server_close()
     print("PASS: WebDriver addon install, JavaScript and error response handling")
+    # Validate CI-only Nimbus probe's privileged-context lifecycle without
+    # invoking chrome context on normal M2 browsers.
+    calls = []
+    original_request = m.request
+    def fake_request(port, method, route, payload=None):
+        calls.append((method, route, payload))
+        if route.endswith("/moz/context"):
+            return None
+        if route.endswith("/execute/async"):
+            assert "ExperimentAPI.manager.store.ready()" in payload["script"]
+            assert "ExperimentAPI.ready()" in payload["script"]
+            return {"status":"pass","store_ready":True,"api_ready":True}
+        raise AssertionError(route)
+    try:
+        m.request = fake_request
+        answer = m.verify_nimbus_ready(2011, "/session/mock")
+        assert answer["store_ready"] and answer["api_ready"]
+        assert calls[0] == ("POST","/session/mock/moz/context",{"context":"chrome"})
+        assert calls[-1] == ("POST","/session/mock/moz/context",{"context":"content"})
+        calls.clear()
+        def fake_failure(port, method, route, payload=None):
+            calls.append((method, route, payload))
+            if route.endswith("/execute/async"):
+                return {"status":"timeout"}
+            return None
+        m.request = fake_failure
+        try:
+            m.verify_nimbus_ready(2011, "/session/mock")
+        except RuntimeError as err:
+            assert "Nimbus did not initialize" in str(err)
+        else:
+            raise AssertionError("Timed-out Nimbus accepted")
+        assert calls[-1][2] == {"context":"content"}
+    finally:
+        m.request = original_request
+    print("PASS: opt-in Nimbus privileged readiness guard, context reset and timeout refusal")
 print("PASS: WebExtension offline regression suite")
 PY
