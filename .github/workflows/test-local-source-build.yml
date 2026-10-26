@@ -1,0 +1,42 @@
+name: Test local source recovery and build safety
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/vulpra-fetch-all.sh
+      - ci/build-local.sh
+      - ci/tests/**
+      - .github/workflows/test-local-source-build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # Fetch only the tiny CI scripts, not the giant Firefox source tree.
+      - name: Check out CI scripts using a sparse partial checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+          sparse-checkout-cone-mode: true
+
+      - name: Check Bash syntax
+        run: |
+          bash -n ci/vulpra-fetch-all.sh
+          bash -n ci/build-local.sh
+          bash -n ci/tests/vulpra-fetch-all-test.sh
+          bash -n ci/tests/build-local-test.sh
+
+      - name: Test restart-safe source retrieval
+        run: bash ci/tests/vulpra-fetch-all-test.sh "$PWD/ci/vulpra-fetch-all.sh"
+
+      - name: Test guarded local native build runner
+        run: bash ci/tests/build-local-test.sh "$PWD/ci/build-local.sh"
