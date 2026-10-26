@@ -131,6 +131,36 @@ must be measured on the **actual workstation configuration**. We have not
 verified global reference reachability, native feature-off builds or source
 and package byte deltas. Those remain necessary before physical pruning.
 
+## Inspect the real configured Linux feature switches
+
+Source defaults alone do not tell us what the verified workstation
+binary was configured to include. Mozilla's own
+`python/mozbuild/mozbuild/backend/configenvironment.py` stores each
+configured substitution as a JSON value at
+`obj-vulpra-linux/config.statusd/substs/<KEY>`. That is build metadata,
+**not** a request to reconfigure or recompile.
+
+The standalone read-only checker below queries selected flags (Sync,
+Accounts-adjacent reporting switches, Normandy, DevTools, telemetry reporting,
+crash reporter, updater, sandbox, tests, Wayland and WebDriver):
+
+```fish
+curl -fL --retry 20 --retry-all-errors -o ~/vulpra-m3-config-baseline.sh https://raw.githubusercontent.com/sguzman/vulpra/main/ci/m3-config-baseline-local.sh
+and bash ~/vulpra-m3-config-baseline.sh
+```
+
+It writes `.git/vulpra-debloat/m3-config-baseline.tsv` and prints flags.
+Unrecorded settings are reported as `(missing)` or `null`; neither means
+`false`. It never runs `mach` or writes the source or object directory.
+The existing object directory predates the Git fast-forward, so **its
+config values reflect the previously built browser**, not proof that the new
+Git HEAD has been recompiled.
+
+These values are required to rank genuinely compile-gated candidates such
+as Sync and the DevTools client. Even an option that reports `false` may
+leave runtime code in `libxul` or `omni.ja`; use package content and
+before/after native tests to prove a real reduction.
+
 ## Audited source anchors (Firefox 159.0b5)
 
 These directory names were verified against the source tree in GitHub on 2026-10-26. The labels below represent **review priorities, not deletion approval**.
