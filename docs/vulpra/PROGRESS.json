@@ -125,16 +125,22 @@
       "evidence": [
         "2026-10-26: M3 read-only pinned-Git source footprint/inventory runner ci/m3-inventory-local.py and path-category classification tests passed CI https://github.com/sguzman/vulpra/actions/runs/40366275497. Audited source anchors and removal acceptance gates are in docs/vulpra/DEBLOAT.md. Actual target-workstation source census and dependency-verified removals have NOT run; M3 remains 0% until evidence arrives.",
         "2026-10-26 11:15 local: User workstation ran read-only ci/m3-inventory-local.py successfully against its pinned checkout: 483753 Git-tracked blobs totaling 3633358256 bytes. Private inventory output: .git/vulpra-debloat/m3-source-inventory.json and .md. Output explicitly confirms no source writes/removal/build; group-level sizes and dependency reachability are not yet reviewed. Source-census subtask VERIFIED but no actual debloat removal or M3 acceptance gate claimed.",
-        "2026-10-26: User supplied real M3 footprint tables from local Git HEAD ee223921: 483753 tracked files / 3633358256 Git blob bytes. Source top groups: third_party 942332791 B, testing 776789044 B, mobile 133582038 B, devtools 95216242 B. Full breakdown and interpretation recorded in docs/vulpra/DEBLOAT.md; inventory is not binary bloat or dependency reachability."
+        "2026-10-26: User supplied real M3 footprint tables from local Git HEAD ee223921: 483753 tracked files / 3633358256 Git blob bytes. Source top groups: third_party 942332791 B, testing 776789044 B, mobile 133582038 B, devtools 95216242 B. Full breakdown and interpretation recorded in docs/vulpra/DEBLOAT.md; inventory is not binary bloat or dependency reachability.",
+        "2026-10-26: Classified 13 M3 code areas in docs/vulpra/DEBLOAT-CANDIDATES.json as protected, platform-source-only, compile-gated, or runtime-bundled; documented exact manifest evidence and unverified next dependencies. Read-only ci/m3-manifest-gates.sh confirmed 19 actual Git HEAD build-manifest invariants using partial Git blobs. Candidate-register validation, prior offline QA and workflow passed https://github.com/sguzman/vulpra/actions/runs/40372711439. No source removed or native package baseline comparison; M3 remains 0%."
       ],
       "verified_preparatory_tasks": [
         {
           "id": "read-only-source-footprint",
           "percent": 100,
           "evidence": "Actual target workstation stdout 2026-10-26 11:15, pinned Git HEAD 483753 files, 3633358256 blob bytes, .git/vulpra-debloat/m3-source-inventory.{json,md}, no worktree writes."
+        },
+        {
+          "id": "build-manifest-and-candidate-matrix",
+          "percent": 100,
+          "evidence": "CI run https://github.com/sguzman/vulpra/actions/runs/40372711439; 19 verified manifest rules plus 13-group JSON candidate validation; source safety, binary gain and removal unverified."
         }
       ],
-      "status_note": "M3 initiated. Real pinned-workstation Git source census succeeded (483753 tracked files, 3633358256 blob bytes); classification/detail JSON exists locally but has not been uploaded for dependency analysis. No removal, rebuilt comparison, or source change accepted yet. M3 milestone remains 0% while its read-only footprint subtask is 100%."
+      "status_note": "Local read-only source census: 483753 tracked blobs / 3633358256 Git blob bytes (pre-debloat, pinned workstation original build). Additional 13-group keep/review/protected candidate register and 19 manifest conditions validated in GitHub CI 40372711439. Build configuration values, full reference reachability and compiled before/after deltas remain unverified. No accepted removals. M3 stays 0%."
     },
     {
       "id": "M4",
@@ -170,6 +176,7 @@
     "2026-10-26: Real WebExtension lifecycle passed via actual geckodriver and packaged Vulpra on target Linux. M2 complete 5/5, 100%; overall product 33% by existing equal M2/M3/M4 weights. M3 can begin. Complete upstream trademark/icon review and security update policy before any public distribution; M2 working personal baseline is not release certification.",
     "2026-10-26: M3 inventory preparation completed with CI-verified read-only source script and audited candidate register. No source removals or actual debloat metrics claimed. Workstation remains on pinned source; no local Git pull required.",
     "2026-10-26: Initial actual M3 source census verified. The user's built local checkout remains pinned; on GitHub, main is 79 commits ahead and 0 behind the previously confirmed local built commit ee223921. This confirms ancestry only, NOT worktree cleanliness or permission to safely pull. Check local status before any fast-forward; avoid discarding known-good local build patches.",
-    "2026-10-26: GitHub compared built local commit ee223921 to main: remote is 86 commits ahead, zero behind at check. Actual local status exactly 2 dirty build patches emitter.py/testing.py; normal blind git pull not yet safe. Standalone ci/sync-local-safe.sh backups + byte-identical remote patch precondition + ff-only. CI 40369168618 passed identity/mismatch/unrelated-dirty synthetic tests. Target workstation sync has NOT been run or verified."
+    "2026-10-26: GitHub compared built local commit ee223921 to main: remote is 86 commits ahead, zero behind at check. Actual local status exactly 2 dirty build patches emitter.py/testing.py; normal blind git pull not yet safe. Standalone ci/sync-local-safe.sh backups + byte-identical remote patch precondition + ff-only. CI 40369168618 passed identity/mismatch/unrelated-dirty synthetic tests. Target workstation sync has NOT been run or verified.",
+    "2026-10-26: M3 manifest-based classification advanced: 13 categories, 19 real Git-blob invariants verified in CI 40372711439; source paths selected for build are not equivalent to removable package bytes. No binary or source removals credited."
   ]
 }
