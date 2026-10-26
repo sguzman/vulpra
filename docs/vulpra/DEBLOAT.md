@@ -20,6 +20,50 @@ It measures tracked Git HEAD blobs, top-level directories, language families and
 
 These do **not** measure the installed binary or determine actual linking/reachability. In particular, counting C/C++ or Python files is **not evidence they can be removed**. Replacements and safe removals are separate future steps.
 
+## Verified pinned-workstation source census (2026-10-26)
+
+The user ran `ci/m3-inventory-local.py` successfully on the actual source
+checkout at `ee22392142889ed2d8f7d3953332901cafd964ef`.
+The read-only inventory counted **483,753** tracked files and
+**3,633,358,256** Git blob bytes. The complete JSON and tables are in
+`.git/vulpra-debloat/m3-source-inventory.{json,md}` on the workstation.
+None of these counts is packaged browser size or actual compile reachability.
+
+| Top-level group | Tracked files | Git blob bytes | Initial review classification |
+| --- | ---: | ---: | --- |
+| `third_party/` | 54,643 | 942,332,791 | Dependency/license audit; not general deletion |
+| `testing/` | 201,076 | 776,789,044 | Test/build footprint; separate source-only vs packaged impact |
+| `dom/` | 32,401 | 271,653,154 | Web compatibility, retain by default |
+| `security/` | 7,357 | 234,319,326 | Security-critical, retain |
+| `js/` | 72,933 | 220,218,858 | Core JavaScript engine, retain |
+| `mobile/` | 15,568 | 133,582,038 | Non-target platform review, not automatic removal |
+| `devtools/` | 9,725 | 95,216,242 | Optional user-facing developer tools; determine necessity first |
+
+Additional narrowly scoped source-prefix candidates:
+
+| Source group | Files | Bytes | Review role |
+| --- | ---: | ---: | --- |
+| `widget/windows/` + `browser/installer/windows/` | 283 | 4,652,137 | Linux-excluded platform source |
+| `widget/cocoa/` | 178 | 1,626,834 | macOS platform source |
+| `mobile/android/` + `widget/android/` | 15,441 | 133,228,752 | Android-specific source |
+| `services/sync/` | 223 | 2,059,832 | Optional Sync feature dependencies |
+| `services/fxaccounts/` | 53 | 833,077 | Accounts/login integration dependencies |
+| `toolkit/components/telemetry/` | 259 | 3,775,176 | Privacy/telemetry dependencies |
+| `browser/components/newtab/` | 50 | 423,733 | New-tab functionality |
+
+The suffix-based long-horizon language census counted **41,766**
+C/C++/assembly files (670,776,071 bytes), **11,032** Python files
+(76,786,691 bytes), **15,756** Rust files (223,048,891 bytes), and
+**280,840** web-language files (880,986,062 bytes). It is not a build
+dependency graph, and no amount of these non-Rust sources has been
+demonstrated removable yet.
+
+**Acceptance status:** Inventory collection PASSED. Dependency tracing,
+source isolation, native before/after package measurements and safe removal
+acceptance have NOT passed. Do not claim source size as package bloat.
+The working browser's tested package belongs to the original local HEAD,
+even after a future source-only Git fast-forward.
+
 ## Audited source anchors (Firefox 159.0b5)
 
 These directory names were verified against the source tree in GitHub on 2026-10-26. The labels below represent **review priorities, not deletion approval**.
