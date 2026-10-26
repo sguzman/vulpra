@@ -86,6 +86,51 @@ For *binary-size* reductions, investigate actual packaged optional features
 and their configure guards separately. There have been no source edits
 or additional native builds at this stage.
 
+## Versioned candidate decisions (updated 2026-10-26)
+
+The machine-readable **13-group review register** is
+[`docs/vulpra/DEBLOAT-CANDIDATES.json`](DEBLOAT-CANDIDATES.json). Each group
+states its current disposition, code/binary distinction, supporting manifest
+evidence and the exact proof missing before modification. Current decisions:
+
+- **Protected:** GTK/Wayland, WebExtensions, core JS/DOM/network/security and
+  license dependencies. These are baseline functionality, not space targets.
+- **Source-only review:** Windows/Cocoa widget code and the Windows installer
+  are gated by the selected platform in `widget/moz.build` and
+  `browser/moz.build`. Android source has separate build/tooling references.
+  Source removal is still **not** proven safe from these gates alone; do a
+  full-tree reference scan first. It may yield zero packaged-byte savings.
+- **Test source retention:** `testing/` is **not** globally optional.
+  Root `moz.build` unconditionally traverses `testing`; the toolkit
+  traverses `/testing/gtest` separately from the harnesses guarded by
+  `ENABLE_TESTS`. The original workstation build needed test-manifest
+  workarounds. Trim only after resolving those references, never by deletion
+  of the entire tree.
+- **Compile/configuration review:** Desktop `browser/moz.configure`
+  explicitly implies `MOZ_SERVICES_SYNC=True`, `MOZ_NORMANDY=True`,
+  `MOZ_SERVICES_HEALTHREPORT=True`, and `MOZ_DEVTOOLS=all`.
+  Sync's traversal depends on `MOZ_SERVICES_SYNC`, while
+  `services/fxaccounts` is traversed independently on GTK builds. DevTools
+  client is conditional on `all`, but platform/server/shared/startup
+  remain; eliminating the client would eliminate debugging workflows.
+- **Runtime-bundled feature review:** `browser/components/moz.build`
+  unconditionally includes the GenAI, new-tab, onboarding and messaging
+  subdirectories, and their manifests package JavaScript, actors or XPCOM
+  components. Turning off a feature pref is **not** an equal claim to
+  physically removing code or saving package bytes.
+- **Telemetry separation:** `MOZ_TELEMETRY_REPORTING` is a configure
+  reporting control, defaulting according to `mozilla_official`, while
+  `toolkit/components/telemetry/moz.build` still links native telemetry
+  into `xul`. The actual local reporting configuration is **unmeasured**.
+  Likewise `glean` contains IPC and native generated interfaces; blanket
+  deletion is unsafe.
+
+**High-value outcome of this audit:** We can now distinguish platform-gated
+tracked source from included Linux runtime modules, and identify which flags
+must be measured on the **actual workstation configuration**. We have not
+verified global reference reachability, native feature-off builds or source
+and package byte deltas. Those remain necessary before physical pruning.
+
 ## Audited source anchors (Firefox 159.0b5)
 
 These directory names were verified against the source tree in GitHub on 2026-10-26. The labels below represent **review priorities, not deletion approval**.
