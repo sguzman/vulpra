@@ -62,12 +62,17 @@ grep -Fq 'wl_compositor' "$work/compositor-info" || {
   echo 'Compositor is missing wl_compositor protocol' >&2
   exit 1
 }
+grep -Fq 'xdg_wm_base' "$work/compositor-info" || {
+  echo 'Compositor is missing xdg_wm_base protocol' >&2
+  exit 1
+}
 
 # Private HOME and no X11 DISPLAY: a normal browser must use GTK Wayland
 # or fail to start; MOZ_HEADLESS is removed to exercise graphical startup.
 env -u MOZ_HEADLESS \
   HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
   XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
+  WAYLAND_DEBUG=client \
   "$appdir/vulpra" about:blank >"$work/browser.log" 2>&1 &
 browser_pid="$!"
 sleep "$duration"
@@ -84,4 +89,13 @@ fi
   echo 'Wayland startup unexpectedly created Firefox profile directory' >&2
   exit 1
 }
-echo "PASS: private Weston compositor started, registry responded, and Vulpra remained alive with its isolated profile for ${duration}s"
+# A process that merely stays alive is insufficient; require a committed
+# non-null pixel buffer on an actual Wayland surface. Accept both common
+# libwayland object-ID renderings (wl_surface#1 and wl_surface@1).
+if ! grep -Eq 'wl_surface[#@][0-9]+\\.attach\\(wl_buffer[#@][0-9]+' "$work/browser.log" || \
+   ! grep -Eq 'wl_surface[#@][0-9]+\\.commit\\(' "$work/browser.log"; then
+  echo "Vulpra did not attach and commit a graphical Wayland frame" >&2
+  tail -n 100 "$work/browser.log" >&2 || true
+  exit 1
+fi
+echo "PASS: private Weston compositor, Wayland surface buffer attachment and commit, and isolated profile for ${duration}s"
