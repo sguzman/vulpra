@@ -59,6 +59,16 @@ if ((result != 0)); then
   exit "$result"
 fi
 
-printf 'PASS: ./mach build returned exit code 0.\n' | tee -a "$BUILD_LOG"
+# A zero exit code alone is not proof that a native browser executable exists.
+BIN="$REPO/obj-vulpra-linux/dist/bin"
+if [[ ! -x "$BIN/firefox" || ! -s "$BIN/application.ini" ]]; then
+  echo "ERROR: mach returned 0, but the native browser binary or application.ini is missing in $BIN" | tee -a "$BUILD_LOG" >&2
+  exit 5
+fi
+if ! grep -Fxq 'Name=Vulpra' "$BIN/application.ini"; then
+  echo "ERROR: Built application.ini does not report Name=Vulpra" | tee -a "$BUILD_LOG" >&2
+  exit 5
+fi
+printf 'PASS: ./mach build returned 0 and a Vulpra executable/application.ini exist.\n' | tee -a "$BUILD_LOG"
 # Packaging is an explicit later gate, not a hidden post-build side effect.
 # To package, run ./mach package after confirming this actual native build.
