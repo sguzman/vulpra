@@ -153,6 +153,51 @@ class LocalPage(http.server.BaseHTTPRequestHandler):
         pass
 
 
+def verify_nimbus_ready(port: int, base: str) -> dict:
+    """CI-only privileged check: retained Nimbus actually initializes.
+
+    Only run under an isolated browser process with geckodriver's explicit
+    --allow-system-access switch. Never use privileged mode for regular
+    M2 WebExtension testing or against an existing Firefox profile.
+    """
+    request(port, "POST", base + "/moz/context", {"context": "chrome"})
+    try:
+        result = request(port, "POST", base + "/execute/async", {
+            "script": """
+                const done = arguments[arguments.length - 1];
+                let completed = false;
+                const finish = value => {
+                    if (!completed) { completed = true; done(value); }
+                };
+                const timer = setTimeout(() => finish({status: "timeout"}), 14000);
+                (async () => {
+                    try {
+                        const { ExperimentAPI } = ChromeUtils.importESModule(
+                            "resource://nimbus/ExperimentAPI.sys.mjs"
+                        );
+                        // Unconditional store.ready() cannot use ExperimentAPI's
+                        // disabled-features early-return to falsely pass.
+                        await ExperimentAPI.manager.store.ready();
+                        await ExperimentAPI.ready();
+                        clearTimeout(timer);
+                        finish({status: "pass", store_ready: true, api_ready: true});
+                    } catch (error) {
+                        clearTimeout(timer);
+                        finish({status: "error", reason: String(error)});
+                    }
+                })();
+            """,
+            "args": [],
+        })
+    finally:
+        request(port, "POST", base + "/moz/context", {"context": "content"})
+    if not isinstance(result, dict) or result.get("status") != "pass" or not (
+        result.get("store_ready") and result.get("api_ready")
+    ):
+        raise RuntimeError("Retained Nimbus did not initialize in lean browser: " + repr(result))
+    return {"store_ready": True, "api_ready": True, "access": "CI-only isolated chrome context"}
+
+
 def main() -> int:
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Code/Apps/vulpra").resolve()
     gecko = shutil.which("geckodriver")
@@ -165,6 +210,7 @@ def main() -> int:
             "Geckodriver not available. On EndeavourOS install official package "
             "with: yay -S --needed geckodriver. No npm or pip required."
         )
+    nimbus_check = os.environ.get("VULPRA_M3_VERIFY_NIMBUS", "0") == "1"
     archive = verified_archive(repo)
     print(f"PASS: Verified existing archive {archive.name}", flush=True)
     logdir = repo / ".git/vulpra-native-build"
@@ -208,7 +254,8 @@ def main() -> int:
         proc = None
         try:
             with gecko_log.open("wb") as driver_log:
-                proc = subprocess.Popen([gecko, "--host", "127.0.0.1", "--port", str(port)],
+                proc = subprocess.Popen([gecko, "--host", "127.0.0.1", "--port", str(port)] +
+                                        (["--allow-system-access"] if nimbus_check else []),
                                         env=env, stdout=driver_log, stderr=subprocess.STDOUT,
                                         start_new_session=True)
                 wait_ready(port, proc)
@@ -265,6 +312,10 @@ def main() -> int:
                 if proof() is not None:
                     raise RuntimeError("WebExtension content script remained active after uninstall")
                 print("PASS: WebExtension uninstalled and no longer injects into new navigation", flush=True)
+                nimbus_result = None
+                if nimbus_check:
+                    nimbus_result = verify_nimbus_ready(port, base)
+                    print("PASS: Nimbus ExperimentStore and API initialized in real packaged browser", flush=True)
                 if fake_firefox.read_bytes() != sentinel:
                     raise RuntimeError("Existing Firefox profile sentinel modified")
                 print("PASS: Temporary HOME and existing Firefox profile preserved", flush=True)
@@ -275,6 +326,7 @@ def main() -> int:
                                      "content_scripts": True, "background_messaging": True,
                                      "storage_local": True, "uninstall": True},
                     "security": {"original_firefox_profile_preserved": True, "temporary_home": True},
+                    "nimbus": nimbus_result,
                     "limits": ["Not a comprehensive security audit", "Does not test signed AMO extensions",
                                "Does not verify persisted extensions across restarts"],
                 }
