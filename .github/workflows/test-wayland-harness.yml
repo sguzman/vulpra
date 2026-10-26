@@ -41,10 +41,35 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+          test "${WAYLAND_DEBUG:-}" = client
+          # Synthetic protocol trace validates parser only, not live painting.
+          printf '%s\\n' '-> wl_surface#13.attach(wl_buffer#45, 0, 0)' >&2
+          printf '%s\\n' '-> wl_surface#13.commit()' >&2
           sleep 30
           MOCK
           chmod +x "$temp/package/firefox"
           VULPRA_WAYLAND_TEST_SECONDS=2 bash packaging/test-wayland.sh "$temp/package"
+      - name: Reject a live process that never draws a Wayland frame
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(mktemp -d)"
+          trap 'rm -rf -- "$temp"' EXIT
+          mkdir -p "$temp/package"
+          cp packaging/vulpra "$temp/package/vulpra"
+          chmod +x "$temp/package/vulpra"
+          cat > "$temp/package/firefox" <<'MOCK'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+          sleep 30
+          MOCK
+          chmod +x "$temp/package/firefox"
+          if VULPRA_WAYLAND_TEST_SECONDS=1 bash packaging/test-wayland.sh "$temp/package"; then
+            echo 'Wayland harness incorrectly accepted a live-but-not-drawing process' >&2
+            exit 1
+          fi
+          echo 'PASS: synthetic live process without attached/committed Wayland frame rejected'
       - name: Reject a browser which crashes on startup
         shell: bash
         run: |
