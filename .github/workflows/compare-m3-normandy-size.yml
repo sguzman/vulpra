@@ -22,7 +22,7 @@ jobs:
       github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
       github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 330
+    timeout-minutes: 350
     env:
       DEBIAN_FRONTEND: noninteractive
       MOZ_HEADLESS: "1"
@@ -61,12 +61,78 @@ jobs:
           print("Paired source commit:",report["source_commit"])
           PY
 
+      - name: Reuse matching independently prebuilt full-Normandy package if ready
+        shell: bash
+        timeout-minutes: 275
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREBUILD_RUN_ID: "40412644709"
+          PREBUILD_SOURCE_SHA: "286627afec2cb141a3d6e553eac41954847db5b4"
+        run: |
+          set -euo pipefail
+          # This prebuild is pinned to the exact SHA of native candidate
+          # 40392545095. Other future candidates use the original baseline
+          # compile path below; never reuse mismatched-source packages.
+          lean_sha="$(python3 -c 'import json,os;from pathlib import Path;print(json.loads((Path(os.environ["RUNNER_TEMP"])/"lean-metadata.json").read_text())["source_commit"])')"
+          if [[ "$lean_sha" != "$PREBUILD_SOURCE_SHA" ]]; then
+            echo "Prebuilt baseline belongs to a different candidate; compiling fresh"
+            exit 0
+          fi
+          for ((poll=0; poll<260; poll++)); do
+            status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREBUILD_RUN_ID" --jq .status)"
+            if [[ "$status" == completed ]]; then
+              conclusion="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREBUILD_RUN_ID" --jq .conclusion)"
+              if [[ "$conclusion" != success ]]; then
+                echo "Parallel full baseline did not succeed ($conclusion); falling back to fresh matched compile"
+                exit 0
+              fi
+              break
+            fi
+            echo "Prebuilt full-Normandy baseline still $status; waiting for matching archive (poll $poll)"
+            sleep 60
+          done
+          [[ "$status" == completed ]] || {
+            echo "Parallel baseline not completed after bounded wait; refusing duplicate long compile" >&2
+            exit 1
+          }
+          mkdir -p "$RUNNER_TEMP/prebuilt-full"
+          gh run download "$PREBUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline \
+            --dir "$RUNNER_TEMP/prebuilt-full"
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          src=json.loads((root/"lean-metadata.json").read_text())
+          base=root/"prebuilt-full"
+          report=json.loads((base/"m3-full-normandy-baseline.json").read_text())
+          pkg=base/"full-normandy-baseline.tar.xz"
+          if src["source_commit"]!=report["source_commit"] or report["source_commit"]!=os.environ["PREBUILD_SOURCE_SHA"]:
+              raise RuntimeError("Prebuilt full-Normandy baseline source does not equal lean source")
+          if report["variant"]!="full-normandy" or not report["normandy_runner_present"]:
+              raise RuntimeError("Wrong/unaudited prebuilt baseline feature configuration")
+          digest=hashlib.sha256(pkg.read_bytes()).hexdigest()
+          sidecar=(base/"full-normandy-baseline.tar.xz.sha256").read_text().split()
+          if digest!=report["sha256"] or not sidecar or sidecar[0]!=digest:
+              raise RuntimeError("Prebuilt baseline checksum mismatch")
+          if pkg.stat().st_size!=report["compressed_bytes"]:
+              raise RuntimeError("Prebuilt baseline size metadata mismatch")
+          print("PASS: exact same candidate source, verified complete full-Normandy package")
+          PY
+          cp "$RUNNER_TEMP/prebuilt-full/full-normandy-baseline.tar.xz" \
+            "$RUNNER_TEMP/full-normandy-baseline.tar.xz"
+          echo "M3_REUSE_PREBUILT_BASELINE=1" >> "$GITHUB_ENV"
+          echo "M3_PREBUILT_BASELINE_RUN_ID=$PREBUILD_RUN_ID" >> "$GITHUB_ENV"
+          echo "PASS: skip redundant native baseline compilation"
+
       - name: Check out exact candidate source commit for matched baseline
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Preserve comparison mozconfig outside source before pinning code
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         shell: bash
         run: |
           set -euo pipefail
@@ -104,11 +170,13 @@ jobs:
           echo "MOZCONFIG=$RUNNER_TEMP/m3-baseline.mozconfig" >> "$GITHUB_ENV"
 
       - name: Configure native compiler cache
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         uses: mozilla-actions/sccache-action@v0.0.11
         with:
           version: "v0.16.0"
 
       - name: Export Actions compiler cache environment
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         uses: actions/github-script@v7
         with:
           script: |
@@ -116,6 +184,7 @@ jobs:
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Bootstrap pinned Firefox Linux dependencies
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         shell: bash
         run: |
           set -euo pipefail
@@ -124,6 +193,7 @@ jobs:
           ./mach --no-interactive bootstrap --application-choice browser
 
       - name: Configure full-Normandy Vulpra with protected feature equality
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         shell: bash
         run: |
           set -euo pipefail
@@ -145,6 +215,7 @@ jobs:
           PY
 
       - name: Match lean native build disk-backed swap capacity
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         shell: bash
         run: |
           set -euo pipefail
@@ -174,6 +245,7 @@ jobs:
           PY
 
       - name: Compile independent full-Normandy baseline
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         shell: bash
         run: |
           set -euo pipefail
@@ -190,6 +262,7 @@ jobs:
           ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-baseline-build.log"
 
       - name: Package and stage verified comparison browser
+        if: env.M3_REUSE_PREBUILT_BASELINE != '1'
         shell: bash
         run: |
           set -euo pipefail
