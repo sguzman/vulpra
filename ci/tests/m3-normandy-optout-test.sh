@@ -91,6 +91,18 @@ assert "wl_surface[#@][0-9]+" in wayland
 assert ".attach" in wayland and ".commit" in wayland
 assert "wl_buffer[#@][0-9]+" in wayland
 
+# Do not claim matched source/toolchain without matched native resource policy.
+native_ci = source(".github/workflows/build-m3-normandy.yml")
+paired_ci = source(".github/workflows/compare-m3-normandy-size.yml")
+for name, workflow in (("native", native_ci), ("matched", paired_ci)):
+    assert 'CARGO_BUILD_JOBS: "1"' in workflow, name
+    assert "sudo fallocate -l 24G" in workflow, name
+    assert "sudo swapon \"$swap\"" in workflow, name
+    assert "SwapTotal:" in workflow, name
+assert "github.event.workflow_run.conclusion == 'success'" in paired_ci
+assert "git\",\"checkout\",\"--detach\",sha" in paired_ci
+print("PASS: native and matched full-Normandy builds use equal constrained Rust/swap environment")
+
 print("PASS: standard Vulpra build default untouched; opt-in isolated object directory")
 print("PASS: original jar.mn retains shared Nimbus helper/schema resources only")
 print("PASS: Normandy startup/shutdown conditional; lean Nimbus bootstrap guarded")
