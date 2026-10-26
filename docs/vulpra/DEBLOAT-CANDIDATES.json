@@ -176,19 +176,21 @@
         "toolkit/components/moz.build: includes normandy when MOZ_BUILD_APP=browser",
         "toolkit/moz.configure: data_reporting dependency"
       ],
-      "next": "Review native omni.ja path-hint sizes from local baseline; map remaining resource://normandy callers. Compile alternate build only if justified; then package separately and run full M2 acceptance plus before/after byte comparison.",
+      "next": "Inspect hosted native candidate build outcome, packaged resource whitelist and headless/Wayland smoke. Run identical M2 navigation/WebExtension acceptance with isolated lean package and compare same-toolchain archive sizes before granting M3 progress.",
       "observed_actual_config": "MOZ_NORMANDY=\"1\" and MOZ_SERVICES_HEALTHREPORT=\"1\"",
       "experimental_compile_variant": {
-        "feature": "Normandy only; health reporting remains unchanged",
+        "feature": "Exclude Normandy recipe runner and studies frontend; retain Nimbus and shared Normandy helper imports",
         "opt_in_flag": "VULPRA_EXPERIMENT_NO_NORMANDY=1",
         "experimental_mozconfig": "ci/mozconfig-linux-normandy-experiment",
         "experimental_objdir": "obj-vulpra-linux-normandy-experiment",
         "source_changes": [
-          "browser/moz.configure conditional default-on implication",
-          "toolkit/components/moz.build conditional Normandy DIRS traversal",
-          "browser/components/BrowserComponents.manifest conditional startup and shutdown callbacks"
+          "browser/moz.configure: opt-in MOZ_NORMANDY=0, normal defaults untouched",
+          "toolkit/components/moz.build and toolkit/components/normandy/jar.mn: original manifest preserved; selected four shared resources only when disabled",
+          "browser/components/BrowserComponents.manifest: conditional Normandy startup/shutdown and lean NimbusBootstrap startup",
+          "toolkit/components/nimbus/moz.build and NimbusBootstrap.sys.mjs: opt-in isolated Nimbus initialization bridge",
+          "browser/components/DesktopActorRegistry.sys.mjs: guard ShieldFrame actor when Normandy absent"
         ],
-        "configure_ci": "https://github.com/sguzman/vulpra/actions/runs/40379371528",
+        "configure_ci": "https://github.com/sguzman/vulpra/actions/runs/40384311987",
         "source_regression_ci": "https://github.com/sguzman/vulpra/actions/runs/40379675945",
         "configured_normandy": false,
         "protected_flags_preserved": [
@@ -203,8 +205,17 @@
         "runtime_smoke_verified": false,
         "measured_size_delta_bytes": null,
         "accepted_m3_removal": false,
-        "risk": "Normandy module clients beyond manifest not globally reference-audited; feature-off binary may expose missing resource imports.",
-        "next": "Review native omni.ja path-hint sizes from local baseline; map remaining resource://normandy callers. Compile alternate build only if justified; then package separately and run full M2 acceptance plus before/after byte comparison."
+        "risk": "Lean source passes isolated configure but has not passed actual native build/package/runtime. Nimbus still shares Normandy helper classes and NimbusBootstrap has not been runtime-accepted. Hosted Ubuntu size is not matched to target workstation Arch size.",
+        "next": "Inspect hosted native candidate build outcome, packaged resource whitelist and headless/Wayland smoke. Run identical M2 navigation/WebExtension acceptance with isolated lean package and compare same-toolchain archive sizes before granting M3 progress.",
+        "full_repository_reference_audit": {
+          "ci": "https://github.com/sguzman/vulpra/actions/runs/40382641564",
+          "artifact": "m3-normandy-references",
+          "matching_source_lines": 379,
+          "external_review_lines": 127,
+          "evidence_issue": "https://github.com/sguzman/vulpra/issues/1",
+          "status": "passed and manually inspected; source-reference audit only, dynamic usage and runtime proof separate"
+        },
+        "native_candidate_ci_workflow": "https://github.com/sguzman/vulpra/actions/workflows/build-m3-normandy.yml"
       }
     },
     {
