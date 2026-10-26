@@ -112,14 +112,22 @@ def main():
             raise RuntimeError("Browser exited " + str(proc.returncode) + ": " + proc.stderr[-1200:])
         if not png.is_file() or png.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
             raise RuntimeError("No valid browser screenshot after JS redirect")
-        if server.paths != ["/start", "/js-run", "/page"]:
+        # Firefox may independently request /favicon.ico while capturing the
+        # screenshot. It is not evidence of JavaScript navigation and must
+        # neither count as an extra functional step nor conceal unknown calls.
+        expected = ["/start", "/js-run", "/page"]
+        extras = [path for path in server.paths if path not in (*expected, "/favicon.ico")]
+        navigated = [path for path in server.paths if path != "/favicon.ico"]
+        if extras or navigated != expected:
             raise RuntimeError("Unexpected HTTP JS/navigation sequence " + repr(server.paths))
         if firefox_profile.read_bytes() != sentinel:
             raise RuntimeError("Firefox profile sentinel changed")
         report = {
             "schema_version": 1, "test": "real_packaged_js_redirect_localhost",
             "result": "pass", "package": archive.name, "sha256": digest,
-            "local_request_sequence": server.paths, "elapsed_seconds": elapsed,
+            "local_request_sequence": navigated, "observed_http_requests": server.paths,
+            "incidental_favicon_requests": server.paths.count("/favicon.ico"),
+            "elapsed_seconds": elapsed,
             "profile_isolation": True, "screenshot_png_signature": True,
             "limits": ["Does not prove full browser UI correctness",
                        "Does not prove Nimbus runtime integration",
