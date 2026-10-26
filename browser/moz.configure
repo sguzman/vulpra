@@ -7,7 +7,22 @@ imply_option("MOZ_SERVICES_HEALTHREPORT", True)
 imply_option("MOZ_SERVICES_SYNC", True)
 imply_option("MOZ_DEDICATED_PROFILES", True)
 imply_option("MOZ_BLOCK_PROFILE_DOWNGRADE", True)
-imply_option("MOZ_NORMANDY", True)
+
+# Vulpra debloat experiment: preserve upstream Normandy by default.
+# Only an explicit isolated experiment leaves this optional recipe runner off.
+# Do not use this option in the known-good normal Linux build.
+option(
+    env="VULPRA_EXPERIMENT_NO_NORMANDY",
+    help="Experimental build without Normandy remote recipe runner",
+)
+
+
+@depends("VULPRA_EXPERIMENT_NO_NORMANDY")
+def vulpra_include_normandy(experimental_disable):
+    return not experimental_disable
+
+
+imply_option("MOZ_NORMANDY", True, when=vulpra_include_normandy)
 imply_option("MOZ_PROFILE_MIGRATOR", True)
 
 
