@@ -29,7 +29,7 @@ check widget/moz.build 'DIRS += [toolkit]' 'selected widget-toolkit directory on
 check browser/moz.build 'if CONFIG["MAKENSISU"]:' 'Windows installer guarded by MAKENSISU'
 check browser/moz.configure 'imply_option("MOZ_SERVICES_SYNC", True)' 'browser implies Sync enabled'
 check browser/moz.configure 'imply_option("MOZ_SERVICES_HEALTHREPORT", True)' 'browser implies health reporting enabled'
-check browser/moz.configure 'imply_option("MOZ_NORMANDY", True)' 'browser implies Normandy enabled'
+check browser/moz.configure 'imply_option("MOZ_NORMANDY", True, when=vulpra_include_normandy)' 'normal browser implies Normandy; opt-in experiment disables'
 check browser/moz.configure 'imply_option("MOZ_DEVTOOLS", "all")' 'browser implies full DevTools client'
 check services/moz.build 'if CONFIG["MOZ_SERVICES_SYNC"]:' 'Sync directory build-gated'
 check services/moz.build '"fxaccounts",' 'FxAccounts listed separately from Sync'
