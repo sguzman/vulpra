@@ -7,6 +7,7 @@ on:
       - ci/vulpra-fetch-all.sh
       - ci/build-local.sh
       - ci/package-smoke-local.sh
+      - ci/smoke-native-local.sh
       - ci/tests/**
       - packaging/**
       - .github/workflows/test-local-source-build.yml
@@ -36,9 +37,11 @@ jobs:
           bash -n ci/vulpra-fetch-all.sh
           bash -n ci/build-local.sh
           bash -n ci/package-smoke-local.sh
+          bash -n ci/smoke-native-local.sh
           bash -n ci/tests/vulpra-fetch-all-test.sh
           bash -n ci/tests/build-local-test.sh
           bash -n ci/tests/package-smoke-local-test.sh
+          bash -n ci/tests/smoke-native-local-test.sh
 
       - name: Test restart-safe source retrieval
         run: bash ci/tests/vulpra-fetch-all-test.sh "$PWD/ci/vulpra-fetch-all.sh"
@@ -48,3 +51,6 @@ jobs:
 
       - name: Test local package staging and isolated smoke runner
         run: bash ci/tests/package-smoke-local-test.sh "$PWD/ci/package-smoke-local.sh" "$PWD/packaging"
+
+      - name: Test no-rebuild native startup probe
+        run: bash ci/tests/smoke-native-local-test.sh "$PWD/ci/smoke-native-local.sh"
