@@ -14,10 +14,13 @@
   "measurements": {
     "local_git_files": 483753,
     "local_git_blob_bytes": 3633358256,
-    "package_bytes": null,
+    "package_bytes": 84044920,
     "libxul_bytes": null,
-    "context": "Exact numeric packaged sizes are in private workstation acceptance JSON, not in uploaded stdout; do not invent them",
-    "observed_config_fields": 19
+    "context": "User workstation pinned original M2 package pre-debloat. Archive compressed byte size and sum of tar regular-file logical bytes measured and verified via sidecar checksum; not installed size or source size. Exact per-feature resource details in private generated JSON, not uploaded.",
+    "observed_config_fields": 19,
+    "package_regular_members_logical_bytes": 324566909,
+    "omni_resource_archives": 2,
+    "package_baseline_source": "User workstation read-only package scan PASS 2026-10-26 12:28 Mexico City local: output .git/vulpra-debloat/m3-package-footprint.{json,md}; exact package SHA already verified by scanner, value not shown in terminal excerpt"
   },
   "evidence_policy": "Never claim safe deletion or improvement from manifest text alone. Require dependency/reference scan, native build and post-change real package, Wayland, JS and WebExtension tests, before/after metrics.",
   "candidates": [
