@@ -28,6 +28,7 @@ The `upstream-base` branch contains the original release source snapshot with Mo
 
 - [Stewardship rules](AGENTS.md)
 - [Roadmap and acceptance gates](docs/vulpra/ROADMAP.md)
+- [Resumable source download and first local build](docs/vulpra/LOCAL-BUILD.md)
 - [Progress ledger](docs/vulpra/PROGRESS.json)
 - [Upstream provenance and license handling](docs/vulpra/UPSTREAM.md)
 - [Import procedure and recovery](docs/vulpra/IMPORT.md)
