@@ -228,6 +228,43 @@ the real old and new package sizes and run actual isolated native, Wayland,
 HTTP/JS navigation and WebExtension lifecycle acceptance; investigate any
 remaining Normandy resource references on that candidate build.
 
+## Dependency boundary: Normandy is not independently removable
+
+Pinned source review on 2026-10-26 exposed dependencies that are *not*
+covered by the two guarded `BrowserComponents.manifest` registrations:
+
+- `toolkit/modules/FirstStartup.sys.mjs` loads Normandy lazily, but its calls
+  are guarded with `AppConstants.MOZ_NORMANDY`. This path is already conditionally
+  safe; it does not prove all other paths are safe.
+- `toolkit/components/nimbus/lib/ExperimentManager.sys.mjs` imports
+  `resource://normandy/lib/ClientEnvironment.sys.mjs` and
+  `resource://normandy/lib/NormandyUtils.sys.mjs`.
+  `ClientEnvironment.sys.mjs` itself lazy-loads
+  `resource://normandy/lib/NormandyApi.sys.mjs`.
+- `toolkit/components/nimbus/FeatureManifest.yaml` includes
+  `resource://normandy/schemas/LegacyHeartbeat.schema.json`. Generation
+  retains a source path and runtime URI that must be audited.
+- `toolkit/components/normandy/Normandy.sys.mjs` currently calls
+  `await lazy.ExperimentAPI.init()` during startup. Removing the Normandy
+  startup registration without an equivalent, independently validated Nimbus
+  initialization path could change retained features' behavior.
+
+Thus the **current isolated `MOZ_NORMANDY=0` configuration is NOT cleared for
+native runtime acceptance yet**. A successful configure does not establish that
+Nimbus's shared modules or bootstrap work. The experiment must preserve or
+relocate shared imports and verify Nimbus startup behavior before promotion.
+
+The source-reference audit is now committed as
+`ci/m3-normandy-reference-audit.py` and
+`.github/workflows/m3-normandy-reference-audit.yml`. Its automated results
+are directed to [M3 issue #1](https://github.com/sguzman/vulpra/issues/1).
+A local synthetic checkout verified the audit's category classification, but
+the full hosted source result must be inspected before deciding the packaging
+whitelist or a native build. Added six build-manifest regression checks for
+these verified dependency anchors.
+
+**No dependency was physically removed and M3 remains 0%.**
+
 ## Actual native configuration results (workstation, 2026-10-26 12:14 local)
 
 The user ran the no-rebuild configuration probe on the *real original object
