@@ -176,7 +176,7 @@
         "toolkit/components/moz.build: includes normandy when MOZ_BUILD_APP=browser",
         "toolkit/moz.configure: data_reporting dependency"
       ],
-      "next": "Observe pinned full native candidate job result. On success, gated packaged JavaScript navigation and WebExtension checks execute; on those passing, matched-source full-Normandy native package is compiled for reliable same-toolchain byte delta. No completion percentage until acceptance evidence.",
+      "next": "Await successful memory-safe native retry 40392545095, then strictly gated archived Wayland same-surface buffer commit, Nimbus store readiness, localhost JS navigation, WebExtension lifecycle and source-matched full-Normandy package-size comparison. Preserve M2 browser and count zero M3 package credit until all gates pass.",
       "observed_actual_config": "MOZ_NORMANDY=\"1\" and MOZ_SERVICES_HEALTHREPORT=\"1\"",
       "experimental_compile_variant": {
         "feature": "Exclude Normandy recipe runner and studies frontend; retain Nimbus and shared Normandy helper imports",
@@ -205,8 +205,8 @@
         "runtime_smoke_verified": false,
         "measured_size_delta_bytes": null,
         "accepted_m3_removal": false,
-        "risk": "Lean source passes isolated configure but has not passed actual native build/package/runtime. Nimbus still shares Normandy helper classes and NimbusBootstrap has not been runtime-accepted. Hosted Ubuntu size is not matched to target workstation Arch size.",
-        "next": "Observe pinned full native candidate job result. On success, gated packaged JavaScript navigation and WebExtension checks execute; on those passing, matched-source full-Normandy native package is compiled for reliable same-toolchain byte delta. No completion percentage until acceptance evidence.",
+        "risk": "First native compile exhausted hosted 15 GiB RAM plus 3 GiB swap while linking/compiling Rust; follow-on runner uses 24 GiB additional verified disk-backed swap and one Cargo job. Despite passing source guards, compiled package, Nimbus, Wayland, JS/WebExtension runtime, and matched Linux size delta remain unverified.",
+        "next": "Await successful memory-safe native retry 40392545095, then strictly gated archived Wayland same-surface buffer commit, Nimbus store readiness, localhost JS navigation, WebExtension lifecycle and source-matched full-Normandy package-size comparison. Preserve M2 browser and count zero M3 package credit until all gates pass.",
         "full_repository_reference_audit": {
           "ci": "https://github.com/sguzman/vulpra/actions/runs/40382641564",
           "artifact": "m3-normandy-references",
@@ -223,7 +223,26 @@
         "native_candidate_package_verified": false,
         "actual_webextension_acceptance": false,
         "actual_localhost_js_acceptance": false,
-        "matched_linux_size_delta_bytes": null
+        "matched_linux_size_delta_bytes": null,
+        "native_build_attempts": [
+          {
+            "ci": "https://github.com/sguzman/vulpra/actions/runs/40384902342",
+            "source_commit": "a59375020446a147d59cbfa70f20ad54b9cfa359",
+            "result": "failure",
+            "failure_stage": "full_native_compile",
+            "log_evidence": "15 GiB RAM and 3 GiB swap effectively saturated during gkrust compilation; hosted runner shut down, exit 143",
+            "produced_archive": false
+          },
+          {
+            "ci": "https://github.com/sguzman/vulpra/actions/runs/40392545095",
+            "source_commit": "286627afec2cb141a3d6e553eac41954847db5b4",
+            "result": "in_progress_at_last_check",
+            "configure_passed": true,
+            "extra_active_swap_gib": 24,
+            "cargo_build_jobs": 1,
+            "produced_archive": false
+          }
+        ]
       }
     },
     {
