@@ -6,7 +6,7 @@
   "upstream_tag": "FIREFOX_159_0b5_RELEASE",
   "upstream_commit": "34ac0671eb25f31f8c56ace36e1c413dd471eb8d",
   "overall": {
-    "percent": 20,
+    "percent": 26,
     "definition": "Product work only, excluding source scaffolding M1. Equal milestone weights for M2 working browser, M3 debloating and M4 defect fixes / Rust migration; integer percent = floor((M2.percent + M3.percent + M4.percent)/3)."
   },
   "milestones": [
@@ -31,7 +31,7 @@
     {
       "id": "M2",
       "name": "Working Linux browser",
-      "percent": 60,
+      "percent": 80,
       "status": "in-progress",
       "evidence": [
         "Isolated launcher contract passed: https://github.com/sguzman/vulpra/actions/runs/40124539256 (mock executable only)",
@@ -53,7 +53,8 @@
         "User-workstation package log clipboard-20261026-094122.txt (2026-10-26 09:40 local): ./mach package exit 0, generated obj-vulpra-linux/dist/vulpra-159.0.en-US.linux-x86_64.tar.xz after 14.68 s; independently staged .git/vulpra-native-build/packages/vulpra-local-20261026-094040-827316872.tar.xz with SHA-256 OK; browser launched from staged package, produced screenshot .git/vulpra-native-build/package-smoke-20261026-094040-827316872.png and PASS reported with dedicated private profile. This is actual native packaged-runtime evidence, not CI mock.",
         "2026-10-26 packaged Weston GUI smoke first attempt: target workstation installed weston 15.0.1/wayland-utils; verified package SHA-256, established Weston connection, remained alive with a private profile, and emitted wl_surface#13.attach(wl_buffer#45...) and wl_surface#13.commit(). The probe nevertheless returned failure because it incorrectly searched for xdg_surface@ rather than Wayland's actual hash-form object IDs. No graphical gate credited until corrected probe passes on the workstation. Fixed probe and CI regression: https://github.com/sguzman/vulpra/actions/runs/40354284554.",
         "2026-10-26 09:58:42 local: user-workstation corrected packaged Wayland smoke PASS. Verified prebuilt Vulpra archive checksum, private Weston compositor connection, non-null wl_surface buffers attached and frames committed, browser alive 6 seconds, private isolated profile. Log: .git/vulpra-native-build/wayland-package-20261026-095842-198046253.log; protocol log: .git/vulpra-native-build/wayland-browser-20261026-095842-198046253.log. Actual graphical protocol proven; human-visible rendering, browsing, extensions and security unverified.",
-        "2026-10-26 local native acceptance attempt: Vulpra packaged binary SHA-256 passed and isolated launcher rejected profile override; local HTTP GET /start and JavaScript-driven /page were observed. Test failed on /js-run because the probe relied on synchronous XMLHttpRequest in a short-lived headless screenshot session. JavaScript execution was not demonstrated broken; test design changed to JS-triggered /js-run navigation followed by server HTTP 302 /page, requiring exact three-request sequence. CI regression passed: https://github.com/sguzman/vulpra/actions/runs/40356996535. Workstation rerun pending. No M2 gate credited."
+        "2026-10-26 local native acceptance attempt: Vulpra packaged binary SHA-256 passed and isolated launcher rejected profile override; local HTTP GET /start and JavaScript-driven /page were observed. Test failed on /js-run because the probe relied on synchronous XMLHttpRequest in a short-lived headless screenshot session. JavaScript execution was not demonstrated broken; test design changed to JS-triggered /js-run navigation followed by server HTTP 302 /page, requiring exact three-request sequence. CI regression passed: https://github.com/sguzman/vulpra/actions/runs/40356996535. Workstation rerun pending. No M2 gate credited.",
+        "2026-10-26 10:20:11 America/Mexico_City: real native browser acceptance PASS from uploaded terminal log: package SHA256 2cc72f3dbd5e5578905900d036afa4d40d883572b9bfdd7d7815b32edc4083d2, refused profile-selection override, local JS-triggered navigation /start -> /js-run -> HTTP 302 /page passed, PNG screenshot valid, synthetic existing Firefox profile preserved. Measured startup+navigation+screenshot 0.895 seconds; generated baseline metrics .git/vulpra-native-build/acceptance-20261026-102011.json, screenshot .png and browser .log. The JSON's exact size and parent-RSS values have not been uploaded; file existence confirmed by successful runner output. Native baseline metrics gate credited; no claim of total-process memory or browser cold-start."
       ],
       "verified_preparatory_tasks": [
         {
@@ -95,15 +96,19 @@
           "id": "real-packaged-wayland-startup",
           "percent": 100,
           "evidence": "User-workstation log wayland-package-20261026-095842-198046253.log, PASS on October 26 2026, packaged native Vulpra under private Weston, attached and committed real Wayland buffers, six-second process uptime and profile isolation."
+        },
+        {
+          "id": "real-localhost-navigation-and-baseline",
+          "percent": 100,
+          "evidence": "Actual user workstation stdout 2026-10-26 10:20, acceptance-20261026-102011.json generated and PASS: JavaScript navigation, HTTP redirect, screenshot, profile isolation, 0.895s combined elapsed. CI mock regression: https://github.com/sguzman/vulpra/actions/runs/40356996535"
         }
       ],
-      "status_note": "Native compile, packaged headless startup, verified tar.xz/checksum, isolated profile and actual Weston Wayland buffer/commit startup PASSED on workstation. M2 remains 3/5 = 60%, because combined extension/security/Wayland gate still requires real navigation and extension/security checks, plus a separate metrics gate.",
+      "status_note": "On target workstation native compile, Vulpra 159 package checksum and isolated headless startup, Weston Wayland buffer/commit GUI startup, JavaScript-triggered HTTP navigation and redirect all PASS. Acceptance runner wrote baseline JSON (archive/executable/libxul bytes, prior successful build duration, measured navigation/screenshot wall time and process-parent RSS sample); resulting exact size/RSS values are not visible in provided terminal log. Remaining M2 gate: real WebExtension lifecycle and targeted security acceptance. Navigation+screenshot 0.895 s is not cold-start alone.",
       "acceptance_gates": {
-        "passed": 3,
+        "passed": 4,
         "total": 5,
         "remaining": [
-          "Verify extension/security/graphical Wayland smoke gates",
-          "Record native size, build time and runtime metrics"
+          "Complete WebExtension lifecycle/compatibility and remaining security acceptance tests (real Wayland and browser navigation already passed)"
         ]
       }
     },
@@ -142,6 +147,7 @@
     "2026-10-26: Graphical Wayland package attempt exposed a false negative in test ID syntax, not a demonstrated Vulpra process crash; user log shows wl_surface# buffer attach+commit. Fix and extended negative tests passed CI 40354284554. Graphical runtime acceptance remains pending workstation rerun.",
     "2026-10-26: Corrected real Weston GUI smoke PASS (user log 09:58 local) with buffer attach/commit for 6 seconds. Not merely a mock; still not a full web-navigation/extension/security acceptance.",
     "2026-10-26: New standalone local HTTP/JavaScript navigation and baseline runner ci/accept-native-package-local.py has synthetic positive/negative CI regressions passing https://github.com/sguzman/vulpra/actions/runs/40355994838. This runner has not yet been run against the actual workstation package; native navigation, JavaScript and metrics are pending.",
-    "2026-10-26: User workstation loopback navigation test observed /start -> /page (working JS redirect), but an extra synchronous-XHR probe failed to observe /js-run. Deterministic JS navigation/HTTP 302 replacement and negative tests passed CI 40356996535; no real rerun yet."
+    "2026-10-26: User workstation loopback navigation test observed /start -> /page (working JS redirect), but an extra synchronous-XHR probe failed to observe /js-run. Deterministic JS navigation/HTTP 302 replacement and negative tests passed CI 40356996535; no real rerun yet.",
+    "2026-10-26: Actual packaged native Vulpra passed localhost JS navigation and 302 HTTP redirect, screenshot, profile safety on workstation (0.895 s combined workflow). Machine-readable baseline JSON generated. M2 progress 4/5=80%, one combined extension/security acceptance gate remains. Overall product roadmap floor(80/3)=26%. Exact JSON size/RSS values still need reviewing before citing numeric quantities."
   ]
 }
