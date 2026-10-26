@@ -89,6 +89,11 @@
           "id": "wayland-compositor-test-harness",
           "percent": 100,
           "evidence": "https://github.com/sguzman/vulpra/actions/runs/40133023153"
+        },
+        {
+          "id": "real-packaged-wayland-startup",
+          "percent": 100,
+          "evidence": "User-workstation log wayland-package-20261026-095842-198046253.log, PASS on October 26 2026, packaged native Vulpra under private Weston, attached and committed real Wayland buffers, six-second process uptime and profile isolation."
         }
       ],
       "status_note": "Native compile, packaged headless startup, verified tar.xz/checksum, isolated profile and actual Weston Wayland buffer/commit startup PASSED on workstation. M2 remains 3/5 = 60%, because combined extension/security/Wayland gate still requires real navigation and extension/security checks, plus a separate metrics gate.",
@@ -134,6 +139,7 @@
     "2026-10-26: User-supplied native-smoke log confirms successful actual native headless launch, local HTML screenshot and isolated temporary profile. Network access warnings were nonfatal. This clears a runtime subcheck but not the combined packaged-runtime acceptance gate.",
     "2026-10-26: Actual workstation compiled binary and standalone Vulpra packaged browser verified to run headlessly, render PNG and use isolated private profile; package checksum matched. M2 is 3/5 gates, 60%; 2 remain graphical/extension/security smoke and actual runtime/size measurements.",
     "2026-10-26: Graphical Wayland package attempt exposed a false negative in test ID syntax, not a demonstrated Vulpra process crash; user log shows wl_surface# buffer attach+commit. Fix and extended negative tests passed CI 40354284554. Graphical runtime acceptance remains pending workstation rerun.",
-    "2026-10-26: Corrected real Weston GUI smoke PASS (user log 09:58 local) with buffer attach/commit for 6 seconds. Not merely a mock; still not a full web-navigation/extension/security acceptance."
+    "2026-10-26: Corrected real Weston GUI smoke PASS (user log 09:58 local) with buffer attach/commit for 6 seconds. Not merely a mock; still not a full web-navigation/extension/security acceptance.",
+    "2026-10-26: New standalone local HTTP/JavaScript navigation and baseline runner ci/accept-native-package-local.py has synthetic positive/negative CI regressions passing https://github.com/sguzman/vulpra/actions/runs/40355994838. This runner has not yet been run against the actual workstation package; native navigation, JavaScript and metrics are pending."
   ]
 }
