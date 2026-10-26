@@ -142,7 +142,7 @@ It uses Mozilla's supported WebDriver add-on install endpoint through
 standard library. No npm, pip, browser rebuild or Git pull.
 
 ```fish
-sudo pacman -S --needed geckodriver
+yay -S --needed geckodriver
 and curl -fL --retry 20 --retry-all-errors -o ~/vulpra-smoke-webextension.py https://raw.githubusercontent.com/sguzman/vulpra/main/ci/smoke-webextension-package-local.py
 and python ~/vulpra-smoke-webextension.py
 ```
