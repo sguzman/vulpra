@@ -1,0 +1,39 @@
+name: M3 Audit Normandy References
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-normandy-reference-audit.yml
+      - ci/m3-normandy-reference-audit.py
+      - browser/moz.configure
+      - browser/components/BrowserComponents.manifest
+      - toolkit/components/moz.build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-references:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact Vulpra source for reference scan
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Scan Git-tracked source for Normandy consumers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-normandy-reference-audit.py . --output "$RUNNER_TEMP/normandy-references.json"
+      - name: Preserve machine-readable audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-normandy-references
+          path: ${{ runner.temp }}/normandy-references.json
+          if-no-files-found: warn
+          retention-days: 14
