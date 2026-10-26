@@ -5,7 +5,8 @@ ac_add_options --with-branding=browser/branding/unofficial
 ac_add_options --with-app-basename=Vulpra
 ac_add_options --disable-tests
 ac_add_options --with-ccache=sccache
-mk_add_options MOZ_PARALLEL_BUILD=2
+# Candidate CI/native builds are memory-sensitive; prefer predictable success.
+mk_add_options MOZ_PARALLEL_BUILD=1
 
 # Opt-in: remove Normandy recipe-runner module from the generated browser.
 # This flag is local to this alternate build. A feature being disabled does
