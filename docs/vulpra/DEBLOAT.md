@@ -198,9 +198,12 @@ on `main`. The original `ci/mozconfig-linux` and original
   known-good browser.
 - `browser/moz.configure` continues to imply `MOZ_NORMANDY=True` unless
   that experimental flag is set.
-- `toolkit/components/moz.build` now traverses the Normandy component
-  directory only when `MOZ_NORMANDY` is configured. This is necessary
-  because the previous manifest added it unconditionally.
+- `toolkit/components/moz.build` traverses the Normandy component
+  directory in both variants, because Nimbus and targeting modules still
+  depend on three shared helpers plus a legacy schema. The **original**
+  conditional `toolkit/components/normandy/jar.mn` includes the full recipe
+  runner only with `MOZ_NORMANDY` enabled; the lean variant ships those
+  shared resources instead.
 - `browser/components/BrowserComponents.manifest` now guards **both**
   startup and shutdown registrations under `#ifdef MOZ_NORMANDY`.
   Previously Normandy's shutdown hook was unconditional, which could have
@@ -221,8 +224,12 @@ Sync, DevTools and the Vulpra application identity remained enabled.
 Source-guard and standard-build-default regressions passed
 https://github.com/sguzman/vulpra/actions/runs/40379675945.
 
-**Scope:** the separate lean configuration is working, but no alternate
-`libxul.so`, `omni.ja`, tarball or installed browser was compiled or tested.
+**Scope:** the separate lean configuration passed its native configure gate,
+not package acceptance. The first full CI native build exhausted runner
+memory during Rust compilation (15 GiB RAM + 3 GiB swap) and terminated,
+without producing an alternate `libxul.so`, `omni.ja`, or tarball. Its
+successor uses 24 GiB additional swap and serialized Cargo compilation;
+that rebuild is still pending native/package acceptance.
 A configure pass is **not** accepted debloating. Before promoting it, compare
 the real old and new package sizes and run actual isolated native, Wayland,
 HTTP/JS navigation and WebExtension lifecycle acceptance; investigate any
