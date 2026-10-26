@@ -101,12 +101,19 @@ import sys
 from pathlib import Path
 
 attached = set()
-attach = re.compile(r"wl_surface([#@][0-9]+)\.attach\(wl_buffer[#@][0-9]+")
+# Wayland attach(NULL) replaces/detaches a previous surface buffer.
+# A later commit of that empty state must not be accepted as painted.
+attach = re.compile(r"wl_surface([#@][0-9]+)\.attach\(([^)]*)\)")
+nonnull = re.compile(r"^wl_buffer[#@][0-9]+(?:\s|,|$)")
 commit = re.compile(r"wl_surface([#@][0-9]+)\.commit\(")
 for line in Path(sys.argv[1]).open(encoding="utf-8", errors="replace"):
     found_attach = attach.search(line)
     if found_attach:
-        attached.add(found_attach.group(1))
+        surface, args = found_attach.groups()
+        if nonnull.search(args):
+            attached.add(surface)
+        else:
+            attached.discard(surface)
     found_commit = commit.search(line)
     if found_commit and found_commit.group(1) in attached:
         break
