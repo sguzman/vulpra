@@ -131,11 +131,12 @@ with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
     # invoking chrome context on normal M2 browsers.
     calls = []
     original_request = m.request
-    def fake_request(port, method, route, payload=None):
+    def fake_request(port, method, route, payload=None, timeout_seconds=12):
         calls.append((method, route, payload))
         if route.endswith("/moz/context"):
             return None
         if route.endswith("/execute/async"):
+            assert timeout_seconds > 14, "async Nimbus deadline must precede transport timeout"
             assert "ExperimentAPI.manager.store.ready()" in payload["script"]
             assert "ExperimentAPI.ready()" in payload["script"]
             return {"status":"pass","store_ready":True,"api_ready":True}
@@ -147,7 +148,7 @@ with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
         assert calls[0] == ("POST","/session/mock/moz/context",{"context":"chrome"})
         assert calls[-1] == ("POST","/session/mock/moz/context",{"context":"content"})
         calls.clear()
-        def fake_failure(port, method, route, payload=None):
+        def fake_failure(port, method, route, payload=None, timeout_seconds=12):
             calls.append((method, route, payload))
             if route.endswith("/execute/async"):
                 return {"status":"timeout"}
