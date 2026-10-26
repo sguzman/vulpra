@@ -24,14 +24,15 @@ import urllib.error
 import urllib.request
 import zipfile
 
-def request(port: int, method: str, route: str, payload: dict | None = None) -> object:
+def request(port: int, method: str, route: str, payload: dict | None = None,
+            timeout_seconds: float = 12) -> object:
     data = None if payload is None else json.dumps(payload).encode()
     req = urllib.request.Request(
         f"http://127.0.0.1:{port}{route}", data=data, method=method,
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=12) as response:
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
             result = json.load(response)
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"WebDriver {method} {route}: {exc.code}: {exc.read()[:700]!r}") from exc
@@ -188,7 +189,7 @@ def verify_nimbus_ready(port: int, base: str) -> dict:
                 })();
             """,
             "args": [],
-        })
+        }, timeout_seconds=20)
     finally:
         request(port, "POST", base + "/moz/context", {"context": "content"})
     if not isinstance(result, dict) or result.get("status") != "pass" or not (
