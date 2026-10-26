@@ -47,7 +47,9 @@
         "Disabled-test manifest bypass matched workstation fix that progressed beyond the missing mochitest support-file blocker: https://github.com/sguzman/vulpra/commit/fa5f9454f37406939e804b5191830b126d9c9bdf. Native compilation success remains unverified.",
         "Local native build wrapper with file/profile isolation guards and successful mock regressions: https://github.com/sguzman/vulpra/blob/main/ci/build-local.sh. It has not compiled the actual browser.",
         "Offline source-retrieval, local build-runner and packaging-smoke mock regression suite passed: https://github.com/sguzman/vulpra/actions/runs/40260188808. This used a tiny sparse CI checkout and synthetic executables; no real Vulpra build or runtime credit.",
-        "Local native build log (2026-10-26, source HEAD ee223921): mach reported 'Your build was successful!' and returned exit 0 after 1052s incremental compilation. Original Vulpra runner incorrectly demanded a hardcoded dist/bin/firefox path and returned exit 5 afterward. The native executable path, packaged startup and isolated profile remain unverified; no additional product-stage gate credited."
+        "Local native build log (2026-10-26, source HEAD ee223921): mach reported 'Your build was successful!' and returned exit 0 after 1052s incremental compilation. Original Vulpra runner incorrectly demanded a hardcoded dist/bin/firefox path and returned exit 5 afterward. The native executable path, packaged startup and isolated profile remain unverified; no additional product-stage gate credited.",
+        "Native Vulpra headless launch verified on 2026-10-26 (user-workstation log native-smoke-20261026-092345-388387374.log): exit 0, real browser produced valid PNG and PASS reported with a temporary isolated profile. Local HTML screenshot: .git/vulpra-native-build/native-smoke-20261026-092345-388387374.png. Network-based Remote Settings and region calls logged nonfatal errors; graphical Wayland, extensions and packaged startup remain unverified.",
+        "Standalone source-preserving native packaging and isolated headless mock tests passed CI: https://github.com/sguzman/vulpra/actions/runs/40351223191. Tests cover native executable named firefox or vulpra. Real package not yet run."
       ],
       "verified_preparatory_tasks": [
         {
@@ -86,7 +88,7 @@
           "evidence": "https://github.com/sguzman/vulpra/actions/runs/40133023153"
         }
       ],
-      "status_note": "Local full native compiler completed successfully on 2026-10-26 (1052s incremental build, mach exit 0); its wrapper failed solely at a hardcoded executable-location check. Actual binary identification, isolated startup, native package and Wayland smoke still pending. One of five combined product acceptance gates remains credited.",
+      "status_note": "User workstation has completed full native build and a real isolated headless launch with PNG screenshot. Compiled native startup is verified, but an independent distributable package and packaged runtime, graphical Wayland, extensions/security and real metrics are not yet verified; first combined product gate (configure) remains 1/5 = 20%.",
       "acceptance_gates": {
         "passed": 1,
         "total": 5,
@@ -130,6 +132,8 @@
     "Build 40131775964 terminated by runner shutdown with exit 143 despite removal of 55-minute timeout; no compiler error/confirmed OOM. Added two-job concurrency experiment and 45-second resource monitoring for following run. M2 remains unchanged.",
     "2026-10-25: Offline synthetic Git downloader regressions and mocked local build-runner tests passed; neither establishes successful native Vulpra compilation or a complete user-workstation source checkout.",
     "2026-10-25: Lightweight GitHub CI run 40260188808 passed synthetic source interruption/resume, local build runner and staged-package headless mock tests. It did not compile Firefox or verify actual browser behavior.",
-    "2026-10-26: Native compilation completed successfully on user workstation according to user-provided build log. CI 40348144467 passed tests for a no-rebuild dynamic-name startup probe and accepting compiler success independently of package layout. Build script fix: 352f456 and mock test: fbd3578. Do not label packaged or runnable browser verified."
+    "2026-10-26: Native compilation completed successfully on user workstation according to user-provided build log. CI 40348144467 passed tests for a no-rebuild dynamic-name startup probe and accepting compiler success independently of package layout. Build script fix: 352f456 and mock test: fbd3578. Do not label packaged or runnable browser verified.",
+    "2026-10-26: User-supplied native-smoke log confirms successful actual native headless launch, local HTML screenshot and isolated temporary profile. Network access warnings were nonfatal. This clears a runtime subcheck but not the combined packaged-runtime acceptance gate.",
+    "2026-10-26: GitHub CI 40351223191 passed standalone package-runner mock regression tests for both plausible on-disk executable names. Actual packaging is still pending."
   ]
 }
