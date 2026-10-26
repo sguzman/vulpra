@@ -10,6 +10,10 @@ git config user.email test@example.invalid
 git config user.name 'Local build regression test'
 printf 'release mock\n' > ci/mozconfig-linux
 printf 'tracked supplemental file\n' > ci/test-file.txt
+# Emulate the formerly ignored Breakpad dependency without tracking it in Git.
+LSS="$R/repo/toolkit/crashreporter/google-breakpad/src/third_party/lss/linux_syscall_support.h"
+mkdir -p "$(dirname "$LSS")"
+printf 'mock Breakpad header\n' > "$LSS"
 printf 'local wasm sysroot mock\n' > "$R/home/.mozbuild/vulpra-local.mozconfig"
 cat > mach <<'MOCK'
 #!/usr/bin/env bash
@@ -77,4 +81,12 @@ set -e
 [[ "$rc" == 7 ]] || { cat "$R/locked.log"; echo "FAIL: concurrent build should be refused: $rc"; exit 6; }
 flock -u 8
 echo 'PASS: refuses concurrent native build'
+rm -f "$LSS"
+set +e
+HOME="$R/home" bash "$SCRIPT" "$R/repo" > "$R/ignored-source.log" 2>&1
+rc=$?
+set -e
+[[ "$rc" == 3 ]] || { cat "$R/ignored-source.log"; echo "FAIL: ignored upstream source missing, expected exit 3, got $rc"; exit 7; }
+grep -Fq 'Missing upstream Breakpad Linux syscall header' "$R/ignored-source.log"
+echo 'PASS: detects omitted gitignored upstream Breakpad header before compilation'
 echo 'PASS: all local-build wrapper regressions'
