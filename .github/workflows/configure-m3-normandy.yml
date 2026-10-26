@@ -1,0 +1,80 @@
+name: M3 Configure Isolated Normandy-Free Vulpra
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/configure-m3-normandy.yml
+      - ci/mozconfig-linux-normandy-experiment
+      - browser/moz.configure
+      - browser/components/BrowserComponents.manifest
+      - toolkit/components/moz.build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-normandy-configure:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-normandy-experiment
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Check out pinned Vulpra source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Provide sccache needed by experimental mozconfig
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Bootstrap Linux build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv python3-dev git curl make
+          ./mach --no-interactive bootstrap --application-choice browser
+
+      - name: Configure experimental native target in independent object directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq 'export VULPRA_EXPERIMENT_NO_NORMANDY=1' "$MOZCONFIG"
+          grep -Fxq 'mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux-normandy-experiment' "$MOZCONFIG"
+          ./mach configure
+          test -s obj-vulpra-linux-normandy-experiment/config.status
+
+      - name: Verify optional feature off and protected features on
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path("obj-vulpra-linux-normandy-experiment/config.statusd/substs")
+          def value(name):
+              path = root / name
+              return json.loads(path.read_text()) if path.exists() else None
+          assert value("MOZ_BUILD_APP") == "browser", value("MOZ_BUILD_APP")
+          assert value("MOZ_WIDGET_TOOLKIT") == "gtk", value("MOZ_WIDGET_TOOLKIT")
+          assert value("MOZ_APP_BASENAME") == "Vulpra", value("MOZ_APP_BASENAME")
+          assert value("MOZ_NORMANDY") in (None, False, 0), value("MOZ_NORMANDY")
+          for key in ("MOZ_SANDBOX", "MOZ_SERVICES_SYNC", "MOZ_WAYLAND"):
+              assert str(value(key)) in ("1", "True"), (key, value(key))
+          assert value("MOZ_DEVTOOLS") == "all", value("MOZ_DEVTOOLS")
+          print("PASS: Separate M3 native configure disabled Normandy while preserving GTK, sandbox, Sync, Wayland, DevTools, app identity")
+          print("CONFIGURE ONLY: no alternate browser compiled, shipped, or runtime-tested.")
+          PY
+
+      - name: Record runner resource diagnostics
+        if: always()
+        shell: bash
+        run: |
+          df -h .
+          free -h
