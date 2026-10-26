@@ -25,7 +25,31 @@ The runner checks that sparse checkout is off and that no tracked working-tree f
 
 Build logs are stored in `.git/vulpra-native-build/`. The runner records the actual mach exit status and verifies that `obj-vulpra-linux/dist/bin/firefox` is executable and that `application.ini` reports `Name=Vulpra`.
 
-## 3. Package and smoke-test the compiled browser
+## 3. Check native startup without recompilation
+
+When `./mach build` reports **Your build was successful** and exits with zero,
+do not rerun compilation just because the prior Vulpra wrapper could not find
+its hardcoded `dist/bin/firefox` path. Mozilla's executable name can differ
+from the application/display name. Source/build success is independent of the
+package and runtime smoke-test gates.
+
+Use the standalone probe to inspect `obj-vulpra-linux/mozinfo.json`, choose
+the actual built browser executable, and perform an isolated local headless
+startup without running `./mach build` or `./mach package`:
+
+```fish
+curl -fL --retry 20 --retry-all-errors -o ~/vulpra-smoke-native.sh https://raw.githubusercontent.com/sguzman/vulpra/main/ci/smoke-native-local.sh
+and bash ~/vulpra-smoke-native.sh
+```
+
+The probe creates a temporary HOME/profile and local HTML test page. It
+saves a PNG and diagnostics inside `.git/vulpra-native-build/`. It does not
+touch the user's installed Firefox Developer Edition profile. It reports
+exactly which prerequisite failed if no executable or application.ini is
+present. A passing native headless smoke test does not certify packaged startup,
+real Wayland UI behavior, extensions or security.
+
+## 4. Package and smoke-test the compiled browser
 
 Only after the native build runner reports an actual compiled Vulpra executable,
 download and run the package/smoke runner from any directory (Fish-compatible):
@@ -49,7 +73,7 @@ Logs, preview packages and screenshots are stored under
 runner does not substitute for detailed extension or security QA, and its
 mock regression tests are not evidence that native Vulpra itself has run.
 
-## 4. Later acceptance gates
+## 5. Later acceptance gates
 
 A successful native build alone is not a shipped browser. Remaining gates include `./mach package`, isolated native launch/profile checks, Wayland rendering and navigation, extension/security smoke checks, and measured build/runtime behavior. Each gate requires actual execution evidence before crediting the roadmap.
 
