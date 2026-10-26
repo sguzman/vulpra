@@ -6,6 +6,7 @@ on:
     paths:
       - ci/vulpra-fetch-all.sh
       - ci/build-local.sh
+      - ci/package-smoke-local.sh
       - ci/tests/**
       - .github/workflows/test-local-source-build.yml
   workflow_dispatch:
@@ -26,17 +27,23 @@ jobs:
           filter: blob:none
           sparse-checkout: |
             ci
+            packaging
           sparse-checkout-cone-mode: true
 
       - name: Check Bash syntax
         run: |
           bash -n ci/vulpra-fetch-all.sh
           bash -n ci/build-local.sh
+          bash -n ci/package-smoke-local.sh
           bash -n ci/tests/vulpra-fetch-all-test.sh
           bash -n ci/tests/build-local-test.sh
+          bash -n ci/tests/package-smoke-local-test.sh
 
       - name: Test restart-safe source retrieval
         run: bash ci/tests/vulpra-fetch-all-test.sh "$PWD/ci/vulpra-fetch-all.sh"
 
       - name: Test guarded local native build runner
         run: bash ci/tests/build-local-test.sh "$PWD/ci/build-local.sh"
+
+      - name: Test local package staging and isolated smoke runner
+        run: bash ci/tests/package-smoke-local-test.sh "$PWD/ci/package-smoke-local.sh" "$PWD/packaging"
