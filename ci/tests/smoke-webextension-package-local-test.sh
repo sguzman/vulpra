@@ -20,6 +20,27 @@ spec.loader.exec_module(m)
 
 with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
     base = pathlib.Path(root)
+    # A staged candidate's 'vulpra' may be a profile-guarding script.
+    # Geckodriver must instead receive the native ELF binary.
+    app = base / "unpacked"
+    app.mkdir()
+    guarded = app / "vulpra"
+    native = app / "firefox"
+    guarded.write_text("#!/bin/sh\\nexit 2\\n")
+    guarded.chmod(0o755)
+    native.write_bytes(bytes([0x7f]) + b"ELF" + b"\\0fixture")
+    native.chmod(0o755)
+    assert m.select_binary(app) == native
+    native.unlink()
+    try:
+        m.select_binary(app)
+    except RuntimeError as err:
+        assert "native ELF" in str(err)
+    else:
+        raise AssertionError("Accepted isolated launcher as WebDriver native binary")
+    native.write_bytes(bytes([0x7f]) + b"ELF" + b"\\0fixture")
+    native.chmod(0o755)
+    print("PASS: WebDriver chooses native ELF, rejects profile-guarding shell launcher")
     addon = base / "temp.xpi"
     token = "test-string-constant-2026"
     m.create_probe_extension(addon, token)
