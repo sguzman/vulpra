@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   source-references:
@@ -37,3 +38,38 @@ jobs:
           path: ${{ runner.temp }}/normandy-references.json
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Publish bounded findings to M3 audit issue
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/normandy-references.json"
+          summary="$RUNNER_TEMP/normandy-summary.md"
+          if [[ -s "$report" ]]; then
+            python3 - "$report" > "$summary" <<'PY'
+          import json
+          import sys
+          r = json.load(open(sys.argv[1], encoding="utf-8"))
+          print("## Automated Normandy source-reference audit")
+          print()
+          print("Commit: `" + r["source_commit"] + "`")
+          print("Run: https://github.com/sguzman/vulpra/actions/runs/" + __import__("os").environ["GITHUB_RUN_ID"])
+          print("Matching tracked-source lines: **" + str(r["match_count"]) + "**")
+          for category, count in r["counts_by_class"].items():
+              print("- " + category + ": " + str(count))
+          print()
+          print("### Candidate consumers outside Normandy and obvious test/docs paths")
+          for path, count in list(r["other_source_paths"].items())[:90]:
+              print("- `" + path + "` (" + str(count) + " matching lines)")
+          if len(r["other_source_paths"]) > 90:
+              print("- ... " + str(len(r["other_source_paths"]) - 90) + " additional paths in artifact")
+          print()
+          print("**Evidence only.** This scan is not a build, static import graph, or runtime proof. See the JSON artifact on the run.")
+          PY
+          else
+            printf '## Normandy source-reference audit failed\n\nRun: https://github.com/sguzman/vulpra/actions/runs/%s\n\nNo JSON scan was produced; do not claim completed reference analysis.\n' "$GITHUB_RUN_ID" > "$summary"
+          fi
+          gh issue comment 1 --repo "$GITHUB_REPOSITORY" --body-file "$summary"
