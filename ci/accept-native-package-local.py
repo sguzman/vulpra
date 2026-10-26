@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """No-rebuild native Vulpra package acceptance and metrics on Linux.
 
-Checks a real local HTTP navigation, JavaScript request, screenshot, private
-profile protection and reproducible packaging measurements. No Git changes,
+Checks a real local HTTP navigation triggered by JavaScript, a subsequent
+HTTP redirect, screenshot, profile protection and reproducible package
+measurements. Synchronous XHR was removed: it was unreliable when Firefox
+closed shortly after a headless screenshot and misclassified real navigation. No Git changes,
 Firefox installation changes or external web requests are required.
 """
 from __future__ import annotations
@@ -80,15 +82,24 @@ def serve_browser_test() -> tuple[http.server.ThreadingHTTPServer, list[str], th
             path = urlsplit(self.path).path
             if path == "/start":
                 body = (b'<!doctype html><meta charset="utf-8"><title>Vulpra start</title>'
-                        b'<script>window.location.replace("/page")</script>')
+                        b'<script>window.location.replace("/js-run")</script>')
             elif path == "/page":
                 body = (b'<!doctype html><meta charset="utf-8"><title>Vulpra runtime</title>'
                         b'<style>body{background:#237c39;color:#fff;font-size:48px}</style>'
                         b'<h1 id="state">Navigation reached page</h1>'
-                        b'<script>document.getElementById("state").textContent="Vulpra JS executed";'
-                        b'var x=new XMLHttpRequest();x.open("GET","/js-run",false);x.send();</script>')
+                        b'<script>document.getElementById("state").textContent="Vulpra JS executed";</script>')
             elif path == "/js-run":
-                body = b"JavaScript network check successful"
+                # This route can only be reached after the JS redirect on /start.
+                # Redirect server-side to make /page depend on a completed
+                # JavaScript-triggered navigation, without a timing-sensitive XHR.
+                with lock:
+                    requests_seen.append(path)
+                self.send_response(302)
+                self.send_header("Location", "/page")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             elif path == "/favicon.ico":
                 self.send_response(204)
                 self.end_headers()
@@ -100,7 +111,7 @@ def serve_browser_test() -> tuple[http.server.ThreadingHTTPServer, list[str], th
             with lock:
                 requests_seen.append(path)
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8" if path != "/js-run" else "text/plain")
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -216,14 +227,17 @@ def main() -> int:
             raise RuntimeError("Browser did not produce a valid PNG screenshot")
         with lock:
             observations = list(seen)
-        missing = {"/start", "/page", "/js-run"} - set(observations)
-        if missing:
-            raise RuntimeError(f"Navigation or JavaScript failed; requests={observations}, missing={sorted(missing)}")
+        expected = ["/start", "/js-run", "/page"]
+        if observations[:3] != expected:
+            raise RuntimeError(
+                "JavaScript-triggered navigation or HTTP redirect failed; "
+                f"requests={observations}, required_first_three={expected}"
+            )
         if existing.read_bytes() != original_profile_bytes:
             raise RuntimeError("Security regression: existing Firefox profile was modified")
         if not (data_home / "vulpra/default").is_dir():
             raise RuntimeError("Isolated Vulpra profile directory missing")
-        print("PASS: Browser navigated local HTTP pages and executed JavaScript network request")
+        print("PASS: Browser completed JavaScript-triggered navigation and HTTP redirect")
         print("PASS: Browser screenshot PNG saved and Firefox profile preserved")
         print(f"Browser startup/navigation/screenshot elapsed: {runtime_seconds}s")
 
@@ -245,17 +259,20 @@ def main() -> int:
             "browser_parent_peak_rss_sampled_bytes": max_parent_rss,
             "rss_scope": "browser launcher parent process only, sampled every 0.1s; not full process tree",
             "navigation_requests": observations,
+            "navigation_validation": "JS location.replace('/js-run') -> HTTP 302 /page",
             "assertions": {
                 "package_sha256": True,
                 "browser_identity": True,
                 "profile_override_refused": True,
                 "http_navigation": True,
-                "javascript_network_request": True,
+                "javascript_triggered_navigation": True,
+                "http_redirect_followed": True,
                 "png_screenshot": True,
                 "existing_firefox_profile_preserved": True,
                 "isolated_vulpra_profile_created": True
             },
-            "limits": ["no external-network testing", "no extension lifecycle validation",
+            "limits": ["no external-network testing", "no XMLHttpRequest or fetch API coverage",
+                       "no extension lifecycle validation",
                        "no comprehensive browser security audit", "no GPU visual pixel validation"],
         }
         result_path.write_text(json.dumps(result, indent=2) + "\n")
