@@ -1,6 +1,6 @@
 # Vulpra native Linux build
 
-**Status (2026-10-26):** Native Vulpra was compiled and packaged successfully on the target Linux workstation, launched headlessly from its independent tar.xz with checksum/profile checks, and passed a real graphical startup test against isolated Weston (Wayland buffer attachments and commits). Actual automated navigation/JavaScript, extension/security smoke and real baseline measurement gates remain open.
+**Status (2026-10-26):** All five M2 working Linux browser acceptance gates **PASSED on the target EndeavourOS workstation**: native compilation, independent package/checksum/private profile, real Weston Wayland buffer/commit startup, local JavaScript navigation/HTTP redirect/PNG plus baseline metrics, and actual temporary unsigned WebExtension install/content/background/storage.local/uninstall/profile-preservation (11:04 local). This is a verified **personal Linux browser baseline**, not a public release or comprehensive security audit. M3 debloat inventory is the next step (see docs/vulpra/DEBLOAT.md).
 
 ## 1. Finish the full-source checkout
 
@@ -164,16 +164,16 @@ observed workstation PASS closes M2.
 
 ## 8. Remaining acceptance gates
 
-M2 requires the real WebExtension acceptance run and any related security
-fixes. The long-horizon project still continues through debloating,
-user-visible defect fixes, and eventual migration of non-Rust native
-components; M2 reaching 100% is **not** full Vulpra completion.
+M2 **completed 5/5 acceptance gates on 2026-10-26**. The actual WebExtension
+runtime PASS report is `.git/vulpra-native-build/webextension-smoke-20261026-110444.json`.
+The verified browser baseline remains pinned to its current source and package.
 
-
-The supplied extension probe checks only its declared capabilities and
-profile isolation; it is not an exhaustive security assessment. The broader
-roadmap continues past M2 with user-specific debloating and Rust migration.
-Only observed native results count as product progress.
+**Next: M3 read-only footprint inventory and evidence-driven optional-feature
+review** (see `docs/vulpra/DEBLOAT.md`). A public distributable release still
+requires independent branding/icon/trademark compliance review, a reliable
+upstream security update policy and broader security maintenance. M2
+completion is not a claim of comprehensive browser security or a finished
+Rust-only browser.
 
 **Git workflow:** Development is on `main`. The workstation checkout remains
 pinned to its existing HEAD and can retain uncommitted local build patches.
