@@ -132,11 +132,47 @@ unsuccessful local run is not a product gate; only actual workstation PASS
 counts. Synthetic negative-case regression tests pass in
 https://github.com/sguzman/vulpra/actions/runs/40355994838.
 
-## 7. Remaining acceptance gates
+## 7. Test the packaged WebExtension runtime
 
-After actual navigation and baseline data, WebExtension loading/compatibility
-and the remaining security checks still need independent observable evidence.
-Passing the full gated suite is not a comprehensive browser security audit.
+The final M2 acceptance gate is a real local WebExtension lifecycle check:
+temporary unsigned add-on installation, content-script injection,
+background messaging, `storage.local`, uninstall, and profile isolation.
+It uses Mozilla's supported WebDriver add-on install endpoint through
+`geckodriver` (Arch package `extra/geckodriver`), with only Python's
+standard library. No npm, pip, browser rebuild or Git pull.
+
+```fish
+sudo pacman -S --needed geckodriver
+and curl -fL --retry 20 --retry-all-errors -o ~/vulpra-smoke-webextension.py https://raw.githubusercontent.com/sguzman/vulpra/main/ci/smoke-webextension-package-local.py
+and python ~/vulpra-smoke-webextension.py
+```
+
+This selects the existing checksum-verified Vulpra tarball and invokes
+`geckodriver` with the **absolute packaged Vulpra executable**, never
+system Firefox. It uses a temporary HOME, profile, local-only HTTP page and
+temporary XPI. A random challenge token is returned by a background
+script through `browser.runtime.sendMessage` and `browser.storage.local`,
+then observed in the page's content script. After uninstall, it must no
+longer be injected. The output is
+`.git/vulpra-native-build/webextension-smoke-<date>.json`; driver errors
+are logged separately.
+
+Offline positive/negative protocol and archive safety regressions passed:
+https://github.com/sguzman/vulpra/actions/runs/40360164044.
+They do **not** establish real packaged WebExtension behavior; only an
+observed workstation PASS closes M2.
+
+## 8. Remaining acceptance gates
+
+M2 requires the real WebExtension acceptance run and any related security
+fixes. The long-horizon project still continues through debloating,
+user-visible defect fixes, and eventual migration of non-Rust native
+components; M2 reaching 100% is **not** full Vulpra completion.
+
+
+The supplied extension probe checks only its declared capabilities and
+profile isolation; it is not an exhaustive security assessment. The broader
+roadmap continues past M2 with user-specific debloating and Rust migration.
 Only observed native results count as product progress.
 
 **Git workflow:** Development is on `main`. The workstation checkout remains
