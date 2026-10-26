@@ -25,7 +25,31 @@ The runner checks that sparse checkout is off and that no tracked working-tree f
 
 Build logs are stored in `.git/vulpra-native-build/`. The runner records the actual mach exit status and verifies that `obj-vulpra-linux/dist/bin/firefox` is executable and that `application.ini` reports `Name=Vulpra`.
 
-## 3. Later acceptance gates
+## 3. Package and smoke-test the compiled browser
+
+Only after the native build runner reports an actual compiled Vulpra executable,
+download and run the package/smoke runner from any directory (Fish-compatible):
+
+```fish
+curl -fL --retry 20 --retry-all-errors -o ~/vulpra-package-smoke-local.sh https://raw.githubusercontent.com/sguzman/vulpra/main/ci/package-smoke-local.sh
+and bash ~/vulpra-package-smoke-local.sh
+```
+
+This calls `./mach package`, stages the independent `vulpra` launcher, verifies
+the archive checksum and app identity, unpacks it under a temporary directory,
+launches its browser with a private HOME and XDG data directory, and checks for
+a PNG screenshot and isolated profile. The test also ensures the sentinel
+Firefox profile file it created stays unchanged; it never selects the user's
+real Firefox profile. If `weston` and `wayland-info` are already installed,
+it attempts a separate graphical Wayland smoke test; otherwise it explicitly
+reports Wayland as **not verified**. No automatic package installation occurs.
+
+Logs, preview packages and screenshots are stored under
+`.git/vulpra-native-build/` so failures leave their evidence intact. This
+runner does not substitute for detailed extension or security QA, and its
+mock regression tests are not evidence that native Vulpra itself has run.
+
+## 4. Later acceptance gates
 
 A successful native build alone is not a shipped browser. Remaining gates include `./mach package`, isolated native launch/profile checks, Wayland rendering and navigation, extension/security smoke checks, and measured build/runtime behavior. Each gate requires actual execution evidence before crediting the roadmap.
 
