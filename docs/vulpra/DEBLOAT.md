@@ -249,21 +249,42 @@ covered by the two guarded `BrowserComponents.manifest` registrations:
   startup registration without an equivalent, independently validated Nimbus
   initialization path could change retained features' behavior.
 
-Thus the **current isolated `MOZ_NORMANDY=0` configuration is NOT cleared for
-native runtime acceptance yet**. A successful configure does not establish that
-Nimbus's shared modules or bootstrap work. The experiment must preserve or
-relocate shared imports and verify Nimbus startup behavior before promotion.
+The first opt-out disabled the entire Normandy directory. That cannot ship
+because Nimbus and shared targeting still import three Normandy helper modules
+plus the LegacyHeartbeat schema. The revised **source-only candidate** retains
+their upstream URIs through a conditional branch of the *original*
+`toolkit/components/normandy/jar.mn`, while omitting Normandy's runner, actions,
+content and studies frontend. The normal build continues using the full
+manifest. The build-system frontend explicitly rejects declaring a different
+JAR manifest when a directory already contains `jar.mn`, so a separate
+`vulpra-shared.jar.mn` attempt was removed.
 
-The source-reference audit is now committed as
-`ci/m3-normandy-reference-audit.py` and
-`.github/workflows/m3-normandy-reference-audit.yml`. Its automated results
-are directed to [M3 issue #1](https://github.com/sguzman/vulpra/issues/1).
-A local synthetic checkout verified the audit's category classification, but
-the full hosted source result must be inspected before deciding the packaging
-whitelist or a native build. Added six build-manifest regression checks for
-these verified dependency anchors.
+The lean GTK build also registers a minimal `NimbusBootstrap.sys.mjs` via
+`MOZ_SRC_FILES` and `BrowserComponents.manifest` to initialize
+`ExperimentAPI` after `sessionstore-windows-restored`. It suppresses the
+`ShieldFrame` JSWindowActor for the unavailable `about:studies` page.
+These are guarded source changes, *not* verified runtime behavior.
 
-**No dependency was physically removed and M3 remains 0%.**
+The complete pinned-source reference scan passed
+https://github.com/sguzman/vulpra/actions/runs/40382641564.
+It found **379 matching tracked-source lines**: 143 inside Normandy,
+72 obvious tests, 37 docs/tooling and 127 other-source lines requiring
+classification. The complete machine-readable artifact was downloaded and
+manually examined; remaining production references were checked for guards,
+shared-module imports and runtime registration. CI evidence and further runs
+are recorded in [M3 issue #1](https://github.com/sguzman/vulpra/issues/1).
+
+After correcting the JAR manifest and source invariants, the opt-in Linux
+configure/source checks passed
+https://github.com/sguzman/vulpra/actions/runs/40384311987.
+A separate [native candidate workflow](https://github.com/sguzman/vulpra/actions/workflows/build-m3-normandy.yml)
+was added to compile, package and smoke-test this branch in hosted Ubuntu.
+Hosted package metrics must not be misrepresented as a same-toolchain comparison
+with the known-good Arch workstation 84,044,920-byte baseline.
+
+**Status: M3 0% (delta 0 pp).** No independently accepted removal or package
+size savings. The lean binary, runtime Nimbus behavior, full WebExtension
+acceptance and matched-toolchain package delta remain unverified.
 
 ## Actual native configuration results (workstation, 2026-10-26 12:14 local)
 
