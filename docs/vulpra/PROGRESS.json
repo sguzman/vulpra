@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "Vulpra",
-  "as_of": "2026-10-24",
+  "as_of": "2026-10-25",
   "source_version": "159.0b5",
   "upstream_tag": "FIREFOX_159_0b5_RELEASE",
   "upstream_commit": "34ac0671eb25f31f8c56ace36e1c413dd471eb8d",
@@ -42,7 +42,10 @@
         "Release-like native configuration with --disable-tests confirmed: https://github.com/sguzman/vulpra/actions/runs/40126662777",
         "Native full build run 40126828007 terminated around 55-minute compilation timeout; compile succeeded through many C/C++ and Rust units before shutdown. No browser success credited.",
         "Native size and elapsed-time reporting verified on mock browser package: https://github.com/sguzman/vulpra/actions/runs/40132561502 (no real browser measurements yet)",
-        "Wayland Weston independent harness and early-exit detection passed: https://github.com/sguzman/vulpra/actions/runs/40133023153 (mock browser only)"
+        "Wayland Weston independent harness and early-exit detection passed: https://github.com/sguzman/vulpra/actions/runs/40133023153 (mock browser only)",
+        "Resumable local source downloader with complete-checkout verification: https://github.com/sguzman/vulpra/blob/main/ci/vulpra-fetch-all.sh. Offline Git recovery/lock tests passed in an isolated synthetic partial clone; target workstation completion is unverified.",
+        "Disabled-test manifest bypass matched workstation fix that progressed beyond the missing mochitest support-file blocker: https://github.com/sguzman/vulpra/commit/fa5f9454f37406939e804b5191830b126d9c9bdf. Native compilation success remains unverified.",
+        "Local native build wrapper with file/profile isolation guards and successful mock regressions: https://github.com/sguzman/vulpra/blob/main/ci/build-local.sh. It has not compiled the actual browser."
       ],
       "verified_preparatory_tasks": [
         {
@@ -81,7 +84,7 @@
           "evidence": "https://github.com/sguzman/vulpra/actions/runs/40133023153"
         }
       ],
-      "status_note": "One of five product-stage acceptance gates passed: full-native configure. Native compilation/runtime remain unverified.",
+      "status_note": "One of five product-stage acceptance gates passed: native configure. Pinned local source checkout is being completed through a resumable small-batch downloader; compiled browser, packaging and runtime remain unverified.",
       "acceptance_gates": {
         "passed": 1,
         "total": 5,
@@ -122,6 +125,7 @@
     "CI 40126662777 passed native configure with optional test binaries disabled; separate browser runtime tests remain required.",
     "Build 40126828007 failed after SIGTERM/143 near explicitly configured 55-minute timeout (not a demonstrated compiler error). Removed premature timeout; enabled Mozilla sccache-action v0.0.11 with Firefox --with-ccache=sccache and GitHub cache backend for retry. This optimization is pending CI verification.",
     "Vulpra-maintained GitHub Actions workflows passed actionlint 1.7.12: https://github.com/sguzman/vulpra/actions/runs/40133272668. This is CI correctness evidence, not browser runtime evidence.",
-    "Build 40131775964 terminated by runner shutdown with exit 143 despite removal of 55-minute timeout; no compiler error/confirmed OOM. Added two-job concurrency experiment and 45-second resource monitoring for following run. M2 remains unchanged."
+    "Build 40131775964 terminated by runner shutdown with exit 143 despite removal of 55-minute timeout; no compiler error/confirmed OOM. Added two-job concurrency experiment and 45-second resource monitoring for following run. M2 remains unchanged.",
+    "2026-10-25: Offline synthetic Git downloader regressions and mocked local build-runner tests passed; neither establishes successful native Vulpra compilation or a complete user-workstation source checkout."
   ]
 }
