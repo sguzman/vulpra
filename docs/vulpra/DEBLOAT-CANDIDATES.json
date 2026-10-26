@@ -16,7 +16,8 @@
     "local_git_blob_bytes": 3633358256,
     "package_bytes": null,
     "libxul_bytes": null,
-    "context": "Exact numeric packaged sizes are in private workstation acceptance JSON, not in uploaded stdout; do not invent them"
+    "context": "Exact numeric packaged sizes are in private workstation acceptance JSON, not in uploaded stdout; do not invent them",
+    "observed_config_fields": 19
   },
   "evidence_policy": "Never claim safe deletion or improvement from manifest text alone. Require dependency/reference scan, native build and post-change real package, Wayland, JS and WebExtension tests, before/after metrics.",
   "candidates": [
@@ -120,7 +121,8 @@
         "services/moz.build: conditional DIRS += sync",
         "browser/components/AccountsGlue.sys.mjs: references resource://services-sync/UIState.sys.mjs"
       ],
-      "next": "Confirm actual local CONFIG value; analyze AccountsGlue/UI consumers; consider a tested opt-out rather than deleting source"
+      "next": "Enabled in tested configuration. Map AccountsGlue/UI module references and test an isolated opt-out, with native build and extension/navigation regression before touching the known-good baseline.",
+      "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" (enabled)"
     },
     {
       "id": "firefox_accounts",
@@ -136,7 +138,8 @@
         "services/moz.build: non-Android includes fxaccounts",
         "browser/components/AccountsGlue.sys.mjs: imports FxAccounts.sys.mjs and FxAccountsCommands.sys.mjs"
       ],
-      "next": "Must map account/OAuth/login dependencies before changing module packaging"
+      "next": "Preserve until AccountsGlue and WebExtension integration dependencies mapped; must not assume toggling Sync removes FxAccounts.",
+      "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" but account services separately compiled for gtk"
     },
     {
       "id": "telemetry_internals",
@@ -152,7 +155,8 @@
         "toolkit/moz.configure: MOZ_TELEMETRY_REPORTING option defaults to mozilla_official",
         "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces"
       ],
-      "next": "Measure actual reporting config; distinguish privacy reduction from binary reduction; protect crash/security requirements"
+      "next": "Report config missing/unverified; preserve native telemetry and crash reporting while examining configured data-reporting components and package footprint.",
+      "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\""
     },
     {
       "id": "normandy_and_healthreport",
@@ -169,7 +173,8 @@
         "toolkit/components/moz.build: includes normandy when MOZ_BUILD_APP=browser",
         "toolkit/moz.configure: data_reporting dependency"
       ],
-      "next": "Trace user-visible remote experiments and data-reporting defaults; do not conflate with sandbox/security/crash code"
+      "next": "Both enabled. Inspect runtime bundle contents, remote experiments references, and selectively reconfigure in an isolated experiment; preserve crash/security reporting.",
+      "observed_actual_config": "MOZ_NORMANDY=\"1\" and MOZ_SERVICES_HEALTHREPORT=\"1\""
     },
     {
       "id": "devtools_client",
@@ -186,7 +191,8 @@
         "toolkit/moz.configure: MOZ_DEVTOOLS all/server",
         "devtools/moz.build: client conditional; platform/server/shared/startup unconditional"
       ],
-      "next": "Measure packaged DevTools client footprint and preserve user debugging workflows unless explicitly excluded"
+      "next": "Full DevTools client enabled. Given debugging value, retain unless packaged footprint and explicit alternative justify exclusion.",
+      "observed_actual_config": "MOZ_DEVTOOLS=\"all\" (full client compiled)"
     },
     {
       "id": "browser_genai",
@@ -242,7 +248,37 @@
         "toolkit/toolkit.mozbuild: core security/netwerk/js/dom directories",
         "M2 actual Javascript/WebExtension/browser startup smoke"
       ],
-      "next": "Retain; any equivalent replacement belongs to long-horizon audited rewrite"
+      "next": "Preserve security and automation capabilities; updater enabled is not evidence an independent update service is configured and functional.",
+      "observed_actual_config": "MOZ_SANDBOX=\"1\", MOZ_WAYLAND=\"1\", MOZ_UPDATER=\"1\", MOZ_CRASHREPORTER=\"1\", ENABLE_WEBDRIVER=\"1\""
     }
-  ]
+  ],
+  "observed_native_config": {
+    "source": "User workstation generated obj-vulpra-linux/config.statusd/substs output 2026-10-26 12:14 America/Mexico_City; originally build-tested object tree predates local Git fast-forward",
+    "identity": {
+      "MOZ_BUILD_APP": "browser",
+      "MOZ_WIDGET_TOOLKIT": "gtk",
+      "OS_TARGET": "Linux",
+      "MOZ_APP_BASENAME": "Vulpra",
+      "MOZ_APP_NAME": "vulpra",
+      "MOZ_APP_VERSION": "159.0"
+    },
+    "enabled": {
+      "MOZ_SERVICES_SYNC": "1",
+      "MOZ_SERVICES_HEALTHREPORT": "1",
+      "MOZ_NORMANDY": "1",
+      "MOZ_DEVTOOLS": "all",
+      "MOZ_CRASHREPORTER": "1",
+      "MOZ_HAS_REMOTE": "1",
+      "ENABLE_WEBDRIVER": "1",
+      "MOZ_UPDATER": "1",
+      "MOZ_SANDBOX": "1",
+      "MOZ_WAYLAND": "1"
+    },
+    "not_recorded": [
+      "MOZ_TELEMETRY_REPORTING",
+      "MOZ_GECKODRIVER",
+      "ENABLE_TESTS"
+    ],
+    "interpretation": "not_recorded does not mean false; these are emitted configure substitutions in the old validated object tree. No different-configuration native build tested."
+  }
 }
