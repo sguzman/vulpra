@@ -7,7 +7,7 @@ if [[ $# -ne 1 ]]; then
 fi
 appdir="$(realpath -e -- "$1")"
 [[ -x "$appdir/vulpra" ]] || { echo 'Missing Vulpra package launcher' >&2; exit 2; }
-for command in weston wayland-info; do
+for command in weston wayland-info python3; do
   command -v "$command" >/dev/null || { echo "Missing compositor test dependency: $command" >&2; exit 2; }
 done
 
