@@ -14,6 +14,7 @@ on:
       - ci/m3-inventory-local.py
       - ci/sync-local-safe.sh
       - ci/m3-manifest-gates.sh
+      - ci/m3-config-baseline-local.sh
       - docs/vulpra/DEBLOAT-CANDIDATES.json
       - docs/vulpra/DEBLOAT.md
       - ci/tests/**
@@ -58,6 +59,8 @@ jobs:
           bash -n ci/tests/m3-inventory-local-test.sh
           bash -n ci/sync-local-safe.sh
           bash -n ci/m3-manifest-gates.sh
+          bash -n ci/m3-config-baseline-local.sh
+          bash -n ci/tests/m3-config-baseline-test.sh
           bash -n ci/tests/sync-local-safe-test.sh
           python3 -m py_compile ci/accept-native-package-local.py
           python3 -m py_compile ci/smoke-webextension-package-local.py
@@ -92,6 +95,9 @@ jobs:
 
       - name: Verify actual Git HEAD build manifest gates without compiling
         run: bash ci/m3-manifest-gates.sh "$PWD"
+
+      - name: Test read-only target configuration flag reader
+        run: bash ci/tests/m3-config-baseline-test.sh "$PWD/ci/m3-config-baseline-local.sh"
 
       - name: Validate classified M3 candidate register
         run: |
