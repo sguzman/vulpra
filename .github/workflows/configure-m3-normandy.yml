@@ -10,7 +10,7 @@ on:
       - browser/components/BrowserComponents.manifest
       - toolkit/components/moz.build
       - toolkit/components/normandy/moz.build
-      - toolkit/components/normandy/vulpra-shared.jar.mn
+      - toolkit/components/normandy/jar.mn
       - toolkit/components/nimbus/moz.build
       - toolkit/components/nimbus/NimbusBootstrap.sys.mjs
       - browser/components/DesktopActorRegistry.sys.mjs
@@ -86,15 +86,18 @@ jobs:
           from pathlib import Path
           def data(path):
               return Path(path).read_text()
-          shared = data("toolkit/components/normandy/vulpra-shared.jar.mn")
+          jar = data("toolkit/components/normandy/jar.mn")
+          assert jar.count("#ifdef MOZ_NORMANDY") == 1
+          enabled, remainder = jar.split("#ifdef MOZ_NORMANDY", 1)[1].split("#else", 1)
+          lean = remainder.split("#endif", 1)[0]
           for name in ("ClientEnvironment.sys.mjs", "NormandyApi.sys.mjs",
                        "NormandyUtils.sys.mjs", "LegacyHeartbeat.schema.json"):
-              assert name in shared, name
+              assert name in lean, name
           for name in ("Normandy.sys.mjs", "RecipeRunner.sys.mjs",
                        "ShieldFrameParent.sys.mjs", "ShieldFrameChild.sys.mjs"):
-              assert name not in shared, name
+              assert name not in lean, name
+          assert "Normandy.sys.mjs" in enabled
           assert 'JAR_MANIFESTS += ["jar.mn"]' in data("toolkit/components/normandy/moz.build")
-          assert 'JAR_MANIFESTS += ["vulpra-shared.jar.mn"]' in data("toolkit/components/normandy/moz.build")
           assert 'DIRS += ["normandy"]' in data("toolkit/components/moz.build")
           assert 'MOZ_SRC_FILES += ["NimbusBootstrap.sys.mjs"]' in data("toolkit/components/nimbus/moz.build")
           manifest = data("browser/components/BrowserComponents.manifest")
