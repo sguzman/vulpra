@@ -257,6 +257,10 @@ def install_test_files(topsrcdir, topobjdir, tests_root, force=False):
 
 # Convenience methods for test manifest reading.
 def read_manifestparser_manifest(context, manifest_path):
+    # Tests are disabled: avoid parsing manifests outside a sparse checkout.
+    if not context.config.substs.get("ENABLE_TESTS"):
+        return None
+
     path = manifest_path.full_path
     return manifestparser.TestManifest(
         manifests=[path],
@@ -268,6 +272,9 @@ def read_manifestparser_manifest(context, manifest_path):
 
 
 def read_reftest_manifest(context, manifest_path):
+    if not context.config.substs.get("ENABLE_TESTS"):
+        return None
+
     import reftest
 
     path = manifest_path.full_path
