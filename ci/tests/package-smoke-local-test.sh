@@ -29,7 +29,7 @@ set -Eeuo pipefail
 [[ "$1" == package ]] || exit 2
 if [[ "${MOCK_PACKAGE_EXIT:-0}" != 0 ]]; then exit "$MOCK_PACKAGE_EXIT"; fi
 mkdir -p obj-vulpra-linux/dist/package-input/firefox
-cp obj-vulpra-linux/dist/bin/firefox obj-vulpra-linux/dist/package-input/firefox/
+cp "obj-vulpra-linux/dist/bin/${MOCK_BROWSER_NAME:-firefox}" "obj-vulpra-linux/dist/package-input/firefox/"
 cp obj-vulpra-linux/dist/bin/application.ini obj-vulpra-linux/dist/package-input/firefox/
 tar -cJf obj-vulpra-linux/dist/native-browser.tar.xz -C obj-vulpra-linux/dist/package-input .
 MACH
@@ -37,10 +37,19 @@ chmod +x mach
 git add mach packaging
 git commit -qm 'Package test fixture'
 HOME="$R/home" VULPRA_SKIP_WAYLAND=1 bash "$RUNNER" "$R/repo" > "$R/success.log" 2>&1 || { cat "$R/success.log"; exit 1; }
-grep -Fq 'PASS: Local packaging and isolated headless smoke acceptance gates' "$R/success.log"
+grep -Fq 'PASS: Vulpra packaged and launched headlessly with private profile' "$R/success.log"
 test "$(find "$R/repo/.git/vulpra-native-build/packages" -name '*.tar.xz' | wc -l)" -eq 1
-test "$(find "$R/repo/.git/vulpra-native-build" -name 'smoke-*.png' | wc -l)" -eq 1
+test "$(find "$R/repo/.git/vulpra-native-build" -name 'package-smoke-*.png' | wc -l)" -eq 1
 echo 'PASS: native package staging, checksum, isolated profile and PNG screenshot'
+# Vulpra may itself be the executable name. Ensure packaging does not
+# overwrite the native binary with its new private-profile launcher.
+mv "$R/repo/obj-vulpra-linux/dist/bin/firefox" "$R/repo/obj-vulpra-linux/dist/bin/vulpra"
+HOME="$R/home" VULPRA_SKIP_WAYLAND=1 MOCK_BROWSER_NAME=vulpra bash "$RUNNER" "$R/repo" > "$R/vulpra.log" 2>&1 || {
+  cat "$R/vulpra.log"; exit 1;
+}
+grep -Fq 'PASS: Vulpra packaged and launched headlessly with private profile' "$R/vulpra.log"
+echo 'PASS: standalone package runner supports native executable named vulpra'
+mv "$R/repo/obj-vulpra-linux/dist/bin/vulpra" "$R/repo/obj-vulpra-linux/dist/bin/firefox"
 set +e
 HOME="$R/home" VULPRA_SKIP_WAYLAND=1 MOCK_PACKAGE_EXIT=19 bash "$RUNNER" "$R/repo" > "$R/failure.log" 2>&1
 rc=$?
