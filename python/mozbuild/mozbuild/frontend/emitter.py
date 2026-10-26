@@ -1954,6 +1954,10 @@ class TreeMetadataEmitter(LoggingMixin):
                 )
 
     def _process_test_manifests(self, context):
+        # Nothing to install or validate for a --disable-tests build.
+        if not context.config.substs.get("ENABLE_TESTS"):
+            return
+
         for prefix, info in TEST_MANIFESTS.items():
             for path, manifest in context.get("%s_MANIFESTS" % prefix, []):
                 for obj in self._process_test_manifest(context, info, path, manifest):
