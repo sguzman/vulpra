@@ -26,6 +26,7 @@ jobs:
       MOZ_HEADLESS: "1"
       SCCACHE_GHA_ENABLED: "true"
       SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
     steps:
       - name: Check out pinned full Firefox source
         uses: actions/checkout@v4
@@ -73,6 +74,38 @@ jobs:
           for key in ("MOZ_SANDBOX", "MOZ_WAYLAND", "MOZ_SERVICES_SYNC"):
               assert str(flag(key)) in ("1", "True"), (key, flag(key))
           print("PASS: opt-in GTK configure excludes Normandy client and preserves protected flags")
+          PY
+
+      - name: Allocate enough disk-backed swap for the Firefox Rust build
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Prior native run 40384902342 exhausted 15 GiB RAM + 3 GiB
+          # swap while compiling gkrust, then lost its hosted runner.
+          # A disk-backed swap file avoids silently changing browser features.
+          swap=/mnt/vulpra-m3-build.swap
+          bytes=$((24 * 1024 * 1024 * 1024))
+          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( available > bytes + 8 * 1024 * 1024 * 1024 )) || {
+            echo "Insufficient disk space to reserve 24 GiB swap and 8 GiB headroom" >&2
+            exit 1
+          }
+          sudo fallocate -l 24G "$swap"
+          sudo chmod 0600 "$swap"
+          sudo mkswap "$swap"
+          sudo swapon "$swap"
+          sudo swapon --show
+          free -h
+          python3 - <<'PY'
+          from pathlib import Path
+          total_kib = next(int(line.split()[1]) for line in
+              Path("/proc/meminfo").read_text().splitlines()
+              if line.startswith("SwapTotal:"))
+          assert total_kib * 1024 >= 24 * 1024**3, (
+              "Expected active 24 GiB disk-backed swap; got",
+              total_kib * 1024,
+          )
+          print("PASS: swap is active; Rust build will use one Cargo job")
           PY
 
       - name: Compile full isolated native variant
