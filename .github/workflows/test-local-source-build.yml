@@ -8,6 +8,7 @@ on:
       - ci/build-local.sh
       - ci/package-smoke-local.sh
       - ci/tests/**
+      - packaging/**
       - .github/workflows/test-local-source-build.yml
   workflow_dispatch:
 
