@@ -45,7 +45,8 @@
         "Wayland Weston independent harness and early-exit detection passed: https://github.com/sguzman/vulpra/actions/runs/40133023153 (mock browser only)",
         "Resumable local source downloader with complete-checkout verification: https://github.com/sguzman/vulpra/blob/main/ci/vulpra-fetch-all.sh. Offline Git recovery/lock tests passed in an isolated synthetic partial clone; target workstation completion is unverified.",
         "Disabled-test manifest bypass matched workstation fix that progressed beyond the missing mochitest support-file blocker: https://github.com/sguzman/vulpra/commit/fa5f9454f37406939e804b5191830b126d9c9bdf. Native compilation success remains unverified.",
-        "Local native build wrapper with file/profile isolation guards and successful mock regressions: https://github.com/sguzman/vulpra/blob/main/ci/build-local.sh. It has not compiled the actual browser."
+        "Local native build wrapper with file/profile isolation guards and successful mock regressions: https://github.com/sguzman/vulpra/blob/main/ci/build-local.sh. It has not compiled the actual browser.",
+        "Offline source-retrieval, local build-runner and packaging-smoke mock regression suite passed: https://github.com/sguzman/vulpra/actions/runs/40260188808. This used a tiny sparse CI checkout and synthetic executables; no real Vulpra build or runtime credit."
       ],
       "verified_preparatory_tasks": [
         {
@@ -126,6 +127,7 @@
     "Build 40126828007 failed after SIGTERM/143 near explicitly configured 55-minute timeout (not a demonstrated compiler error). Removed premature timeout; enabled Mozilla sccache-action v0.0.11 with Firefox --with-ccache=sccache and GitHub cache backend for retry. This optimization is pending CI verification.",
     "Vulpra-maintained GitHub Actions workflows passed actionlint 1.7.12: https://github.com/sguzman/vulpra/actions/runs/40133272668. This is CI correctness evidence, not browser runtime evidence.",
     "Build 40131775964 terminated by runner shutdown with exit 143 despite removal of 55-minute timeout; no compiler error/confirmed OOM. Added two-job concurrency experiment and 45-second resource monitoring for following run. M2 remains unchanged.",
-    "2026-10-25: Offline synthetic Git downloader regressions and mocked local build-runner tests passed; neither establishes successful native Vulpra compilation or a complete user-workstation source checkout."
+    "2026-10-25: Offline synthetic Git downloader regressions and mocked local build-runner tests passed; neither establishes successful native Vulpra compilation or a complete user-workstation source checkout.",
+    "2026-10-25: Lightweight GitHub CI run 40260188808 passed synthetic source interruption/resume, local build runner and staged-package headless mock tests. It did not compile Firefox or verify actual browser behavior."
   ]
 }
