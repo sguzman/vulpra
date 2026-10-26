@@ -1,6 +1,6 @@
 # Vulpra native Linux build
 
-**Status:** The first native Vulpra browser has not been built or launched successfully. Mocked packaging and configuration checks are not proof of a functioning browser.
+**Status (2026-10-26):** Native Vulpra was successfully compiled, launched headlessly, packaged into a separate tar.xz and launched again from that standalone package with checksum and private-profile checks on the target Linux workstation. Graphical Wayland, browser feature/security and real baseline measurement gates remain open.
 
 ## 1. Finish the full-source checkout
 
@@ -23,7 +23,7 @@ For Fish, retrieve the small runner from this repository, then invoke it:
 
 The runner checks that sparse checkout is off and that no tracked working-tree files are missing, then invokes the existing `./mach build`. It does not reinstall Firefox, touch the Firefox Developer Edition profile, delete the object directory, or start a second Git source download.
 
-Build logs are stored in `.git/vulpra-native-build/`. The runner records the actual mach exit status and verifies that `obj-vulpra-linux/dist/bin/firefox` is executable and that `application.ini` reports `Name=Vulpra`.
+Build logs are stored in `.git/vulpra-native-build/`. The runner records the actual `mach` exit status and credits native compiler success without assuming the executable must be named `firefox`. Native application identity and startup are verified separately by the no-rebuild startup probe.
 
 ## 3. Check native startup without recompilation
 
@@ -78,8 +78,34 @@ to repeat its unfinished work.
 extensions, navigation, security, or real runtime performance. Those remain
 separate gates. Its CI mocks are not a substitute for the real package run.
 
-## 5. Later acceptance gates
+## 5. Test packaged graphical Wayland without rebuilding
 
-A successful native build alone is not a shipped browser. Remaining gates include `./mach package`, isolated native launch/profile checks, Wayland rendering and navigation, extension/security smoke checks, and measured build/runtime behavior. Each gate requires actual execution evidence before crediting the roadmap.
+The existing package can be tested in an isolated Weston compositor without
+installing the browser or disturbing the desktop Firefox profile:
 
-**Git workflow:** Development is on `main`; the workstation downloader remains pinned to its original local HEAD, and no Git pull is required merely to use the standalone local-build runner. The full hosted-build workflow is manual-only. Do not restart hosted full builds as a substitute for the workstation build.
+```fish
+curl -fL --retry 20 --retry-all-errors -o ~/vulpra-smoke-wayland-package.sh https://raw.githubusercontent.com/sguzman/vulpra/main/ci/smoke-wayland-package-local.sh
+and bash ~/vulpra-smoke-wayland-package.sh
+```
+
+Requires `weston` and `wayland-info`. If either is unavailable the probe
+explicitly reports NOT VERIFIED before touching the archive. It chooses the
+latest verified `vulpra-local-*.tar.xz` package and its SHA-256 sidecar,
+extracts privately, runs Weston with a private Wayland socket, starts
+`vulpra-launch` with private HOME, waits for a real `xdg_surface` protocol
+interaction and checks the browser remains alive. Logs live under
+`.git/vulpra-native-build/`. `Ctrl+C` cleans up child processes and the
+temporary extracted archive. This still does not prove navigation,
+extensions, security or visual accuracy.
+
+## 6. Remaining acceptance gates
+
+Complete graphical Wayland startup, then automated navigation, extension
+compatibility, security/profile and actual size/runtime baseline measurements.
+Only observed native results count as product progress.
+
+**Git workflow:** Development is on `main`. The workstation checkout remains
+pinned to its existing HEAD and can retain uncommitted local build patches.
+Standalone runners are downloaded into the user's home directory; running
+them never requires a source reset, full rebuild or Git pull. The hosted full
+browser build remains manual-only.
