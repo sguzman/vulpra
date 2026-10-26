@@ -94,6 +94,31 @@ jobs:
           fi
           echo 'PASS: unrelated Wayland surface commits are rejected'
 
+      - name: Reject a buffer detached before its Wayland surface commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(mktemp -d)"
+          trap 'rm -rf -- "$temp"' EXIT
+          mkdir -p "$temp/package"
+          cp packaging/vulpra "$temp/package/vulpra"
+          chmod +x "$temp/package/vulpra"
+          cat > "$temp/package/firefox" <<'MOCK'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+          printf '%s\n' '-> wl_surface#13.attach(wl_buffer#45, 0, 0)' >&2
+          printf '%s\n' '-> wl_surface#13.attach(nil, 0, 0)' >&2
+          printf '%s\n' '-> wl_surface#13.commit()' >&2
+          sleep 30
+          MOCK
+          chmod +x "$temp/package/firefox"
+          if VULPRA_WAYLAND_TEST_SECONDS=1 bash packaging/test-wayland.sh "$temp/package"; then
+            echo 'Wayland harness accepted detached/null buffer as a graphical frame' >&2
+            exit 1
+          fi
+          echo 'PASS: null buffer detachment invalidates earlier surface attachment'
+
       - name: Reject a browser which crashes on startup
         shell: bash
         run: |
