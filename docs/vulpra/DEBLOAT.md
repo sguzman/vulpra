@@ -213,11 +213,20 @@ callers to `resource://normandy` need a reference scan and an independently
 built native package must pass the full M2 regression suite before this
 experiment can be promoted or contribute to M3's percentage.
 
-Dedicated configure-only GitHub Actions:
-https://github.com/sguzman/vulpra/actions/workflows/configure-m3-normandy.yml.
-It checks that the alternate object tree has Normandy disabled while
-GTK/Wayland/sandbox/Sync/DevTools and the Vulpra identity remain intact.
-A configure pass is still **not** a compiled or tested browser.
+**Actual isolated Linux configure PASS:**
+https://github.com/sguzman/vulpra/actions/runs/40379371528.
+The hosted runner bootstrapped the full Firefox native configuration and
+verified that `MOZ_NORMANDY` was absent/false while GTK, Wayland, sandbox,
+Sync, DevTools and the Vulpra application identity remained enabled.
+Source-guard and standard-build-default regressions passed
+https://github.com/sguzman/vulpra/actions/runs/40379675945.
+
+**Scope:** the separate lean configuration is working, but no alternate
+`libxul.so`, `omni.ja`, tarball or installed browser was compiled or tested.
+A configure pass is **not** accepted debloating. Before promoting it, compare
+the real old and new package sizes and run actual isolated native, Wayland,
+HTTP/JS navigation and WebExtension lifecycle acceptance; investigate any
+remaining Normandy resource references on that candidate build.
 
 ## Actual native configuration results (workstation, 2026-10-26 12:14 local)
 
