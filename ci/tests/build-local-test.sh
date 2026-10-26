@@ -19,7 +19,7 @@ cat > mach <<'MOCK'
 #!/usr/bin/env bash
 printf 'mock mach invoked with %s\n' "$*"
 [[ "$*" == build ]] || exit 8
-if [[ "${MOCK_BUILD_EXIT:-0}" == 0 ]]; then
+if [[ "${MOCK_BUILD_EXIT:-0}" == 0 && "${MOCK_SKIP_BINARY:-0}" != 1 ]]; then
   mkdir -p obj-vulpra-linux/dist/bin
   printf '#!/bin/sh\n' > obj-vulpra-linux/dist/bin/firefox
   chmod +x obj-vulpra-linux/dist/bin/firefox
@@ -31,12 +31,23 @@ chmod +x mach
 git add mach ci/mozconfig-linux ci/test-file.txt
 git commit -qm 'mock checkout'
 if HOME="$R/home" bash "$SCRIPT" "$R/repo" > "$R/pass.log" 2>&1; then
-  grep -q 'PASS: ./mach build returned 0 and a Vulpra executable' "$R/pass.log" || exit 9
+  grep -q 'PASS: Native Vulpra compilation finished successfully' "$R/pass.log" || exit 9
   echo 'PASS: fake native build succeeds; source checks and logging work'
 else
   cat "$R/pass.log"
   exit 1
 fi
+# A native build may succeed before downstream package layout is established.
+# Do not relabel a successful compile as a failure based on a guessed file path.
+rm -rf "$R/repo/obj-vulpra-linux"
+if HOME="$R/home" MOCK_SKIP_BINARY=1 bash "$SCRIPT" "$R/repo" > "$R/compile-only.log" 2>&1; then
+  grep -Fq 'PASS: Native Vulpra compilation finished successfully' "$R/compile-only.log" || exit 11
+else
+  cat "$R/compile-only.log"
+  echo 'FAIL: successful compilation incorrectly rejected due to missing package binaries'
+  exit 12
+fi
+echo 'PASS: successful compile accepted without a preexisting packaged binary'
 set +e
 HOME="$R/home" MOCK_BUILD_EXIT=13 bash "$SCRIPT" "$R/repo" > "$R/fail.log" 2>&1
 rc=$?
