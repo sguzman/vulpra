@@ -2,6 +2,7 @@
 """Offline fixture for the M3 native-package localhost acceptance harness."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -9,7 +10,7 @@ import tarfile
 import tempfile
 
 MOCK = r'''#!/usr/bin/env python3
-import pathlib, sys
+import pathlib, sys, os, struct, zlib
 from urllib.parse import urljoin
 from urllib.request import urlopen
 
@@ -26,7 +27,17 @@ try:
     urlopen(urljoin(url, "/favicon.ico"), timeout=5).read()
 except Exception:
     pass
-screenshot.write_bytes(b"\x89PNG\r\n\x1a\nmock png body")
+def png_chunk(kind, payload):
+    crc = zlib.crc32(kind + payload) & 0xffffffff
+    return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", crc)
+header = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
+png_bytes = (b"\x89PNG\r\n\x1a\n" +
+             png_chunk(b"IHDR", header) +
+             png_chunk(b"IDAT", zlib.compress(b"\x00\x00\x00\x00\xff")) +
+             png_chunk(b"IEND", b""))
+if os.environ.get("VULPRA_FIXTURE_INVALID_PNG") == "1":
+    png_bytes = b"\x89PNG\r\n\x1a\nmock png body"
+screenshot.write_bytes(png_bytes)
 '''
 
 def main():
@@ -61,8 +72,17 @@ def main():
         assert result["local_request_sequence"] == ["/start", "/js-run", "/page"]
         assert result["incidental_favicon_requests"] == 1
         assert result["observed_http_requests"] == ["/start", "/js-run", "/page", "/favicon.ico"]
+        assert result["screenshot_png_complete_and_crc_valid"]
+        assert result["screenshot_dimensions"] == [1, 1]
         assert result["sha256"] == checksum
         assert result["profile_isolation"]
+        bad_png = subprocess.run(
+            [sys.executable, str(script), str(repo)],
+            capture_output=True, text=True, timeout=35,
+            env={**os.environ, "VULPRA_FIXTURE_INVALID_PNG": "1"})
+        assert bad_png.returncode != 0, "Malformed PNG accepted"
+        assert "Invalid screenshot PNG" in bad_png.stderr, bad_png.stderr
+
         sidecar.write_text("0" * 64 + "  " + archive.name + "\n")
         rejected = subprocess.run([sys.executable, str(script), str(repo)],
                                   capture_output=True, text=True, timeout=20)
