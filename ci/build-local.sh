@@ -37,7 +37,14 @@ export MOZCONFIG="${MOZCONFIG:-$HOME/.mozbuild/vulpra-local.mozconfig}"
 # Store logs inside the Git directory, outside tracked source and installed Firefox.
 LOGDIR=$(git rev-parse --path-format=absolute --git-path vulpra-native-build)
 mkdir -p "$LOGDIR"
-STAMP=$(date +%Y%m%d-%H%M%S)
+# Only one native compile may write to this object directory at a time.
+LOCK="$LOGDIR/build.lock"
+exec 9>"$LOCK"
+if ! flock -n 9; then
+  echo "ERROR: Another Vulpra native build is already running in $REPO." >&2
+  exit 7
+fi
+STAMP=$(date +%Y%m%d-%H%M%S-%N)
 BUILD_LOG="$LOGDIR/build-$STAMP.log"
 
 printf 'Vulpra native build: %s\n' "$(date -Is)"
@@ -50,8 +57,13 @@ printf 'Installed Firefox and its profile are not used or modified by this scrip
 start=$(date +%s)
 set +e
 ./mach build 2>&1 | tee "$BUILD_LOG"
-result=${PIPESTATUS[0]}
+pipe_status=("${PIPESTATUS[@]}")
 set -e
+result=${pipe_status[0]}
+if ((pipe_status[1] != 0)); then
+  echo "ERROR: Build log could not be saved reliably: $BUILD_LOG" >&2
+  exit 6
+fi
 elapsed=$(($(date +%s) - start))
 printf 'Vulpra build exit code: %d (elapsed %ds)\n' "$result" "$elapsed" | tee -a "$BUILD_LOG"
 if ((result != 0)); then
