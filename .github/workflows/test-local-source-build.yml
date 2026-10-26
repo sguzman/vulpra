@@ -12,6 +12,7 @@ on:
       - ci/accept-native-package-local.py
       - ci/smoke-webextension-package-local.py
       - ci/m3-inventory-local.py
+      - ci/sync-local-safe.sh
       - ci/tests/**
       - packaging/**
       - .github/workflows/test-local-source-build.yml
@@ -51,6 +52,8 @@ jobs:
           bash -n ci/tests/accept-native-package-local-test.sh
           bash -n ci/tests/smoke-webextension-package-local-test.sh
           bash -n ci/tests/m3-inventory-local-test.sh
+          bash -n ci/sync-local-safe.sh
+          bash -n ci/tests/sync-local-safe-test.sh
           python3 -m py_compile ci/accept-native-package-local.py
           python3 -m py_compile ci/smoke-webextension-package-local.py
           python3 -m py_compile ci/m3-inventory-local.py
@@ -78,3 +81,6 @@ jobs:
 
       - name: Test read-only M3 pinned source inventory
         run: bash ci/tests/m3-inventory-local-test.sh "$PWD/ci/m3-inventory-local.py"
+
+      - name: Test guarded pinned-workstation Git synchronization
+        run: bash ci/tests/sync-local-safe-test.sh "$PWD/ci/sync-local-safe.sh"
