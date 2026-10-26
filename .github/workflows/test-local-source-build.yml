@@ -13,6 +13,9 @@ on:
       - ci/smoke-webextension-package-local.py
       - ci/m3-inventory-local.py
       - ci/sync-local-safe.sh
+      - ci/m3-manifest-gates.sh
+      - docs/vulpra/DEBLOAT-CANDIDATES.json
+      - docs/vulpra/DEBLOAT.md
       - ci/tests/**
       - packaging/**
       - .github/workflows/test-local-source-build.yml
@@ -35,6 +38,7 @@ jobs:
           sparse-checkout: |
             ci
             packaging
+            docs/vulpra
           sparse-checkout-cone-mode: true
 
       - name: Check Bash syntax
@@ -53,6 +57,7 @@ jobs:
           bash -n ci/tests/smoke-webextension-package-local-test.sh
           bash -n ci/tests/m3-inventory-local-test.sh
           bash -n ci/sync-local-safe.sh
+          bash -n ci/m3-manifest-gates.sh
           bash -n ci/tests/sync-local-safe-test.sh
           python3 -m py_compile ci/accept-native-package-local.py
           python3 -m py_compile ci/smoke-webextension-package-local.py
@@ -84,3 +89,17 @@ jobs:
 
       - name: Test guarded pinned-workstation Git synchronization
         run: bash ci/tests/sync-local-safe-test.sh "$PWD/ci/sync-local-safe.sh"
+
+      - name: Verify actual Git HEAD build manifest gates without compiling
+        run: bash ci/m3-manifest-gates.sh "$PWD"
+
+      - name: Validate classified M3 candidate register
+        run: |
+          jq -e \'
+            .schema_version == 1 and
+            (.candidates | length) >= 10 and
+            ((.candidates | map(.id) | unique | length) == (.candidates | length)) and
+            (all(.candidates[]; (.evidence | length > 0) and (.paths | length > 0) and (.next | length > 0))) and
+            ([.candidates[] | select(.decision == "protected")] | length >= 2) and
+            (all(.candidates[]; .decision != "remove_now"))
+          \' docs/vulpra/DEBLOAT-CANDIDATES.json
