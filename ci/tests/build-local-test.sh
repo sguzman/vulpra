@@ -14,13 +14,19 @@ cat > mach <<'MOCK'
 #!/usr/bin/env bash
 printf 'mock mach invoked with %s\n' "$*"
 [[ "$*" == build ]] || exit 8
+if [[ "${MOCK_BUILD_EXIT:-0}" == 0 ]]; then
+  mkdir -p obj-vulpra-linux/dist/bin
+  printf '#!/bin/sh\n' > obj-vulpra-linux/dist/bin/firefox
+  chmod +x obj-vulpra-linux/dist/bin/firefox
+  printf 'Name=Vulpra\n' > obj-vulpra-linux/dist/bin/application.ini
+fi
 exit "${MOCK_BUILD_EXIT:-0}"
 MOCK
 chmod +x mach
 git add mach ci/mozconfig-linux
 git commit -qm 'mock checkout'
 if HOME="$R/home" bash "$SCRIPT" "$R/repo" > "$R/pass.log" 2>&1; then
-  grep -q 'PASS: ./mach build returned exit code 0' "$R/pass.log" || exit 9
+  grep -q 'PASS: ./mach build returned 0 and a Vulpra executable' "$R/pass.log" || exit 9
   echo 'PASS: fake native build succeeds; source checks and logging work'
 else
   cat "$R/pass.log"
