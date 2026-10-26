@@ -20,7 +20,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 - [x] 📦 Stage a separate Vulpra launcher in a tarball and verify mock package/checksum/profile behavior. Evidence: passing CI 40125061263. Real native packaging remains unverified.
 - [x] 🏷️ Configure independent Vulpra display strings and an upstream-supported app basename, retaining Gecko extension compatibility ID. Evidence: passing audit CI 40124841263. Actual compiled identity and icons remain unverified.
 - [x] 🧱 Configure full native Linux x86-64 build with the pinned source and documented GitHub Actions toolchain. Evidence: configure-only runs 40126134453 and 40126662777 (--disable-tests); no compiled binary yet.
-- [ ] 🛡️ Produce independently branded packaged browser with dedicated profile; no changes to installed Firefox Developer Edition. Mock-tested launcher and archive are only prerequisites, not final shipping evidence.
+- [x] 🛡️ Produce independently branded packaged browser with dedicated profile; no changes to installed Firefox Developer Edition. Actual workstation evidence (2026-10-26): `./mach package` produced `vulpra-159.0.en-US.linux-x86_64.tar.xz`, staged `vulpra-local-20261026-094040-827316872.tar.xz` passed SHA-256, and launched headlessly using a temporary Vulpra-only profile, writing a PNG. Graphical Wayland, navigation and extensions remain separate gates.
 - [ ] 🤖 Establish CI smoke testing for startup, browsing, navigation, extension functionality, security basics and Wayland behavior. Weston compositor harness verified in CI 40133023153 (mock executable only), and experimental real Wayland step connected in commit 8dc8aa7; actual browser behavior remains unverified.
 
 ### 📏 Phase 2 — Baseline
