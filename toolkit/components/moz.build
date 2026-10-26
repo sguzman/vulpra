@@ -145,10 +145,10 @@ if CONFIG["MOZ_WIDGET_TOOLKIT"] not in ("android", "windows"):
 
 if CONFIG["MOZ_BUILD_APP"] == "browser":
     DIRS += ["messaging-system"]
-    # Opt-in Vulpra lean builds exclude the Normandy packaged resource tree;
-    # normal Firefox/Vulpra builds continue to include it by default.
-    if CONFIG["MOZ_NORMANDY"]:
-        DIRS += ["normandy"]
+    # The opt-in variant still traverses Normandy to ship only the small
+    # shared helper jar required by Nimbus and browser targeting. Its own
+    # moz.build selects that jar when MOZ_NORMANDY is disabled.
+    DIRS += ["normandy"]
 
 if CONFIG["MOZ_BUILD_APP"] != "comm/mail":
     DIRS += ["ipprotection"]
