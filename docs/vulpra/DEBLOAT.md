@@ -186,6 +186,39 @@ configure-only test earns package-size credit. A meaningful reduction
 requires another independently staged archive, passing M2 functional tests
 and a comparable size measurement.
 
+## First isolated shipping-feature removal experiment: Normandy
+
+A first **opt-in candidate**, not yet an accepted removal, is now committed
+on `main`. The original `ci/mozconfig-linux` and original
+`obj-vulpra-linux` build remain unchanged and stay the M2 reference.
+
+- `ci/mozconfig-linux-normandy-experiment` selects a **different**
+  `obj-vulpra-linux-normandy-experiment` directory and explicitly exports
+  `VULPRA_EXPERIMENT_NO_NORMANDY=1`. Never select it for the existing
+  known-good browser.
+- `browser/moz.configure` continues to imply `MOZ_NORMANDY=True` unless
+  that experimental flag is set.
+- `toolkit/components/moz.build` now traverses the Normandy component
+  directory only when `MOZ_NORMANDY` is configured. This is necessary
+  because the previous manifest added it unconditionally.
+- `browser/components/BrowserComponents.manifest` now guards **both**
+  startup and shutdown registrations under `#ifdef MOZ_NORMANDY`.
+  Previously Normandy's shutdown hook was unconditional, which could have
+  referenced a removed resource.
+
+The source changes are conditional and keep the normal build default.
+They are an actual conditional compilation/packaging change, **not**
+proof that the runtime works without Normandy. In particular, remaining
+callers to `resource://normandy` need a reference scan and an independently
+built native package must pass the full M2 regression suite before this
+experiment can be promoted or contribute to M3's percentage.
+
+Dedicated configure-only GitHub Actions:
+https://github.com/sguzman/vulpra/actions/workflows/configure-m3-normandy.yml.
+It checks that the alternate object tree has Normandy disabled while
+GTK/Wayland/sandbox/Sync/DevTools and the Vulpra identity remain intact.
+A configure pass is still **not** a compiled or tested browser.
+
 ## Actual native configuration results (workstation, 2026-10-26 12:14 local)
 
 The user ran the no-rebuild configuration probe on the *real original object
