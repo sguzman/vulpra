@@ -27,6 +27,17 @@ if [[ -n "$missing" ]]; then
   exit 3
 fi
 
+
+# The original Vulpra import accidentally omitted this gitignored upstream
+# Breakpad dependency. A git ls-files check alone cannot detect such omissions.
+LSS_HEADER="$REPO/toolkit/crashreporter/google-breakpad/src/third_party/lss/linux_syscall_support.h"
+if [[ ! -s "$LSS_HEADER" ]]; then
+  echo 'ERROR: Missing upstream Breakpad Linux syscall header; refusing a doomed 85-minute build.' >&2
+  echo 'Restore the pinned upstream source, keeping existing obj-vulpra-linux artifacts intact.' >&2
+  echo 'See: https://github.com/sguzman/vulpra/commit/b9349a7f9a3e00e5e4f11aea4af7179a315412ec' >&2
+  exit 3
+fi
+
 export MOZCONFIG="${MOZCONFIG:-$HOME/.mozbuild/vulpra-local.mozconfig}"
 [[ -f "$MOZCONFIG" ]] || {
   echo "ERROR: Missing local mozconfig: $MOZCONFIG" >&2
