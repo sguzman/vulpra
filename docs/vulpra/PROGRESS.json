@@ -6,8 +6,8 @@
   "upstream_tag": "FIREFOX_159_0b5_RELEASE",
   "upstream_commit": "34ac0671eb25f31f8c56ace36e1c413dd471eb8d",
   "overall": {
-    "percent": 0,
-    "definition": "Verified browser-delivery acceptance work; repository scaffolding is excluded from product progress."
+    "percent": 20,
+    "definition": "Product work only, excluding source scaffolding M1. Equal milestone weights for M2 working browser, M3 debloating and M4 defect fixes / Rust migration; integer percent = floor((M2.percent + M3.percent + M4.percent)/3)."
   },
   "milestones": [
     {
@@ -31,7 +31,7 @@
     {
       "id": "M2",
       "name": "Working Linux browser",
-      "percent": 20,
+      "percent": 60,
       "status": "in-progress",
       "evidence": [
         "Isolated launcher contract passed: https://github.com/sguzman/vulpra/actions/runs/40124539256 (mock executable only)",
@@ -49,7 +49,8 @@
         "Offline source-retrieval, local build-runner and packaging-smoke mock regression suite passed: https://github.com/sguzman/vulpra/actions/runs/40260188808. This used a tiny sparse CI checkout and synthetic executables; no real Vulpra build or runtime credit.",
         "Local native build log (2026-10-26, source HEAD ee223921): mach reported 'Your build was successful!' and returned exit 0 after 1052s incremental compilation. Original Vulpra runner incorrectly demanded a hardcoded dist/bin/firefox path and returned exit 5 afterward. The native executable path, packaged startup and isolated profile remain unverified; no additional product-stage gate credited.",
         "Native Vulpra headless launch verified on 2026-10-26 (user-workstation log native-smoke-20261026-092345-388387374.log): exit 0, real browser produced valid PNG and PASS reported with a temporary isolated profile. Local HTML screenshot: .git/vulpra-native-build/native-smoke-20261026-092345-388387374.png. Network-based Remote Settings and region calls logged nonfatal errors; graphical Wayland, extensions and packaged startup remain unverified.",
-        "Standalone source-preserving native packaging and isolated headless mock tests passed CI: https://github.com/sguzman/vulpra/actions/runs/40351223191. Tests cover native executable named firefox or vulpra. Real package not yet run."
+        "Standalone source-preserving native packaging and isolated headless mock tests passed CI: https://github.com/sguzman/vulpra/actions/runs/40351223191. Tests cover native executable named firefox or vulpra. Real package not yet run.",
+        "User-workstation package log clipboard-20261026-094122.txt (2026-10-26 09:40 local): ./mach package exit 0, generated obj-vulpra-linux/dist/vulpra-159.0.en-US.linux-x86_64.tar.xz after 14.68 s; independently staged .git/vulpra-native-build/packages/vulpra-local-20261026-094040-827316872.tar.xz with SHA-256 OK; browser launched from staged package, produced screenshot .git/vulpra-native-build/package-smoke-20261026-094040-827316872.png and PASS reported with dedicated private profile. This is actual native packaged-runtime evidence, not CI mock."
       ],
       "verified_preparatory_tasks": [
         {
@@ -88,15 +89,13 @@
           "evidence": "https://github.com/sguzman/vulpra/actions/runs/40133023153"
         }
       ],
-      "status_note": "User workstation has completed full native build and a real isolated headless launch with PNG screenshot. Compiled native startup is verified, but an independent distributable package and packaged runtime, graphical Wayland, extensions/security and real metrics are not yet verified; first combined product gate (configure) remains 1/5 = 20%.",
+      "status_note": "Native build and native headless startup verified on 2026-10-26. Genuine Vulpra 159.0 tarball created by ./mach package in 14.68 s; separately staged standalone package SHA-256 checked, launched in headless mode, rendered a PNG, and created an isolated Vulpra profile. Native packaging and packaged startup combined gates passed; graphical Wayland, extension/security checks and real metrics remain unverified.",
       "acceptance_gates": {
-        "passed": 1,
+        "passed": 3,
         "total": 5,
         "remaining": [
-          "Produce compiled native Linux binary and isolated Vulpra package",
-          "Verify packaged runtime startup and browser behavior",
-          "Verify extension/security/Wayland smoke gates",
-          "Record compiled size, build time and runtime metrics"
+          "Verify extension/security/graphical Wayland smoke gates",
+          "Record native size, build time and runtime metrics"
         ]
       }
     },
@@ -119,11 +118,8 @@
     "Source import passed on GitHub Actions run 40119418469; source archive hash verified.",
     "Original Mozilla .github/workflows/README and pr-handler.yml restored to upstream-base with matching blob SHAs.",
     "main source ancestry includes pristine release root import commit; critical source/license paths verified.",
-    "No compiled Linux browser or actual behavior fix has been verified.",
-    "Overall product percentage remains zero until browser functionality is demonstrated.",
     "Source tree verified against archive, modulo exact checked CRLF normalization for one upstream JSON file and empty cache folders unrepresentable in Git.",
     "M1 source foundation complete: audit verifies source licensing inventory and flags unresolved Nightly branding as M2 shipping block; no distributable Vulpra binary claim.",
-    "M2 mock launcher, mock package and independent source strings are passing. Native build still pending; no product success credited.",
     "Full native build 40120428907 failed at native compilation with unavailable job logs at this check; failure cause undetermined. Rebranded build 40124841229 continues.",
     "Linux full-native configure passed 40126134453. M2 20% reflects one of five explicit gates; overall shipped/browser-functionality percentage remains zero.",
     "CI 40126662777 passed native configure with optional test binaries disabled; separate browser runtime tests remain required.",
@@ -134,6 +130,6 @@
     "2026-10-25: Lightweight GitHub CI run 40260188808 passed synthetic source interruption/resume, local build runner and staged-package headless mock tests. It did not compile Firefox or verify actual browser behavior.",
     "2026-10-26: Native compilation completed successfully on user workstation according to user-provided build log. CI 40348144467 passed tests for a no-rebuild dynamic-name startup probe and accepting compiler success independently of package layout. Build script fix: 352f456 and mock test: fbd3578. Do not label packaged or runnable browser verified.",
     "2026-10-26: User-supplied native-smoke log confirms successful actual native headless launch, local HTML screenshot and isolated temporary profile. Network access warnings were nonfatal. This clears a runtime subcheck but not the combined packaged-runtime acceptance gate.",
-    "2026-10-26: GitHub CI 40351223191 passed standalone package-runner mock regression tests for both plausible on-disk executable names. Actual packaging is still pending."
+    "2026-10-26: Actual workstation compiled binary and standalone Vulpra packaged browser verified to run headlessly, render PNG and use isolated private profile; package checksum matched. M2 is 3/5 gates, 60%; 2 remain graphical/extension/security smoke and actual runtime/size measurements."
   ]
 }
