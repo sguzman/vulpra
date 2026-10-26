@@ -58,4 +58,11 @@ GeneratedFile(
 
 FINAL_LIBRARY = "xul"
 
+# Only the opt-in Linux no-Normandy build needs its own Nimbus startup
+# hook. Leave upstream builds untouched.
+if (CONFIG["MOZ_BUILD_APP"] == "browser"
+        and CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk"
+        and not CONFIG["MOZ_NORMANDY"]):
+    MOZ_SRC_FILES += ["NimbusBootstrap.sys.mjs"]
+
 JAR_MANIFESTS += ["jar.mn"]
