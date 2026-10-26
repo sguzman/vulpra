@@ -19,6 +19,9 @@ setup_remote() {
   printf '#!/bin/sh\nexit 0\n' > "$ROOT/source/ci/executable.sh"
   chmod +x "$ROOT/source/ci/executable.sh"
   ln -s ../ci/user-edit.txt "$ROOT/source/docs/symlink"
+  # Test durable blob storage with an incompressible multi-megabyte source.
+  mkdir -p "$ROOT/source/assets"
+  dd if=/dev/urandom of="$ROOT/source/assets/large.bin" bs=1M count=5 status=none
   "$REAL_GIT" -C "$ROOT/source" add .
   "$REAL_GIT" -C "$ROOT/source" commit -qm 'Source test fixtures'
   "$REAL_GIT" clone -q --bare "$ROOT/source" "$ROOT/remote.git"
@@ -39,6 +42,7 @@ assert_finished() {
   [[ -L "$dest/docs/symlink" ]] || fail "symlink not restored"
   [[ -x "$dest/ci/executable.sh" ]] || fail "executable bit not restored"
   [[ -e "$dest/source-0/data-24.txt" ]] || fail "tracked source not restored"
+  cmp "$ROOT/source/assets/large.bin" "$dest/assets/large.bin" || fail 'large blob contents changed or missing'
   GIT_NO_LAZY_FETCH=1 "$REAL_GIT" -C "$dest" fsck --full --no-reflogs --unreachable >/dev/null 2> "$ROOT/fsck-stderr" || fail "Git object integrity invalid"
 }
 setup_remote
