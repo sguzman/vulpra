@@ -96,8 +96,11 @@ grep -Fq 'wl_compositor' "$work/compositor-info" || {
 grep -Fq 'xdg_wm_base' "$work/compositor-info" || {
   echo 'ERROR: xdg_wm_base missing.' | tee -a "$log" >&2; exit 5;
 }
-# WAYLAND_DEBUG captures client protocol. A process that merely stays alive
-# must not pass unless it creates a real Wayland toplevel surface.
+# WAYLAND_DEBUG captures real graphical protocol traffic. The client object
+# formatter differs among libwayland versions ("wl_surface#13" or "@13").
+# A running process alone cannot pass: it must attach a non-null buffer to a
+# Wayland surface and commit a frame. Avoid assuming one specific xdg_* ID
+# spelling; that produced a false failure against the real Weston 15 trace.
 env -u MOZ_HEADLESS -u DISPLAY \
   HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
   XDG_RUNTIME_DIR="$work/runtime" WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
@@ -115,11 +118,12 @@ fi
   echo 'ERROR: Private profile missing or Firefox profile unexpectedly used.' | tee -a "$log" >&2
   exit 5
 }
-grep -Eq 'xdg_(surface|toplevel)@' "$work/browser.log" || {
-  echo 'ERROR: No graphical xdg_surface/toplevel activity recorded; being alive is insufficient.' | tee -a "$log" >&2
+if ! grep -Eq 'wl_surface[#@][0-9]+\.attach\(wl_buffer[#@][0-9]+' "$work/browser.log" ||
+   ! grep -Eq 'wl_surface[#@][0-9]+\.commit\(' "$work/browser.log"; then
+  echo 'ERROR: No Wayland surface buffer attachment and frame commit recorded; being alive is insufficient.' | tee -a "$log" >&2
   tail -n 45 "$work/browser.log" >&2 || true
   exit 5
-}
-printf 'PASS: Packaged Vulpra connected to private Weston, created Wayland xdg surfaces, remained alive for %ss, and isolated its profile.\n' "$duration" | tee -a "$log"
+fi
+printf 'PASS: Packaged Vulpra connected to private Weston, attached and committed Wayland buffers, remained alive for %ss, and isolated its profile.\n' "$duration" | tee -a "$log"
 printf 'Log: %s\nWayland protocol log: %s\n' "$log" "$LOGDIR/wayland-browser-$stamp.log" | tee -a "$log"
 echo 'This does not verify human-visible rendering, web navigation, extensions, or security behavior.' | tee -a "$log"
