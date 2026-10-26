@@ -122,7 +122,9 @@
       "name": "User-specific debloating",
       "percent": 0,
       "status": "in-progress",
-      "evidence": []
+      "evidence": [
+        "2026-10-26: M3 read-only pinned-Git source footprint/inventory runner ci/m3-inventory-local.py and path-category classification tests passed CI https://github.com/sguzman/vulpra/actions/runs/40366275497. Audited source anchors and removal acceptance gates are in docs/vulpra/DEBLOAT.md. Actual target-workstation source census and dependency-verified removals have NOT run; M3 remains 0% until evidence arrives."
+      ]
     },
     {
       "id": "M4",
@@ -155,6 +157,7 @@
     "2026-10-26: User workstation loopback navigation test observed /start -> /page (working JS redirect), but an extra synchronous-XHR probe failed to observe /js-run. Deterministic JS navigation/HTTP 302 replacement and negative tests passed CI 40356996535; no real rerun yet.",
     "2026-10-26: Actual packaged native Vulpra passed localhost JS navigation and 302 HTTP redirect, screenshot, profile safety on workstation (0.895 s combined workflow). Machine-readable baseline JSON generated. M2 progress 4/5=80%, one combined extension/security acceptance gate remains. Overall product roadmap floor(80/3)=26%. Exact JSON size/RSS values still need reviewing before citing numeric quantities.",
     "2026-10-26: Final M2 WebExtension/security test runner with CI fixtures is ready; awaiting native workstation test. M2 remains 80% and overall product progress remains 26%. Do not count synthetic extension mocks as native compatibility.",
-    "2026-10-26: Real WebExtension lifecycle passed via actual geckodriver and packaged Vulpra on target Linux. M2 complete 5/5, 100%; overall product 33% by existing equal M2/M3/M4 weights. M3 can begin. Complete upstream trademark/icon review and security update policy before any public distribution; M2 working personal baseline is not release certification."
+    "2026-10-26: Real WebExtension lifecycle passed via actual geckodriver and packaged Vulpra on target Linux. M2 complete 5/5, 100%; overall product 33% by existing equal M2/M3/M4 weights. M3 can begin. Complete upstream trademark/icon review and security update policy before any public distribution; M2 working personal baseline is not release certification.",
+    "2026-10-26: M3 inventory preparation completed with CI-verified read-only source script and audited candidate register. No source removals or actual debloat metrics claimed. Workstation remains on pinned source; no local Git pull required."
   ]
 }
