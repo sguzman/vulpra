@@ -78,7 +78,7 @@ def select_binary(appdir: Path) -> Path:
         binary = appdir / name
         if binary.is_file() and os.access(binary, os.X_OK):
             with binary.open("rb") as stream:
-                if stream.read(4) == b"\\x7fELF":
+                if stream.read(4) == b"\x7fELF":
                     return binary
     raise RuntimeError("No actual native ELF Vulpra browser found beside application.ini")
 
