@@ -14,14 +14,12 @@ import pathlib, sys, os, struct, zlib
 from urllib.parse import urljoin
 from urllib.request import urlopen
 
-# Simulate a headless screenshot client that runs the known fixture's redirect.
+# Simulate a headless screenshot client painting the requested page.
 args = sys.argv
 screenshot = pathlib.Path(args[args.index("--screenshot") + 1])
 url = args[-1]
 body = urlopen(url, timeout=5).read().decode()
-assert 'location.assign("/js-run")' in body, body
-final = urlopen(urljoin(url, "/js-run"), timeout=5).read().decode()
-assert "JavaScript navigation succeeded" in final, final
+assert "JavaScript navigation succeeded" in body, body
 # Real Firefox may fetch a favicon outside the scripted redirect chain.
 try:
     urlopen(urljoin(url, "/favicon.ico"), timeout=5).read()
@@ -74,9 +72,9 @@ def main():
         report = repo / ".git" / "vulpra-native-build" / "m3-localhost-acceptance.json"
         result = json.loads(report.read_text())
         assert result["result"] == "pass"
-        assert result["local_request_sequence"] == ["/start", "/js-run", "/page"]
+        assert result["local_request_sequence"] == ["/page"]
         assert result["incidental_favicon_requests"] == 1
-        assert result["observed_http_requests"] == ["/start", "/js-run", "/page", "/favicon.ico"]
+        assert result["observed_http_requests"] == ["/page", "/favicon.ico"]
         assert result["screenshot_png_complete_and_crc_valid"]
         assert result["screenshot_dimensions"] == [1, 1]
         assert result["sha256"] == checksum
@@ -94,7 +92,7 @@ def main():
         assert rejected.returncode != 0, "Checksum corruption must refuse browser launch"
         assert "Checksum mismatch" in rejected.stderr, rejected.stderr
 
-    print("PASS: accepted checksum-verified fixture with real local JS redirect sequence")
+    print("PASS: accepted checksum-verified fixture with local HTTP screenshot")
     print("PASS: corrupted checksum refused before executing packaged binary")
     print("PASS: test fixture did not create or modify user browser files")
 

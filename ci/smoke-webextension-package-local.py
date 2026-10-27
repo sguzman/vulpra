@@ -139,20 +139,75 @@ def create_probe_extension(path: Path, token: str) -> None:
 
 class LocalPage(http.server.BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        if self.path.split("?")[0] != "/extension":
+        path = self.path.split("?")[0]
+        self.server.paths.append(path)
+        if path == "/extension":
+            data = b'<!doctype html><html><meta charset="utf-8"><title>Vulpra extension smoke</title><h1>WebExtension test</h1></html>'
+            status = 200
+        elif path == "/start":
+            data = (b'<!doctype html><meta charset="utf-8"><title>M3 startup</title>'
+                    b'<script>location.assign("/js-run");</script>')
+            status = 200
+        elif path == "/js-run":
+            data = b""
+            status = 302
+        elif path == "/page":
+            data = (b'<!doctype html><meta charset="utf-8"><title>M3 destination</title>'
+                    b'<h1 id="pass">JavaScript navigation succeeded</h1>')
+            status = 200
+        elif path == "/favicon.ico":
+            data = b""
+            status = 404
+        else:
             self.send_error(404)
             return
-        data = b'<!doctype html><html><meta charset="utf-8"><title>Vulpra extension smoke</title><h1>WebExtension test</h1></html>'
-        self.send_response(200)
+        self.send_response(status)
+        if path == "/js-run":
+            self.send_header("Location", "/page")
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        if data:
+            self.wfile.write(data)
 
     def log_message(self, *_args: object) -> None:
         pass
 
+
+
+def verify_js_navigation(port: int, base: str, server: http.server.ThreadingHTTPServer) -> dict:
+    """Require browser-executed JavaScript, followed HTTP 302 and final DOM.
+
+    CLI --screenshot cannot provide this proof: it may exit while navigating.
+    """
+    request(port, "POST", base + "/url", {
+        "url": f"http://127.0.0.1:{server.server_port}/start",
+    }, timeout_seconds=35)
+    deadline = time.monotonic() + 25
+    reached = False
+    last = None
+    while time.monotonic() < deadline:
+        last = request(port, "POST", base + "/execute/sync", {
+            "script": "return {url: document.URL, title: document.title, text: document.querySelector('h1')?.textContent || null};",
+            "args": [],
+        })
+        if (isinstance(last, dict) and
+            last.get("url") == f"http://127.0.0.1:{server.server_port}/page" and
+            last.get("title") == "M3 destination" and
+            last.get("text") == "JavaScript navigation succeeded"):
+            reached = True
+            break
+        time.sleep(0.25)
+    observed = list(server.paths)
+    functional = [path for path in observed if path != "/favicon.ico"]
+    if not reached or functional != ["/start", "/js-run", "/page"]:
+        raise RuntimeError(
+            "Real WebDriver JS/302 navigation failed: "
+            f"reached={reached}, current={last!r}, requests={observed!r}")
+    return {"verified": True, "local_request_sequence": functional,
+            "final_url": last["url"], "final_document_title": last["title"],
+            "final_document_text": last["text"]}
 
 def verify_nimbus_ready(port: int, base: str) -> dict:
     """CI-only privileged check: retained Nimbus actually initializes.
@@ -270,6 +325,7 @@ def main() -> int:
         for name in ("DISPLAY", "WAYLAND_DISPLAY", "MOZ_REMOTE"):
             env.pop(name, None)
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), LocalPage)
+        server.paths = []
         from threading import Thread
         Thread(target=server.serve_forever, daemon=True).start()
         port = find_port()
@@ -303,6 +359,8 @@ def main() -> int:
                 if reported.get("browserName") != "firefox":
                     raise RuntimeError(f"Unexpected automation browser: {reported!r}")
                 base = f"/session/{session_id}"
+                js_result = verify_js_navigation(port, base, server)
+                print("PASS: real WebDriver JS redirect, HTTP 302 and final DOM", flush=True)
                 url = f"http://127.0.0.1:{server.server_port}/extension"
                 def navigate(suffix: str) -> None:
                     request(port, "POST", base + "/url", {"url": url + "?step=" + suffix})
@@ -344,6 +402,7 @@ def main() -> int:
                 report = {
                     "schema_version": 1, "status": "pass",
                     "package": archive.name,
+                    "javascript_navigation": js_result,
                     "webextension": {"manifest_version": 2, "temporary_unsigned_install": True,
                                      "content_scripts": True, "background_messaging": True,
                                      "storage_local": True, "uninstall": True,

@@ -102,10 +102,17 @@ with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
         raise AssertionError("Corrupt package accepted")
     print("PASS: archive checksum verification rejects corruption")
     page_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), m.LocalPage)
+    page_server.paths = []
     threading.Thread(target=page_server.serve_forever, daemon=True).start()
     with urllib.request.urlopen(f"http://127.0.0.1:{page_server.server_port}/extension") as r:
         assert r.status == 200
         assert b"WebExtension test" in r.read()
+    with urllib.request.urlopen(f"http://127.0.0.1:{page_server.server_port}/start") as r:
+        assert b'location.assign("/js-run")' in r.read()
+    with urllib.request.urlopen(f"http://127.0.0.1:{page_server.server_port}/js-run") as r:
+        assert r.geturl().endswith("/page")
+        assert b"JavaScript navigation succeeded" in r.read()
+    assert page_server.paths[-3:] == ["/start", "/js-run", "/page"]
     try:
         urllib.request.urlopen(f"http://127.0.0.1:{page_server.server_port}/wrong")
     except urllib.error.HTTPError as e:
@@ -114,7 +121,7 @@ with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
         raise AssertionError("Non-probe route unexpectedly served")
     page_server.shutdown()
     page_server.server_close()
-    print("PASS: localhost extension page rejects unrelated paths")
+    print("PASS: localhost extension and JS/302 pages reject unrelated paths")
     class DriverMock(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             result = {"value": {"ready": True}}
@@ -154,6 +161,37 @@ with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
     server.shutdown()
     server.server_close()
     print("PASS: WebDriver addon install, JavaScript and error response handling")
+    # Require both final browser DOM AND exact observed HTTP request sequence.
+    original = m.request
+    js_calls = []
+    class FakePage:
+        server_port = 8093
+        paths = ["/start", "/js-run", "/page"]
+    def fake_js_request(_port, method, route, payload=None, timeout_seconds=12):
+        js_calls.append((method, route, payload))
+        if route.endswith("/url"):
+            assert method == "POST" and payload["url"].endswith("/start")
+            return None
+        if route.endswith("/execute/sync"):
+            return {"url": "http://127.0.0.1:8093/page",
+                    "title": "M3 destination",
+                    "text": "JavaScript navigation succeeded"}
+        raise AssertionError(route)
+    try:
+        m.request = fake_js_request
+        result = m.verify_js_navigation(2011, "/session/mock", FakePage())
+        assert result["verified"] and result["local_request_sequence"] == FakePage.paths
+        assert js_calls[0][1] == "/session/mock/url"
+        FakePage.paths = ["/start", "/js-run"]
+        try:
+            m.verify_js_navigation(2011, "/session/mock", FakePage())
+        except RuntimeError as err:
+            assert "navigation failed" in str(err)
+        else:
+            raise AssertionError("Accepted final DOM without final HTTP /page request")
+    finally:
+        m.request = original
+    print("PASS: WebDriver JS redirect rejects incomplete HTTP navigation")
     # Validate CI-only Nimbus probe's privileged-context lifecycle without
     # invoking chrome context on normal M2 browsers.
     calls = []

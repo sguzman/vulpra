@@ -1,6 +1,9 @@
 name: M3 Verify Native Candidate Runtime
 
 on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/verify-m3-normandy-runtime.yml"]
   workflow_run:
     workflows: ["M3 Build Isolated Normandy-Free Linux Candidate"]
     types: [completed]
@@ -14,10 +17,11 @@ jobs:
   native-runtime:
     if: >-
       github.repository == 'sguzman/vulpra' &&
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'))
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     env:
@@ -83,8 +87,8 @@ jobs:
             "$GITHUB_WORKSPACE/.git/vulpra-native-build/m3-normandy-package.json"
         env:
           GH_TOKEN: ${{ github.token }}
-          NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
-          NATIVE_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          NATIVE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '40431768974' }}
+          NATIVE_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '674db8e385c36aec23e78bbe059b2a1fec194fae' }}
 
       - name: Require a real Wayland framebuffer attachment and commit
         shell: bash
@@ -100,13 +104,13 @@ jobs:
           VULPRA_WAYLAND_TEST_SECONDS=15 bash packaging/test-wayland.sh "$(dirname "${inis[0]}")"
           echo "PASS: candidate packaged browser attached and committed real Weston Wayland surface frames"
 
-      - name: Verify actual local HTTP JavaScript navigation
+      - name: Verify localhost screenshot and profile isolation
         shell: bash
         run: |
           set -euo pipefail
           python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
 
-      - name: Verify actual packaged WebExtension lifecycle and Nimbus initialization
+      - name: Verify real JS redirect, WebExtension lifecycle and Nimbus initialization
         shell: bash
         env:
           VULPRA_M3_VERIFY_NIMBUS: "1"
@@ -137,8 +141,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VULPRA_JOB_STATUS: ${{ job.status }}
-          NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
-          NATIVE_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+          NATIVE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '40431768974' }}
+          NATIVE_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '674db8e385c36aec23e78bbe059b2a1fec194fae' }}
         run: |
           set -euo pipefail
           {

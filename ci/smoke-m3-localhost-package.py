@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify JS navigation and profile isolation in an already staged Vulpra package.
+"""Verify localhost screenshot and profile isolation in an already staged Vulpra package.
 
 No network beyond localhost. The script does not build, install, update or
 change any browser; it verifies the staged archive's checksum and uses a
@@ -152,7 +152,7 @@ def main():
         try:
             proc = subprocess.run(
                 ["timeout", "120", str(binary), "--headless", "--screenshot",
-                 str(png), f"http://127.0.0.1:{server.server_port}/start"],
+                 str(png), f"http://127.0.0.1:{server.server_port}/page"],
                 capture_output=True, text=True, env=env, timeout=125,
             )
         finally:
@@ -162,10 +162,10 @@ def main():
         if proc.returncode != 0:
             raise RuntimeError("Browser exited " + str(proc.returncode) + ": " + proc.stderr[-1200:])
         image_dimensions = verify_png_screenshot(png)
-        # Firefox may independently request /favicon.ico while capturing the
-        # screenshot. It is not evidence of JavaScript navigation and must
-        # neither count as an extra functional step nor conceal unknown calls.
-        expected = ["/start", "/js-run", "/page"]
+        # --screenshot exits after initial painting; JS redirects can race
+        # the process exit. Do not count a screenshot as async JS evidence.
+        # The WebDriver runtime probe separately waits for the final document.
+        expected = ["/page"]
         extras = [path for path in server.paths if path not in (*expected, "/favicon.ico")]
         navigated = [path for path in server.paths if path != "/favicon.ico"]
         if extras or navigated != expected:
@@ -173,7 +173,7 @@ def main():
         if firefox_profile.read_bytes() != sentinel:
             raise RuntimeError("Firefox profile sentinel changed")
         report = {
-            "schema_version": 1, "test": "real_packaged_js_redirect_localhost",
+            "schema_version": 1, "test": "real_packaged_localhost_screenshot",
             "result": "pass", "package": archive.name, "sha256": digest,
             "local_request_sequence": navigated, "observed_http_requests": server.paths,
             "incidental_favicon_requests": server.paths.count("/favicon.ico"),
@@ -181,15 +181,16 @@ def main():
             "profile_isolation": True, "screenshot_png_signature": True,
             "screenshot_png_complete_and_crc_valid": True,
             "screenshot_dimensions": image_dimensions,
-            "limits": ["Does not prove full browser UI correctness",
+            "limits": ["Does not prove JavaScript redirects; requires real WebDriver navigation gate",
+                       "Does not prove full browser UI correctness",
                        "Does not prove Nimbus runtime integration",
                        "Not a same-toolchain package-size comparison"],
         }
     output = repo / ".git" / "vulpra-native-build" / "m3-localhost-acceptance.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n")
-    print("PASS: real packaged JS navigation /start -> /js-run -> /page")
-    print("PASS: signed-off archive checksum, valid PNG and Firefox profile isolation")
+    print("PASS: real packaged localhost screenshot rendered")
+    print("PASS: archive checksum, valid PNG and Firefox profile isolation; JS checked separately")
     print("Report: " + str(output))
 
 
