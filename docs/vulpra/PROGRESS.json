@@ -150,7 +150,8 @@
         "2026-10-26: Started parallel independently compiled *full-Normandy* baseline from EXACT in-progress lean candidate source commit 286627afec2cb141a3d6e553eac41954847db5b4, with identical non-Normandy mozconfig flags, one Cargo job, 24 GiB swap, isolated objdir, source-attributed SHA-256 package report and preserved archive. Workflow run https://github.com/sguzman/vulpra/actions/runs/40412644709 passed pinned checkout/bootstrap and was configuring at last check. Final comparison workflow commit 0ce8c4f now waits for this source-pinned run and reuses its package iff source/variant/checksum/size match, otherwise falls back to previous exact-source native baseline compile. Workflow lint PASS https://github.com/sguzman/vulpra/actions/runs/40412934878; standalone baseline workflow lint PASS https://github.com/sguzman/vulpra/actions/runs/40412644683. Parallel build is a scheduling optimization, NOT an accepted runtime or measured savings. Original lean candidate 40392545095 still compiling; M3 0%, overall 33%.",
         "2026-10-27: Both independent source-matched native Linux variants COMPILED and ./mach package emitted Vulpra tar.xz archives, but staging FAILED: packaging/stage.sh incorrectly required an executable named firefox while the native Vulpra build carries its executable as vulpra. Lean https://github.com/sguzman/vulpra/actions/runs/40392545095 and full baseline https://github.com/sguzman/vulpra/actions/runs/40412644709; both logs explicitly report 'stage: Firefox executable missing beside application.ini'. No packaged artifact was uploaded by failed CI jobs, so native recompilation is necessary. Repair preserves native binary and adds separate vulpra-launch; packaging launch and localhost acceptance fixture tests PASS https://github.com/sguzman/vulpra/actions/runs/40431563473 and https://github.com/sguzman/vulpra/actions/runs/40431563559. New same-commit lean/full rebuilds https://github.com/sguzman/vulpra/actions/runs/40431768974 and https://github.com/sguzman/vulpra/actions/runs/40431769117 started; matching source commit 674db8e385c36aec23e78bbe059b2a1fec194fae; workflow lint PASS https://github.com/sguzman/vulpra/actions/runs/40431769066. Real branded package runtime/Nimbus and positive matched byte savings still not verified. M3=0%, overall 33%.",
         "2026-10-27: FIRST ACCEPTED real packaged removal after diagnosed screenshot timing race. Native lean build https://github.com/sguzman/vulpra/actions/runs/40431768974 and full baseline https://github.com/sguzman/vulpra/actions/runs/40431769117 both PASS and uploaded independently packaged same-source artifacts (674db8e385c36aec23e78bbe059b2a1fec194fae). Corrected real browser validation https://github.com/sguzman/vulpra/actions/runs/40439671494 PASS: Weston Wayland attached+committed real frame, checksum, screenshot, isolated Firefox profile, real WebDriver JS redirect /start -> /js-run -> /page and final DOM, temporary WebExtension content/background/storage/uninstall, Nimbus manager.store.ready() and ExperimentAPI.ready(). Matched package comparison https://github.com/sguzman/vulpra/actions/runs/40439793884 PASS: full 86,937,548 compressed bytes vs lean 86,909,928; positive saving EXACTLY 27,620 bytes (0.032%). Normandy runner resource absent in lean, shared Nimbus helper modules present. Previous screenshot race is harness artifact, not evidence of browser break. M3 1/6 roadmap acceptance gates (17%); overall floor((100+17+0)/3) =39%. No full M3 finish claimed.",
-        "2026-10-27: Proven source-only Windows/Cocoa reduction: 453 Git-tracked files/6,266,676 Git blob bytes were pruned in isolated CI (40519242468). Linux GTK protected configure PASS, complete native browser compile PASS, staged package SHA PASS, Weston Wayland attach/commit PASS, localhost screenshot PNG/profile PASS, real JS navigation -> HTTP 302 -> final DOM PASS, unsigned WebExtension install/content/background/storage/uninstall PASS, Nimbus ExperimentStore/API ready PASS. Eight necessary cross-platform Glean/locale/Cargo files retained. Atomic main source deletion commit 81d9b335b747c377b730a0c3a4de9ea1cf522fe5 verified to retain exactly 8 scoped files. No measured binary-size reduction or broad telemetry removal. Initial non-Linux platform subset phase gate accepted; other platform paths still need auditing."
+        "2026-10-27: Proven source-only Windows/Cocoa reduction: 453 Git-tracked files/6,266,676 Git blob bytes were pruned in isolated CI (40519242468). Linux GTK protected configure PASS, complete native browser compile PASS, staged package SHA PASS, Weston Wayland attach/commit PASS, localhost screenshot PNG/profile PASS, real JS navigation -> HTTP 302 -> final DOM PASS, unsigned WebExtension install/content/background/storage/uninstall PASS, Nimbus ExperimentStore/API ready PASS. Eight necessary cross-platform Glean/locale/Cargo files retained. Atomic main source deletion commit 81d9b335b747c377b730a0c3a4de9ea1cf522fe5 verified to retain exactly 8 scoped files. No measured binary-size reduction or broad telemetry removal. Initial non-Linux platform subset phase gate accepted; other platform paths still need auditing.",
+        "2026-10-27: SECOND ACCEPTED selective opt-in packaged binary removal: ASRouter SidebarChatBotPromo.sys.mjs and SmartWindowNewTabPromo.sys.mjs gated only by VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS, with immutable AppConstants protection; default still retains them. Native candidate source commit 1683ca67b69389a879717bcd537772c3b40624b6 compiled, packaged, checksum verified, physically omitted exactly two promotion resources while retaining ASRouter/telemetry/onboarding; real Weston Wayland, JS navigation/DOM/PNG, temporary WebExtensions, Nimbus readiness, two guarded template routes, Firefox profile isolation ALL PASS: https://github.com/sguzman/vulpra/actions/runs/40547968387. Source-pinned baseline failed once because the configure assertion rejected an empty-string disabled flag (40563942562), not a browser compile issue. Corrected matched comparison https://github.com/sguzman/vulpra/actions/runs/40567473401 succeeded: full 86,930,792 bytes; opt-in lean 86,927,608 bytes; net SAVING 3,184 compressed bytes (0.00366%). This is separate from 27,620-byte Normandy saving and 6,266,676 source-only widget/installer bytes, with no deduplicated combined binary comparison claimed. M3 remains 2/6 (33%), overall 44%, since promotional feature audit covers additional unreviewed integrations."
       ],
       "verified_preparatory_tasks": [
         {
@@ -204,11 +205,11 @@
           "evidence": "Corrected original JAR manifest conditional, GTK-only NimbusBootstrap and ShieldFrame guard; Ubuntu configure and static invariants passed https://github.com/sguzman/vulpra/actions/runs/40384311987. No native compiled binary or feature-off package/runtime."
         }
       ],
-      "status_note": "Two M3 roadmap acceptance gates now satisfied. First accepted selective binary-size reduction: opt-in Normandy-free source-matched Ubuntu package, 27,620 compressed bytes (0.032%), real runtime PASSED. Second accepted source-only platform pruning: 453 files/6,266,676 Git blob bytes deleted from widget/windows, widget/cocoa, browser/installer/windows, preserving eight shared Glean, updater and Rust files. Complete isolated GTK native build, Vulpra packaging, Wayland render, localhost PNG/JS/302, WebExtension and Nimbus acceptance PASSED in CI 40519242468; deletion committed to main 81d9b335. No Windows/macOS code compiled on Linux before pruning, no binary reduction claimed. 2/6 checklist gates = 33% M3; overall 44%. Other Windows/macOS paths remain for further targeted audits; M2 and user Firefox unchanged.",
+      "status_note": "Two M3 roadmap acceptance gates satisfied: tested before/after selective removal plus bounded non-Linux source prune. Opt-in Normandy runner native package saved 27,620 compressed bytes (0.032%) under source-matched Ubuntu. Additional accepted opt-in two-module ASRouter AI promotion removal saved 3,184 compressed bytes (0.00366%) under separately source-matched Ubuntu, runtime+Wayland/JS/WebExtensions/Nimbus passed (40547968387, 40567473401). These variant savings are NOT additive without one combined source-matched package trial. Source-only Windows/Cocoa widget and installer pruning: 453 files / 6,266,676 Git blob bytes removed after full runtime acceptance 40519242468; no compiled binary saving claimed. Default build still bundles opt-in feature candidates; core browser, extensions, Sync, telemetry and security paths retained. Remaining 4/6 roadmap gates unresolved, M3 33%, overall 44%; no claim that Pocket, promo, reporting, mobile/test/localization audits are complete.",
       "acceptance_gates": {
         "passed": 2,
         "total": 6,
-        "method": "Two of the six explicitly documented M3 roadmap gates have accepted evidence: (1) reproducible before/after measurements and live native acceptance for each accepted removal (positive paired binary saving verified for Normandy; source-only before/after file and blob counts for platform prune), and (2) audited non-Linux platform-only source/installer subset pruned after complete native browser compilation and runtime acceptance. Equal gate weights: round(2/6*100)=33%. This does NOT certify every Windows/macOS source tree removed nor imply binary savings from non-compiled platform code.",
+        "method": "Two of six roadmap gates passed: (1) verified source-matched package-byte reductions and full native runtime evidence for accepted opt-in Normandy and ASRouter promo removals plus source-only platform file/blob evidence, and (2) bounded non-Linux widget/installer source prune. The 3,184-byte ASRouter candidate is additional evidence for the existing per-removal validation gate, NOT a newly completed third roadmap gate; promotion/Pocket/Sync/reporting audit remains incomplete.",
         "remaining": [
           "Complete feature bundle, binary/build dependency and platform map",
           "Complete candidate keep/disable/compile/remove classification",
@@ -285,6 +286,44 @@
             "Not a proof that all non-Linux code across repository is removable",
             "Not an independent after-main-commit native build; verified precommit trial source tree precisely matched 453 files removed from main",
             "Does not disable telemetry or eliminate Glean"
+          ]
+        },
+        {
+          "id": "opt-in-asrouter-ai-promos",
+          "status": "accepted",
+          "source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+          "candidate_run": 40547968387,
+          "matched_full_run": 40567473401,
+          "previous_failed_comparison_run": 40563942562,
+          "full_compressed_bytes": 86930792,
+          "lean_compressed_bytes": 86927608,
+          "saved_compressed_bytes": 3184,
+          "compressed_reduction_percent": 0.00366,
+          "omitted_resources": [
+            "modules/asrouter/SidebarChatBotPromo.sys.mjs",
+            "modules/asrouter/SmartWindowNewTabPromo.sys.mjs"
+          ],
+          "retained_resources": [
+            "modules/asrouter/ASRouter.sys.mjs",
+            "modules/asrouter/ASRouterTelemetry.sys.mjs",
+            "modules/asrouter/OnboardingMessageProvider.sys.mjs"
+          ],
+          "checks": [
+            "native GTK/Wayland/Sandbox/Sync/Normandy/DevTools configure",
+            "real native compiled package checksum and physical resource index",
+            "actual Weston Wayland attach/commit",
+            "localhost JavaScript redirect/screenshot/DOM",
+            "temporary WebExtension install/content/background/storage/uninstall",
+            "Nimbus readiness and guarded remote promo template dispatch",
+            "Firefox profile isolation",
+            "source-pinned same-compiler baseline full package and positive tar.xz byte delta"
+          ],
+          "limitations": [
+            "Ubuntu 24.04 CI measurement, not target Arch workstation",
+            "default build retains the two modules; opt-in alternate only",
+            "3,184 bytes is a very small package reduction, not broader removal of promotional messaging/telemetry/Pocket/Sync",
+            "source-matched comparison positive but no cross-build reproducibility characterization",
+            "M3 promotion/Sync/Pocket/reporting inventory gate remains open"
           ]
         }
       ]
