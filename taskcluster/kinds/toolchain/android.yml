@@ -267,8 +267,9 @@ linux64-android-gradle-dependencies:
             - 'mobile/android/**/*.gradle'
             - 'mobile/android/**/*.gradle.kts'
             - 'mobile/android/**/gradle.properties'
-            - 'mobile/android/android-components/plugins/dependencies/src/main/java/ApplicationServices.kt'
-            - 'mobile/android/android-components/plugins/dependencies/src/main/java/DependenciesPlugin.kt'
+            # Vulpra Linux-only source pruning removed Android Components' Gradle plugin.
+            # The Android Gradle dependency tasks are unsupported in this fork.
+            # Do not hash paths absent from the source tree while resolving Linux toolchains.
             - 'mobile/android/config/mozconfigs/android-arm-gradle-dependencies/**'
             - 'mobile/android/config/mozconfigs/common*'
             - 'mobile/android/gradle.configure'
@@ -314,8 +315,9 @@ linux64-android-gradle-dependencies-appservices:
             - 'mobile/android/**/*.gradle'
             - 'mobile/android/**/*.gradle.kts'
             - 'mobile/android/**/gradle.properties'
-            - 'mobile/android/android-components/plugins/dependencies/src/main/java/ApplicationServices.kt'
-            - 'mobile/android/android-components/plugins/dependencies/src/main/java/DependenciesPlugin.kt'
+            # Vulpra Linux-only source pruning removed Android Components' Gradle plugin.
+            # The Android Gradle dependency tasks are unsupported in this fork.
+            # Do not hash paths absent from the source tree while resolving Linux toolchains.
             - 'mobile/android/config/mozconfigs/android-arm-gradle-dependencies/**'
             - 'mobile/android/config/mozconfigs/common*'
             - 'mobile/android/gradle.configure'
