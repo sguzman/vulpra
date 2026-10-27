@@ -123,6 +123,15 @@ export var AppConstants = Object.freeze({
 
   MOZ_NORMANDY: @MOZ_NORMANDY_BOOL@,
 
+  // Compile-time constant, not a mutable preference: the opt-in package
+  // must never try to load promotion modules deliberately left unbundled.
+  VULPRA_NO_ASROUTER_PROMOS:
+#ifdef VULPRA_NO_ASROUTER_PROMOS
+  true,
+#else
+  false,
+#endif
+
   MOZ_MAINTENANCE_SERVICE: @MOZ_MAINTENANCE_SERVICE_BOOL@,
 
   MOZ_BACKGROUNDTASKS: @MOZ_BACKGROUNDTASKS_BOOL@,
