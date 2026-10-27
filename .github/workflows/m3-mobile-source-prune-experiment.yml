@@ -64,8 +64,7 @@ jobs:
           # The Linux compiler downloader also loads Taskcluster toolchain YAML.
           # Removed Android Gradle-plugin files must never reappear as resources.
           for basename in ApplicationServices.kt DependenciesPlugin.kt; do
-            if grep -Fq "mobile/android/android-components/plugins/dependencies/src/main/java/$basename" \\
-                taskcluster/kinds/toolchain/android.yml; then
+            if grep -Fq "mobile/android/android-components/plugins/dependencies/src/main/java/$basename" taskcluster/kinds/toolchain/android.yml; then
               echo "ERROR: Taskcluster hashes deleted Android Components file: $basename" >&2
               exit 1
             fi
