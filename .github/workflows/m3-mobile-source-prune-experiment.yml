@@ -217,7 +217,6 @@ jobs:
           r=Path(os.environ["RUNNER_TEMP"])/"m3-android-source-prune.json"
           data=json.loads(r.read_text())
           data["status"]="native and runtime accepted in disposable checkout; commit removal NOT performed"
-          data["tested"]["wayland"]=True if "tested" in data else True
           data["tested"]={"wayland":True,"localhost_js":True,"webextensions":True,
                           "nimbus":True,"profile_isolation":True}
           r.write_text(json.dumps(data,indent=2)+"\n")
