@@ -23,6 +23,24 @@ def vulpra_include_normandy(experimental_disable):
 
 
 imply_option("MOZ_NORMANDY", True, when=vulpra_include_normandy)
+
+# An isolated M3 Linux candidate may omit exactly two ASRouter promotional
+# implementation modules. The ordinary desktop browser retains both.
+option(
+    env="VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS",
+    help="Experimental Linux build without two ASRouter AI promotions",
+)
+
+
+@depends("VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS", target_has_linux_kernel)
+def vulpra_no_asrouter_promos(disable, linux):
+    if disable and not linux:
+        die("Vulpra promo opt-out is supported only on Linux")
+    return bool(disable)
+
+
+set_config("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)
+set_define("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)
 imply_option("MOZ_PROFILE_MIGRATOR", True)
 
 
