@@ -42,9 +42,12 @@ jobs:
           import json,os,subprocess
           from pathlib import Path
           roots=["widget/windows", "browser/installer/windows", "widget/cocoa"]
-          # Glean metrics index references these files for all desktop builds;
-          # they are generator metadata, not Windows/Cocoa implementation.
-          retained=["widget/cocoa/metrics.yaml","widget/windows/metrics.yaml"]
+          # Some cross-platform generators require these metadata files on
+          # Linux. The Glean index includes platform metrics globally; the
+          # localized updater config includes a Windows-format append file
+          # even when the Linux installer is the compiled target.
+          retained=["widget/cocoa/metrics.yaml","widget/windows/metrics.yaml",
+                    "browser/installer/windows/nsis/updater_append.ini"]
           names=subprocess.check_output(["git","ls-files","-z","--",*roots]).split(bytes([0]))
           paths=[Path(os.fsdecode(name)) for name in names if name]
           to_remove=[p for p in paths if p.as_posix() not in retained]
@@ -66,24 +69,27 @@ jobs:
           print(json.dumps(info,indent=2))
           PY
           git rm -r -- widget/windows browser/installer/windows widget/cocoa >/dev/null
-          # Restore only the two files required by the desktop Glean generator.
+          # Keep only demonstrated shared generator inputs.
           git restore --source=HEAD --staged --worktree -- \
-            widget/cocoa/metrics.yaml widget/windows/metrics.yaml
-          test ! -d browser/installer/windows
+            widget/cocoa/metrics.yaml widget/windows/metrics.yaml \
+            browser/installer/windows/nsis/updater_append.ini
+          test -f browser/installer/windows/nsis/updater_append.ini
           test -d widget/gtk
           test -d toolkit/mozapps/extensions
           python3 - <<'PY'
           import subprocess
           from pathlib import Path
-          expected={"widget/cocoa/metrics.yaml","widget/windows/metrics.yaml"}
-          survivors={str(p) for root in ("widget/cocoa","widget/windows")
+          expected={"widget/cocoa/metrics.yaml","widget/windows/metrics.yaml",
+                    "browser/installer/windows/nsis/updater_append.ini"}
+          survivors={str(p) for root in ("widget/cocoa","widget/windows",
+                                         "browser/installer/windows")
                      for p in Path(root).rglob("*") if p.is_file()}
           assert survivors == expected, (survivors - expected, expected - survivors)
           deleted=subprocess.check_output(["git","diff","--cached","--name-only","--diff-filter=D"],text=True).splitlines()
           assert not any(p in expected for p in deleted)
-          print(f"PASS: {len(deleted)} platform files pruned; two necessary Glean metadata inputs retained")
+          print(f"PASS: {len(deleted)} platform files pruned; three necessary generator inputs retained")
           PY
-          echo "PASS: platform implementations excluded without removing shared Glean generator inputs"
+          echo "PASS: platform implementations excluded without removing shared generator inputs"
 
       # The shared M3 mozconfig uses --with-ccache=sccache. Explicitly
       # initialize GitHub cache backend credentials before mach configure;
@@ -217,7 +223,7 @@ jobs:
             echo
             echo "Run: https://github.com/sguzman/vulpra/actions/runs/$GITHUB_RUN_ID"
             echo "Status: **$EXPERIMENT_STATUS**"
-            echo 'Scope: Windows/Cocoa implementations pruned in ephemeral Linux checkout; two shared Glean metric YAML inputs retained.'
+            echo 'Scope: Windows/Cocoa implementations pruned in ephemeral Linux checkout; three shared Glean/locale generator inputs retained.'
             echo 'Compiler, full native browser, packaging, real Wayland/JS/WebExtension/Nimbus suite required.'
             echo 'No deletion committed to main; no binary-size improvement or M3 acceptance credited from this workflow alone.'
           } > "$RUNNER_TEMP/m3-platform-prune-comment.md"
