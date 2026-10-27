@@ -11,6 +11,7 @@ on:
       - mobile/android/**
       - mobile/shared/**
       - widget/android/**
+      - taskcluster/kinds/toolchain/android.yml
   workflow_dispatch:
 
 permissions:
@@ -60,6 +61,16 @@ jobs:
               exit 1
             fi
           done
+          # The Linux compiler downloader also loads Taskcluster toolchain YAML.
+          # Removed Android Gradle-plugin files must never reappear as resources.
+          for basename in ApplicationServices.kt DependenciesPlugin.kt; do
+            if grep -Fq "mobile/android/android-components/plugins/dependencies/src/main/java/$basename" \\
+                taskcluster/kinds/toolchain/android.yml; then
+              echo "ERROR: Taskcluster hashes deleted Android Components file: $basename" >&2
+              exit 1
+            fi
+          done
+          echo "PASS: Taskcluster toolchain graph no longer hashes deleted Android Gradle sources"
           echo "PASS: three Android app roots remain absent on current main"
           echo "PASS: shared GeckoView, Android widget and core build paths remain"
           echo "Historical native acceptance: https://github.com/sguzman/vulpra/actions/runs/40585240593"
