@@ -1,265 +1,66 @@
-name: M3 Experiment Linux-Excluded Platform Source Prune
+# Historical filename retained to preserve links to the successful pre-merge
+# experiment. The deletions are now committed; this job must not repeat them.
+name: M3 Verify Committed Linux Platform Source Prune
 
 on:
   push:
     branches: [main]
     paths:
       - .github/workflows/m3-platform-prune-experiment.yml
+      - widget/windows/**
+      - widget/cocoa/**
+      - browser/installer/windows/**
+      - toolkit/library/rust/shared/Cargo.toml
   workflow_dispatch:
 
 permissions:
   contents: read
-  issues: write
-
-concurrency:
-  group: vulpra-m3-linux-source-prune
-  cancel-in-progress: false
 
 jobs:
-  native-platform-prune:
+  verify-platform-prune:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 350
-    env:
-      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
-      MOZ_HEADLESS: "1"
-      DEBIAN_FRONTEND: noninteractive
-      SCCACHE_GHA_ENABLED: "true"
-      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
-      CARGO_BUILD_JOBS: "1"
-      VULPRA_M3_VERIFY_NIMBUS: "1"
+    timeout-minutes: 10
     steps:
-      - name: Check out complete pinned Linux browser source
+      - name: Checkout retained source and dependency manifests only
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            widget/windows
+            widget/cocoa
+            browser/installer/windows
+            toolkit/library/rust/shared
+          sparse-checkout-cone-mode: true
 
-      - name: Remove only excluded Windows and Cocoa widget/installer source in ephemeral runner
+      - name: Verify exactly eight shared files remain at committed HEAD
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import json,os,subprocess
-          from pathlib import Path
-          roots=["widget/windows", "browser/installer/windows", "widget/cocoa"]
-          # Some cross-platform generators require these metadata files on
-          # Linux. The Glean index includes platform metrics globally; the
-          # localized updater config includes a Windows-format append file
-          # even when the Linux installer is the compiled target.
-          # Cargo resolves target-gated path dependencies before selecting a
-          # target. gkrust-shared references widget_windows even on Linux, so
-          # Cargo.toml and its Rust sources must remain readable; none are
-          # evidence of native Windows widget compilation.
-          retained=["widget/cocoa/metrics.yaml","widget/windows/metrics.yaml",
-                    "browser/installer/windows/nsis/updater_append.ini",
-                    "widget/windows/rust/Cargo.toml",
-                    "widget/windows/rust/src/AlertsServiceRust.h",
-                    "widget/windows/rust/src/PermissionMonitor.h",
-                    "widget/windows/rust/src/lib.rs",
-                    "widget/windows/rust/src/permission_monitor.rs"]
-          names=subprocess.check_output(["git","ls-files","-z","--",*roots]).split(bytes([0]))
-          paths=[Path(os.fsdecode(name)) for name in names if name]
-          to_remove=[p for p in paths if p.as_posix() not in retained]
-          if len(to_remove)<200:
-              raise RuntimeError(f"Too few platform source files to assess: {len(to_remove)}")
-          if not all(Path(name).is_file() for name in retained):
-              raise RuntimeError("Required shared Glean metric inputs absent before prune")
-          logical=sum(p.lstat().st_size for p in to_remove)
-          info={"schema_version":1,"scope":"ephemeral CI source-only platform prune",
-                "original_source_commit":os.environ["GITHUB_SHA"],
-                "excluded_roots":roots,"source_files_removed":len(to_remove),
-                "required_shared_generator_files_retained":retained,
-                "removed_worktree_logical_bytes":logical,
-                "linux_binary_size_savings_verified":False,
-                "source_removal_committed_to_main":False,
-                "interpretation":"No source changes on main; runtime and compiler safety must pass"}
-          out=Path(os.environ["RUNNER_TEMP"])/"m3-platform-prune-source.json"
-          out.write_text(json.dumps(info,indent=2)+"\n")
-          print(json.dumps(info,indent=2))
-          PY
-          git rm -r -- widget/windows browser/installer/windows widget/cocoa >/dev/null
-          # Keep only required cross-platform generator and Cargo metadata.
-          git restore --source=HEAD --staged --worktree -- \
-            widget/cocoa/metrics.yaml widget/windows/metrics.yaml \
-            browser/installer/windows/nsis/updater_append.ini \
-            widget/windows/rust/Cargo.toml \
-            widget/windows/rust/src/AlertsServiceRust.h \
-            widget/windows/rust/src/PermissionMonitor.h \
-            widget/windows/rust/src/lib.rs \
-            widget/windows/rust/src/permission_monitor.rs
-          test -f browser/installer/windows/nsis/updater_append.ini
-          test -d widget/gtk
-          test -d toolkit/mozapps/extensions
-          python3 - <<'PY'
-          import subprocess
-          from pathlib import Path
-          expected={"widget/cocoa/metrics.yaml","widget/windows/metrics.yaml",
-                    "browser/installer/windows/nsis/updater_append.ini",
-                    "widget/windows/rust/Cargo.toml",
-                    "widget/windows/rust/src/AlertsServiceRust.h",
-                    "widget/windows/rust/src/PermissionMonitor.h",
-                    "widget/windows/rust/src/lib.rs",
-                    "widget/windows/rust/src/permission_monitor.rs"}
-          survivors={str(p) for root in ("widget/cocoa","widget/windows",
-                                         "browser/installer/windows")
-                     for p in Path(root).rglob("*") if p.is_file()}
-          assert survivors == expected, (survivors - expected, expected - survivors)
-          deleted=subprocess.check_output(["git","diff","--cached","--name-only","--diff-filter=D"],text=True).splitlines()
-          assert not any(p in expected for p in deleted)
-          assert len(deleted) == 453, f"Unexpected source-prune scope: {len(deleted)}"
-          print(f"PASS: {len(deleted)} platform files pruned; required three generator and five Cargo crate files retained")
-          PY
-          # Validate the exact Windows crate dependency that failed after
-          # successful configure in the previous experiment.
-          python3 - <<'PY'
-          import tomllib
-          from pathlib import Path
-          root=Path(".")
-          gkrust=tomllib.loads((root/"toolkit/library/rust/shared/Cargo.toml").read_text())
-          windows=gkrust["target"]["cfg(target_os = \"windows\")"]["dependencies"]
-          assert windows["widget_windows"]["path"] == "../../../../widget/windows/rust"
-          crate=root/"widget/windows/rust"
-          manifest=tomllib.loads((crate/"Cargo.toml").read_text())
-          assert manifest["package"]["name"]=="widget_windows"
-          assert (crate/"src/lib.rs").is_file()
-          print("PASS: target-gated Cargo workspace path dependency remains valid")
-          PY
-          echo "PASS: platform implementation prune preserves shared Glean, updater and Cargo inputs"
-
-      # The shared M3 mozconfig uses --with-ccache=sccache. Explicitly
-      # initialize GitHub cache backend credentials before mach configure;
-      # otherwise sccache aborts prior to testing any source-prune boundary.
-      - name: Prepare Mozilla compiler cache
-        uses: mozilla-actions/sccache-action@v0.0.11
-        with:
-          version: "v0.16.0"
-
-      - name: Export Actions compiler-cache credentials
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Bootstrap Linux compiler and protected runtime dependencies
-        shell: bash
-        timeout-minutes: 55
-        run: |
-          set -euo pipefail
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
-            install -y --no-install-recommends python3 python3-venv python3-dev \
-            git curl make jq weston wayland-utils libgtk-3-0t64 \
-            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
-          ./mach --no-interactive bootstrap --application-choice browser
-
-      - name: Verify full protected Linux configure despite absent platform source
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./mach configure
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          root=Path("obj-vulpra-linux-m3-baseline/config.statusd/substs")
-          def get(key):
-              path=root/key
-              return json.loads(path.read_text()) if path.exists() else None
-          assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
-          assert get("MOZ_APP_BASENAME")=="Vulpra"
-          assert get("MOZ_DEVTOOLS")=="all"
-          for key in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC","MOZ_NORMANDY"):
-              assert str(get(key)) in ("1","True"), (key,get(key))
-          print("PASS: real Linux/GTK/Wayland/Sync/Normandy/DevTools configure with source prune")
-          PY
-
-      - name: Reserve 24 GiB disk-backed swap for native Rust component build
-        shell: bash
-        run: |
-          set -euo pipefail
-          swap=/mnt/vulpra-m3-platform-prune.swap
-          bytes=$((24*1024*1024*1024))
-          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
-          (( available > bytes+8*1024*1024*1024 )) || {
-            echo "Insufficient scratch storage to safely compile browser" >&2
-            exit 1
-          }
-          sudo fallocate -l 24G "$swap"
-          sudo chmod 0600 "$swap"
-          sudo mkswap "$swap"
-          sudo swapon "$swap"
-          sudo swapon --show
-
-      - name: Compile real full-featured browser with Windows/Cocoa source excluded
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-platform-prune-build.log"
-          echo "PASS: browser compiled after platform-source removal"
-
-      - name: Package native browser and retain isolated profile launcher
-        shell: bash
-        run: |
-          set -euo pipefail
-          ./mach package
-          dist=obj-vulpra-linux-m3-baseline/dist
-          mapfile -d '' -t archives < <(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print0)
-          [[ "${#archives[@]}" -eq 1 ]]
-          mkdir -p .git/vulpra-native-build/packages
-          bash packaging/stage.sh "${archives[0]}" \
-            "$GITHUB_WORKSPACE/.git/vulpra-native-build/packages/vulpra-local-platform-prune.tar.xz"
-          (cd .git/vulpra-native-build/packages && sha256sum -c vulpra-local-platform-prune.tar.xz.sha256)
-          echo "PASS: source-pruned native browser packaged; no binary size comparison asserted"
-
-      - name: Real packaged Wayland and JS/browser extension/Nimbus safety acceptance
-        shell: bash
-        timeout-minutes: 25
-        run: |
-          set -euo pipefail
-          work="$(mktemp -d)"
-          trap 'rm -rf -- "$work"' EXIT
-          tar -xf .git/vulpra-native-build/packages/vulpra-local-platform-prune.tar.xz -C "$work"
-          mapfile -d '' -t inis < <(find "$work" -maxdepth 5 -type f -name application.ini -print0)
-          [[ "${#inis[@]}" -eq 1 ]]
-          VULPRA_WAYLAND_TEST_SECONDS=12 bash packaging/test-wayland.sh "$(dirname "${inis[0]}")"
-          python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
-          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
-            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
-          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
-          chmod 0755 "$RUNNER_TEMP/geckodriver"
-          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
-          echo "PASS: source-pruned binary passed real native browser runtime checks"
-
-      - name: Preserve experiment evidence and reusable candidate
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: m3-platform-prune-experiment
-          path: |
-            ${{ runner.temp }}/m3-platform-prune-source.json
-            .git/vulpra-native-build/packages/vulpra-local-platform-prune.tar.xz
-            .git/vulpra-native-build/packages/vulpra-local-platform-prune.tar.xz.sha256
-            .git/vulpra-native-build/m3-localhost-acceptance.json
-            .git/vulpra-native-build/webextension-smoke-*.json
-          include-hidden-files: true
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Report bounded outcome without crediting uncommitted source prune
-        if: always()
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EXPERIMENT_STATUS: ${{ job.status }}
-        run: |
-          set -euo pipefail
-          {
-            echo '## M3 Linux-excluded source-prune native experiment'
-            echo
-            echo "Run: https://github.com/sguzman/vulpra/actions/runs/$GITHUB_RUN_ID"
-            echo "Status: **$EXPERIMENT_STATUS**"
-            echo 'Scope: Windows/Cocoa implementations pruned in ephemeral Linux checkout; three Glean/locale and five target-gated Cargo files retained.'
-            echo 'Compiler, full native browser, packaging, real Wayland/JS/WebExtension/Nimbus suite required.'
-            echo 'No deletion committed to main; no binary-size improvement or M3 acceptance credited from this workflow alone.'
-          } > "$RUNNER_TEMP/m3-platform-prune-comment.md"
-          gh issue comment 1 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/m3-platform-prune-comment.md"
+          expected="$(mktemp)"
+          actual="$(mktemp)"
+          trap 'rm -f -- "$expected" "$actual"' EXIT
+          cat > "$expected" <<'EXPECTED'
+          browser/installer/windows/nsis/updater_append.ini
+          widget/cocoa/metrics.yaml
+          widget/windows/metrics.yaml
+          widget/windows/rust/Cargo.toml
+          widget/windows/rust/src/AlertsServiceRust.h
+          widget/windows/rust/src/PermissionMonitor.h
+          widget/windows/rust/src/lib.rs
+          widget/windows/rust/src/permission_monitor.rs
+          EXPECTED
+          git ls-tree -r --name-only HEAD -- \
+            widget/windows widget/cocoa browser/installer/windows \
+            | LC_ALL=C sort > "$actual"
+          LC_ALL=C sort -o "$expected" "$expected"
+          diff -u "$expected" "$actual"
+          while IFS= read -r path; do
+            test -f "$path" || { echo "Missing retained dependency: $path" >&2; exit 1; }
+          done < "$expected"
+          grep -Fq 'widget_windows = { path = "../../../../widget/windows/rust" }' \
+            toolkit/library/rust/shared/Cargo.toml
+          grep -Fq 'name = "widget_windows"' widget/windows/rust/Cargo.toml
+          echo 'PASS: only eight essential shared inputs survive on main.'
+          echo 'This is a source invariant, not a fresh native build or binary size measurement.'
