@@ -37,6 +37,27 @@ CI verified protected GTK/Wayland/Sandbox/Sync/Normandy/DevTools configuration, 
 **Scope limitation:** This accepts one bounded source-only platform-pruning gate. It does not certify all Windows/macOS-specific modules removed, that Linux packages got smaller, or that the telemetry infrastructure was deleted. Further platform, telemetry and promotion work requires separate dependency audits and protected native runtime acceptance.
 
 
+## Four-way Pocket, promotion, Sync and reporting source audit (2026-10-27)
+
+The read-only [complete source scan](https://github.com/sguzman/vulpra/actions/runs/40544803899) **PASSED** on source commit `dfdc1915b279f33d4d91992355aa8da48384b1a0`. Its synthetic Git fixture, actual tracked-tree scan and evidence artifact all passed. Unlike GitHub code search, the scan used the checked-out pinned source with `git grep`. The artifact contains exact literal matches and ranked non-test/non-doc file paths.
+
+| Candidate reference set | Literal matching lines | Ranked non-test/non-doc paths |
+| --- | ---: | ---: |
+| Pocket | 3,292 | 295 |
+| Promotions / onboarding | 368 | 55 |
+| Sync / Accounts | 1,616 | 123 |
+| Telemetry transport / reporting | 1,736 | 142 |
+
+The path counts are **not unique runtime dependencies**: the ranking can include incidental third-party/sample matches, and the regexes can miss computed imports. No package-size change, runtime behavior or removal is claimed by the census.
+
+Specific desktop blockers worth isolating before a native opt-out:
+- **Pocket:** `browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs` and `ActivityStream.sys.mjs` reference Pocket content; Nimbus feature metadata and new-tab metrics also refer to it. Do not delete New Tab wholesale.
+- **Promotions:** `browser/components/asrouter/moz.build` packages promo modules, with dispatch from `ASRouter.sys.mjs`, browser glue, and message-preview/enterprise consumers. Remove only narrow promotions after proving imports, behavior and fallback.
+- **Sync / Accounts:** `browser/components/AccountsGlue.sys.mjs` is registered during browser startup and lazily imports **both** FxAccounts and Sync UIState. `services/fxaccounts` is traversed independently of `services/sync`. A compile switch for Sync alone cannot justify deleting Accounts.
+- **Telemetry:** `TelemetrySend.sys.mjs` handles ping transmission; `TelemetryReportingPolicy.sys.mjs` and `TelemetryControllerParent.sys.mjs` participate in reporting startup/lifecycle. `toolkit/components/glean` contains native metrics and IPC integrations. `browser/app/profile/firefox.js` has defaults enabling several legacy ping types, but these defaults alone do not establish actual Vulpra network traffic. Treat submission/transport, local metric infrastructure, and crash reporting separately.
+
+The dependency map and candidate statuses are recorded in [DEBLOAT-CANDIDATES.json](DEBLOAT-CANDIDATES.json). **M3 remains 2/6 gates (33%), overall 44%.** Next evidence gate: choose one narrow packaged feature, map every non-test caller and runtime fallback, and only then perform source-matched opt-in native build, live behavior and package-size comparison. No telemetry deletion or other candidate is yet authorized.
+
 ## First rule: preserve a known-good baseline
 
 Keep the pinned local workstation checkout, its build output, and the verified packaged tarball. Do not reset the tree, disable Git sparse settings blindly, delete build directories or relaunch a full Firefox compilation just to compute statistics. The source inventory is **read-only** and writes only to a private directory inside `.git`.
@@ -123,7 +144,7 @@ or additional native builds at this stage.
 
 ## Versioned candidate decisions (updated 2026-10-26)
 
-The machine-readable **13-group review register** is
+The machine-readable **14-group review register** is
 [`docs/vulpra/DEBLOAT-CANDIDATES.json`](DEBLOAT-CANDIDATES.json). Each group
 states its current disposition, code/binary distinction, supporting manifest
 evidence and the exact proof missing before modification. Current decisions:
