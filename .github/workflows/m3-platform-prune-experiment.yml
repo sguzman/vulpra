@@ -1,0 +1,191 @@
+name: M3 Experiment Linux-Excluded Platform Source Prune
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-platform-prune-experiment.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: vulpra-m3-linux-source-prune
+  cancel-in-progress: false
+
+jobs:
+  native-platform-prune:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
+      MOZ_HEADLESS: "1"
+      DEBIAN_FRONTEND: noninteractive
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
+      VULPRA_M3_VERIFY_NIMBUS: "1"
+    steps:
+      - name: Check out complete pinned Linux browser source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Remove only excluded Windows and Cocoa widget/installer source in ephemeral runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          roots=["widget/windows", "browser/installer/windows", "widget/cocoa"]
+          names=subprocess.check_output(["git","ls-files","-z","--",*roots]).split(b"\0")
+          paths=[Path(os.fsdecode(name)) for name in names if name]
+          if len(paths)<300:
+              # Do not silently call an incomplete checkout a verified prune.
+              raise RuntimeError(f"Too few platform source files to assess: {len(paths)}")
+          logical=sum(p.lstat().st_size for p in paths)
+          info={"schema_version":1,"scope":"ephemeral CI source-only platform prune",
+                "original_source_commit":os.environ["GITHUB_SHA"],
+                "excluded_roots":roots,"source_files_removed":len(paths),
+                "removed_worktree_logical_bytes":logical,
+                "linux_binary_size_savings_verified":False,
+                "source_removal_committed_to_main":False,
+                "interpretation":"No source changes on main; runtime and compiler safety must pass"}
+          out=Path(os.environ["RUNNER_TEMP"])/"m3-platform-prune-source.json"
+          out.write_text(json.dumps(info,indent=2)+"\n")
+          print(json.dumps(info,indent=2))
+          PY
+          git rm -r -- widget/windows browser/installer/windows widget/cocoa >/dev/null
+          test ! -d widget/windows
+          test ! -d widget/cocoa
+          test ! -d browser/installer/windows
+          test -d widget/gtk
+          test -d toolkit/mozapps/extensions
+          echo "PASS: ephemeral platform-only deletion, GTK and WebExtensions preserved"
+
+      - name: Bootstrap Linux compiler and protected runtime dependencies
+        shell: bash
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends python3 python3-venv python3-dev \
+            git curl make jq weston wayland-utils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          ./mach --no-interactive bootstrap --application-choice browser
+
+      - name: Verify full protected Linux configure despite absent platform source
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach configure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("obj-vulpra-linux-m3-baseline/config.statusd/substs")
+          def get(key):
+              path=root/key
+              return json.loads(path.read_text()) if path.exists() else None
+          assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
+          assert get("MOZ_APP_BASENAME")=="Vulpra"
+          assert get("MOZ_DEVTOOLS")=="all"
+          for key in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC","MOZ_NORMANDY"):
+              assert str(get(key)) in ("1","True"), (key,get(key))
+          print("PASS: real Linux/GTK/Wayland/Sync/Normandy/DevTools configure with source prune")
+          PY
+
+      - name: Reserve 24 GiB disk-backed swap for native Rust component build
+        shell: bash
+        run: |
+          set -euo pipefail
+          swap=/mnt/vulpra-m3-platform-prune.swap
+          bytes=$((24*1024*1024*1024))
+          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( available > bytes+8*1024*1024*1024 )) || {
+            echo "Insufficient scratch storage to safely compile browser" >&2
+            exit 1
+          }
+          sudo fallocate -l 24G "$swap"
+          sudo chmod 0600 "$swap"
+          sudo mkswap "$swap"
+          sudo swapon "$swap"
+          sudo swapon --show
+
+      - name: Compile real full-featured browser with Windows/Cocoa source excluded
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-platform-prune-build.log"
+          echo "PASS: browser compiled after platform-source removal"
+
+      - name: Package native browser and retain isolated profile launcher
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist=obj-vulpra-linux-m3-baseline/dist
+          mapfile -d '' -t archives < <(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print0)
+          [[ "${#archives[@]}" -eq 1 ]]
+          mkdir -p .git/vulpra-native-build/packages
+          bash packaging/stage.sh "${archives[0]}" \
+            "$GITHUB_WORKSPACE/.git/vulpra-native-build/packages/vulpra-local-platform-prune.tar.xz"
+          (cd .git/vulpra-native-build/packages && sha256sum -c vulpra-local-platform-prune.tar.xz.sha256)
+          echo "PASS: source-pruned native browser packaged; no binary size comparison asserted"
+
+      - name: Real packaged Wayland and JS/browser extension/Nimbus safety acceptance
+        shell: bash
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf -- "$work"' EXIT
+          tar -xf .git/vulpra-native-build/packages/vulpra-local-platform-prune.tar.xz -C "$work"
+          mapfile -d '' -t inis < <(find "$work" -maxdepth 5 -type f -name application.ini -print0)
+          [[ "${#inis[@]}" -eq 1 ]]
+          VULPRA_WAYLAND_TEST_SECONDS=12 bash packaging/test-wayland.sh "$(dirname "${inis[0]}")"
+          python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          echo "PASS: source-pruned binary passed real native browser runtime checks"
+
+      - name: Preserve experiment evidence and reusable candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-platform-prune-experiment
+          path: |
+            ${{ runner.temp }}/m3-platform-prune-source.json
+            .git/vulpra-native-build/packages/vulpra-local-platform-prune.tar.xz
+            .git/vulpra-native-build/packages/vulpra-local-platform-prune.tar.xz.sha256
+            .git/vulpra-native-build/m3-localhost-acceptance.json
+            .git/vulpra-native-build/webextension-smoke-*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Report bounded outcome without crediting uncommitted source prune
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPERIMENT_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          {
+            echo '## M3 Linux-excluded source-prune native experiment'
+            echo
+            echo "Run: https://github.com/sguzman/vulpra/actions/runs/$GITHUB_RUN_ID"
+            echo "Status: **$EXPERIMENT_STATUS**"
+            echo 'Scope: widget/windows, browser/installer/windows, widget/cocoa absent from ephemeral Linux checkout.'
+            echo 'Compiler, full native browser, packaging, real Wayland/JS/WebExtension/Nimbus suite required.'
+            echo 'No deletion committed to main; no binary-size improvement or M3 acceptance credited from this workflow alone.'
+          } > "$RUNNER_TEMP/m3-platform-prune-comment.md"
+          gh issue comment 1 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/m3-platform-prune-comment.md"
