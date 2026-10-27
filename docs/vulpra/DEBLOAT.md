@@ -18,6 +18,14 @@ Two native Ubuntu 24.04 builds with the **same commit** `674db8e385c36aec23e78bb
 
 The lean package lacks `res/normandy/Normandy.sys.mjs` and retains required shared Nimbus/Normandy helpers. The result counts as **one** verified removal, not complete debloating, a comprehensive browser security audit, or an Arch-specific gain. No existing installed Firefox or M2 package was changed.
 
+## GenAI bundled-runtime dependency audit (2026-10-27)
+
+The [complete pinned-source Git audit](https://github.com/sguzman/vulpra/actions/runs/40441432696) passed with **845 literal matching lines**: 129 outside the GenAI subtree/tests/docs, 139 GenAI-owned, 561 tests, 16 documentation/tooling. The exact findings and locations are in the downloadable `m3-genai-references` JSON artifact. This is the actual complete repository, not an incomplete GitHub code-search index.
+
+Important outside consumers: `browser/components/BrowserComponents.manifest` registers `LinkPreview.init` during delayed startup; `browser/components/DesktopActorRegistry.sys.mjs` contains GenAI actors; `browser/app/profile/firefox.js` contains prefs; sidebar, main preferences, enterprise policy, browser context menus, `toolkit/components/nimbus/FeatureManifest.yaml`, model manager and security sources also reference the feature. Whole-directory deletion would leave runtime/actor/UI references unresolved.
+
+**Decision:** Keep GenAI modules bundled in the verified browser until narrow module boundaries and their complete consumers are guarded. Treat individual promotions, models or entry points as candidates, not as automatically removable. An eventual opt-in removal must pass the same source-pinned real native Wayland/JavaScript/WebExtension/Nimbus + compressed-package comparison suite used for the Normandy runner.
+
 ## First rule: preserve a known-good baseline
 
 Keep the pinned local workstation checkout, its build output, and the verified packaged tarball. Do not reset the tree, disable Git sparse settings blindly, delete build directories or relaunch a full Firefox compilation just to compute statistics. The source inventory is **read-only** and writes only to a private directory inside `.git`.

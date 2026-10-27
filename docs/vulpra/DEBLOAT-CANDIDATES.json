@@ -283,7 +283,7 @@
     },
     {
       "id": "browser_genai",
-      "decision": "audit_in_progress",
+      "decision": "retain_pending_external_consumers",
       "surface": "runtime_bundled",
       "paths": [
         "browser/components/genai/"
@@ -296,9 +296,31 @@
         "browser/components/genai/moz.build: MOZ_SRC_FILES GenAI, page/link preview, actors",
         "browser/components/moz.build unconditionally lists genai; browser/components/BrowserComponents.manifest has unguarded delayed startup LinkPreview.init; browser/components/genai/moz.build bundles GenAI, link preview, PageAssist and actors"
       ],
-      "next": "Full Git-tracked reference audit for direct GenAI and LinkPreview callers underway, with separate test-only and shipped-source classifications; see ci/m3-genai-reference-audit.py and workflow m3-genai-reference-audit.yml. No module pruning until unguarded startup registration, actor and sidebar/UI consumers are resolved. Must demonstrate real native runtime, protected feature equality and positive package delta before credit.",
+      "next": "Target narrow optional GenAI promotional assets only after consumer-level import/registration guards are mapped. No whole-directory GenAI deletion. Required: isolated opt-in native build, full live runtime acceptance and matched source/config package byte reduction.",
       "audit_ci": "https://github.com/sguzman/vulpra/actions/workflows/m3-genai-reference-audit.yml",
-      "removal_accepted": false
+      "removal_accepted": false,
+      "audit_result": {
+        "status": "passed_full_source_reference_scan",
+        "run_id": 40441432696,
+        "source_commit": "777eaa453fbf6adfed11eddf63bda16840dab78f",
+        "matching_lines": 845,
+        "external_source_review_lines": 129,
+        "genai_owned_lines": 139,
+        "test_only_lines": 561,
+        "docs_tooling_lines": 16,
+        "report_artifact": "m3-genai-references",
+        "high_impact_consumers": [
+          "browser/components/BrowserComponents.manifest",
+          "browser/components/DesktopActorRegistry.sys.mjs",
+          "browser/components/preferences/config/tabs-browsing.mjs",
+          "browser/components/preferences/OnDeviceModelManager.mjs",
+          "browser/components/sidebar/browser-sidebar.js",
+          "browser/components/enterprisepolicies/Policies.sys.mjs",
+          "browser/base/content/nsContextMenu.sys.mjs",
+          "toolkit/components/nimbus/FeatureManifest.yaml"
+        ],
+        "interpretation": "Literal reference scan only. Unconditional startup registration plus external actor/sidebar/preference callers block whole-directory deletion; no packaged size benefit or native removal has been demonstrated."
+      }
     },
     {
       "id": "newtab_and_messaging",
