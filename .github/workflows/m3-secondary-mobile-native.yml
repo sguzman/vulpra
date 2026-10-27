@@ -59,6 +59,14 @@ jobs:
           # Install Mozilla's supported Clang before making staged source
           # deletions. Bootstrap of a dirty working tree may skip toolchains.
           ./mach --no-interactive bootstrap --application-choice browser
+          # Bootstrap can exit successfully without fetching its compiler.
+          # Resolve the toolchain explicitly and install into the same
+          # Mozilla state directory when that happens, before any deletions.
+          if ! test -x "$HOME/.mozbuild/clang/bin/clang" || \
+             ! test -x "$HOME/.mozbuild/clang/bin/clang++"; then
+            echo 'Mozilla bootstrap omitted Clang; resolving the supported Taskcluster toolchain explicitly'
+            (cd "$HOME/.mozbuild" && "$GITHUB_WORKSPACE/mach" artifact toolchain --from-build linux64-clang)
+          fi
           test -x "$HOME/.mozbuild/clang/bin/clang"
           test -x "$HOME/.mozbuild/clang/bin/clang++"
           "$HOME/.mozbuild/clang/bin/clang" --version
