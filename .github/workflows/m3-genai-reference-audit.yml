@@ -1,0 +1,105 @@
+name: M3 Audit GenAI Runtime Dependencies
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-genai-reference-audit.yml
+      - ci/m3-genai-reference-audit.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit-full-source:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out complete source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Regression-test audit grouping with isolated synthetic Git source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import subprocess
+          import tempfile
+          with tempfile.TemporaryDirectory() as d:
+              root=Path(d)
+              subprocess.run(["git","init","-q",str(root)],check=True)
+              subprocess.run(["git","-C",str(root),"config","user.email","qa@vulpra.invalid"],check=True)
+              subprocess.run(["git","-C",str(root),"config","user.name","QA"],check=True)
+              files={
+                "mach":"#!/bin/sh\n",
+                "browser/components/genai/GenAI.sys.mjs":"// browser.ml.chat.enabled\n",
+                "browser/components/BrowserComponents.manifest":"category browser-window-delayed-startup moz-src:///browser/components/genai/LinkPreview.sys.mjs LinkPreview.init\n",
+                "browser/components/sidebar/SidebarManager.sys.mjs":"// GenAI.sys.mjs\n",
+                "browser/components/genai/tests/test.js":"// browser.ml.chat.enabled\n",
+                "docs/audit.md":"browser/components/genai/\n",
+              }
+              for name,content in files.items():
+                  f=root/name
+                  f.parent.mkdir(parents=True,exist_ok=True)
+                  f.write_text(content)
+              subprocess.run(["git","-C",str(root),"add","."],check=True)
+              subprocess.run(["git","-C",str(root),"commit","-qm","fixture"],check=True)
+              outfile=root/"report.json"
+              subprocess.run(["python3","ci/m3-genai-reference-audit.py",str(root),
+                              "--output",str(outfile)],check=True)
+              result=json.loads(outfile.read_text())
+              assert result["counts_by_class"]["external-source-review"]==2,result
+              assert result["counts_by_class"]["genai-owned"]==1,result
+              assert result["counts_by_class"]["test-only"]==1,result
+              assert result["counts_by_class"]["project-docs-tooling"]==1,result
+              assert result["removal_authorized"] is False
+              print("PASS: distinct external, GenAI-owned, tests, and docs references")
+          PY
+      - name: Scan pinned complete tree for GenAI consumers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-genai-reference-audit.py . --output "$RUNNER_TEMP/m3-genai-references.json"
+      - name: Preserve full machine-readable audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-genai-references
+          path: ${{ runner.temp }}/m3-genai-references.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Record candidate blockers without claiming removal
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/m3-genai-references.json" > "$RUNNER_TEMP/genai-comment.md" <<'PY'
+          import json,os,sys
+          from pathlib import Path
+          path=Path(sys.argv[1])
+          print("## M3 GenAI dependency audit")
+          print()
+          print("Run: https://github.com/sguzman/vulpra/actions/runs/"+os.environ["GITHUB_RUN_ID"])
+          if path.is_file():
+              result=json.loads(path.read_text())
+              print("Commit: `"+result["source_commit"]+"`")
+              print("Literal reference lines:",result["matching_lines"])
+              print("External source callers needing review:")
+              for file,n in list(result["external_source_paths"].items())[:65]:
+                  print(f"- `{file}` ({n})")
+              print()
+              print("Full list and classifications in uploaded JSON artifact.")
+          else:
+              print("Audit failed before full report; do not infer safety.")
+          print()
+          print("No GenAI removal claimed; native build and regression gates remain mandatory.")
+          PY
+          gh issue comment 1 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/genai-comment.md"
