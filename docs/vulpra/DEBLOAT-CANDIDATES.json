@@ -570,6 +570,44 @@
       ],
       "next": "Preserve security and automation capabilities; updater enabled is not evidence an independent update service is configured and functional.",
       "observed_actual_config": "MOZ_SANDBOX=\"1\", MOZ_WAYLAND=\"1\", MOZ_UPDATER=\"1\", MOZ_CRASHREPORTER=\"1\", ENABLE_WEBDRIVER=\"1\""
+    },
+    {
+      "id": "remaining_mobile_platform_leaves",
+      "decision": "isolated_source_only_native_trial",
+      "paths": [
+        "mobile/android/fonts/",
+        "mobile/android/geckoview_example/",
+        "mobile/android/examples/",
+        "mobile/android/test_infra/",
+        "mobile/android/test_runner/",
+        "mobile/android/branding/",
+        "mobile/ios/",
+        "widget/uikit/"
+      ],
+      "why": "Linux GTK does not select standalone Android example apps, Android application branding/font inputs, iOS app, or UIKit widget implementation, but only isolated native acceptance and remaining reference audit can authorize physical deletion.",
+      "next": "Await native Linux full configure/build/packaging and Weston/JS/WebExtension/Nimbus safety test of source-pruned CI checkout; review all external literal references and preserve shared GeckoView/mobile/Android widget and GTK inputs. If accepted, commit only exact roots and record source-only bytes with no binary savings claim.",
+      "source_files": 280,
+      "source_bytes": 7704040,
+      "evidence": [
+        "Preflight Git tree inventory verified all eight trees and exact blob sizes/counts; test pending https://github.com/sguzman/vulpra/actions/runs/40599356576"
+      ],
+      "trial": {
+        "status": "in_progress",
+        "workflow": ".github/workflows/m3-secondary-mobile-native.yml",
+        "ci_run_id": 40599356576,
+        "source_commit": "28fe67e3ef678c951fcc0f3b83080ec8e6d9a8b8",
+        "total_git_files": 280,
+        "total_git_blob_bytes": 7704040,
+        "protected": [
+          "mobile/android/geckoview/build.gradle",
+          "mobile/android/moz.build",
+          "mobile/shared/moz.build",
+          "widget/android/moz.build",
+          "widget/gtk/moz.build",
+          "toolkit/library/rust/shared/Cargo.toml"
+        ],
+        "committed_to_main": false
+      }
     }
   ],
   "observed_native_config": {
