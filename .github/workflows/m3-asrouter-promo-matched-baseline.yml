@@ -1,0 +1,214 @@
+name: M3 Compare Accepted ASRouter Promotion Package Sizes
+
+on:
+  workflow_run:
+    workflows: ["M3 Native ASRouter Promotion Opt-out Acceptance"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vulpra-m3-promo-matched-baseline
+  cancel-in-progress: false
+
+jobs:
+  build-source-matched-full:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
+      CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
+      MOZ_HEADLESS: "1"
+      DEBIAN_FRONTEND: noninteractive
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
+    steps:
+      - name: Checkout exact successful candidate source, not latest main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - name: Require source match and identical non-promo compiler options
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          bash ci/tests/m3-asrouter-promos-optout-test.sh "$GITHUB_WORKSPACE"
+          test "${VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS:-}" = ""
+          echo 'PASS: exact accepted candidate commit, original promo modules enabled for baseline'
+
+      - name: Download and validate the passing native candidate evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/promo-candidate"
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-asrouter-promos-native-evidence \
+            --dir "$RUNNER_TEMP/promo-candidate"
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"promo-candidate"
+          reports=list(root.rglob("m3-asrouter-promo-package.json"))
+          archives=list(root.rglob("vulpra-local-asrouter-promos-ci.tar.xz"))
+          assert len(reports)==1 and len(archives)==1,(reports,archives)
+          report=json.loads(reports[0].read_text())
+          data=archives[0]
+          assert report["source_commit"] == os.environ["CANDIDATE_SHA"]
+          assert data.stat().st_size == report["compressed_bytes"]
+          assert hashlib.sha256(data.read_bytes()).hexdigest() == report["sha256"]
+          assert len(report["omitted_resources"])==2
+          (root/"candidate-byte-count.txt").write_text(str(report["compressed_bytes"])+"\n")
+          print("PASS: validated accepted source-pinned candidate and SHA256 from exact native run")
+          PY
+
+      - name: Prepare identical Mozilla compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Export Actions cache backend credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Bootstrap Linux native compiler
+        shell: bash
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends python3 python3-venv python3-dev git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+
+      - name: Verify full-promo baseline configure and protected feature set
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach configure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("obj-vulpra-linux-m3-baseline/config.statusd/substs")
+          def get(k):
+              p=root/k
+              return json.loads(p.read_text()) if p.exists() else None
+          assert get("VULPRA_NO_ASROUTER_PROMOS") in (False,None,0),get("VULPRA_NO_ASROUTER_PROMOS")
+          assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
+          assert get("MOZ_APP_BASENAME")=="Vulpra"
+          assert get("MOZ_DEVTOOLS")=="all"
+          for k in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC","MOZ_NORMANDY"):
+              assert str(get(k)) in ("1","True"),(k,get(k))
+          print("PASS: same protected browser; only promotion omission differs")
+          PY
+
+      - name: Reserve same 24 GiB swap and one Cargo job
+        shell: bash
+        run: |
+          set -euo pipefail
+          bytes=$((24*1024*1024*1024))
+          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( available > bytes + 8*1024*1024*1024 ))
+          sudo fallocate -l 24G /mnt/vulpra-m3-promo-baseline.swap
+          sudo chmod 0600 /mnt/vulpra-m3-promo-baseline.swap
+          sudo mkswap /mnt/vulpra-m3-promo-baseline.swap
+          sudo swapon /mnt/vulpra-m3-promo-baseline.swap
+          grep -Fq '/mnt/vulpra-m3-promo-baseline.swap' /proc/swaps
+
+      - name: Compile native source-matched full-promo browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-promo-full-build.log"
+
+      - name: Package the full baseline and compare actual tarball bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist=obj-vulpra-linux-m3-baseline/dist
+          mapfile -d '' -t archives < <(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print0)
+          [[ "${#archives[@]}" -eq 1 ]]
+          bash packaging/stage.sh "${archives[0]}" "$RUNNER_TEMP/vulpra-promo-full-baseline.tar.xz"
+          (cd "$RUNNER_TEMP" && sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256)
+          python3 - <<'PY'
+          import hashlib,io,json,os,tarfile,zipfile
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          archive=root/"vulpra-promo-full-baseline.tar.xz"
+          entries=set()
+          with tarfile.open(archive,"r:xz") as tar:
+              for item in tar:
+                  if item.isfile() and item.name.endswith("/omni.ja"):
+                      with zipfile.ZipFile(io.BytesIO(tar.extractfile(item).read())) as jar:
+                          entries.update(jar.namelist())
+          modules=("modules/asrouter/SidebarChatBotPromo.sys.mjs",
+                   "modules/asrouter/SmartWindowNewTabPromo.sys.mjs")
+          absent=[p for p in modules if not any(n.endswith(p) for n in entries)]
+          assert not absent, ("Full source-matched baseline omitted promotions",absent)
+          candidate=int((root/"promo-candidate"/"candidate-byte-count.txt").read_text())
+          full=archive.stat().st_size
+          report={"schema_version":1,"source_commit":os.environ["CANDIDATE_SHA"],
+                  "candidate_run":int(os.environ["NATIVE_RUN_ID"]),
+                  "matched_baseline_run":int(os.environ["GITHUB_RUN_ID"]),
+                  "full_compressed_bytes":full,
+                  "candidate_compressed_bytes":candidate,
+                  "saved_compressed_bytes":full-candidate,
+                  "reduction_percent":round((full-candidate)/full*100,5),
+                  "baseline_sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),
+                  "full_promo_resources_present":True,
+                  "requires_positive_bytes":True,
+                  "source_pinned":True,
+                  "real_runtime_accepted_by_candidate_run":True}
+          (root/"m3-promo-matched-size.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          assert full>candidate,("No demonstrated positive compressed-package saving",report)
+          print("PASS: strict positive source-matched Linux native package reduction")
+          PY
+
+      - name: Preserve baseline archive and strict paired-size evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-asrouter-promo-matched-baseline
+          path: |
+            ${{ runner.temp }}/vulpra-promo-full-baseline.tar.xz
+            ${{ runner.temp }}/vulpra-promo-full-baseline.tar.xz.sha256
+            ${{ runner.temp }}/m3-promo-matched-size.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Preserve bounded failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if test -f "$RUNNER_TEMP/m3-promo-full-build.log"; then
+            tail -n 4000 "$RUNNER_TEMP/m3-promo-full-build.log" > \
+              "$RUNNER_TEMP/m3-promo-full-build-failure-tail.log"
+          fi
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-asrouter-promo-baseline-failure-tail
+          path: ${{ runner.temp }}/m3-promo-full-build-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
