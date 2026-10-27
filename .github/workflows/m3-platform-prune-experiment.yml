@@ -42,15 +42,21 @@ jobs:
           import json,os,subprocess
           from pathlib import Path
           roots=["widget/windows", "browser/installer/windows", "widget/cocoa"]
-          names=subprocess.check_output(["git","ls-files","-z","--",*roots]).split(b"\0")
+          # Glean metrics index references these files for all desktop builds;
+          # they are generator metadata, not Windows/Cocoa implementation.
+          retained=["widget/cocoa/metrics.yaml","widget/windows/metrics.yaml"]
+          names=subprocess.check_output(["git","ls-files","-z","--",*roots]).split(b"\\0")
           paths=[Path(os.fsdecode(name)) for name in names if name]
-          if len(paths)<200:
-              # Do not silently call an incomplete checkout a verified prune.
-              raise RuntimeError(f"Too few platform source files to assess: {len(paths)}")
-          logical=sum(p.lstat().st_size for p in paths)
+          to_remove=[p for p in paths if p.as_posix() not in retained]
+          if len(to_remove)<200:
+              raise RuntimeError(f"Too few platform source files to assess: {len(to_remove)}")
+          if not all(Path(name).is_file() for name in retained):
+              raise RuntimeError("Required shared Glean metric inputs absent before prune")
+          logical=sum(p.lstat().st_size for p in to_remove)
           info={"schema_version":1,"scope":"ephemeral CI source-only platform prune",
                 "original_source_commit":os.environ["GITHUB_SHA"],
-                "excluded_roots":roots,"source_files_removed":len(paths),
+                "excluded_roots":roots,"source_files_removed":len(to_remove),
+                "required_shared_generator_files_retained":retained,
                 "removed_worktree_logical_bytes":logical,
                 "linux_binary_size_savings_verified":False,
                 "source_removal_committed_to_main":False,
@@ -60,12 +66,24 @@ jobs:
           print(json.dumps(info,indent=2))
           PY
           git rm -r -- widget/windows browser/installer/windows widget/cocoa >/dev/null
-          test ! -d widget/windows
-          test ! -d widget/cocoa
+          # Restore only the two files required by the desktop Glean generator.
+          git restore --source=HEAD --staged --worktree -- \
+            widget/cocoa/metrics.yaml widget/windows/metrics.yaml
           test ! -d browser/installer/windows
           test -d widget/gtk
           test -d toolkit/mozapps/extensions
-          echo "PASS: ephemeral platform-only deletion, GTK and WebExtensions preserved"
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          expected={"widget/cocoa/metrics.yaml","widget/windows/metrics.yaml"}
+          survivors={str(p) for root in ("widget/cocoa","widget/windows")
+                     for p in Path(root).rglob("*") if p.is_file()}
+          assert survivors == expected, (survivors - expected, expected - survivors)
+          deleted=subprocess.check_output(["git","diff","--cached","--name-only","--diff-filter=D"],text=True).splitlines()
+          assert not any(p in expected for p in deleted)
+          print(f"PASS: {len(deleted)} platform files pruned; two necessary Glean metadata inputs retained")
+          PY
+          echo "PASS: platform implementations excluded without removing shared Glean generator inputs"
 
       # The shared M3 mozconfig uses --with-ccache=sccache. Explicitly
       # initialize GitHub cache backend credentials before mach configure;
@@ -199,7 +217,7 @@ jobs:
             echo
             echo "Run: https://github.com/sguzman/vulpra/actions/runs/$GITHUB_RUN_ID"
             echo "Status: **$EXPERIMENT_STATUS**"
-            echo 'Scope: widget/windows, browser/installer/windows, widget/cocoa absent from ephemeral Linux checkout.'
+            echo 'Scope: Windows/Cocoa implementations pruned in ephemeral Linux checkout; two shared Glean metric YAML inputs retained.'
             echo 'Compiler, full native browser, packaging, real Wayland/JS/WebExtension/Nimbus suite required.'
             echo 'No deletion committed to main; no binary-size improvement or M3 acceptance credited from this workflow alone.'
           } > "$RUNNER_TEMP/m3-platform-prune-comment.md"
