@@ -97,7 +97,7 @@ jobs:
                   "total_git_blob_bytes":sum(x["git_blob_bytes"] for x in stats.values()),
                   "protected_paths":[
                       "mobile/shared/moz.build","mobile/android/moz.build",
-                      "mobile/android/geckoview/moz.build",
+                      "mobile/android/geckoview/build.gradle",
                       "widget/android/moz.build","widget/gtk/moz.build",
                       "browser/app.mozbuild","toolkit/library/rust/shared/Cargo.toml"]}
           out=Path(os.environ["RUNNER_TEMP"])/"m3-mobile-leaves-source-prune.json"
@@ -114,7 +114,7 @@ jobs:
             test ! -e "$path"
           done
           for path in mobile/shared/moz.build mobile/android/moz.build \
-                      mobile/android/geckoview/moz.build widget/android/moz.build \
+                      mobile/android/geckoview/build.gradle widget/android/moz.build \
                       widget/gtk/moz.build browser/app.mozbuild \
                       toolkit/library/rust/shared/Cargo.toml; do
             test -f "$path"
