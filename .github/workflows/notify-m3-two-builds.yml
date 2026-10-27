@@ -1,0 +1,68 @@
+name: Notify When Both M3 Native Builds Finish
+
+on:
+  workflow_run:
+    workflows:
+      - M3 Build Isolated Normandy-Free Linux Candidate
+      - M3 Prebuild Source-Matched Full Normandy Baseline
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+# Prevent two near-simultaneous completions from posting duplicate comments.
+concurrency:
+  group: vulpra-m3-two-native-builds-finished
+  cancel-in-progress: false
+
+jobs:
+  notify-once:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      (github.event.workflow_run.id == 40392545095 ||
+       github.event.workflow_run.id == 40412644709)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LEAN_RUN_ID: "40392545095"
+      FULL_RUN_ID: "40412644709"
+    steps:
+      - name: Mention owner on M3 issue once BOTH pinned runs have finished
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # This is completion notification, not an M3 pass gate:
+          # failure, cancellation and timeout must also be reported.
+          lean_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LEAN_RUN_ID" --jq .status)"
+          full_status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FULL_RUN_ID" --jq .status)"
+          if [[ "$lean_status" != completed || "$full_status" != completed ]]; then
+            echo "Still compiling: lean=$lean_status full=$full_status. No notification."
+            exit 0
+          fi
+          lean_result="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LEAN_RUN_ID" --jq .conclusion)"
+          full_result="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FULL_RUN_ID" --jq .conclusion)"
+
+          marker='<!-- vulpra-m3-both-native-builds-finished-40392545095-40412644709 -->'
+          if gh api --paginate "repos/$GITHUB_REPOSITORY/issues/1/comments?per_page=100"               --jq '.[].body' | grep -Fq -- "$marker"; then
+            echo "Completion notification already posted. No duplicate."
+            exit 0
+          fi
+
+          {
+            echo "$marker"
+            echo "## Vulpra M3: both native builds have finished"
+            echo
+            echo "@sguzman Both source-matched GitHub Actions compilations are now **completed**:"
+            echo
+            echo "- [Normandy-free candidate, run $LEAN_RUN_ID](https://github.com/$GITHUB_REPOSITORY/actions/runs/$LEAN_RUN_ID): **$lean_result**"
+            echo "- [Original full-Normandy baseline, run $FULL_RUN_ID](https://github.com/$GITHUB_REPOSITORY/actions/runs/$FULL_RUN_ID): **$full_result**"
+            echo
+            echo "This alert confirms completion only, including failures/cancellations. It does **not** claim passing packaged runtime checks or positive package-size savings."
+            echo "The M3 acceptance ledger must remain evidence-backed."
+          } > "$RUNNER_TEMP/vulpra-m3-native-build-notification.md"
+          gh issue comment 1 --repo "$GITHUB_REPOSITORY"             --body-file "$RUNNER_TEMP/vulpra-m3-native-build-notification.md"
+          echo "PASS: one GitHub issue mention immediately after the second build completion event."
