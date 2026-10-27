@@ -152,7 +152,8 @@
         "2026-10-27: FIRST ACCEPTED real packaged removal after diagnosed screenshot timing race. Native lean build https://github.com/sguzman/vulpra/actions/runs/40431768974 and full baseline https://github.com/sguzman/vulpra/actions/runs/40431769117 both PASS and uploaded independently packaged same-source artifacts (674db8e385c36aec23e78bbe059b2a1fec194fae). Corrected real browser validation https://github.com/sguzman/vulpra/actions/runs/40439671494 PASS: Weston Wayland attached+committed real frame, checksum, screenshot, isolated Firefox profile, real WebDriver JS redirect /start -> /js-run -> /page and final DOM, temporary WebExtension content/background/storage/uninstall, Nimbus manager.store.ready() and ExperimentAPI.ready(). Matched package comparison https://github.com/sguzman/vulpra/actions/runs/40439793884 PASS: full 86,937,548 compressed bytes vs lean 86,909,928; positive saving EXACTLY 27,620 bytes (0.032%). Normandy runner resource absent in lean, shared Nimbus helper modules present. Previous screenshot race is harness artifact, not evidence of browser break. M3 1/6 roadmap acceptance gates (17%); overall floor((100+17+0)/3) =39%. No full M3 finish claimed.",
         "2026-10-27: Proven source-only Windows/Cocoa reduction: 453 Git-tracked files/6,266,676 Git blob bytes were pruned in isolated CI (40519242468). Linux GTK protected configure PASS, complete native browser compile PASS, staged package SHA PASS, Weston Wayland attach/commit PASS, localhost screenshot PNG/profile PASS, real JS navigation -> HTTP 302 -> final DOM PASS, unsigned WebExtension install/content/background/storage/uninstall PASS, Nimbus ExperimentStore/API ready PASS. Eight necessary cross-platform Glean/locale/Cargo files retained. Atomic main source deletion commit 81d9b335b747c377b730a0c3a4de9ea1cf522fe5 verified to retain exactly 8 scoped files. No measured binary-size reduction or broad telemetry removal. Initial non-Linux platform subset phase gate accepted; other platform paths still need auditing.",
         "2026-10-27: SECOND ACCEPTED selective opt-in packaged binary removal: ASRouter SidebarChatBotPromo.sys.mjs and SmartWindowNewTabPromo.sys.mjs gated only by VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS, with immutable AppConstants protection; default still retains them. Native candidate source commit 1683ca67b69389a879717bcd537772c3b40624b6 compiled, packaged, checksum verified, physically omitted exactly two promotion resources while retaining ASRouter/telemetry/onboarding; real Weston Wayland, JS navigation/DOM/PNG, temporary WebExtensions, Nimbus readiness, two guarded template routes, Firefox profile isolation ALL PASS: https://github.com/sguzman/vulpra/actions/runs/40547968387. Source-pinned baseline failed once because the configure assertion rejected an empty-string disabled flag (40563942562), not a browser compile issue. Corrected matched comparison https://github.com/sguzman/vulpra/actions/runs/40567473401 succeeded: full 86,930,792 bytes; opt-in lean 86,927,608 bytes; net SAVING 3,184 compressed bytes (0.00366%). This is separate from 27,620-byte Normandy saving and 6,266,676 source-only widget/installer bytes, with no deduplicated combined binary comparison claimed. M3 remains 2/6 (33%), overall 44%, since promotional feature audit covers additional unreviewed integrations.",
-        "2026-10-27: M3 Android application source-only pruning TRIAL, no deletion committed and no gate credit. Full pinned-source CI disposable checkout staged exactly three Android-only roots: mobile/android/fenix (3,881 tracked files, 61,071,734 Git blob bytes), mobile/android/focus-android (743 files, 9,353,910 bytes), mobile/android/android-components (9,510 files, 45,571,225 bytes). Total 14,134 files/115,996,869 Git blob bytes. mobile/shared, widget/android, mobile/android/moz.build and key Linux build manifests protected. Preliminary test 40584407127 verified counts and 685 external literal reference lines before cancellation due workflow correction. First completed preflight run 40584538820 staged all deletions but its native configure failed before compilation: bootstrap on dirty checkout selected system Clang 18, rejected by Firefox >=19; this is a tooling/setup failure, not proof of Android-source break. Workflow now bootstraps Mozilla Clang >=19 BEFORE staging deletion; replacement run https://github.com/sguzman/vulpra/actions/runs/40585240593 started. Native compile, runtime acceptance and reference classification pending. Permanent main source deletion ZERO. M3 still 2/6 gates (33%); overall 44%."
+        "2026-10-27: M3 Android application source-only pruning TRIAL, no deletion committed and no gate credit. Full pinned-source CI disposable checkout staged exactly three Android-only roots: mobile/android/fenix (3,881 tracked files, 61,071,734 Git blob bytes), mobile/android/focus-android (743 files, 9,353,910 bytes), mobile/android/android-components (9,510 files, 45,571,225 bytes). Total 14,134 files/115,996,869 Git blob bytes. mobile/shared, widget/android, mobile/android/moz.build and key Linux build manifests protected. Preliminary test 40584407127 verified counts and 685 external literal reference lines before cancellation due workflow correction. First completed preflight run 40584538820 staged all deletions but its native configure failed before compilation: bootstrap on dirty checkout selected system Clang 18, rejected by Firefox >=19; this is a tooling/setup failure, not proof of Android-source break. Workflow now bootstraps Mozilla Clang >=19 BEFORE staging deletion; replacement run https://github.com/sguzman/vulpra/actions/runs/40585240593 started. Native compile, runtime acceptance and reference classification pending. Permanent main source deletion ZERO. M3 still 2/6 gates (33%); overall 44%.",
+        "2026-10-27: LARGE ACCEPTED source-only Linux-unselected Android app prune. In isolated CI full browser test https://github.com/sguzman/vulpra/actions/runs/40585240593, removed Fenix (3,881 files / 61,071,734 Git blob B), Focus Android (743 / 9,353,910 B), Android Components (9,510 / 45,571,225 B): total 14,134 files / 115,996,869 Git blob B; native Clang >=19 configuration, real GTK Wayland/sandbox/Sync/Normandy/DevTools, complete C++/Rust build, package and SHA-256, real Weston Wayland frame, JS 302 -> DOM/PNG, WebExtensions full lifecycle, Nimbus ready, Firefox profile isolation all PASS. The one failed earlier run 40584538820 was caused by running bootstrap on a dirty staged deletion tree and selecting unsupported system Clang 18; rerun bootstrapped Clang before deletion. External literal path reference audit: 685 lines, largely Android-only Gradle/taskgraph/build tooling, lint excludes, Android suite definitions and comments. Desktop native tested; Android Gradle and Android Taskcluster workflows are knowingly out-of-scope and broken by this source-only prune. Git commit https://github.com/sguzman/vulpra/commit/546755376021d230bb12ab2f904129a7d6f80973 removed only the three subtree entries, preserved mobile/shared, GeckoView, Android widget and shared build manifests. No extra M3 roadmap gate credited, because remaining testing/locales/mobile dependency audit is incomplete; 2/6 gates 33%, overall 44%."
       ],
       "verified_preparatory_tasks": [
         {
@@ -206,7 +207,7 @@
           "evidence": "Corrected original JAR manifest conditional, GTK-only NimbusBootstrap and ShieldFrame guard; Ubuntu configure and static invariants passed https://github.com/sguzman/vulpra/actions/runs/40384311987. No native compiled binary or feature-off package/runtime."
         }
       ],
-      "status_note": "Two M3 roadmap acceptance gates satisfied: tested before/after selective removal plus bounded non-Linux source prune. Opt-in Normandy runner native package saved 27,620 compressed bytes (0.032%) under source-matched Ubuntu. Additional accepted opt-in two-module ASRouter AI promotion removal saved 3,184 compressed bytes (0.00366%) under separately source-matched Ubuntu, runtime+Wayland/JS/WebExtensions/Nimbus passed (40547968387, 40567473401). These variant savings are NOT additive without one combined source-matched package trial. Source-only Windows/Cocoa widget and installer pruning: 453 files / 6,266,676 Git blob bytes removed after full runtime acceptance 40519242468; no compiled binary saving claimed. Default build still bundles opt-in feature candidates; core browser, extensions, Sync, telemetry and security paths retained. Remaining 4/6 roadmap gates unresolved, M3 33%, overall 44%; no claim that Pocket, promo, reporting, mobile/test/localization audits are complete.",
+      "status_note": "M3 source-only pruning accepted: Windows/Cocoa/Windows installer subset 453 files / 6,266,676 Git blob bytes (commit 81d9b335, CI 40519242468), plus three Android-only app roots 14,134 files / 115,996,869 Git blob bytes (commit 54675537, native runtime CI 40585240593). Total permanently removed = 14,587 source files / 122,263,545 Git blob bytes; binary reduction NOT claimed for these sources. Independent opt-in native packaged Normandy runner saving 27,620 bytes (0.032%) and two ASRouter AI promos saving 3,184 bytes (0.00366%) were separately validated, NOT combined and not default configuration. Android Gradle/app CI tooling referencing removed roots intentionally unsupported; mobile/shared, GeckoView, widget/android still present. Remaining 4/6 M3 full-stage audits open (feature dependencies/classification, marketing/Pocket/Sync/reporting, other mobile/test/localization); M3 33%, overall 44%.",
       "acceptance_gates": {
         "passed": 2,
         "total": 6,
@@ -325,6 +326,49 @@
             "3,184 bytes is a very small package reduction, not broader removal of promotional messaging/telemetry/Pocket/Sync",
             "source-matched comparison positive but no cross-build reproducibility characterization",
             "M3 promotion/Sync/Pocket/reporting inventory gate remains open"
+          ]
+        },
+        {
+          "id": "android-app-source-tree",
+          "status": "accepted_source_only",
+          "selected_roots": [
+            "mobile/android/fenix",
+            "mobile/android/focus-android",
+            "mobile/android/android-components"
+          ],
+          "removed_paths": 14134,
+          "removed_git_blob_bytes": 115996869,
+          "native_trial_source_commit": "0e5feb7092bdc9b5ec9d1d8d210aa30957d1f850",
+          "candidate_run": 40585240593,
+          "accepted_source_commit": "546755376021d230bb12ab2f904129a7d6f80973",
+          "native_trial_package_compressed_bytes": 87164700,
+          "protected_paths": [
+            "mobile/shared",
+            "mobile/android/moz.build",
+            "mobile/android/geckoview",
+            "mobile/android/components",
+            "widget/android",
+            "browser/app.mozbuild"
+          ],
+          "checks": [
+            "exact three subtree paths staged with git rm in isolated Ubuntu CI checkout, 14,134 source blobs counted",
+            "Mozilla Clang >=19 and real Linux GTK/Wayland/Sandbox/Sync/Normandy/DevTools configure passed",
+            "full native C++/Rust browser compiled and packaged from pruned source",
+            "isolated staged package SHA-256 checked",
+            "actual private Weston Wayland framebuffer attachment and commit",
+            "real localhost screenshot complete PNG and WebDriver JavaScript 302 redirect to final DOM",
+            "temporary WebExtension unsigned installation/content/background/storage/uninstall",
+            "Nimbus ExperimentStore and ExperimentAPI ready",
+            "pre-existing Firefox profile preserved; temporary HOME",
+            "accepted Git commit changed only the three Android app directory tree entries; all other tree entries retain exact SHA"
+          ],
+          "binary_savings_bytes": null,
+          "limitations": [
+            "Git source blob accounting only; desktop binary saving not measured or expected for Android app-only roots",
+            "Android Gradle, app, and associated Android Taskcluster workflows still contain references to removed directories and are now out of scope",
+            "additional Android widget/GeckoView/common mobile code retained because of cross-platform interfaces and unknown dependencies",
+            "target is Linux-first Vulpra; acceptance does not prove Android build or every developer task",
+            "broad M3 test/localization/mobile-source audit gate remains open"
           ]
         }
       ]

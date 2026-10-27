@@ -107,7 +107,7 @@
     },
     {
       "id": "android_mobile",
-      "decision": "review",
+      "decision": "accepted_bounded_source_only_prune",
       "surface": "source_only",
       "paths": [
         "mobile/android/",
@@ -120,9 +120,9 @@
         "mobile/android/moz.build: Android app and GeckoView generated files",
         "widget/moz.build: toolkit selector"
       ],
-      "next": "Wait for clean-bootstrap Clang>=19 native acceptance run 40585240593. Then evaluate 685 audited external references, especially Gradle Android-only entrypoints and remaining test tooling, before permanent 14,134-file source deletion. No M3 credit meanwhile.",
+      "next": "Three unsupported Android app roots permanently pruned after isolated native GTK/Wayland and full runtime acceptance. Preserve mobile/shared, GeckoView and widget/android; remaining Android, test, build-tool and locale dependencies require separate audit. Android Gradle and Android Taskcluster app jobs are out of scope.",
       "staged_app_source_trial": {
-        "status": "prune_staged_only_in_throwaway_runner; native acceptance in progress",
+        "status": "accepted_source_only_prune_committed_to_main",
         "run_id": 40585240593,
         "preliminary_run_id": 40584407127,
         "preliminary_run_conclusion": "cancelled on workflow correction after source staging preflight passed; no native credit",
@@ -149,9 +149,9 @@
         "outside_selected_roots_literal_reference_lines": 685,
         "retained_mobile_shared": "mobile/shared/",
         "retained_widget_android": "widget/android/",
-        "source_only": "Source Git blob bytes only; no compressed package saving claimed or expected",
-        "acceptance": "Requires completed real native Linux configure/build/package/Wayland/JS/WebExtensions/Nimbus/profile smoke and classification of external references before any permanent deletion",
-        "permanent_main_deleted_files": 0,
+        "source_only": "14,134 original Git blob files / 115,996,869 B removed from Git main tree; NO claimed compiled-package or runtime memory saving",
+        "acceptance": "native Linux build, staged checksum, Weston Wayland, localhost JS/PNG/WebExtensions, Nimbus and Firefox-profile isolation PASSED; permanent commit exactly matches tested subtree deletion set",
+        "permanent_main_deleted_files": 14134,
         "preliminary_compiler_failure_run_id": 40584538820,
         "preliminary_compiler_failure": "Mozilla's supported compiler was not installed when bootstrap ran after staging deletions; system /usr/bin/clang 18.1.3 cannot configure Firefox 159 (requires >=19). Retried bootstrap on CLEAN checkout before staged deletes.",
         "external_reference_review": {
@@ -176,7 +176,12 @@
           ],
           "observed_desktop_caller": "browser/extensions/webcompat/moz.build contains only a COMMENT citing Android Components webcompat file, not an active source dependency",
           "incomplete_proof": "Literal source matches do not establish full build reachability; full native Linux rebuild and functional smoke are mandatory; independent tests for Android toolchain are explicitly out of scope"
-        }
+        },
+        "permanent_main_deleted_git_blob_bytes": 115996869,
+        "accepted_main_commit": "546755376021d230bb12ab2f904129a7d6f80973",
+        "accepted_ci_run": 40585240593,
+        "android_only_workflows": "intentionally unsupported: Android Gradle modules, related Taskcluster Android pipelines and Android app-specific lint/test targets still reference omitted roots",
+        "remaining_open": "Unpruned widget/android, mobile/shared, GeckoView, other mobile directory trees; test infrastructure and localization audit incomplete"
       }
     },
     {

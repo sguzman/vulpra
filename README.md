@@ -2,7 +2,7 @@
 
 **Vulpra** is a personal, Linux-first Firefox-derived browser project. It targets x86-64 Linux with native Wayland/Hyprland use. It is independent of Mozilla and is not an official Firefox product.
 
-> **Status (2026-10-27):** 🦊 **M2 working Linux browser 100% (5/5 gates); M3 debloating 33% (2/6 gates).** Vulpra 159.0b5 compiled and passed packaged Wayland, JavaScript/HTTP, temporary WebExtension and profile-isolation acceptance. M3 has two independently **measured opt-in Linux package reductions** (Normandy runner: 27,620 compressed bytes, 0.032%; ASRouter two AI promo modules: 3,184 compressed bytes, 0.00366%; both with native/runtime and source-matched comparison evidence; not additive without a combined build) and one **source-only deletion** (453 unselected Windows/Cocoa files, 6,266,676 Git blob bytes, native/runtime CI verified). Eight shared generator/Cargo files remain. **The personal browser baseline works; these changes do not establish a finished public release, full telemetry removal, automatic updater, broader security audit or Rust-only browser.**
+> **Status (2026-10-27):** 🦊 **M2 working Linux browser 100% (5/5 gates); M3 debloating 33% (2/6 gates).** Vulpra 159.0b5 compiled and passed packaged Wayland, JavaScript/HTTP, temporary WebExtension and profile-isolation acceptance. M3 has two independently **measured opt-in Linux package reductions** (Normandy runner: 27,620 compressed bytes, 0.032%; ASRouter two AI promo modules: 3,184 compressed bytes, 0.00366%; both with native/runtime and source-matched comparison evidence; not additive without a combined build) and two **source-only pruning passes** (453 Windows/Cocoa files / 6,266,676 Git blob bytes and 14,134 Android-only app files / 115,996,869 Git blob bytes; total **14,587 files / 122,263,545 original Git blob bytes**, both with native/runtime CI verification). Shared GeckoView/Android widget and generator/Cargo dependencies remain; unsupported Android Gradle/app Taskcluster jobs still reference removed app roots. **The personal browser baseline works; these changes do not establish a finished public release, full telemetry removal, automatic updater, broader security audit or Rust-only browser.**
 
 ## Direction
 
@@ -18,7 +18,7 @@ Avoid deleting security foundations, extension support, essential web standards 
 
 - ✅ **M1 — Source foundation: 100%**
 - ✅ **M2 — Working Linux browser: 100%**, five actual acceptance gates complete on the target machine
-- ✂️ **M3 — Personal debloating: 33% (2/6 gates)**, opt-in Normandy and two-module ASRouter package reductions plus Windows/Cocoa source-only prune verified; more feature/platform/privacy work remains
+- ✂️ **M3 — Personal debloating: 33% (2/6 gates)**, opt-in Normandy and two-module ASRouter package reductions plus Windows/Cocoa and Android-only application source pruning verified; more feature/platform/privacy and test/localization work remains
 - 🦀 **M4 — Defect fixes / Rust trajectory: 0%**, pending M3
 
 **Overall product roadmap: 44%** (equal-weight M2–M4; source scaffolding M1 excluded). Percentages are updated only for tested completion, not for roadmap or tooling preparation. Packaged size, source footprint, browser memory and startup measurements have separate provenance and must not be conflated. Upstream security maintenance and independent icon/trademark review remain necessary before distribution.
