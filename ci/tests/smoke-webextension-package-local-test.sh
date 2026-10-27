@@ -229,5 +229,45 @@ with tempfile.TemporaryDirectory(prefix="vulpra-addon-tests-") as root:
     finally:
         m.request = original_request
     print("PASS: opt-in Nimbus privileged readiness guard, context reset and timeout refusal")
+    # The promo opt-out probe must inspect the immutable compiled guard and
+    # route both live message templates, then restore content context even
+    # when one of the required checks fails.
+    calls = []
+    original_request = m.request
+    def promo_mock(port, method, route, payload=None, timeout_seconds=12):
+        calls.append((method, route, payload))
+        if route.endswith("/moz/context"):
+            return None
+        if route.endswith("/execute/sync"):
+            source = payload["script"]
+            assert "AppConstants.VULPRA_NO_ASROUTER_PROMOS" in source
+            assert "ASRouter.routeCFRMessage" in source
+            assert '"sidebar_chatbot_promo"' in source
+            assert '"smart_window_newtab_promo"' in source
+            return {"status":"pass","compile_guard":True,"templates":2}
+        raise AssertionError(route)
+    try:
+        m.request = promo_mock
+        assert m.verify_asrouter_promo_optout(2011,"/session/mock")["templates"] == 2
+        assert calls[0][2] == {"context":"chrome"}
+        assert calls[-1][2] == {"context":"content"}
+        calls.clear()
+        def promo_failure(port, method, route, payload=None, timeout_seconds=12):
+            calls.append((method, route, payload))
+            if route.endswith("/execute/sync"):
+                return {"status":"wrong-build-flag"}
+            return None
+        m.request = promo_failure
+        try:
+            m.verify_asrouter_promo_optout(2011,"/session/mock")
+        except RuntimeError as err:
+            assert "promotion opt-out dispatch failed" in str(err)
+        else:
+            raise AssertionError("Accepted runtime with missing immutable opt-out guard")
+        assert calls[-1][2] == {"context":"content"}
+    finally:
+        m.request = original_request
+    print("PASS: M3 packaged promo dispatch, immutable flag and context reset")
+
 print("PASS: WebExtension offline regression suite")
 PY
