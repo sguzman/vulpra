@@ -2,7 +2,7 @@
 
 **Vulpra** is a personal, Linux-first Firefox-derived browser project. It targets x86-64 Linux with native Wayland/Hyprland use. It is independent of Mozilla and is not an official Firefox product.
 
-> **Status (2026-10-26):** 🦊 **M2 working Linux browser 100% (5/5 gates)**. Native Vulpra 159.0b5 compiled successfully on the target EndeavourOS workstation and passed package/checksum, independent profile, headless rendering, Weston Wayland graphics, JavaScript/HTTP navigation, a recorded initial baseline and temporary WebExtension lifecycle (install/content/background/storage/uninstall) acceptance. **The personal baseline works; this is not yet a public distributable release, comprehensive security audit, automatic updater, debloated browser or Rust-only implementation.**
+> **Status (2026-10-27):** 🦊 **M2 working Linux browser 100% (5/5 gates); M3 debloating 33% (2/6 gates).** Vulpra 159.0b5 compiled and passed packaged Wayland, JavaScript/HTTP, temporary WebExtension and profile-isolation acceptance. M3 has one **measured opt-in Linux package reduction** (Normandy runner: 27,620 compressed bytes, 0.032%, with native/runtime and matched-build evidence) and one **source-only deletion** (453 unselected Windows/Cocoa files, 6,266,676 Git blob bytes, native/runtime CI verified). Eight shared generator/Cargo files remain. **The personal browser baseline works; these changes do not establish a finished public release, full telemetry removal, automatic updater, broader security audit or Rust-only browser.**
 
 ## Direction
 
@@ -18,10 +18,10 @@ Avoid deleting security foundations, extension support, essential web standards 
 
 - ✅ **M1 — Source foundation: 100%**
 - ✅ **M2 — Working Linux browser: 100%**, five actual acceptance gates complete on the target machine
-- 🔍 **M3 — Personal debloating: 0%**, read-only source inventory and candidate classification prepared, no removal credited
+- ✂️ **M3 — Personal debloating: 33% (2/6 gates)**, opt-in Normandy native package reduction and Windows/Cocoa source-only prune verified; more feature/platform/privacy work remains
 - 🦀 **M4 — Defect fixes / Rust trajectory: 0%**, pending M3
 
-**Overall product roadmap: 33%** (equal-weight M2–M4; source scaffolding M1 excluded). Percentages are updated only for tested completion, not for roadmap or tooling preparation. Packaged size, source footprint, browser memory and startup measurements have separate provenance and must not be conflated. Upstream security maintenance and independent icon/trademark review remain necessary before distribution.
+**Overall product roadmap: 44%** (equal-weight M2–M4; source scaffolding M1 excluded). Percentages are updated only for tested completion, not for roadmap or tooling preparation. Packaged size, source footprint, browser memory and startup measurements have separate provenance and must not be conflated. Upstream security maintenance and independent icon/trademark review remain necessary before distribution.
 
 ## Pinned source
 
