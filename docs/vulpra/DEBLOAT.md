@@ -1,6 +1,22 @@
 # Vulpra M3 — User-specific debloating
 
-**Status (2026-10-26):** M2 working personal Linux baseline verified on the target EndeavourOS workstation (5/5 native acceptance gates). M3 is open; **no removals or source-footprint comparison have been credited yet**.
+**Status (2026-10-27):** M2 working personal Linux baseline verified on the EndeavourOS workstation (5/5 native acceptance gates). M3 is open with **one accepted, measured native packaged reduction** (the opt-in Normandy runner); five other roadmap gates are still open. The saving is small and source-matched on Ubuntu CI, not a direct comparison to the workstation Arch package.
+
+## First accepted removal: Normandy recipe runner (2026-10-27)
+
+Two native Ubuntu 24.04 builds with the **same commit** `674db8e385c36aec23e78bbe059b2a1fec194fae` and identical non-Normandy compiler options both compiled and packaged successfully: [lean candidate](https://github.com/sguzman/vulpra/actions/runs/40431768974) and [full baseline](https://github.com/sguzman/vulpra/actions/runs/40431769117). The branded native ELF remains `vulpra`; the profile-isolating launcher is separately packaged as `vulpra-launch`. Both archives and SHA-256 attestations were uploaded as CI artifacts.
+
+[Real packaged runtime acceptance](https://github.com/sguzman/vulpra/actions/runs/40439671494) **passed**. The lean browser attached and committed Wayland frames under Weston, captured a full valid PNG, preserved the Firefox profile, navigated with real browser JavaScript to a localhost HTTP 302 and verified the final DOM through persistent WebDriver, installed and removed an unsigned temporary WebExtension with content/background/storage execution, and initialized Nimbus ExperimentStore and API. A previous runtime attempt incorrectly used a short-lived screenshot process to judge asynchronous navigation; the real WebDriver check resolves that test race without changing the compiled engine.
+
+[Matched artifact size comparison](https://github.com/sguzman/vulpra/actions/runs/40439793884) **passed**:
+
+| Linux native compressed package | Actual bytes |
+| --- | ---: |
+| Full Normandy | 86,937,548 |
+| Opt-in Normandy-free | 86,909,928 |
+| **Verified reduction** | **27,620 (0.032%)** |
+
+The lean package lacks `res/normandy/Normandy.sys.mjs` and retains required shared Nimbus/Normandy helpers. The result counts as **one** verified removal, not complete debloating, a comprehensive browser security audit, or an Arch-specific gain. No existing installed Firefox or M2 package was changed.
 
 ## First rule: preserve a known-good baseline
 

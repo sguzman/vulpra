@@ -29,7 +29,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 
 ## ✂️ M3 — User-specific debloating
 
-**Status: in progress, 0% accepted.** The native working-browser baseline has passed all five M2 gates. M3 only gains progress from measured source/dependency inventory, justified classification, and demonstrated non-regressive removals. No blind platform-directory deletions.
+**Status: in progress, 1/6 acceptance gates (17%) complete.** The native working-browser baseline has passed all five M2 gates. The first opt-in Normandy runner removal now passes real packaged runtime and matched-size acceptance (details below). The rest of M3 remains open; no blind platform-directory deletions.
 
 ### 🧭 Phase 1 — Evidence inventory
 - [ ] 🗺️ Map feature bundles, binary dependencies, build dependencies and platform-specific modules.
@@ -39,7 +39,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 - [ ] 🖥️ Audit and then prune non-Linux platform build/distribution material proven unnecessary.
 - [ ] 📣 Audit promotional UI, Pocket, account/Sync and telemetry paths against the user's use case.
 - [ ] 🌐 Audit mobile, test fixtures and optional packaged localizations without breaking required desktop functionality.
-- [ ] 🧪 Demonstrate each accepted removal with before/after measurements and passing targeted tests.
+- [x] 🧪 Demonstrate each **accepted** removal to date with before/after measurements and passing targeted tests. **One verified removal: opt-in Normandy runner**, full 86,937,548 B vs lean 86,909,928 B (27,620 B, 0.032%) under source-matched Ubuntu builds. Native runs [lean 40431768974](https://github.com/sguzman/vulpra/actions/runs/40431768974) and [full 40431769117](https://github.com/sguzman/vulpra/actions/runs/40431769117), real runtime [40439671494](https://github.com/sguzman/vulpra/actions/runs/40439671494), matched-size [40439793884](https://github.com/sguzman/vulpra/actions/runs/40439793884). This gate must be maintained for every future accepted candidate.
 
 ## 🐞 M4 — Actual defect fixes and personalization
 
