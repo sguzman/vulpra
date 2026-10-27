@@ -1,4 +1,4 @@
-# Vulpra M3 matched-toolchain BASELINE for paired lean-package comparison.
+# Vulpra M3 isolated opt-in ASRouter promotion module packaging experiment.
 # Never use the existing obj-vulpra-linux or overwrite the verified M2 package.
 mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux-m3-promos-experiment
 ac_add_options --with-branding=browser/branding/unofficial
@@ -8,4 +8,6 @@ ac_add_options --with-ccache=sccache
 # Candidate CI/native builds are memory-sensitive; prefer predictable success.
 mk_add_options MOZ_PARALLEL_BUILD=1
 
-# All protected baseline features remain enabled; only two ASRouter\n# AI promotion modules are excluded by the opt-in configure flag.\nexport VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS=1\n
+# All protected baseline features remain enabled; only two ASRouter
+# AI promotion modules are excluded by the opt-in configure flag.
+export VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS=1
