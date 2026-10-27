@@ -1,0 +1,257 @@
+name: M3 Native Linux Test of Staged Android App Source Prune
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-mobile-source-prune-experiment.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vulpra-m3-android-apps-native
+  cancel-in-progress: false
+
+jobs:
+  verify-pruned-linux-browser:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-mobile-experiment
+      DEBIAN_FRONTEND: noninteractive
+      MOZ_HEADLESS: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
+      VULPRA_M3_VERIFY_NIMBUS: "1"
+    steps:
+      - name: Checkout the entire pinned Linux browser source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Stage only three Android-only application directory removals
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          roots=["mobile/android/fenix","mobile/android/focus-android",
+                 "mobile/android/android-components"]
+          def git(*args):
+              return subprocess.check_output(["git",*args])
+          tracked=git("ls-tree","-r","-l","-z","HEAD","--",*roots)
+          stats={key:{"files":0,"git_blob_bytes":0} for key in roots}
+          for entry in tracked.split(b"\0"):
+              if not entry: continue
+              metadata,path=entry.split(b"\t",1)
+              name=path.decode("utf-8","surrogateescape")
+              root=next((r for r in roots if name.startswith(r+"/")),None)
+              assert root, name
+              kind=metadata.split()
+              assert kind[1]==b"blob",(name,kind)
+              stats[root]["files"]+=1
+              stats[root]["git_blob_bytes"]+=int(kind[3])
+          assert all(x["files"]>100 for x in stats.values()),stats
+          assert git("status","--porcelain")==b"","checkout was not clean"
+          report={"schema_version":1,"source_commit":os.environ["GITHUB_SHA"],
+                  "status":"uncommitted native trial; not an accepted deletion",
+                  "roots":stats,
+                  "total_files":sum(x["files"] for x in stats.values()),
+                  "total_git_blob_bytes":sum(x["git_blob_bytes"] for x in stats.values()),
+                  "protected_paths":[
+                      "mobile/shared/moz.build","mobile/android/moz.build",
+                      "widget/android/moz.build","browser/app.mozbuild",
+                      "toolkit/library/rust/shared/Cargo.toml"]}
+          out=Path(os.environ["RUNNER_TEMP"])/"m3-android-source-prune.json"
+          out.write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          PY
+          # Deletions live only in this throwaway runner, not on main.
+          git rm -r -q -- mobile/android/fenix mobile/android/focus-android \
+            mobile/android/android-components
+          for path in mobile/android/fenix mobile/android/focus-android \
+                      mobile/android/android-components; do
+            test ! -e "$path"
+          done
+          for path in mobile/shared/moz.build mobile/android/moz.build \
+                      widget/android/moz.build browser/app.mozbuild \
+                      toolkit/library/rust/shared/Cargo.toml; do
+            test -f "$path"
+            ! git diff --cached --name-only -- "$path" | grep -q .
+          done
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          report=json.loads((Path(os.environ["RUNNER_TEMP"])/"m3-android-source-prune.json").read_text())
+          deleted=subprocess.check_output(["git","diff","--cached","--name-only",
+             "--diff-filter=D","-z"]).split(b"\0")
+          deleted=[x.decode("utf-8","surrogateescape") for x in deleted if x]
+          roots=tuple(r+"/" for r in report["roots"])
+          assert len(deleted)==report["total_files"],(len(deleted),report["total_files"])
+          assert all(x.startswith(roots) for x in deleted),deleted[:10]
+          print(f"PASS: staged only {len(deleted)} deletions in disposable CI checkout")
+          PY
+          # External literal references require review, but do not by themselves
+          # prove a desktop active build dependency.
+          git grep -n -F -e 'mobile/android/fenix' -e 'mobile/android/focus-android' \
+            -e 'mobile/android/android-components' -- \
+            ':!mobile/android/**' ':!docs/**' \
+            > "$RUNNER_TEMP/m3-android-external-references.txt" || rc=$?
+          test "${rc:-0}" -le 1
+          echo "External literal references: $(wc -l < "$RUNNER_TEMP/m3-android-external-references.txt")"
+
+      - name: Prepare Mozilla compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Export GitHub Actions cache credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Bootstrap compiler and graphical test prerequisites
+        shell: bash
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends python3 python3-venv python3-dev \
+            git curl make jq weston wayland-utils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          ./mach --no-interactive bootstrap --application-choice browser
+
+      - name: Configure genuine GTK browser with protected features
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach configure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("obj-vulpra-linux-m3-mobile-experiment/config.statusd/substs")
+          def get(k):
+              p=root/k
+              return json.loads(p.read_text()) if p.exists() else None
+          assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
+          assert get("MOZ_APP_BASENAME")=="Vulpra"
+          assert get("MOZ_DEVTOOLS")=="all"
+          for k in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC","MOZ_NORMANDY"):
+              assert str(get(k)) in ("1","True"),(k,get(k))
+          assert get("VULPRA_NO_ASROUTER_PROMOS") in (False,None,0,"")
+          print("PASS: real desktop configure preserved security, graphics, Sync, Nimbus and ASRouter defaults")
+          PY
+
+      - name: Reserve 24 GiB swap and constrain Cargo concurrency
+        shell: bash
+        run: |
+          set -euo pipefail
+          bytes=$((24*1024*1024*1024))
+          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( available > bytes + 8*1024*1024*1024 ))
+          sudo fallocate -l 24G /mnt/vulpra-m3-mobile-apps.swap
+          sudo chmod 0600 /mnt/vulpra-m3-mobile-apps.swap
+          sudo mkswap /mnt/vulpra-m3-mobile-apps.swap
+          sudo swapon /mnt/vulpra-m3-mobile-apps.swap
+          grep -Fq '/mnt/vulpra-m3-mobile-apps.swap' /proc/swaps
+
+      - name: Compile native Linux browser with three Android app roots absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-android-apps-native-build.log"
+
+      - name: Package and SHA256-check the isolated native binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist=obj-vulpra-linux-m3-mobile-experiment/dist
+          mapfile -d '' -t archives < <(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print0)
+          [[ "${#archives[@]}" -eq 1 ]]
+          mkdir -p .git/vulpra-native-build/packages
+          bash packaging/stage.sh "${archives[0]}" \
+            "$GITHUB_WORKSPACE/.git/vulpra-native-build/packages/vulpra-local-m3-mobile-apps-ci.tar.xz"
+          (cd .git/vulpra-native-build/packages && \
+            sha256sum -c vulpra-local-m3-mobile-apps-ci.tar.xz.sha256)
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=Path(os.environ["RUNNER_TEMP"])/"m3-android-source-prune.json"
+          data=json.loads(r.read_text())
+          a=Path(".git/vulpra-native-build/packages/vulpra-local-m3-mobile-apps-ci.tar.xz")
+          data["experimental_compressed_package_bytes"]=a.stat().st_size
+          data["status"]="native package built; runtime not yet accepted"
+          r.write_text(json.dumps(data,indent=2)+"\n")
+          print("PASS: source-only pruning trial yielded real independently checksummed Linux package")
+          PY
+
+      - name: Exercise Weston Wayland JS WebExtensions Nimbus and profile isolation
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+          work="$(mktemp -d)"
+          trap 'rm -rf -- "$work"' EXIT
+          tar -xf .git/vulpra-native-build/packages/vulpra-local-m3-mobile-apps-ci.tar.xz -C "$work"
+          mapfile -d '' -t inis < <(find "$work" -maxdepth 5 -type f -name application.ini -print0)
+          [[ "${#inis[@]}" -eq 1 ]]
+          VULPRA_WAYLAND_TEST_SECONDS=12 bash packaging/test-wayland.sh "$(dirname "${inis[0]}")"
+          python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=Path(os.environ["RUNNER_TEMP"])/"m3-android-source-prune.json"
+          data=json.loads(r.read_text())
+          data["status"]="native and runtime accepted in disposable checkout; commit removal NOT performed"
+          data["tested"]["wayland"]=True if "tested" in data else True
+          data["tested"]={"wayland":True,"localhost_js":True,"webextensions":True,
+                          "nimbus":True,"profile_isolation":True}
+          r.write_text(json.dumps(data,indent=2)+"\n")
+          PY
+
+      - name: Preserve exact source and native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-android-apps-native-evidence
+          path: |
+            ${{ runner.temp }}/m3-android-source-prune.json
+            ${{ runner.temp }}/m3-android-external-references.txt
+            .git/vulpra-native-build/packages/vulpra-local-m3-mobile-apps-ci.tar.xz.sha256
+            .git/vulpra-native-build/m3-localhost-acceptance.json
+            .git/vulpra-native-build/webextension-smoke-*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Preserve bounded failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if test -f "$RUNNER_TEMP/m3-android-apps-native-build.log"; then
+            tail -n 3000 "$RUNNER_TEMP/m3-android-apps-native-build.log" > \
+              "$RUNNER_TEMP/m3-android-apps-build-failure-tail.log"
+          fi
+
+      - name: Upload bounded failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-android-apps-build-failure-tail
+          path: ${{ runner.temp }}/m3-android-apps-build-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
