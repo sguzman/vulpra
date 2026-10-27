@@ -437,9 +437,10 @@
         "browser/components/moz.build: unconditional dirs",
         "browser/components/newtab/moz.build: browsercomps resources and registrants",
         "browser/components/asrouter/moz.build: actors/modules",
-        "browser/components/aboutwelcome/moz.build: actors/modules"
+        "browser/components/aboutwelcome/moz.build: actors/modules",
+        "New isolated, not-yet-accepted native experiment: https://github.com/sguzman/vulpra/actions/runs/40547968387 (runtime and size acceptance pending)"
       ],
-      "next": "Trace per-component service dependencies and UI fallback before experimentation",
+      "next": "Await full native opt-in compile, packaged source-resource and live Wayland/JS/WebExtension/Nimbus/promo-dispatch tests; only upon success compare same-source full baseline compressed tarball and decide acceptance. No progress credit beforehand.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -452,6 +453,33 @@
           "browser/extensions/newtab/lib/PlacesFeed.sys.mjs"
         ],
         "removal_authorized": false
+      },
+      "promotion_optout_experiment": {
+        "status": "isolated_native_candidate_running; not accepted",
+        "feature": "two ASRouter AI promotion module resources; retains all core ASRouter, onboarding and telemetry modules",
+        "source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+        "native_run": 40547968387,
+        "opt_in_mozconfig": "ci/mozconfig-linux-m3-promos-experiment",
+        "build_flag": "VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS=1",
+        "immutable_guard": "toolkit/modules/AppConstants.sys.mjs VULPRA_NO_ASROUTER_PROMOS",
+        "omitted": [
+          "browser/components/asrouter/modules/SidebarChatBotPromo.sys.mjs",
+          "browser/components/asrouter/modules/SmartWindowNewTabPromo.sys.mjs"
+        ],
+        "protected_runtime": [
+          "GTK/Wayland",
+          "sandbox",
+          "Sync",
+          "Normandy/Nimbus",
+          "DevTools",
+          "JavaScript navigation",
+          "WebExtensions",
+          "Firefox profile isolation"
+        ],
+        "compared_archives": "Source-matched full-vs-opt-in binary comparison is conditional on candidate success; not yet measured",
+        "baseline_workflow": ".github/workflows/m3-asrouter-promo-matched-baseline.yml",
+        "acceptance": "pending complete native compilation, package, live behavior and strictly positive source-pinned bytes",
+        "removal_accepted": false
       }
     },
     {
