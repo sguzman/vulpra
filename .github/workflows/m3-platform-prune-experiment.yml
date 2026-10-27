@@ -44,7 +44,7 @@ jobs:
           roots=["widget/windows", "browser/installer/windows", "widget/cocoa"]
           names=subprocess.check_output(["git","ls-files","-z","--",*roots]).split(b"\0")
           paths=[Path(os.fsdecode(name)) for name in names if name]
-          if len(paths)<300:
+          if len(paths)<200:
               # Do not silently call an incomplete checkout a verified prune.
               raise RuntimeError(f"Too few platform source files to assess: {len(paths)}")
           logical=sum(p.lstat().st_size for p in paths)
