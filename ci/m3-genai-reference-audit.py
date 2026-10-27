@@ -18,12 +18,12 @@ PATTERNS = (
     r"moz-src:///browser/components/genai/",
     r"chrome://browser/content/genai/",
     r"browser/components/genai/",
-    r"GenAI\\.sys\\.mjs",
-    r"LinkPreview(Model|Parent|Child)?\\.sys\\.mjs",
-    r"PageAssist(Parent|Child)?\\.sys\\.mjs",
-    r"GenAI(Parent|Child)\\.sys\\.mjs",
-    r"LinkPreview\\.(init|uninit|enable|block)",
-    r"browser\\.ml\\.(chat|linkPreview)",
+    r"GenAI\.sys\.mjs",
+    r"LinkPreview(Model|Parent|Child)?\.sys\.mjs",
+    r"PageAssist(Parent|Child)?\.sys\.mjs",
+    r"GenAI(Parent|Child)\.sys\.mjs",
+    r"LinkPreview\.(init|uninit|enable|block)",
+    r"browser\.ml\.(chat|linkPreview)",
 )
 GROUPS = {
     "genai-owned": ("browser/components/genai/",),
@@ -33,12 +33,12 @@ GROUPS = {
 }
 
 def classify(path: str) -> str:
-    if path.startswith(GROUPS["genai-owned"]):
-        return "genai-owned"
     lower = path.lower()
     if (path.startswith(GROUPS["test-only"]) or "/test/" in path or
             "/tests/" in path):
         return "test-only"
+    if path.startswith(GROUPS["genai-owned"]):
+        return "genai-owned"
     if path.startswith(GROUPS["project-docs-tooling"]) or lower.endswith((".md", ".rst")):
         return "project-docs-tooling"
     if path.startswith(GROUPS["localization"]) or lower.endswith((".ftl", ".dtd")):
