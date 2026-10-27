@@ -254,6 +254,52 @@ def verify_nimbus_ready(port: int, base: str) -> dict:
     return {"store_ready": True, "api_ready": True, "access": "CI-only isolated chrome context"}
 
 
+def verify_asrouter_promo_optout(port: int, base: str) -> dict:
+    """Exercise the actual packaged ASRouter guard in disposable chrome context.
+
+    Resource omission is independently checked in the native package step.
+    This verifies a remote promo template cannot dereference either omitted
+    lazy module, while the retained ASRouter dispatcher still responds.
+    """
+    request(port, "POST", base + "/moz/context", {"context": "chrome"})
+    try:
+        result = request(port, "POST", base + "/execute/sync", {
+            "script": """
+                const { AppConstants } = ChromeUtils.importESModule(
+                    "resource://gre/modules/AppConstants.sys.mjs"
+                );
+                if (!AppConstants.VULPRA_NO_ASROUTER_PROMOS) {
+                    return {status: "wrong-build-flag"};
+                }
+                const { ASRouter } = ChromeUtils.importESModule(
+                    "resource:///modules/asrouter/ASRouter.sys.mjs"
+                );
+                const templates = [
+                    "sidebar_chatbot_promo", "smart_window_newtab_promo"
+                ];
+                for (const template of templates) {
+                    const message = {id: "vulpra-m3-" + template,
+                                     template, content: {}};
+                    const routed = ASRouter.routeCFRMessage(
+                        message, null, {id: "vulpra-m3-smoke"});
+                    if (routed.message?.template !== template) {
+                        return {status: "failed-dispatch", template};
+                    }
+                }
+                return {status: "pass", compile_guard: true,
+                        templates: templates.length};
+            """,
+            "args": [],
+        }, timeout_seconds=20)
+    finally:
+        request(port, "POST", base + "/moz/context", {"context": "content"})
+    if not isinstance(result, dict) or result.get("status") != "pass" or (
+        result.get("compile_guard") is not True or result.get("templates") != 2
+    ):
+        raise RuntimeError("ASRouter promotion opt-out dispatch failed: " + repr(result))
+    return result
+
+
 def verify_uninstall_stays_uninstalled(proof, seconds: float = 2.0) -> int:
     """Require the removed extension to stay absent across an observation window.
 
@@ -289,6 +335,7 @@ def main() -> int:
             "with: yay -S --needed geckodriver. No npm or pip required."
         )
     nimbus_check = os.environ.get("VULPRA_M3_VERIFY_NIMBUS", "0") == "1"
+    promo_check = os.environ.get("VULPRA_M3_VERIFY_NO_ASROUTER_PROMOS", "0") == "1"
     archive = verified_archive(repo)
     print(f"PASS: Verified existing archive {archive.name}", flush=True)
     logdir = repo / ".git/vulpra-native-build"
@@ -334,7 +381,7 @@ def main() -> int:
         try:
             with gecko_log.open("wb") as driver_log:
                 proc = subprocess.Popen([gecko, "--host", "127.0.0.1", "--port", str(port)] +
-                                        (["--allow-system-access"] if nimbus_check else []),
+                                        (["--allow-system-access"] if nimbus_check or promo_check else []),
                                         env=env, stdout=driver_log, stderr=subprocess.STDOUT,
                                         start_new_session=True)
                 wait_ready(port, proc)
@@ -396,6 +443,10 @@ def main() -> int:
                 if nimbus_check:
                     nimbus_result = verify_nimbus_ready(port, base)
                     print("PASS: Nimbus ExperimentStore and API initialized in real packaged browser", flush=True)
+                promo_result = None
+                if promo_check:
+                    promo_result = verify_asrouter_promo_optout(port, base)
+                    print("PASS: two omitted ASRouter promo template routes stayed harmless", flush=True)
                 if fake_firefox.read_bytes() != sentinel:
                     raise RuntimeError("Existing Firefox profile sentinel modified")
                 print("PASS: Temporary HOME and existing Firefox profile preserved", flush=True)
@@ -410,6 +461,7 @@ def main() -> int:
                                      "post_uninstall_samples": uninstall_samples},
                     "security": {"original_firefox_profile_preserved": True, "temporary_home": True},
                     "nimbus": nimbus_result,
+                    "asrouter_promotion_optout": promo_result,
                     "limits": ["Not a comprehensive security audit", "Does not test signed AMO extensions",
                                "Does not verify persisted extensions across restarts"],
                 }
