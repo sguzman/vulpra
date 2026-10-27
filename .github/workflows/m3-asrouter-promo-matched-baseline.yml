@@ -1,6 +1,11 @@
 name: M3 Compare Accepted ASRouter Promotion Package Sizes
 
 on:
+  # Explicit source-pinned repair attempt; ordinary pushes cannot start this.
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-asrouter-promo-matched-baseline.yml
   workflow_run:
     workflows: ["M3 Native ASRouter Promotion Opt-out Acceptance"]
     types: [completed]
@@ -18,15 +23,18 @@ jobs:
   build-source-matched-full:
     if: >-
       github.repository == 'sguzman/vulpra' &&
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'))
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     env:
-      NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
-      CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+      # Push-mode recovery retries the already successful native artifact.
+      # Both paths check out and compare its EXACT source commit, not HEAD.
+      NATIVE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '40547968387' }}
+      CANDIDATE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '1683ca67b69389a879717bcd537772c3b40624b6' }}
       MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
       MOZ_HEADLESS: "1"
       DEBIAN_FRONTEND: noninteractive
@@ -37,7 +45,7 @@ jobs:
       - name: Checkout exact successful candidate source, not latest main
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '1683ca67b69389a879717bcd537772c3b40624b6' }}
           fetch-depth: 1
 
       - name: Require source match and identical non-promo compiler options
@@ -110,7 +118,11 @@ jobs:
           def get(k):
               p=root/k
               return json.loads(p.read_text()) if p.exists() else None
-          assert get("VULPRA_NO_ASROUTER_PROMOS") in (False,None,0),get("VULPRA_NO_ASROUTER_PROMOS")
+          # Mozilla serializes absent/false configure substitutions as "".
+          # Failure 40563942562 was ONLY this over-strict assertion; native
+          # configure had already succeeded with all protected flags intact.
+          no_promo=get("VULPRA_NO_ASROUTER_PROMOS")
+          assert no_promo in (False, None, 0, ""),repr(no_promo)
           assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
           assert get("MOZ_APP_BASENAME")=="Vulpra"
           assert get("MOZ_DEVTOOLS")=="all"
