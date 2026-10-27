@@ -34,6 +34,38 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Prepare Mozilla compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Export GitHub Actions cache credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Bootstrap compiler and graphical test prerequisites
+        shell: bash
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends python3 python3-venv python3-dev \
+            git curl make jq weston wayland-utils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          # Install Mozilla's supported Clang before making staged source
+          # deletions. Bootstrap of a dirty working tree may skip toolchains.
+          ./mach --no-interactive bootstrap --application-choice browser
+          test -x "$HOME/.mozbuild/clang/bin/clang"
+          test -x "$HOME/.mozbuild/clang/bin/clang++"
+          "$HOME/.mozbuild/clang/bin/clang" --version
+          major="$("$HOME/.mozbuild/clang/bin/clang" --version | head -1 | sed -E 's/.*version ([0-9]+).*/\1/')"
+          [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 19 ))
+          echo "PASS: supported Mozilla Clang $major installed before source-only prune"
+
       - name: Stage only three Android-only application directory removals
         shell: bash
         run: |
@@ -105,30 +137,6 @@ jobs:
             > "$RUNNER_TEMP/m3-android-external-references.txt" || rc=$?
           test "${rc:-0}" -le 1
           echo "External literal references: $(wc -l < "$RUNNER_TEMP/m3-android-external-references.txt")"
-
-      - name: Prepare Mozilla compiler cache
-        uses: mozilla-actions/sccache-action@v0.0.11
-        with:
-          version: "v0.16.0"
-
-      - name: Export GitHub Actions cache credentials
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Bootstrap compiler and graphical test prerequisites
-        shell: bash
-        timeout-minutes: 55
-        run: |
-          set -euo pipefail
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
-            install -y --no-install-recommends python3 python3-venv python3-dev \
-            git curl make jq weston wayland-utils libgtk-3-0t64 \
-            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
-          ./mach --no-interactive bootstrap --application-choice browser
 
       - name: Configure genuine GTK browser with protected features
         shell: bash
