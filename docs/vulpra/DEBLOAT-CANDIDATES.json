@@ -4,7 +4,7 @@
   "phase": "M3",
   "source": "Firefox 159.0b5",
   "basis_local_commit": "ee22392142889ed2d8f7d3953332901cafd964ef",
-  "as_of": "2026-10-26",
+  "as_of": "2026-10-27",
   "definitions": {
     "source_only": "Candidate changes only Git-tracked source footprint; compiled/runtime benefit not established",
     "compile_condition": "There is a manifest/configuration gate, but behavior and actual configured value still require measurement",
@@ -163,7 +163,7 @@
     },
     {
       "id": "normandy_and_healthreport",
-      "decision": "evaluate_feature_optout",
+      "decision": "accepted_selective_optout",
       "surface": "compile_condition",
       "paths": [
         "toolkit/components/normandy/"
@@ -176,7 +176,7 @@
         "toolkit/components/moz.build: includes normandy when MOZ_BUILD_APP=browser",
         "toolkit/moz.configure: data_reporting dependency"
       ],
-      "next": "Await successful memory-safe native retry 40392545095, then strictly gated archived Wayland same-surface buffer commit, Nimbus store readiness, localhost JS navigation, WebExtension lifecycle and source-matched full-Normandy package-size comparison. Preserve M2 browser and count zero M3 package credit until all gates pass.",
+      "next": "Normandy recipe runner is accepted as an optional isolated Linux variant. Keep preserved Nimbus/shared helpers. Subsequent debloat candidates require their own reference audit, native build, actual runtime acceptance and source-matched package delta; this does not disable HealthReport.",
       "observed_actual_config": "MOZ_NORMANDY=\"1\" and MOZ_SERVICES_HEALTHREPORT=\"1\"",
       "experimental_compile_variant": {
         "feature": "Exclude Normandy recipe runner and studies frontend; retain Nimbus and shared Normandy helper imports",
@@ -201,12 +201,12 @@
           "MOZ_SERVICES_SYNC=1",
           "MOZ_APP_BASENAME=Vulpra"
         ],
-        "compiled_browser_verified": false,
-        "runtime_smoke_verified": false,
-        "measured_size_delta_bytes": null,
-        "accepted_m3_removal": false,
-        "risk": "First native compile exhausted hosted 15 GiB RAM plus 3 GiB swap while linking/compiling Rust; follow-on runner uses 24 GiB additional verified disk-backed swap and one Cargo job. Despite passing source guards, compiled package, Nimbus, Wayland, JS/WebExtension runtime, and matched Linux size delta remain unverified.",
-        "next": "Await successful memory-safe native retry 40392545095, then strictly gated archived Wayland same-surface buffer commit, Nimbus store readiness, localhost JS navigation, WebExtension lifecycle and source-matched full-Normandy package-size comparison. Preserve M2 browser and count zero M3 package credit until all gates pass.",
+        "compiled_browser_verified": true,
+        "runtime_smoke_verified": true,
+        "measured_size_delta_bytes": 27620,
+        "accepted_m3_removal": true,
+        "risk": "Accepted only for opt-in separate Linux build: original M2 and default non-Normandy setting unchanged. Real Wayland, WebDriver JS redirect, XPI extension and Nimbus runtime passed; the 0.032% Ubuntu compressed reduction is small. Not a blanket safe-removal claim for all platforms.",
+        "next": "Keep exact acceptance evidence and continue the remaining five M3 roadmap gates; no need to rebuild Normandy just to repeat proof.",
         "full_repository_reference_audit": {
           "ci": "https://github.com/sguzman/vulpra/actions/runs/40382641564",
           "artifact": "m3-normandy-references",
@@ -219,11 +219,11 @@
         "runtime_acceptance_workflow": "https://github.com/sguzman/vulpra/actions/workflows/verify-m3-normandy-runtime.yml",
         "matched_package_comparison_workflow": "https://github.com/sguzman/vulpra/actions/workflows/compare-m3-normandy-size.yml",
         "matched_baseline_mozconfig": "ci/mozconfig-linux-m3-baseline",
-        "native_candidate_compiled": false,
-        "native_candidate_package_verified": false,
-        "actual_webextension_acceptance": false,
-        "actual_localhost_js_acceptance": false,
-        "matched_linux_size_delta_bytes": null,
+        "native_candidate_compiled": true,
+        "native_candidate_package_verified": true,
+        "actual_webextension_acceptance": true,
+        "actual_localhost_js_acceptance": true,
+        "matched_linux_size_delta_bytes": 27620,
         "native_build_attempts": [
           {
             "ci": "https://github.com/sguzman/vulpra/actions/runs/40384902342",
@@ -241,8 +241,26 @@
             "extra_active_swap_gib": 24,
             "cargo_build_jobs": 1,
             "produced_archive": false
+          },
+          {
+            "ci": "https://github.com/sguzman/vulpra/actions/runs/40431768974",
+            "source_commit": "674db8e385c36aec23e78bbe059b2a1fec194fae",
+            "result": "success",
+            "produced_archive": true,
+            "stage": "native compile, package, private Wayland smoke"
           }
-        ]
+        ],
+        "final_evidence": {
+          "source_sha": "674db8e385c36aec23e78bbe059b2a1fec194fae",
+          "lean_native_run": 40431768974,
+          "full_native_run": 40431769117,
+          "runtime_run": 40439671494,
+          "comparison_run": 40439793884,
+          "full_bytes": 86937548,
+          "lean_bytes": 86909928,
+          "delta_bytes": 27620,
+          "delta_percent": 0.032
+        }
       }
     },
     {
@@ -265,7 +283,7 @@
     },
     {
       "id": "browser_genai",
-      "decision": "review",
+      "decision": "audit_in_progress",
       "surface": "runtime_bundled",
       "paths": [
         "browser/components/genai/"
@@ -275,9 +293,12 @@
       "why": "browser/components/moz.build unconditionally includes genai, whose moz.build packages GenAI and associated modules into browser resources",
       "evidence": [
         "browser/components/moz.build: DIRS includes genai",
-        "browser/components/genai/moz.build: MOZ_SRC_FILES GenAI, page/link preview, actors"
+        "browser/components/genai/moz.build: MOZ_SRC_FILES GenAI, page/link preview, actors",
+        "browser/components/moz.build unconditionally lists genai; browser/components/BrowserComponents.manifest has unguarded delayed startup LinkPreview.init; browser/components/genai/moz.build bundles GenAI, link preview, PageAssist and actors"
       ],
-      "next": "Inspect frontend integration and dependencies; test pref gating and actual packaged difference before disabling"
+      "next": "Full Git-tracked reference audit for direct GenAI and LinkPreview callers underway, with separate test-only and shipped-source classifications; see ci/m3-genai-reference-audit.py and workflow m3-genai-reference-audit.yml. No module pruning until unguarded startup registration, actor and sidebar/UI consumers are resolved. Must demonstrate real native runtime, protected feature equality and positive package delta before credit.",
+      "audit_ci": "https://github.com/sguzman/vulpra/actions/workflows/m3-genai-reference-audit.yml",
+      "removal_accepted": false
     },
     {
       "id": "newtab_and_messaging",
