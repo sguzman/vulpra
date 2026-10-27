@@ -1,0 +1,8 @@
+# Isolated M3 native GTK acceptance for Linux-unselected Android app sources.
+# Same build options as ci/mozconfig-linux-m3-baseline except unique objdir.
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux-m3-mobile-experiment
+ac_add_options --with-branding=browser/branding/unofficial
+ac_add_options --with-app-basename=Vulpra
+ac_add_options --disable-tests
+ac_add_options --with-ccache=sccache
+mk_add_options MOZ_PARALLEL_BUILD=1
