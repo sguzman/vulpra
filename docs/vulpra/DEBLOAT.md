@@ -26,6 +26,12 @@ Important outside consumers: `browser/components/BrowserComponents.manifest` reg
 
 **Decision:** Keep GenAI modules bundled in the verified browser until narrow module boundaries and their complete consumers are guarded. Treat individual promotions, models or entry points as candidates, not as automatically removable. An eventual opt-in removal must pass the same source-pinned real native Wayland/JavaScript/WebExtension/Nimbus + compressed-package comparison suite used for the Normandy runner.
 
+## Linux source-only pruning, under test (2026-10-27)
+
+The [current isolated Ubuntu native experiment](https://github.com/sguzman/vulpra/actions/runs/40515987579) removes 458 Git-tracked implementation files from `widget/windows/`, `widget/cocoa/` and `browser/installer/windows/`; their total Git blob size is **6,273,579 bytes** (not compressed binary size). Exactly three shared metadata files are retained: the Windows and Cocoa Glean `metrics.yaml` inputs, and the Windows-format `updater_append.ini` consumed unconditionally by browser locale generation. Earlier trials failed configuration at those shared input dependencies ([Glean input](https://github.com/sguzman/vulpra/actions/runs/40443043378), [updater input](https://github.com/sguzman/vulpra/actions/runs/40514571558)). Their failure does not prove Windows/Cocoa implementations must compile on Linux.
+
+No permanent source deletion or M3 acceptance is credited yet. The experiment must configure, compile and package the real browser, then pass Weston/Wayland, JavaScript, temporary WebExtension lifecycle and Nimbus checks. Its existing Firefox/M2 install and normal `main` source tree remain unchanged. The candidate is source-only: removed Windows/macOS implementations were not compiled by the GTK/Wayland build, so no runtime or binary-size saving is inferred.
+
 ## First rule: preserve a known-good baseline
 
 Keep the pinned local workstation checkout, its build output, and the verified packaged tarball. Do not reset the tree, disable Git sparse settings blindly, delete build directories or relaunch a full Firefox compilation just to compute statistics. The source inventory is **read-only** and writes only to a private directory inside `.git`.

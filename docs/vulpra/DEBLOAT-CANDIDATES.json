@@ -44,7 +44,7 @@
     },
     {
       "id": "windows_widget_installer",
-      "decision": "review",
+      "decision": "ephemeral_linux_source_prune_in_native_validation",
       "surface": "source_only",
       "paths": [
         "widget/windows/",
@@ -55,13 +55,37 @@
       "why": "widget/moz.build adds only selected platform subdir; browser/moz.build adds Windows installer only if MAKENSISU. Global references not exhaustively scanned",
       "evidence": [
         "widget/moz.build: toolkit selector",
-        "browser/moz.build: conditional MAKENSISU"
+        "browser/moz.build: conditional MAKENSISU",
+        "Linux-only CI experiment: https://github.com/sguzman/vulpra/actions/runs/40515987579; compilation/packaging/runtime not yet proven. Required Glean source metadata and Windows updater fragment retained."
       ],
-      "next": "Search cross-tree references and generator inputs; isolated source-prune experiment; no binary-size claim"
+      "next": "Review result of exact CI 40515987579; only commit source removals to main if real native build, packaging, Wayland, JS, WebExtension and Nimbus pass. Do not claim compiled-package byte savings for these already non-Linux platform implementations.",
+      "platform_prune_trial": {
+        "run": 40515987579,
+        "source_commit": "cee7441ebe2280f9294914a5e3e5878d1c17ba05",
+        "caveat": "Current CI source checkout selected experiment workflow from commit cee7441; exact run source verified by run",
+        "attempted_total_removal_files": 458,
+        "attempted_total_removed_git_blob_bytes": 6273579,
+        "scope": [
+          "widget/windows",
+          "widget/cocoa",
+          "browser/installer/windows"
+        ],
+        "retained_shared_metadata": [
+          "widget/windows/metrics.yaml",
+          "widget/cocoa/metrics.yaml",
+          "browser/installer/windows/nsis/updater_append.ini"
+        ],
+        "previous_errors": [
+          "40443043378: missing Glean metrics YAML due to shared metrics index",
+          "40514571558: missing Windows-format updater_append.ini due to common browser locale generator"
+        ],
+        "acceptance": "pending_native_ci",
+        "effect_on_linux_compiled_binary": "not measured; platform modules were already excluded by GTK config"
+      }
     },
     {
       "id": "macos_cocoa_widget",
-      "decision": "review",
+      "decision": "ephemeral_linux_source_prune_in_native_validation",
       "surface": "source_only",
       "paths": [
         "widget/cocoa/"
@@ -70,9 +94,11 @@
       "source_bytes": 1626834,
       "why": "Only selected by widget toolkit for Cocoa, not GTK; shared Cocoa-named includes outside this path need scanning",
       "evidence": [
-        "widget/moz.build: toolkit selector"
+        "widget/moz.build: toolkit selector",
+        "Linux-only CI experiment: https://github.com/sguzman/vulpra/actions/runs/40515987579; compilation/packaging/runtime not yet proven. Required Glean source metadata and Windows updater fragment retained."
       ],
-      "next": "Check all generated bindings and cross-tree references before source removal"
+      "next": "Review result of exact CI 40515987579; only commit source removals to main if real native build, packaging, Wayland, JS, WebExtension and Nimbus pass. Do not claim compiled-package byte savings for these already non-Linux platform implementations.",
+      "platform_prune_trial_ref": "windows_widget_installer.platform_prune_trial"
     },
     {
       "id": "android_mobile",
