@@ -156,7 +156,20 @@
         "browser/components/AccountsGlue.sys.mjs: references resource://services-sync/UIState.sys.mjs"
       ],
       "next": "Enabled in tested configuration. Map AccountsGlue/UI module references and test an isolated opt-out, with native build and extension/navigation regression before touching the known-good baseline.",
-      "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" (enabled)"
+      "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" (enabled)",
+      "audit_result": {
+        "source_audit_run": 40544803899,
+        "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
+        "matching_lines": 1616,
+        "non_test_doc_paths": 123,
+        "high_impact_callers": [
+          "browser/base/content/browser-sync.js",
+          "browser/components/AccountsGlue.sys.mjs",
+          "browser/components/preferences/config/account-sync.mjs",
+          "services/fxaccounts/FxAccounts.sys.mjs"
+        ],
+        "removal_authorized": false
+      }
     },
     {
       "id": "firefox_accounts",
@@ -173,7 +186,19 @@
         "browser/components/AccountsGlue.sys.mjs: imports FxAccounts.sys.mjs and FxAccountsCommands.sys.mjs"
       ],
       "next": "Preserve until AccountsGlue and WebExtension integration dependencies mapped; must not assume toggling Sync removes FxAccounts.",
-      "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" but account services separately compiled for gtk"
+      "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" but account services separately compiled for gtk",
+      "audit_result": {
+        "source_audit_run": 40544803899,
+        "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
+        "matching_lines": 1616,
+        "non_test_doc_paths": 123,
+        "high_impact_callers": [
+          "browser/components/AccountsGlue.sys.mjs",
+          "services/fxaccounts/FxAccounts.sys.mjs",
+          "services/fxaccounts/FxAccountsWebChannel.sys.mjs"
+        ],
+        "removal_authorized": false
+      }
     },
     {
       "id": "telemetry_internals",
@@ -190,7 +215,24 @@
         "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces"
       ],
       "next": "Report config missing/unverified; preserve native telemetry and crash reporting while examining configured data-reporting components and package footprint.",
-      "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\""
+      "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\"",
+      "audit_result": {
+        "source_audit_run": 40544803899,
+        "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
+        "matching_lines": 1736,
+        "non_test_doc_paths": 142,
+        "high_impact_callers": [
+          "toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs",
+          "toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs",
+          "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+          "toolkit/components/glean/bindings/GleanPings.cpp"
+        ],
+        "known_default_prefs": [
+          "browser/app/profile/firefox.js enables shutdown/new-profile/first-shutdown legacy pings; this is a source default, not proof of actual Vulpra network transmission"
+        ],
+        "distinction": "Transport/reporting, browser telemetry consumers, Glean metrics/IPC and crash reporting have different dependencies; source-only audit does not prove safe physical deletion.",
+        "removal_authorized": false
+      }
     },
     {
       "id": "normandy_and_healthreport",
@@ -354,6 +396,32 @@
       }
     },
     {
+      "id": "pocket_integration",
+      "decision": "review_external_newtab_consumers",
+      "surface": "runtime_bundled",
+      "paths": [
+        "browser/extensions/newtab/",
+        "browser/components/newtab/"
+      ],
+      "source_files": null,
+      "source_bytes": null,
+      "why": "Pocket recommendations and UI references reach New Tab feed modules, Nimbus metadata and browser prefs; broad New Tab deletion would affect core browser UI. Literal grep also includes Android, sample data and unrelated incidental matches.",
+      "evidence": [
+        "Full checked-out source reference scan: https://github.com/sguzman/vulpra/actions/runs/40544803899",
+        "browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs: 42 matching source lines",
+        "browser/extensions/newtab/lib/ActivityStream.sys.mjs: 19 matching source lines",
+        "browser/components/newtab/metrics.yaml and toolkit/components/nimbus/FeatureManifest.yaml include Pocket-related definitions"
+      ],
+      "next": "Map DiscoveryStreamFeed/ActivityStream call sites, prefs, default New Tab fallback and packaged Pocket resources before any narrow opt-in removal; preserve working new-tab navigation, JS, extensions, Nimbus and profile isolation.",
+      "audit_result": {
+        "source_audit_run": 40544803899,
+        "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
+        "matching_lines": 3292,
+        "non_test_doc_paths": 295,
+        "removal_authorized": false
+      }
+    },
+    {
       "id": "newtab_and_messaging",
       "decision": "review",
       "surface": "runtime_bundled",
@@ -371,7 +439,20 @@
         "browser/components/asrouter/moz.build: actors/modules",
         "browser/components/aboutwelcome/moz.build: actors/modules"
       ],
-      "next": "Trace per-component service dependencies and UI fallback before experimentation"
+      "next": "Trace per-component service dependencies and UI fallback before experimentation",
+      "audit_result": {
+        "source_audit_run": 40544803899,
+        "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
+        "matching_lines": 368,
+        "non_test_doc_paths": 55,
+        "high_impact_callers": [
+          "browser/components/asrouter/modules/ASRouter.sys.mjs",
+          "browser/components/asrouter/moz.build",
+          "browser/components/BrowserGlue.sys.mjs",
+          "browser/extensions/newtab/lib/PlacesFeed.sys.mjs"
+        ],
+        "removal_authorized": false
+      }
     },
     {
       "id": "core_web_security",
@@ -423,5 +504,30 @@
       "ENABLE_TESTS"
     ],
     "interpretation": "not_recorded does not mean false; these are emitted configure substitutions in the old validated object tree. No different-configuration native build tested."
+  },
+  "optional_feature_boundary_audit": {
+    "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
+    "run_id": 40544803899,
+    "url": "https://github.com/sguzman/vulpra/actions/runs/40544803899",
+    "method": "full checked-out tracked-source git grep; literal patterns, source-path ranking excludes tests/docs but can include incidental third-party matches",
+    "removal_authorized": false,
+    "groups": {
+      "pocket": {
+        "matching_lines": 3292,
+        "non_test_doc_paths": 295
+      },
+      "promotion": {
+        "matching_lines": 368,
+        "non_test_doc_paths": 55
+      },
+      "sync": {
+        "matching_lines": 1616,
+        "non_test_doc_paths": 123
+      },
+      "reporting": {
+        "matching_lines": 1736,
+        "non_test_doc_paths": 142
+      }
+    }
   }
 }
