@@ -438,9 +438,9 @@
         "browser/components/newtab/moz.build: browsercomps resources and registrants",
         "browser/components/asrouter/moz.build: actors/modules",
         "browser/components/aboutwelcome/moz.build: actors/modules",
-        "New isolated, not-yet-accepted native experiment: https://github.com/sguzman/vulpra/actions/runs/40547968387 (runtime and size acceptance pending)"
+        "ACCEPTED opt-in ASRouter two-promo removal: native runtime pass https://github.com/sguzman/vulpra/actions/runs/40547968387; source-matched binary-size pass https://github.com/sguzman/vulpra/actions/runs/40567473401 (3,184 B/0.00366%). All remaining promotional/pocket/sync/reporting bundles unreviewed."
       ],
-      "next": "Await full native opt-in compile, packaged source-resource and live Wayland/JS/WebExtension/Nimbus/promo-dispatch tests; only upon success compare same-source full baseline compressed tarball and decide acceptance. No progress credit beforehand.",
+      "next": "Retain default modules and core ASRouter. Continue targeted promotion/Pocket/Sync/telemetry dependency and product-value audit; one accepted two-module opt-in resource exclusion does not complete entire promotional-messaging gate.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -455,7 +455,7 @@
         "removal_authorized": false
       },
       "promotion_optout_experiment": {
-        "status": "isolated_native_candidate_running; not accepted",
+        "status": "accepted_opt_in_native_variant",
         "feature": "two ASRouter AI promotion module resources; retains all core ASRouter, onboarding and telemetry modules",
         "source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
         "native_run": 40547968387,
@@ -476,10 +476,16 @@
           "WebExtensions",
           "Firefox profile isolation"
         ],
-        "compared_archives": "Source-matched full-vs-opt-in binary comparison is conditional on candidate success; not yet measured",
+        "compared_archives": "Full 86,930,792 B and opt-in lean 86,927,608 B under source-matched Ubuntu Linux build; positive 3,184 B reduction in separate native variants; this does not add directly to Normandy saving.",
         "baseline_workflow": ".github/workflows/m3-asrouter-promo-matched-baseline.yml",
-        "acceptance": "pending complete native compilation, package, live behavior and strictly positive source-pinned bytes",
-        "removal_accepted": false
+        "acceptance": "Passed native compiled/packaged SHA-256, required modules present and two promotion resources absent, Weston buffers, JS/screenshot, WebExtension install/background/storage/uninstall, Nimbus, guarded remote promotion message templates and Firefox profile; source-matched byte comparison strictly positive.",
+        "removal_accepted": true,
+        "matched_baseline_run": 40567473401,
+        "failed_preliminary_comparison_run": 40563942562,
+        "full_compressed_bytes": 86930792,
+        "lean_compressed_bytes": 86927608,
+        "saved_compressed_bytes": 3184,
+        "compressed_reduction_percent": 0.00366
       }
     },
     {
