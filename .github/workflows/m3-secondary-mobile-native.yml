@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/m3-secondary-mobile-native.yml
+      - taskcluster/kinds/toolchain/android.yml
   workflow_dispatch:
 
 permissions:
@@ -56,6 +57,10 @@ jobs:
             install -y --no-install-recommends python3 python3-venv python3-dev \
             git curl make jq weston wayland-utils libgtk-3-0t64 \
             libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          # Linux-only toolchain resolution still loads Mozilla's full task graph.
+          # Guard the specific stale Android file-hash references repaired by M3.
+          ! grep -Fq 'mobile/android/android-components/plugins/dependencies/src/main/java/ApplicationServices.kt' taskcluster/kinds/toolchain/android.yml
+          ! grep -Fq 'mobile/android/android-components/plugins/dependencies/src/main/java/DependenciesPlugin.kt' taskcluster/kinds/toolchain/android.yml
           # Install Mozilla's supported Clang before making staged source
           # deletions. Bootstrap of a dirty working tree may skip toolchains.
           ./mach --no-interactive bootstrap --application-choice browser
