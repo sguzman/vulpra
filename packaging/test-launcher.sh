@@ -50,6 +50,9 @@ fi
 grep -q 'symbolic link' "$temp/stderr"
 # New native Vulpra builds already have an ELF named vulpra. Verify that
 # the wrapper can coexist as vulpra-launch without replacing that binary.
+# Restore a safe private profile after the intentional symlink-refusal test.
+rm -f "$temp/data/vulpra/default"
+mkdir -m 0700 "$temp/data/vulpra/default"
 rm -f "$temp/package/vulpra"
 mv "$temp/package/firefox" "$temp/package/vulpra"
 cp "$project_root/vulpra" "$temp/package/vulpra-launch"

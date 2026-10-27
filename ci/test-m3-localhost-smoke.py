@@ -55,6 +55,11 @@ def main():
         launcher = browser / "vulpra"
         launcher.write_text(MOCK)
         launcher.chmod(0o755)
+        # The legacy package format has a separate native Firefox binary.
+        # The mock vulpra file represents its isolated launcher.
+        native = browser / "firefox"
+        native.write_text(MOCK)
+        native.chmod(0o755)
         archive = packages / "vulpra-local-fixture.tar.xz"
         with tarfile.open(archive, "w:xz") as tf:
             tf.add(browser, arcname="firefox")
