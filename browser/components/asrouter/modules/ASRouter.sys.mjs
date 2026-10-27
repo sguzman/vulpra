@@ -1764,10 +1764,22 @@ export class _ASRouter {
         lazy.MenuMessage.showMenuMessage(browser, message, trigger, force);
         break;
       case "sidebar_chatbot_promo":
-        lazy.SidebarChatBotPromo.showPromo(browser, message, force);
+        // The isolated Linux candidate physically omits this lazy module.
+        // This immutable build flag prevents loading a missing resource,
+        // including when a remote message supplies this template.
+        if (!AppConstants.VULPRA_NO_ASROUTER_PROMOS) {
+          lazy.SidebarChatBotPromo.showPromo(browser, message, force);
+        }
         break;
       case "smart_window_newtab_promo":
-        lazy.SmartWindowNewTabPromo.showPromo(browser, message, trigger, force);
+        if (!AppConstants.VULPRA_NO_ASROUTER_PROMOS) {
+          lazy.SmartWindowNewTabPromo.showPromo(
+            browser,
+            message,
+            trigger,
+            force
+          );
+        }
         break;
       case "newtab_message": {
         let targetBrowser = force ? null : browser;
