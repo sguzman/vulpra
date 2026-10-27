@@ -129,7 +129,12 @@ def main():
         appdir = inis[0].parent
         if "Name=Vulpra" not in inis[0].read_text().splitlines():
             raise RuntimeError("Unexpected browser identity")
-        binary = appdir / "vulpra"
+        if (appdir / "vulpra-launch").is_file():
+            binary = appdir / "vulpra-launch"
+        elif (appdir / "firefox").is_file():
+            binary = appdir / "vulpra"
+        else:
+            raise RuntimeError("Branded native package is missing its isolated launcher")
         if not binary.is_file() or not os.access(binary, os.X_OK):
             raise RuntimeError("Isolated packaged launcher absent")
         server = ThreadingHTTPServer(("127.0.0.1", 0), Page)

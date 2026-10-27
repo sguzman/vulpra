@@ -24,15 +24,22 @@ if [[ "${#candidates[@]}" -ne 1 ]]; then
   exit 1
 fi
 app_dir="$(dirname -- "${candidates[0]}")"
-if [[ ! -x "$app_dir/firefox" ]]; then
-  printf 'stage: Firefox executable missing beside application.ini\n' >&2
+# Preserve the native browser binary byte-for-byte.
+# M2 packages use firefox + vulpra (launcher).
+# Independently branded native packages use vulpra (ELF) + vulpra-launch.
+if [[ -x "$app_dir/vulpra" ]]; then
+  launcher="$app_dir/vulpra-launch"
+elif [[ -x "$app_dir/firefox" ]]; then
+  launcher="$app_dir/vulpra"
+else
+  printf 'stage: no native Firefox/Vulpra executable beside application.ini\n' >&2
   exit 1
 fi
-if [[ -e "$app_dir/vulpra" ]]; then
-  printf 'stage: Vulpra launcher already exists; refusing overwrite\n' >&2
+if [[ -e "$launcher" || -L "$launcher" ]]; then
+  printf 'stage: isolated launcher already exists; refusing overwrite\n' >&2
   exit 1
 fi
-install -m 0755 "$script_dir/vulpra" "$app_dir/vulpra"
+install -m 0755 "$script_dir/vulpra" "$launcher"
 tar -cJf "$output" -C "$work" .
 # Store relative filename so the checksum survives artifact downloads/moves.
 (

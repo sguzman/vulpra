@@ -48,4 +48,16 @@ if "$temp/package/vulpra" > "$temp/stdout" 2> "$temp/stderr"; then
   exit 1
 fi
 grep -q 'symbolic link' "$temp/stderr"
-echo 'PASS: Vulpra launcher isolates profiles, preserves URL args, and rejects profile escapes.'
+# New native Vulpra builds already have an ELF named vulpra. Verify that
+# the wrapper can coexist as vulpra-launch without replacing that binary.
+rm -f "$temp/package/vulpra"
+mv "$temp/package/firefox" "$temp/package/vulpra"
+cp "$project_root/vulpra" "$temp/package/vulpra-launch"
+chmod +x "$temp/package/vulpra-launch"
+"$temp/package/vulpra-launch" https://example.org/branded
+mapfile -t branded_args < "$MOCK_ARGS_FILE"
+[[ "${branded_args[0]}" == --no-remote && "${branded_args[1]}" == --new-instance ]]
+[[ "${branded_args[2]}" == --profile && "${branded_args[3]}" == "$temp/data/vulpra/default" ]]
+[[ "${branded_args[4]}" == https://example.org/branded ]]
+[[ "$(sha256sum "$HOME/.mozilla/firefox/profiles.ini")" == "$original_hash" ]]
+echo 'PASS: legacy and native-branded Vulpra launchers isolate profiles, preserve URL args, and reject profile escapes.'

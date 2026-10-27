@@ -6,7 +6,15 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 appdir="$(realpath -e -- "$1")"
-[[ -x "$appdir/vulpra" ]] || { echo 'Missing Vulpra package launcher' >&2; exit 2; }
+# The private launcher has a different name when the native ELF is vulpra.
+if [[ -x "$appdir/vulpra-launch" ]]; then
+  launcher="$appdir/vulpra-launch"
+elif [[ -x "$appdir/vulpra" && -x "$appdir/firefox" ]]; then
+  launcher="$appdir/vulpra"
+else
+  echo 'Missing isolated Vulpra package launcher' >&2
+  exit 2
+fi
 for command in weston wayland-info python3; do
   command -v "$command" >/dev/null || { echo "Missing compositor test dependency: $command" >&2; exit 2; }
 done
@@ -73,7 +81,7 @@ env -u MOZ_HEADLESS \
   HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
   XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
   WAYLAND_DEBUG=client \
-  "$appdir/vulpra" about:blank >"$work/browser.log" 2>&1 &
+  "$launcher" about:blank >"$work/browser.log" 2>&1 &
 browser_pid="$!"
 sleep "$duration"
 if ! kill -0 "$browser_pid" 2>/dev/null; then

@@ -15,7 +15,14 @@ for argument in "$@"; do
   esac
 done
 package_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-browser="$package_dir/firefox"
+# The native Firefox binary retains its old name in M2 archives, while
+# independently branded Vulpra archives ship a native ELF named vulpra.
+# Never replace or rename the native executable to install our wrapper.
+case "$(basename -- "${BASH_SOURCE[0]}")" in
+  vulpra) browser="$package_dir/firefox" ;;
+  vulpra-launch) browser="$package_dir/vulpra" ;;
+  *) printf 'vulpra: unrecognized launcher filename\n' >&2; exit 2 ;;
+esac
 if [[ ! -x "$browser" ]]; then
   printf 'vulpra: packaged browser is not executable: %s\n' "$browser" >&2
   exit 1
