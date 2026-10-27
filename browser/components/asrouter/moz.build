@@ -39,12 +39,18 @@ EXTRA_JS_MODULES.asrouter += [
     "modules/PinnableSitesProvider.sys.mjs",
     "modules/PreonboardingSplash.sys.mjs",
     "modules/RemoteL10n.sys.mjs",
-    "modules/SidebarChatBotPromo.sys.mjs",
-    "modules/SmartWindowNewTabPromo.sys.mjs",
     "modules/Spotlight.sys.mjs",
     "modules/ToastNotification.sys.mjs",
     "modules/ToolbarBadgeHub.sys.mjs",
 ]
+
+# Only the opt-in Linux build excludes these two promotion implementations.
+# Leave ASRouter, normal onboarding, new-tab, telemetry and Nimbus packaged.
+if not CONFIG["VULPRA_NO_ASROUTER_PROMOS"]:
+    EXTRA_JS_MODULES.asrouter += [
+        "modules/SidebarChatBotPromo.sys.mjs",
+        "modules/SmartWindowNewTabPromo.sys.mjs",
+    ]
 
 MOCHITEST_CHROME_MANIFESTS += ["tests/chrome/chrome.toml"]
 
