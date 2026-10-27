@@ -120,13 +120,13 @@
         "mobile/android/moz.build: Android app and GeckoView generated files",
         "widget/moz.build: toolkit selector"
       ],
-      "next": "Inspect 685 surviving external literal references (many may be unrelated Android-only tooling) and await full Linux native build/Wayland/JavaScript/WebExtension/Nimbus tests from staged 14,134-file source removal; never commit the deletion or credit M3 until evidence passes.",
+      "next": "Wait for clean-bootstrap Clang>=19 native acceptance run 40585240593. Then evaluate 685 audited external references, especially Gradle Android-only entrypoints and remaining test tooling, before permanent 14,134-file source deletion. No M3 credit meanwhile.",
       "staged_app_source_trial": {
         "status": "prune_staged_only_in_throwaway_runner; native acceptance in progress",
-        "run_id": 40584538820,
+        "run_id": 40585240593,
         "preliminary_run_id": 40584407127,
         "preliminary_run_conclusion": "cancelled on workflow correction after source staging preflight passed; no native credit",
-        "candidate_source_commit": "1c3bd4a7f3e6bc338aa4c7d5f7cfc71630dc3409",
+        "candidate_source_commit": "0e5feb7092bdc9b5ec9d1d8d210aa30957d1f850",
         "selected_roots": [
           {
             "path": "mobile/android/fenix/",
@@ -151,7 +151,32 @@
         "retained_widget_android": "widget/android/",
         "source_only": "Source Git blob bytes only; no compressed package saving claimed or expected",
         "acceptance": "Requires completed real native Linux configure/build/package/Wayland/JS/WebExtensions/Nimbus/profile smoke and classification of external references before any permanent deletion",
-        "permanent_main_deleted_files": 0
+        "permanent_main_deleted_files": 0,
+        "preliminary_compiler_failure_run_id": 40584538820,
+        "preliminary_compiler_failure": "Mozilla's supported compiler was not installed when bootstrap ran after staging deletions; system /usr/bin/clang 18.1.3 cannot configure Firefox 159 (requires >=19). Retried bootstrap on CLEAN checkout before staged deletes.",
+        "external_reference_review": {
+          "reference_artifact_run_id": 40584538820,
+          "reference_artifact_id": 12771041400,
+          "method": "git grep literal path references outside mobile/android and docs in staged native source; content examined from actual CI artifact; false positives and Android-only references remain",
+          "matching_lines": 685,
+          "largest_categories": {
+            "tools/": 221,
+            ".prettierignore": 192,
+            "taskcluster/": 129,
+            "testing/": 34,
+            "mots.yaml": 16,
+            "settings.gradle": 14,
+            "build/": 11
+          },
+          "high_risk_remaining": [
+            "settings.gradle contains direct Android-only includeBuild and projectDir references to removed roots; Gradle Android tasks would break by design, verify not used by GTK build",
+            "testing/mozbase/moztest/moztest/resolve.py defines Android suite root paths and matchers; ensure Linux native tests do not require those suites",
+            "tools/lint/glean-parser/__init__.py refers to Android-specific tags.yaml; keep Glean compiler and desktop metrics",
+            "build/sparse-profiles/taskgraph and taskcluster task definitions retain Android-only source paths; remain broken for Android target if source removal lands"
+          ],
+          "observed_desktop_caller": "browser/extensions/webcompat/moz.build contains only a COMMENT citing Android Components webcompat file, not an active source dependency",
+          "incomplete_proof": "Literal source matches do not establish full build reachability; full native Linux rebuild and functional smoke are mandatory; independent tests for Android toolchain are explicitly out of scope"
+        }
       }
     },
     {
