@@ -1,0 +1,51 @@
+name: M3 Audit Optional UI and Reporting Boundaries
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-optional-boundary-audit.sh
+      - ci/tests/m3-optional-boundary-audit-test.sh
+      - .github/workflows/m3-optional-boundary-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-full-source:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout complete pinned browser source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Syntax and synthetic Git fixture regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/m3-optional-boundary-audit.sh
+          bash -n ci/tests/m3-optional-boundary-audit-test.sh
+          bash ci/tests/m3-optional-boundary-audit-test.sh "$GITHUB_WORKSPACE/ci/m3-optional-boundary-audit.sh"
+
+      - name: Audit real tracked Pocket promotions Sync and reporting references
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/m3-optional-boundary-audit.sh "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/m3-optional-boundaries" \
+            | tee "$RUNNER_TEMP/m3-optional-audit-summary.txt"
+
+      - name: Preserve source-attributed machine-readable review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-optional-boundaries
+          path: |
+            ${{ runner.temp }}/m3-optional-boundaries/
+            ${{ runner.temp }}/m3-optional-audit-summary.txt
+          if-no-files-found: warn
+          retention-days: 14
