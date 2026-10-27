@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: vulpra-m3-android-apps-native
-  cancel-in-progress: false
+  # A corrected preflight supersedes older, costlier candidate runs.
+  cancel-in-progress: true
 
 jobs:
   verify-pruned-linux-browser:
