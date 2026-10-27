@@ -21,14 +21,14 @@ jobs:
   notify-once:
     if: >-
       github.repository == 'sguzman/vulpra' &&
-      (github.event.workflow_run.id == 40392545095 ||
-       github.event.workflow_run.id == 40412644709)
+      (github.event.workflow_run.id == 40431768974 ||
+       github.event.workflow_run.id == 40431769117)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:
       GH_TOKEN: ${{ github.token }}
-      LEAN_RUN_ID: "40392545095"
-      FULL_RUN_ID: "40412644709"
+      LEAN_RUN_ID: "40431768974"
+      FULL_RUN_ID: "40431769117"
     steps:
       - name: Mention owner on M3 issue once BOTH pinned runs have finished
         shell: bash
@@ -46,7 +46,7 @@ jobs:
           lean_result="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LEAN_RUN_ID" --jq .conclusion)"
           full_result="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FULL_RUN_ID" --jq .conclusion)"
 
-          marker='<!-- vulpra-m3-both-native-builds-finished-40392545095-40412644709 -->'
+          marker='<!-- vulpra-m3-both-native-builds-finished-40431768974-40431769117 -->'
           comments="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/1/comments?per_page=100" --jq '.[].body')"
           if grep -Fq -- "$marker" <<< "$comments"; then
             echo "Completion notification already posted. No duplicate."
