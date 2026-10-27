@@ -29,17 +29,17 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 
 ## ✂️ M3 — User-specific debloating
 
-**Status: in progress, 1/6 acceptance gates (17%) complete.** The native working-browser baseline has passed all five M2 gates. The first opt-in Normandy runner removal now passes real packaged runtime and matched-size acceptance (details below). The rest of M3 remains open; no blind platform-directory deletions.
+**Status: in progress, 2/6 acceptance gates (33%) complete.** The native M2 browser remains protected. The opt-in Normandy runner has a measured compressed binary reduction; the bounded Windows/Cocoa source-only pruning now has complete CI native/browser acceptance and an exact 453-file deletion committed to main. These are distinct accomplishments: source blob reduction is not binary saving. Four M3 gates remain open and other platform trees still require selective audits.
 
 ### 🧭 Phase 1 — Evidence inventory
 - [ ] 🗺️ Map feature bundles, binary dependencies, build dependencies and platform-specific modules.
 - [ ] 🔬 Classify candidates as keep, disable, conditionally compile or remove. Include fallback and safety impact.
 
 ### 🪚 Phase 2 — Incremental removals
-- [ ] 🖥️ Audit and then prune non-Linux platform build/distribution material proven unnecessary.
+- [x] 🖥️ Audit and prune an initially bounded set of non-Linux widget/installer sources proven unnecessary for the Linux browser. **453 files (6,266,676 Git blob bytes)** permanently removed in [commit 81d9b335](https://github.com/sguzman/vulpra/commit/81d9b335b747c377b730a0c3a4de9ea1cf522fe5), preserving eight shared generator/Rust dependency files. Actual full native Linux build, Wayland, JS, WebExtension and Nimbus [CI 40519242468 passed](https://github.com/sguzman/vulpra/actions/runs/40519242468). Other non-Linux source trees remain unreviewed. **Source-only reduction, no claimed compiled-package savings.**
 - [ ] 📣 Audit promotional UI, Pocket, account/Sync and telemetry paths against the user's use case.
 - [ ] 🌐 Audit mobile, test fixtures and optional packaged localizations without breaking required desktop functionality.
-- [x] 🧪 Demonstrate each **accepted** removal to date with before/after measurements and passing targeted tests. **One verified removal: opt-in Normandy runner**, full 86,937,548 B vs lean 86,909,928 B (27,620 B, 0.032%) under source-matched Ubuntu builds. Native runs [lean 40431768974](https://github.com/sguzman/vulpra/actions/runs/40431768974) and [full 40431769117](https://github.com/sguzman/vulpra/actions/runs/40431769117), real runtime [40439671494](https://github.com/sguzman/vulpra/actions/runs/40439671494), matched-size [40439793884](https://github.com/sguzman/vulpra/actions/runs/40439793884). This gate must be maintained for every future accepted candidate.
+- [x] 🧪 Demonstrate every **accepted** removal with relevant before/after measurements and passing targeted tests. **Normandy opt-in binary removal plus bounded source-only platform prune** (453 files / 6,266,676 Git blob bytes; complete native/runtime [40519242468](https://github.com/sguzman/vulpra/actions/runs/40519242468); no claimed binary saving). **Opt-in Normandy runner**, full 86,937,548 B vs lean 86,909,928 B (27,620 B, 0.032%) under source-matched Ubuntu builds. Native runs [lean 40431768974](https://github.com/sguzman/vulpra/actions/runs/40431768974) and [full 40431769117](https://github.com/sguzman/vulpra/actions/runs/40431769117), real runtime [40439671494](https://github.com/sguzman/vulpra/actions/runs/40439671494), matched-size [40439793884](https://github.com/sguzman/vulpra/actions/runs/40439793884). This gate must be maintained for every future accepted candidate.
 
 ## 🐞 M4 — Actual defect fixes and personalization
 

@@ -1,6 +1,6 @@
 # Vulpra M3 — User-specific debloating
 
-**Status (2026-10-27):** M2 working personal Linux baseline verified on the EndeavourOS workstation (5/5 native acceptance gates). M3 is open with **one accepted, measured native packaged reduction** (the opt-in Normandy runner); five other roadmap gates are still open. The saving is small and source-matched on Ubuntu CI, not a direct comparison to the workstation Arch package.
+**Status (2026-10-27):** M2 working personal Linux baseline verified on EndeavourOS (5/5 acceptance gates). M3 has **two accepted, distinct changes**: (1) one measured *native binary-package* reduction (opt-in Normandy runner, 27,620 compressed bytes) and (2) bounded *source-tree-only* Windows/Cocoa pruning (453 files, 6,266,676 Git blob bytes), with complete native Linux compilation and runtime acceptance. M3 roadmap 2/6 gates complete; four remain. No binary saving is attributed to the platform-source deletion and the existing workstation Firefox/M2 package has not been changed.
 
 ## First accepted removal: Normandy recipe runner (2026-10-27)
 
@@ -26,11 +26,16 @@ Important outside consumers: `browser/components/BrowserComponents.manifest` reg
 
 **Decision:** Keep GenAI modules bundled in the verified browser until narrow module boundaries and their complete consumers are guarded. Treat individual promotions, models or entry points as candidates, not as automatically removable. An eventual opt-in removal must pass the same source-pinned real native Wayland/JavaScript/WebExtension/Nimbus + compressed-package comparison suite used for the Normandy runner.
 
-## Linux source-only pruning, under test (2026-10-27)
+## Accepted Linux source-only pruning (2026-10-27)
 
-The [current isolated Ubuntu native experiment](https://github.com/sguzman/vulpra/actions/runs/40515987579) removes 458 Git-tracked implementation files from `widget/windows/`, `widget/cocoa/` and `browser/installer/windows/`; their total Git blob size is **6,273,579 bytes** (not compressed binary size). Exactly three shared metadata files are retained: the Windows and Cocoa Glean `metrics.yaml` inputs, and the Windows-format `updater_append.ini` consumed unconditionally by browser locale generation. Earlier trials failed configuration at those shared input dependencies ([Glean input](https://github.com/sguzman/vulpra/actions/runs/40443043378), [updater input](https://github.com/sguzman/vulpra/actions/runs/40514571558)). Their failure does not prove Windows/Cocoa implementations must compile on Linux.
+The [complete GitHub CI native experiment](https://github.com/sguzman/vulpra/actions/runs/40519242468) **passed** after deleting exactly 453 platform-specific Git-tracked implementation files from `widget/windows/`, `widget/cocoa/` and `browser/installer/windows/` in an ephemeral checkout. Their aggregate Git blob bytes were **6,266,676**; this is a **source footprint measurement**, not a Linux binary or build-time saving. Read-back of the [permanent `main` deletion commit](https://github.com/sguzman/vulpra/commit/81d9b335b747c377b730a0c3a4de9ea1cf522fe5) verified that exactly eight files remain inside those directories.
 
-No permanent source deletion or M3 acceptance is credited yet. The experiment must configure, compile and package the real browser, then pass Weston/Wayland, JavaScript, temporary WebExtension lifecycle and Nimbus checks. Its existing Firefox/M2 install and normal `main` source tree remain unchanged. The candidate is source-only: removed Windows/macOS implementations were not compiled by the GTK/Wayland build, so no runtime or binary-size saving is inferred.
+The necessary survivors are `widget/windows/metrics.yaml` and `widget/cocoa/metrics.yaml` (Glean desktop generator), `browser/installer/windows/nsis/updater_append.ini` (unconditionally used by locale/update generator), plus `widget/windows/rust/Cargo.toml`, `rust/src/lib.rs`, `rust/src/permission_monitor.rs`, `rust/src/AlertsServiceRust.h`, `rust/src/PermissionMonitor.h` (Cargo target-gated dependency graph). Those resources are required to resolve a Linux build despite target-specific runtime code being excluded.
+
+CI verified protected GTK/Wayland/Sandbox/Sync/Normandy/DevTools configuration, complete native compilation, staging and SHA-256 verification of a branded Vulpra package, committed private Weston/Wayland frames, local screenshot PNG/profile preservation, persistent WebDriver JavaScript -> HTTP 302 -> final DOM, temporary unsigned WebExtension lifecycle including storage/background, and Nimbus ExperimentStore/ExperimentAPI. Failed precursors revealed missing [Glean YAML](https://github.com/sguzman/vulpra/actions/runs/40443043378), [updater input](https://github.com/sguzman/vulpra/actions/runs/40514571558) and [target-gated Cargo manifest](https://github.com/sguzman/vulpra/actions/runs/40515987579); all resolved in the successful run.
+
+**Scope limitation:** This accepts one bounded source-only platform-pruning gate. It does not certify all Windows/macOS-specific modules removed, that Linux packages got smaller, or that the telemetry infrastructure was deleted. Further platform, telemetry and promotion work requires separate dependency audits and protected native runtime acceptance.
+
 
 ## First rule: preserve a known-good baseline
 

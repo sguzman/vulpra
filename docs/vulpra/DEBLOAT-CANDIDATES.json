@@ -44,7 +44,7 @@
     },
     {
       "id": "windows_widget_installer",
-      "decision": "ephemeral_linux_source_prune_in_native_validation",
+      "decision": "accepted_source_only_prune",
       "surface": "source_only",
       "paths": [
         "widget/windows/",
@@ -58,34 +58,38 @@
         "browser/moz.build: conditional MAKENSISU",
         "Linux-only CI experiment: https://github.com/sguzman/vulpra/actions/runs/40515987579; compilation/packaging/runtime not yet proven. Required Glean source metadata and Windows updater fragment retained."
       ],
-      "next": "Review result of exact CI 40515987579; only commit source removals to main if real native build, packaging, Wayland, JS, WebExtension and Nimbus pass. Do not claim compiled-package byte savings for these already non-Linux platform implementations.",
+      "next": "Accepted first bounded GTK Linux-only source prune; continue other out-of-scope non-Linux platform components separately. Never claim binary byte improvement for already uncompiled paths.",
       "platform_prune_trial": {
-        "run": 40515987579,
-        "source_commit": "cee7441ebe2280f9294914a5e3e5878d1c17ba05",
-        "caveat": "Current CI source checkout selected experiment workflow from commit cee7441; exact run source verified by run",
-        "attempted_total_removal_files": 458,
-        "attempted_total_removed_git_blob_bytes": 6273579,
+        "source_commit": "bf8c2d4d941516f16a87bd41f7ae772f798d7a65",
+        "successful_run": 40519242468,
+        "accepted_main_commit": "81d9b335b747c377b730a0c3a4de9ea1cf522fe5",
+        "removed_files": 453,
+        "removed_git_blob_bytes": 6266676,
+        "remaining_shared_files": 8,
+        "remaining_paths": [
+          "widget/cocoa/metrics.yaml",
+          "widget/windows/metrics.yaml",
+          "browser/installer/windows/nsis/updater_append.ini",
+          "widget/windows/rust/Cargo.toml",
+          "widget/windows/rust/src/AlertsServiceRust.h",
+          "widget/windows/rust/src/PermissionMonitor.h",
+          "widget/windows/rust/src/lib.rs",
+          "widget/windows/rust/src/permission_monitor.rs"
+        ],
         "scope": [
           "widget/windows",
           "widget/cocoa",
           "browser/installer/windows"
         ],
-        "retained_shared_metadata": [
-          "widget/windows/metrics.yaml",
-          "widget/cocoa/metrics.yaml",
-          "browser/installer/windows/nsis/updater_append.ini"
-        ],
-        "previous_errors": [
-          "40443043378: missing Glean metrics YAML due to shared metrics index",
-          "40514571558: missing Windows-format updater_append.ini due to common browser locale generator"
-        ],
-        "acceptance": "pending_native_ci",
-        "effect_on_linux_compiled_binary": "not measured; platform modules were already excluded by GTK config"
-      }
+        "acceptance": "complete_native_and_runtime_ci_pass",
+        "linux_binary_size_saving_bytes": null,
+        "other_platform_source_removals": "not yet audited"
+      },
+      "removal_accepted": true
     },
     {
       "id": "macos_cocoa_widget",
-      "decision": "ephemeral_linux_source_prune_in_native_validation",
+      "decision": "accepted_source_only_prune",
       "surface": "source_only",
       "paths": [
         "widget/cocoa/"
@@ -97,8 +101,9 @@
         "widget/moz.build: toolkit selector",
         "Linux-only CI experiment: https://github.com/sguzman/vulpra/actions/runs/40515987579; compilation/packaging/runtime not yet proven. Required Glean source metadata and Windows updater fragment retained."
       ],
-      "next": "Review result of exact CI 40515987579; only commit source removals to main if real native build, packaging, Wayland, JS, WebExtension and Nimbus pass. Do not claim compiled-package byte savings for these already non-Linux platform implementations.",
-      "platform_prune_trial_ref": "windows_widget_installer.platform_prune_trial"
+      "next": "Accepted first bounded GTK Linux-only source prune; continue other out-of-scope non-Linux platform components separately. Never claim binary byte improvement for already uncompiled paths.",
+      "platform_prune_trial_ref": "windows_widget_installer.platform_prune_trial",
+      "removal_accepted": true
     },
     {
       "id": "android_mobile",

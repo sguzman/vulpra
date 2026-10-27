@@ -6,7 +6,7 @@
   "upstream_tag": "FIREFOX_159_0b5_RELEASE",
   "upstream_commit": "34ac0671eb25f31f8c56ace36e1c413dd471eb8d",
   "overall": {
-    "percent": 39,
+    "percent": 44,
     "definition": "Product work only, excluding source scaffolding M1. Equal milestone weights for M2 working browser, M3 debloating and M4 defect fixes / Rust migration; integer percent = floor((M2.percent + M3.percent + M4.percent)/3)."
   },
   "milestones": [
@@ -120,7 +120,7 @@
     {
       "id": "M3",
       "name": "User-specific debloating",
-      "percent": 17,
+      "percent": 33,
       "status": "in-progress",
       "evidence": [
         "2026-10-26: M3 read-only pinned-Git source footprint/inventory runner ci/m3-inventory-local.py and path-category classification tests passed CI https://github.com/sguzman/vulpra/actions/runs/40366275497. Audited source anchors and removal acceptance gates are in docs/vulpra/DEBLOAT.md. Actual target-workstation source census and dependency-verified removals have NOT run; M3 remains 0% until evidence arrives.",
@@ -149,7 +149,8 @@
         "2026-10-26: Verified Wayland run 40402080044 hit a 20-minute apt mirror timeout before functional execution; replacement same-surface/NULL-detach negative harness https://github.com/sguzman/vulpra/actions/runs/40405124317 PASSED all tests. Preventive correction to downstream *real candidate* runtime workflow (commit fd67814): apt --no-install-recommends plus download retries and 65-minute dependency-install/100-minute job limits; workflow syntax lint PASS https://github.com/sguzman/vulpra/actions/runs/40410470305. This only prevents a known CI infrastructure cancellation, not proof of Normandy-free native package compatibility or measurable saved bytes.",
         "2026-10-26: Started parallel independently compiled *full-Normandy* baseline from EXACT in-progress lean candidate source commit 286627afec2cb141a3d6e553eac41954847db5b4, with identical non-Normandy mozconfig flags, one Cargo job, 24 GiB swap, isolated objdir, source-attributed SHA-256 package report and preserved archive. Workflow run https://github.com/sguzman/vulpra/actions/runs/40412644709 passed pinned checkout/bootstrap and was configuring at last check. Final comparison workflow commit 0ce8c4f now waits for this source-pinned run and reuses its package iff source/variant/checksum/size match, otherwise falls back to previous exact-source native baseline compile. Workflow lint PASS https://github.com/sguzman/vulpra/actions/runs/40412934878; standalone baseline workflow lint PASS https://github.com/sguzman/vulpra/actions/runs/40412644683. Parallel build is a scheduling optimization, NOT an accepted runtime or measured savings. Original lean candidate 40392545095 still compiling; M3 0%, overall 33%.",
         "2026-10-27: Both independent source-matched native Linux variants COMPILED and ./mach package emitted Vulpra tar.xz archives, but staging FAILED: packaging/stage.sh incorrectly required an executable named firefox while the native Vulpra build carries its executable as vulpra. Lean https://github.com/sguzman/vulpra/actions/runs/40392545095 and full baseline https://github.com/sguzman/vulpra/actions/runs/40412644709; both logs explicitly report 'stage: Firefox executable missing beside application.ini'. No packaged artifact was uploaded by failed CI jobs, so native recompilation is necessary. Repair preserves native binary and adds separate vulpra-launch; packaging launch and localhost acceptance fixture tests PASS https://github.com/sguzman/vulpra/actions/runs/40431563473 and https://github.com/sguzman/vulpra/actions/runs/40431563559. New same-commit lean/full rebuilds https://github.com/sguzman/vulpra/actions/runs/40431768974 and https://github.com/sguzman/vulpra/actions/runs/40431769117 started; matching source commit 674db8e385c36aec23e78bbe059b2a1fec194fae; workflow lint PASS https://github.com/sguzman/vulpra/actions/runs/40431769066. Real branded package runtime/Nimbus and positive matched byte savings still not verified. M3=0%, overall 33%.",
-        "2026-10-27: FIRST ACCEPTED real packaged removal after diagnosed screenshot timing race. Native lean build https://github.com/sguzman/vulpra/actions/runs/40431768974 and full baseline https://github.com/sguzman/vulpra/actions/runs/40431769117 both PASS and uploaded independently packaged same-source artifacts (674db8e385c36aec23e78bbe059b2a1fec194fae). Corrected real browser validation https://github.com/sguzman/vulpra/actions/runs/40439671494 PASS: Weston Wayland attached+committed real frame, checksum, screenshot, isolated Firefox profile, real WebDriver JS redirect /start -> /js-run -> /page and final DOM, temporary WebExtension content/background/storage/uninstall, Nimbus manager.store.ready() and ExperimentAPI.ready(). Matched package comparison https://github.com/sguzman/vulpra/actions/runs/40439793884 PASS: full 86,937,548 compressed bytes vs lean 86,909,928; positive saving EXACTLY 27,620 bytes (0.032%). Normandy runner resource absent in lean, shared Nimbus helper modules present. Previous screenshot race is harness artifact, not evidence of browser break. M3 1/6 roadmap acceptance gates (17%); overall floor((100+17+0)/3) =39%. No full M3 finish claimed."
+        "2026-10-27: FIRST ACCEPTED real packaged removal after diagnosed screenshot timing race. Native lean build https://github.com/sguzman/vulpra/actions/runs/40431768974 and full baseline https://github.com/sguzman/vulpra/actions/runs/40431769117 both PASS and uploaded independently packaged same-source artifacts (674db8e385c36aec23e78bbe059b2a1fec194fae). Corrected real browser validation https://github.com/sguzman/vulpra/actions/runs/40439671494 PASS: Weston Wayland attached+committed real frame, checksum, screenshot, isolated Firefox profile, real WebDriver JS redirect /start -> /js-run -> /page and final DOM, temporary WebExtension content/background/storage/uninstall, Nimbus manager.store.ready() and ExperimentAPI.ready(). Matched package comparison https://github.com/sguzman/vulpra/actions/runs/40439793884 PASS: full 86,937,548 compressed bytes vs lean 86,909,928; positive saving EXACTLY 27,620 bytes (0.032%). Normandy runner resource absent in lean, shared Nimbus helper modules present. Previous screenshot race is harness artifact, not evidence of browser break. M3 1/6 roadmap acceptance gates (17%); overall floor((100+17+0)/3) =39%. No full M3 finish claimed.",
+        "2026-10-27: Proven source-only Windows/Cocoa reduction: 453 Git-tracked files/6,266,676 Git blob bytes were pruned in isolated CI (40519242468). Linux GTK protected configure PASS, complete native browser compile PASS, staged package SHA PASS, Weston Wayland attach/commit PASS, localhost screenshot PNG/profile PASS, real JS navigation -> HTTP 302 -> final DOM PASS, unsigned WebExtension install/content/background/storage/uninstall PASS, Nimbus ExperimentStore/API ready PASS. Eight necessary cross-platform Glean/locale/Cargo files retained. Atomic main source deletion commit 81d9b335b747c377b730a0c3a4de9ea1cf522fe5 verified to retain exactly 8 scoped files. No measured binary-size reduction or broad telemetry removal. Initial non-Linux platform subset phase gate accepted; other platform paths still need auditing."
       ],
       "verified_preparatory_tasks": [
         {
@@ -203,15 +204,14 @@
           "evidence": "Corrected original JAR manifest conditional, GTK-only NimbusBootstrap and ShieldFrame guard; Ubuntu configure and static invariants passed https://github.com/sguzman/vulpra/actions/runs/40384311987. No native compiled binary or feature-off package/runtime."
         }
       ],
-      "status_note": "One real opt-in debloat accepted: independently compiled and packaged Normandy-free/full variants from identical source SHA 674db8e385c36aec23e78bbe059b2a1fec194fae. Real runtime CI PASS 40439671494; checksum/matched-source size CI PASS 40439793884, measured 27,620 B compressed saving (0.032%), shared Nimbus preserved. 1 of 6 documented M3 gates completed; 5 broader audit/removal workstreams remain. M3 17%; overall 39%. Existing M2 browser untouched.",
+      "status_note": "Two M3 roadmap acceptance gates now satisfied. First accepted selective binary-size reduction: opt-in Normandy-free source-matched Ubuntu package, 27,620 compressed bytes (0.032%), real runtime PASSED. Second accepted source-only platform pruning: 453 files/6,266,676 Git blob bytes deleted from widget/windows, widget/cocoa, browser/installer/windows, preserving eight shared Glean, updater and Rust files. Complete isolated GTK native build, Vulpra packaging, Wayland render, localhost PNG/JS/302, WebExtension and Nimbus acceptance PASSED in CI 40519242468; deletion committed to main 81d9b335. No Windows/macOS code compiled on Linux before pruning, no binary reduction claimed. 2/6 checklist gates = 33% M3; overall 44%. Other Windows/macOS paths remain for further targeted audits; M2 and user Firefox unchanged.",
       "acceptance_gates": {
-        "passed": 1,
+        "passed": 2,
         "total": 6,
-        "method": "One of the six explicitly listed M3 roadmap checklist gates is satisfied: every accepted removal to date (Normandy runner only) has reproducible before/after measurement and passing native/browser runtime gates. Equal checklist weights: round(1 / 6 * 100) = 17%. Future candidates must meet the same gate.",
+        "method": "Two of the six explicitly documented M3 roadmap gates have accepted evidence: (1) reproducible before/after measurements and live native acceptance for each accepted removal (positive paired binary saving verified for Normandy; source-only before/after file and blob counts for platform prune), and (2) audited non-Linux platform-only source/installer subset pruned after complete native browser compilation and runtime acceptance. Equal gate weights: round(2/6*100)=33%. This does NOT certify every Windows/macOS source tree removed nor imply binary savings from non-compiled platform code.",
         "remaining": [
           "Complete feature bundle, binary/build dependency and platform map",
           "Complete candidate keep/disable/compile/remove classification",
-          "Audit and prune non-Linux platform-only source/distribution safely",
           "Audit promotional UI, Pocket, account/Sync and telemetry paths",
           "Audit mobile/test/source-only assets and optional packaged localizations"
         ]
@@ -244,6 +244,47 @@
             "Ubuntu 24.04 CI binary comparison; not Arch workstation measurement",
             "one selective removal, not completion of all M3 debloating",
             "no full general security audit"
+          ]
+        },
+        {
+          "id": "linux-excluded-widget-installer-source",
+          "status": "accepted_source_only",
+          "candidate_run": 40519242468,
+          "source_commit": "bf8c2d4d941516f16a87bd41f7ae772f798d7a65",
+          "accepted_source_commit": "81d9b335b747c377b730a0c3a4de9ea1cf522fe5",
+          "removed_paths": 453,
+          "removed_git_blob_bytes": 6266676,
+          "retained_shared_paths": [
+            "widget/cocoa/metrics.yaml",
+            "widget/windows/metrics.yaml",
+            "browser/installer/windows/nsis/updater_append.ini",
+            "widget/windows/rust/Cargo.toml",
+            "widget/windows/rust/src/AlertsServiceRust.h",
+            "widget/windows/rust/src/PermissionMonitor.h",
+            "widget/windows/rust/src/lib.rs",
+            "widget/windows/rust/src/permission_monitor.rs"
+          ],
+          "scope": [
+            "widget/windows",
+            "widget/cocoa",
+            "browser/installer/windows"
+          ],
+          "checks": [
+            "full GTK/Wayland/Sandbox/Sync/Normandy/DevTools native configuration",
+            "real compiled branded Vulpra Linux browser with platform sources absent",
+            "packaged and SHA256-verified isolated launcher",
+            "real private Weston Wayland frame attachment and commit",
+            "real packaged localhost PNG screenshot and Firefox profile isolation",
+            "real WebDriver browser JavaScript redirect and HTTP 302 to final DOM",
+            "temporary unsigned WebExtension content/background/storage and uninstall",
+            "Nimbus ExperimentStore and ExperimentAPI ready"
+          ],
+          "binary_savings_bytes": null,
+          "limitations": [
+            "This reduction measures source Git blob bytes; Linux compiled binary saving not measured/expected because platform compilation was already excluded",
+            "Not a proof that all non-Linux code across repository is removable",
+            "Not an independent after-main-commit native build; verified precommit trial source tree precisely matched 453 files removed from main",
+            "Does not disable telemetry or eliminate Glean"
           ]
         }
       ]
@@ -290,6 +331,7 @@
     "2026-10-26: M3 moved beyond read-only inventory to an opt-in, source-controlled Normandy-free compile branch condition using separate object directory. Linux configure PASS 40379371528, static regression PASS 40379675945. Not credited as finished debloating before native build and runtime comparison.",
     "2026-10-26: M3 Normandy opt-out incomplete dependency boundary exposed, including Nimbus shared utility imports and bootstrap. Added full-source audit harness and 6 pinned-source invariants. No native removal credit; M3=0%, overall=33%.",
     "2026-10-26: M3 full Normandy reference scan 379 lines PASS, narrow physical packaging candidate with shared dependencies preserved and source configure PASS 40384311987. Native build and full regression pending, no earned percentage; M3 0%, overall 33%.",
-    "2026-10-27: First small debloat source-to-real-native acceptance PASSED (Normandy): full 86,937,548 B versus lean 86,909,928 B, saving 27,620 B (0.032%) in same-source Ubuntu CI, runtime run 40439671494 and comparison run 40439793884. M3 percent 17 from exactly 1 of six roadmap checklist acceptance gates completed; product overall 39 by published formula. Remaining M3 gates still open."
+    "2026-10-27: First small debloat source-to-real-native acceptance PASSED (Normandy): full 86,937,548 B versus lean 86,909,928 B, saving 27,620 B (0.032%) in same-source Ubuntu CI, runtime run 40439671494 and comparison run 40439793884. M3 percent 17 from exactly 1 of six roadmap checklist acceptance gates completed; product overall 39 by published formula. Remaining M3 gates still open.",
+    "2026-10-27: M3 native Linux platform prune PASSED run 40519242468 and exact 453 source files committed as 81d9b335, preserving 8 necessary generator/Cargo files. Accepted as source-only 6,266,676 Git blob bytes, not executable size reduction. Second roadmap gate credited: M3 33% (2/6), overall 44%; other platform-specific code remains. Target user's existing Firefox/M2 install and profiles not touched."
   ]
 }
