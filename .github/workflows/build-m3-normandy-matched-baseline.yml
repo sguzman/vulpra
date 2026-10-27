@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     env:
-      CANDIDATE_SHA: 286627afec2cb141a3d6e553eac41954847db5b4
+      CANDIDATE_SHA: ${{ github.sha }}
       MOZ_HEADLESS: "1"
       DEBIAN_FRONTEND: noninteractive
       SCCACHE_GHA_ENABLED: "true"
@@ -26,7 +26,7 @@ jobs:
       - name: Check out exact candidate source for original full Normandy
         uses: actions/checkout@v4
         with:
-          ref: 286627afec2cb141a3d6e553eac41954847db5b4
+          ref: ${{ github.sha }}
           fetch-depth: 1
       - name: Verify pinned source and matched mozconfig options
         shell: bash

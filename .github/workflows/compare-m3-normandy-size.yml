@@ -66,18 +66,20 @@ jobs:
         timeout-minutes: 275
         env:
           GH_TOKEN: ${{ github.token }}
-          PREBUILD_RUN_ID: "40412644709"
-          PREBUILD_SOURCE_SHA: "286627afec2cb141a3d6e553eac41954847db5b4"
+          PREBUILD_WORKFLOW: "build-m3-normandy-matched-baseline.yml"
         run: |
           set -euo pipefail
-          # This prebuild is pinned to the exact SHA of native candidate
-          # 40392545095. Other future candidates use the original baseline
-          # compile path below; never reuse mismatched-source packages.
+          # Select a baseline build for the EXACT lean source SHA. Never
+          # reuse a completed artifact compiled from a different checkout.
           lean_sha="$(python3 -c 'import json,os;from pathlib import Path;print(json.loads((Path(os.environ["RUNNER_TEMP"])/"lean-metadata.json").read_text())["source_commit"])')"
-          if [[ "$lean_sha" != "$PREBUILD_SOURCE_SHA" ]]; then
-            echo "Prebuilt baseline belongs to a different candidate; compiling fresh"
+          export PREBUILD_SOURCE_SHA="$lean_sha"
+          matching_runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$PREBUILD_WORKFLOW/runs?per_page=30")"
+          PREBUILD_RUN_ID="$(jq -r --arg sha "$lean_sha" '[.workflow_runs[] | select(.head_sha == $sha and .event == "push")] | sort_by(.id) | reverse | .[0].id // empty' <<< "$matching_runs")"
+          if [[ -z "$PREBUILD_RUN_ID" ]]; then
+            echo "No independent source-matched prebuild discovered; using existing full native compile fallback"
             exit 0
           fi
+          echo "Source-matched full baseline workflow run: $PREBUILD_RUN_ID"
           for ((poll=0; poll<260; poll++)); do
             status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREBUILD_RUN_ID" --jq .status)"
             if [[ "$status" == completed ]]; then

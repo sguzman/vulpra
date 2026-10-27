@@ -204,10 +204,12 @@ jobs:
           [[ "${#inis[@]}" -eq 1 ]] || { echo "Ambiguous package application.ini" >&2; exit 1; }
           appdir="$(dirname "${inis[0]}")"
           grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
+          # A branded native Vulpra ELF is preserved; the private launcher is separate.
           test -x "$appdir/vulpra"
+          test -x "$appdir/vulpra-launch"
           echo '<!doctype html><title>Vulpra M3 smoke</title><h1>Local page</h1><script>document.querySelector("h1").textContent="JS executed";</script>' > "$work/check.html"
           HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" MOZ_HEADLESS=1 \
-            timeout 120 "$appdir/vulpra" --headless --screenshot "$work/screenshot.png" "file://$work/check.html"
+            timeout 120 "$appdir/vulpra-launch" --headless --screenshot "$work/screenshot.png" "file://$work/check.html"
           test -s "$work/screenshot.png"
           file --mime-type "$work/screenshot.png" | grep -Fq 'image/png'
           test "$(sha256sum "$work/home/.mozilla/firefox/profiles.ini")" = "$baseline"
