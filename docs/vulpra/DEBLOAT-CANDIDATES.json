@@ -589,13 +589,14 @@
       "source_files": 280,
       "source_bytes": 7704040,
       "evidence": [
-        "Preflight Git tree inventory verified all eight trees and exact blob sizes/counts; test pending https://github.com/sguzman/vulpra/actions/runs/40599356576"
+        "Preflight Git tree inventory verified all eight trees and exact blob sizes/counts; test pending https://github.com/sguzman/vulpra/actions/runs/40599356576",
+        "Compiler repair accepted as safety maintenance, not pruning gate: Taskcluster source hash repair 9a2fde29, Android guard 40600782277 passed, follow-on native test 40600510147 reached GTK configure after clean source-staging."
       ],
       "trial": {
-        "status": "in_progress",
+        "status": "compiler_bootstrap_and_source_staging_passed; native configuration/build/runtime pending",
         "workflow": ".github/workflows/m3-secondary-mobile-native.yml",
-        "ci_run_id": 40599356576,
-        "source_commit": "28fe67e3ef678c951fcc0f3b83080ec8e6d9a8b8",
+        "ci_run_id": 40600510147,
+        "source_commit": "907b210ad0015f5996c674a42d358b0d9694e615",
         "total_git_files": 280,
         "total_git_blob_bytes": 7704040,
         "protected": [
@@ -606,7 +607,20 @@
           "widget/gtk/moz.build",
           "toolkit/library/rust/shared/Cargo.toml"
         ],
-        "committed_to_main": false
+        "committed_to_main": false,
+        "failures": [
+          {
+            "run": 40599356576,
+            "kind": "pre-staging bootstrap failure",
+            "explanation": "bootstrap returned without Mozilla Clang artifact; native test not attempted"
+          },
+          {
+            "run": 40600015975,
+            "kind": "pre-staging toolchain resolution failure",
+            "explanation": "Taskcluster Android dependency toolchain still referenced two removed Android Components plugin source files (four YAML resource entries)"
+          }
+        ],
+        "repair": "Removed 4 stale resource entries from taskcluster/kinds/toolchain/android.yml commit 9a2fde29 and added persistent CI check; bootstrap and staging on 40600510147 passed."
       }
     }
   ],
