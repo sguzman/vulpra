@@ -68,6 +68,7 @@ jobs:
           bash -n ci/tests/m3-config-baseline-test.sh
           bash -n ci/tests/m3-package-footprint-test.sh
           bash -n ci/tests/m3-normandy-optout-test.sh
+          bash -n ci/tests/m3-asrouter-promos-optout-test.sh
           python3 -m py_compile ci/m3-package-footprint-local.py
           bash -n ci/tests/sync-local-safe-test.sh
           python3 -m py_compile ci/accept-native-package-local.py
@@ -112,6 +113,9 @@ jobs:
 
       - name: Test opt-in Normandy packaging and manifest conditionals
         run: bash ci/tests/m3-normandy-optout-test.sh "$PWD"
+
+      - name: Test isolated ASRouter promotion resource opt-out
+        run: bash ci/tests/m3-asrouter-promos-optout-test.sh "$PWD"
 
       - name: Validate classified M3 candidate register
         run: |
