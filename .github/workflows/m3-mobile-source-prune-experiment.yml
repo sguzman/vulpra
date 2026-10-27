@@ -1,6 +1,6 @@
-# Historical filename retained for the native trial linked by its run ID.
-# The three Android-only app directory deletions are now COMMITTED to main;
-# never repeat the staged 14,134-file deletion or rebuild the browser here.
+# The full native Android application pruning trial already passed.
+# This read-only HEAD invariant verifies no removed app roots reappear.
+# Full before/after evidence: GitHub Actions 40585240593 and commit 54675537.
 name: M3 Verify Committed Android App Source Prune
 
 on:
@@ -20,61 +20,46 @@ jobs:
   verify-android-app-prune:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 10
     steps:
-      - name: Checkout tree metadata and tiny CI source subset
+      - name: Checkout only current Git tree metadata
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           filter: blob:none
           sparse-checkout: |
             ci
           sparse-checkout-cone-mode: true
 
-      - name: Verify exact original scope and retained Android integration
+      - name: Verify Android app-only deletions and protected shared source
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import subprocess
-          base="f75c875d61ab76031f3ecc1f5bc6382bdc32183e"
-          prune="546755376021d230bb12ab2f904129a7d6f80973"
-          roots=("mobile/android/fenix","mobile/android/focus-android",
-                 "mobile/android/android-components")
-          def git(*args):
-              return subprocess.check_output(("git",*args))
-          assert git("rev-parse",f"{prune}^").decode().strip()==base
-          orig=git("ls-tree","-r","-l","-z",base,"--",*roots)
-          stats={root:{"files":0,"bytes":0} for root in roots}
-          expected=set()
-          for item in orig.split(b"\0"):
-              if not item: continue
-              meta,path=item.split(b"\t",1)
-              name=path.decode("utf-8","surrogateescape")
-              r=next((x for x in roots if name.startswith(x+"/")),None)
-              assert r,(name,roots)
-              typ=meta.split()
-              assert typ[1]==b"blob",(name,typ)
-              expected.add(name)
-              stats[r]["files"]+=1
-              stats[r]["bytes"]+=int(typ[3])
-          assert stats=={
-             "mobile/android/fenix":{"files":3881,"bytes":61071734},
-             "mobile/android/focus-android":{"files":743,"bytes":9353910},
-             "mobile/android/android-components":{"files":9510,"bytes":45571225}
-          },stats
-          changed=git("diff","--name-only","-z",base,prune)
-          actual={x.decode("utf-8","surrogateescape") for x in changed.split(b"\0") if x}
-          assert actual==expected,("Prune commit changed unexpected paths",len(actual^expected))
-          assert not git("ls-tree","-r","--name-only","HEAD","--",*roots)
-          protected=("mobile/shared/moz.build","mobile/android/moz.build",
-                     "widget/android/moz.build","browser/app.mozbuild",
-                     "toolkit/library/rust/shared/Cargo.toml")
-          for path in protected:
-              assert git("rev-parse",f"HEAD:{path}"),path
-              assert git("rev-parse",f"{base}:{path}")==git("rev-parse",f"{prune}:{path}"),path
-          print("PASS: exactly 14,134 unsupported Android app files removed")
-          print("PASS: 115,996,869 original Git blob bytes, source only")
-          print("PASS: shared mobile/Android widget, GeckoView entry and desktop dependencies retained")
-          print("Native Linux acceptance: https://github.com/sguzman/vulpra/actions/runs/40585240593")
-          PY
+          # Git tree lookup, not a 14,134-file history diff or full checkout.
+          # Immutable commit 546755376021d230bb12ab2f904129a7d6f80973
+          # already passed exact deletion and native runtime acceptance.
+          for root in mobile/android/fenix mobile/android/focus-android \
+                      mobile/android/android-components; do
+            if git ls-tree HEAD -- "$root" | grep -q .; then
+              echo "ERROR: deleted Android app root returned: $root" >&2
+              exit 1
+            fi
+          done
+          for path in mobile/shared/moz.build mobile/android/moz.build \
+                      widget/android/moz.build browser/app.mozbuild \
+                      toolkit/library/rust/shared/Cargo.toml; do
+            if ! git ls-tree -r HEAD -- "$path" | grep -q .; then
+              echo "ERROR: protected source absent: $path" >&2
+              exit 1
+            fi
+          done
+          for root in mobile/android/geckoview mobile/android/components \
+                      mobile/android/modules; do
+            if ! git ls-tree HEAD -- "$root" | grep -q .; then
+              echo "ERROR: preserved shared Android root absent: $root" >&2
+              exit 1
+            fi
+          done
+          echo "PASS: three Android app roots remain absent on current main"
+          echo "PASS: shared GeckoView, Android widget and core build paths remain"
+          echo "Historical native acceptance: https://github.com/sguzman/vulpra/actions/runs/40585240593"
