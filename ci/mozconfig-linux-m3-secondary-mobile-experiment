@@ -1,0 +1,8 @@
+# Disposable M3 GTK/Wayland compile for non-Linux mobile/platform leaf-source prune.
+# Keep verified local M2 tree and M3 prior artifacts untouched.
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux-m3-secondary-mobile
+ac_add_options --with-branding=browser/branding/unofficial
+ac_add_options --with-app-basename=Vulpra
+ac_add_options --disable-tests
+ac_add_options --with-ccache=sccache
+mk_add_options MOZ_PARALLEL_BUILD=1
