@@ -47,7 +47,8 @@ jobs:
           full_result="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FULL_RUN_ID" --jq .conclusion)"
 
           marker='<!-- vulpra-m3-both-native-builds-finished-40392545095-40412644709 -->'
-          if gh api --paginate "repos/$GITHUB_REPOSITORY/issues/1/comments?per_page=100"               --jq '.[].body' | grep -Fq -- "$marker"; then
+          comments="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/1/comments?per_page=100" --jq '.[].body')"
+          if grep -Fq -- "$marker" <<< "$comments"; then
             echo "Completion notification already posted. No duplicate."
             exit 0
           fi
