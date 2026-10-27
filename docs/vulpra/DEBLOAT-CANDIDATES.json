@@ -120,7 +120,39 @@
         "mobile/android/moz.build: Android app and GeckoView generated files",
         "widget/moz.build: toolkit selector"
       ],
-      "next": "Trace app/build/generator references, not wholesale removal"
+      "next": "Inspect 685 surviving external literal references (many may be unrelated Android-only tooling) and await full Linux native build/Wayland/JavaScript/WebExtension/Nimbus tests from staged 14,134-file source removal; never commit the deletion or credit M3 until evidence passes.",
+      "staged_app_source_trial": {
+        "status": "prune_staged_only_in_throwaway_runner; native acceptance in progress",
+        "run_id": 40584538820,
+        "preliminary_run_id": 40584407127,
+        "preliminary_run_conclusion": "cancelled on workflow correction after source staging preflight passed; no native credit",
+        "candidate_source_commit": "1c3bd4a7f3e6bc338aa4c7d5f7cfc71630dc3409",
+        "selected_roots": [
+          {
+            "path": "mobile/android/fenix/",
+            "files": 3881,
+            "git_blob_bytes": 61071734
+          },
+          {
+            "path": "mobile/android/focus-android/",
+            "files": 743,
+            "git_blob_bytes": 9353910
+          },
+          {
+            "path": "mobile/android/android-components/",
+            "files": 9510,
+            "git_blob_bytes": 45571225
+          }
+        ],
+        "total_files": 14134,
+        "total_git_blob_bytes": 115996869,
+        "outside_selected_roots_literal_reference_lines": 685,
+        "retained_mobile_shared": "mobile/shared/",
+        "retained_widget_android": "widget/android/",
+        "source_only": "Source Git blob bytes only; no compressed package saving claimed or expected",
+        "acceptance": "Requires completed real native Linux configure/build/package/Wayland/JS/WebExtensions/Nimbus/profile smoke and classification of external references before any permanent deletion",
+        "permanent_main_deleted_files": 0
+      }
     },
     {
       "id": "source_testing",
