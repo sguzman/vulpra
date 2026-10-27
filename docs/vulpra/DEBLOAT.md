@@ -58,6 +58,18 @@ Specific desktop blockers worth isolating before a native opt-out:
 
 The dependency map and candidate statuses are recorded in [DEBLOAT-CANDIDATES.json](DEBLOAT-CANDIDATES.json). **M3 remains 2/6 gates (33%), overall 44%.** Next evidence gate: choose one narrow packaged feature, map every non-test caller and runtime fallback, and only then perform source-matched opt-in native build, live behavior and package-size comparison. No telemetry deletion or other candidate is yet authorized.
 
+## Isolated ASRouter AI promotion resource experiment (2026-10-27)
+
+The full-source Pocket/promotion/Sync/reporting audit identified two narrow promotional modules packaged via `browser/components/asrouter/moz.build`. A guarded, **opt-in Linux-only** experiment now excludes exactly `SidebarChatBotPromo.sys.mjs` and `SmartWindowNewTabPromo.sys.mjs` from the browser's ASRouter resource map. It does **not** remove ASRouter, onboarding, feature callouts, new-tab UI, telemetry, WebExtensions, Sync or Nimbus.
+
+- **Source implementation:** `browser/moz.configure` defines `VULPRA_NO_ASROUTER_PROMOS` only when explicitly requested with `VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS=1`. The default build retains both modules. `toolkit/modules/AppConstants.sys.mjs` exports the immutable compiled flag; the two respective `ASRouter.routeCFRMessage` cases never dereference absent modules when enabled. No mutable preference can bypass the guard.
+- **Separate object directory:** `ci/mozconfig-linux-m3-promos-experiment`; default `ci/mozconfig-linux` and known-good local object tree remain untouched.
+- **Native acceptance:** [opt-in native build and runtime run 40547968387](https://github.com/sguzman/vulpra/actions/runs/40547968387) must pass full GTK/Wayland configuration, C++/Rust compile, package SHA256, physical absence of exactly two resources with key ASRouter modules present, actual Weston frames, browser JS redirect/DOM, WebExtension lifecycle, Nimbus initialization, Chrome-context guarded promo dispatch, and Firefox profile isolation.
+- **Strict source-matched package measurement:** `.github/workflows/m3-asrouter-promo-matched-baseline.yml` is triggered only by successful native acceptance; it must compile the full browser from the *candidate's exact commit* using matched non-promo compiler options, verify the original modules are present in its package, and show a strictly positive compressed-byte saving. No candidate-vs-original-workstation comparison is valid.
+- **Offline checks:** `ci/tests/m3-asrouter-promos-optout-test.sh` protects source/config flags; WebExtension harness fixtures check both accepted and rejected Chrome-context promo probes. These tests are not a native browser substitute.
+
+**Current accounting:** An experiment is not an accepted removal. M3 remains **2/6 gates (33%)**, overall **44%**, pending actual native and source-matched package evidence. The immutable guard is necessary because remote messaging could otherwise request a promotion template after the resource is absent.
+
 ## First rule: preserve a known-good baseline
 
 Keep the pinned local workstation checkout, its build output, and the verified packaged tarball. Do not reset the tree, disable Git sparse settings blindly, delete build directories or relaunch a full Firefox compilation just to compute statistics. The source inventory is **read-only** and writes only to a private directory inside `.git`.
