@@ -67,8 +67,21 @@ def inspect_omni(data):
         return output
     hints = {h: metric() for h in HINTS}
     categories = defaultdict(metric)
+    # Exact ZIP-entry byte sizes and CRCs help distinguish a physically
+    # excluded New Tab resource from unrelated whole tar.xz variation.
+    # ZIP compress_size is NOT its independent contribution to the outer XZ.
+    newtab_prefix = "builtin-addons/newtab/lib/"
+    newtab_entries = []
     for member in entries:
         add(categories[member.filename.strip("/").split("/")[0] or "[root]"], member.file_size)
+        if member.filename.startswith(newtab_prefix):
+            newtab_entries.append({
+                "path": member.filename,
+                "logical_bytes": member.file_size,
+                "zip_compressed_entry_bytes": member.compress_size,
+                "zip_crc32": f"{member.CRC:08x}",
+                "zip_compress_type": member.compress_type,
+            })
         for hint in HINTS:
             if hint in member.filename.lower():
                 add(hints[hint], member.file_size)
@@ -78,6 +91,16 @@ def inspect_omni(data):
         "logical_bytes": sum(e.file_size for e in entries),
         "zip_compressed_entry_bytes": sum(e.compress_size for e in entries),
         "hints": hints,
+        "newtab_lib_resources": {
+            "count": len(newtab_entries),
+            "logical_bytes": sum(x["logical_bytes"] for x in newtab_entries),
+            "zip_compressed_entry_bytes": sum(
+                x["zip_compressed_entry_bytes"] for x in newtab_entries
+            ),
+            "entries": sorted(newtab_entries, key=lambda x: x["path"]),
+            "limits": "ZIP entry compressed bytes are not outer tar.xz savings; "
+                      "CRC32 detects accidental differences, not adversarial tampering.",
+        },
         "first_path_components": dict(sorted(categories.items(),
                                       key=lambda t: -t[1]["logical_bytes"])[:25]),
     })
@@ -124,6 +147,7 @@ def census(archive):
             "No comparison build performed; existing package may predate source Git HEAD",
             "Logical bytes and ZIP hint matches do not equal disk blocks, RAM or removable package bytes",
             "Resource substring groups can overlap or omit indirectly named features",
+            "New Tab ZIP entry bytes are not isolated compressed tar.xz savings; artifact-based comparison still required",
             "No proof of dependency reachability or safe removal",
         ],
     }

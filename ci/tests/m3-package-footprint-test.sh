@@ -16,6 +16,9 @@ with zipfile.ZipFile(packed, "w", zipfile.ZIP_DEFLATED) as jar:
     jar.writestr("modules/services-sync/Sync.sys.mjs", "012345")
     jar.writestr("modules/Telemetry.sys.mjs", "telemetry")
     jar.writestr("modules/SomeOther.sys.mjs", "otherwise")
+    jar.writestr("builtin-addons/newtab/lib/AdsFeed.sys.mjs", "sponsored module payload")
+    jar.writestr("builtin-addons/newtab/lib/ActivityStream.sys.mjs", "retained core")
+
 with tarfile.open(archive, "w:xz") as out:
     for name, data in (
         ("vulpra/vulpra", b"test executable"),
@@ -48,6 +51,22 @@ assert a["hints"]["genai"]["files"] == 1
 assert a["hints"]["services-sync"]["files"] == 1
 assert a["hints"]["telemetry"]["files"] == 1
 assert a["hints"]["devtools"]["files"] == 0
+newtab = a["newtab_lib_resources"]
+assert newtab["count"] == 2
+by_path = {x["path"]: x for x in newtab["entries"]}
+ads = by_path["builtin-addons/newtab/lib/AdsFeed.sys.mjs"]
+retained = by_path["builtin-addons/newtab/lib/ActivityStream.sys.mjs"]
+assert ads["logical_bytes"] == len("sponsored module payload")
+assert retained["logical_bytes"] == len("retained core")
+assert ads["zip_compressed_entry_bytes"] > 0
+assert retained["zip_compressed_entry_bytes"] > 0
+assert ads["zip_crc32"] and len(ads["zip_crc32"]) == 8
+assert newtab["logical_bytes"] == ads["logical_bytes"] + retained["logical_bytes"]
+assert newtab["zip_compressed_entry_bytes"] == (
+    ads["zip_compressed_entry_bytes"] + retained["zip_compressed_entry_bytes"]
+)
+assert "not outer tar.xz savings" in newtab["limits"]
+
 assert sum(x["logical_bytes"] for x in d["archive_groups"].values()) == d["sum_regular_file_logical_bytes"]
 assert len(d["limits"]) >= 3
 PY
