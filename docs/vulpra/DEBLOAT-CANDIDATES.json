@@ -642,7 +642,7 @@
     },
     {
       "id": "remaining_mobile_platform_leaves",
-      "decision": "isolated_source_only_native_trial",
+      "decision": "accepted_bounded_source_only_prune",
       "paths": [
         "mobile/android/fonts/",
         "mobile/android/geckoview_example/",
@@ -654,7 +654,7 @@
         "widget/uikit/"
       ],
       "why": "Linux GTK does not select standalone Android example apps, Android application branding/font inputs, iOS app, or UIKit widget implementation, but only isolated native acceptance and remaining reference audit can authorize physical deletion.",
-      "next": "Await native Linux full configure/build/packaging and Weston/JS/WebExtension/Nimbus safety test of source-pruned CI checkout; review all external literal references and preserve shared GeckoView/mobile/Android widget and GTK inputs. If accepted, commit only exact roots and record source-only bytes with no binary savings claim.",
+      "next": "Eight exact Android/iOS/UIKit-only leaf directories now committed after full Linux native/runtime verification. Preserve GeckoView, mobile/shared, GTK/widget, testing harnesses and platform guards; remaining source, test fixture and localization audits are still open. No binary saving claim.",
       "source_files": 280,
       "source_bytes": 7704040,
       "evidence": [
@@ -690,6 +690,33 @@
           }
         ],
         "repair": "Removed 4 stale resource entries from taskcluster/kinds/toolchain/android.yml commit 9a2fde29 and added persistent CI check; bootstrap and staging on 40600510147 passed."
+      },
+      "accepted_trial": {
+        "trial_source_commit": "907b210ad0015f5996c674a42d358b0d9694e615",
+        "full_native_ci_run_id": 40600510147,
+        "evidence_artifact_id": 12783184176,
+        "permanent_main_commit": "8331ca63f97b84779d6b1765955dff6017d060f8",
+        "removed_roots": [
+          "mobile/android/fonts",
+          "mobile/android/geckoview_example",
+          "mobile/android/examples",
+          "mobile/android/test_infra",
+          "mobile/android/test_runner",
+          "mobile/android/branding",
+          "mobile/ios",
+          "widget/uikit"
+        ],
+        "removed_files": 280,
+        "removed_original_git_blob_bytes": 7704040,
+        "outside_literal_reference_lines": 110,
+        "trial_compressed_package_bytes": 86922928,
+        "acceptance": "Native GTK configure/build/package SHA256, real Weston Wayland, localhost JavaScript/PNG, WebExtensions, Nimbus and Firefox profile isolation passed",
+        "known_unsupported": "Android Gradle/Taskcluster, Android stage-android test font staging, mobile test runner, iOS/UIKit builds; references retained in related unsupported manifests and docs",
+        "protected": "mobile/shared, GeckoView, widget/android, widget/gtk, browser/app.mozbuild and shared Rust/Cargo inputs retained",
+        "total_permanent_source_deleted_files": 14867,
+        "total_permanent_original_git_blob_bytes": 129967585,
+        "linux_binary_size_saving_bytes": null,
+        "m3_gate_credit": "no new gate; mobile/test/localization audit remains open"
       }
     }
   ],
