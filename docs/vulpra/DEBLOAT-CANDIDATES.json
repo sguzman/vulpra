@@ -713,7 +713,8 @@
         "lean_compressed_bytes": 86927608,
         "saved_compressed_bytes": 3184,
         "compressed_reduction_percent": 0.00366
-      }
+      },
+      "runtime_guard_followup": "The prior false-valued VULPRA_NO_ASROUTER_PROMOS global macro was accidentally present under #ifdef in the ordinary build despite CONFIG false. Enabled-only set_define fix 16d8753 restores expected default routing; config-only three-variant CI 40708134402 and native conditional recompilation required before claiming this correction fully verified. Prior matched full/lean promotion resource-byte evidence remains historical evidence, not updated post-fix package sizing."
     },
     {
       "id": "core_web_security",
@@ -817,7 +818,7 @@
     },
     {
       "id": "newtab_adsfeed_optout",
-      "decision": "native_runtime_passed; same_source_matched_baseline_compiling; no accepted byte saving",
+      "decision": "native runtime candidate passed; old baseline invalid due false-value #ifdef; corrected matched full/lean builds running; no accepted byte saving",
       "surface": "packaged New Tab extension library resource",
       "paths": [
         "browser/extensions/newtab/lib/AdsFeed.sys.mjs",
@@ -836,15 +837,26 @@
       "native_verification": "PASS: native run 40617558714 compiled Vulpra Linux, packaged and checksum verified, omitted only AdsFeed.sys.mjs from omni.ja, preserved five key New Tab resources, real about:newtab, Weston Wayland, JS, WebExtension install/background/storage/uninstall, Nimbus and profile isolation.",
       "compressed_package_bytes": 86932376,
       "matched_baseline_delta_bytes": null,
-      "next": "Native candidate accepted as tested but NO quantified saving until source-pinned full AdsFeed baseline run 40627016301 completes and validates a positive compressed package delta. Baseline is in native compilation. Default/normal package unchanged.",
+      "next": "Await exact-source 864e5b7 simultaneous corrected full baseline run 40708368442 and lean native run 40708368192; a post-native workflow_run will compare independently verified package size/SHA reports. Verify preflight 40708134402 first, including absence of both opt-out macros in default configure. Do not credit positive savings or M3 gate before successful comparison.",
       "evidence": [
         "https://github.com/sguzman/vulpra/commit/a8547f9a1cc4e81985cf171c679c1d19a46875b3",
         "https://github.com/sguzman/vulpra/actions/runs/40617558714",
-        "https://github.com/sguzman/vulpra/actions/runs/40627016301"
+        "https://github.com/sguzman/vulpra/actions/runs/40627016301",
+        "https://github.com/sguzman/vulpra/commit/16d87534e557be4d1e5edac08262ad8af0932af3",
+        "https://github.com/sguzman/vulpra/actions/runs/40708134402",
+        "https://github.com/sguzman/vulpra/actions/runs/40708368192",
+        "https://github.com/sguzman/vulpra/actions/runs/40708368442"
       ],
       "removal_authorized": false,
       "native_package_sha256": "94720e52420f4da85ffe46c95363be24053223c8d03e29376a2a2f642079f304",
-      "matched_baseline_run_id": 40627016301
+      "matched_baseline_run_id": 40627016301,
+      "first_matched_baseline_run_id": 40627016301,
+      "first_matched_baseline_outcome": "Baseline native compiler and package passed, but failed package acceptance: original AdsFeed.sys.mjs not found in default omni.ja. Root cause: set_define(FLAG, False) placed FALSE-valued flag in global JAR/JS preprocessor context, so #ifdef incorrectly selected the opt-out branch even in the normal build. This was NOT a native compiler failure or a positive package-size reduction.",
+      "flag_fix_commit": "16d87534e557be4d1e5edac08262ad8af0932af3",
+      "corrected_matched_source_commit": "864e5b7653b3a1cad94f5b60139e932ddb099b75",
+      "corrected_native_candidate_run_id": 40708368192,
+      "corrected_full_parallel_run_id": 40708368442,
+      "preflight_run_id": 40708134402
     }
   ],
   "observed_native_config": {
