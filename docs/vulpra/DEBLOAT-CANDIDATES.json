@@ -653,7 +653,7 @@
         "Source-pinned Pocket runtime-boundary audit and seven invalid-source mutations passed: https://github.com/sguzman/vulpra/actions/runs/40773515182",
         "Extended promo import/renderer source-boundary audit and nine mutation tests PASSED: https://github.com/sguzman/vulpra/actions/runs/40773988580"
       ],
-      "next": "Opt-in real vendored Webpack compile and original PromoCard JS exclusion passed at 2635afe; 2,732 uncompressed JS bytes. First native candidate 40777472270 stopped before compilation on a CI false-negative for config string '1', fixed in 977c7ae; fresh lean/full 40778245764/40778245670 started. Asset audit 40778037014 found shared mascot outside PromoCard and widespread l10n definitions, so preserve SVG and localizations. No native or compressed-package acceptance yet.",
+      "next": "Real vendored Webpack paired bundle + actual fileDependencies graph passed 40783148652 at dadfc584: default compiled real PromoCard, experimental compiled only null substitute; original handler/title excluded, JS delta 2,732 uncompressed bytes, vendor identical. Candidate not native accepted: matched full/lean native builds 40778245670 and 40778245764 at source 977c7ae compiling. Preserve shared mascot/locales. No native compressed saving or additional M3 gate credit.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -735,6 +735,23 @@
           "classification": "source_and_real_js_bundle_opt_in_passed_native_runtime_pending",
           "reason": "AdBanner statically imports PromoCard even when the optional card is pref-off; physical removal requires guarded bundler import and fallback, packaged asset and locale audits, plus native/renderer acceptance. Preserve banner and sponsored label/context menu."
         }
+      },
+      "promocard_webpack_dependency_proof": {
+        "kind": "real_vendored_webpack_dependency_graph_preflight",
+        "source_commit": "dadfc584b3ec11dd2d3c41beaccb15a5397c8886",
+        "workflow_run": 40783148652,
+        "artifact_id": 12857683303,
+        "status": "passed",
+        "normal_bundle_bytes": 1335463,
+        "optin_bundle_bytes": 1332731,
+        "uncompressed_js_delta_bytes": 2732,
+        "normal_dependencies_include_real_promocard": true,
+        "normal_dependencies_exclude_null_promocard": true,
+        "optin_dependencies_include_null_promocard": true,
+        "optin_dependencies_exclude_real_promocard": true,
+        "retained_sponsored_banner": true,
+        "unchanged_vendor_bundle": true,
+        "limits": "Source HEAD differs from in-progress source-matched native runs (977c7ae) due to follow-up test-only/doc changes. No native acceptance, no final tar.xz claim, not a physical source-file deletion."
       }
     },
     {
@@ -756,7 +773,7 @@
         "browser/components/aboutwelcome/moz.build: actors/modules",
         "ACCEPTED opt-in ASRouter two-promo removal: native runtime pass https://github.com/sguzman/vulpra/actions/runs/40547968387; source-matched binary-size pass https://github.com/sguzman/vulpra/actions/runs/40567473401 (3,184 B/0.00366%). All remaining promotional/pocket/sync/reporting bundles unreviewed."
       ],
-      "next": "Narrow PromoCard opt-in compile path is now guarded and Webpack-verified. Wait for source-matched native 40777472270 and 40777472244 and package/Wayland/JS/extension/Nimbus/profile validation; do not credit per-component tar.xz size from the 2,732-B uncompressed JS delta.",
+      "next": "Source-only Webpack pair and graph checked (40783148652) including physical module resolution; native linux full/opt-in jobs at same commit 977c7ae, 40778245670/40778245764 compiling. Earlier lean 40777472270 failed in configure before compilation and cannot be paired with old baseline. Runtime, package ZIP markers and signed tar.xz comparison still pending. No source/permanent deletion or byte credit.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
