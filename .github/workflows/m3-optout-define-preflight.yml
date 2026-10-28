@@ -81,7 +81,7 @@ jobs:
                   observed.append(d.is_file())
                   if d.is_file():
                       value = json.loads(d.read_text())
-                      assert value in (1, True), (variant, macro, value)
+                      assert str(value) in ("1", "True"), (variant, macro, value)
                   assert s.is_file(), (variant, macro, "missing CONFIG value")
                   assert bool(json.loads(s.read_text())) == d.is_file(), (variant, macro)
               assert tuple(observed) == required[variant], (variant, observed, required[variant])
