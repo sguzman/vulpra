@@ -653,7 +653,7 @@
         "Source-pinned Pocket runtime-boundary audit and seven invalid-source mutations passed: https://github.com/sguzman/vulpra/actions/runs/40773515182",
         "Extended promo import/renderer source-boundary audit and nine mutation tests PASSED: https://github.com/sguzman/vulpra/actions/runs/40773988580"
       ],
-      "next": "Continue with narrow PromoCard renderer/bundler and asset/localization impact checks. AdBanner statically imports PromoCard and will not bundle if it is removed without a guarded import/fallback. The 3-part billboard+two-pref render condition is not a compile-time guard. Preserve legacy+modern stories, Top Sites, New Tab UI, ads clients and Nimbus. No opt-in module deletion authorized yet.",
+      "next": "The narrow guarded PromoCard opt-in now passes real vendored Webpack compile and bundle marker checks (40776956857): normal JSX 1,335,463 B, lean 1,332,731 B (2,732 uncompressed JS bytes). Full native opt-in 40777472270 and normal 40777472244 are running; no source file deletion, no accepted compressed bytes or completed Pocket gate. Keep both feed registrations, AdBanner, Nimbus, SVG and other callers.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -732,7 +732,7 @@
             "SHOW_PERSONALIZE",
             "firefox-mascot-prop-paintbucket-rgb.svg"
           ],
-          "classification": "opt_in_component_candidate_only_not_removal_ready",
+          "classification": "source_and_real_js_bundle_opt_in_passed_native_runtime_pending",
           "reason": "AdBanner statically imports PromoCard even when the optional card is pref-off; physical removal requires guarded bundler import and fallback, packaged asset and locale audits, plus native/renderer acceptance. Preserve banner and sponsored label/context menu."
         }
       }
@@ -756,7 +756,7 @@
         "browser/components/aboutwelcome/moz.build: actors/modules",
         "ACCEPTED opt-in ASRouter two-promo removal: native runtime pass https://github.com/sguzman/vulpra/actions/runs/40547968387; source-matched binary-size pass https://github.com/sguzman/vulpra/actions/runs/40567473401 (3,184 B/0.00366%). All remaining promotional/pocket/sync/reporting bundles unreviewed."
       ],
-      "next": "Evaluate the narrowly optional PromoCard JSX static import and its single mascot asset/locale hooks as a possible guarded opt-in variant. Protect AdBanner's main sponsored-content rendering/menu, all core New Tab/ASRouter/onboarding, Nimbus and story-feed modules. Map all imports/assets before experimental omission; require real bundled native source-matched runtime acceptance. Do not delete based on pref default.",
+      "next": "Narrow PromoCard opt-in compile path is now guarded and Webpack-verified. Wait for source-matched native 40777472270 and 40777472244 and package/Wayland/JS/extension/Nimbus/profile validation; do not credit per-component tar.xz size from the 2,732-B uncompressed JS delta.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -1033,6 +1033,56 @@
         "observed_delta_spread_bytes": 212240,
         "interpretation": "Different source commits and independent builds: both positive deltas are measured, neither demonstrates reproducible or isolated AdsFeed-size saving. Source and packaging differences are unresolved."
       }
+    },
+    {
+      "id": "newtab_promocard_optout",
+      "decision": "isolated_native_trial_running_not_accepted",
+      "surface": "optional_generated_newtab_js_bundle",
+      "paths": [
+        "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCard.jsx",
+        "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx",
+        "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx",
+        "browser/extensions/newtab/webpack.system-addon.config.js",
+        "browser/extensions/newtab/build-newtab-bundles.py",
+        "browser/moz.configure"
+      ],
+      "source_files_removed": 0,
+      "normal_browser_changed": false,
+      "removal_authorized": false,
+      "why": "PromoCard is statically imported by retained AdBanner; opt-in Linux CONFIG flag substitutes only a null JSX component during vendored Webpack compilation and blocks optional render branch. Default keeps real PromoCard. Neither Pocket feed nor AdBanner itself can safely be deleted.",
+      "evidence": [
+        "Source-boundary PromoCard audit and nine broken-dependency checks PASSED: https://github.com/sguzman/vulpra/actions/runs/40773988580",
+        "Real vendored Webpack normal/lean bundles and nine fail-closed source contracts passed: https://github.com/sguzman/vulpra/actions/runs/40776540055",
+        "Two real vendored Webpack builds, synthetic archive/parser and negative-byte compare passed: https://github.com/sguzman/vulpra/actions/runs/40776956857",
+        "Native lean started: https://github.com/sguzman/vulpra/actions/runs/40777472270",
+        "Native full baseline started: https://github.com/sguzman/vulpra/actions/runs/40777472244"
+      ],
+      "preflight": {
+        "source_commit": "2635afea3c2d263efacd2f81c676c7602ebe9a33",
+        "workflow_run": 40776956857,
+        "evidence_artifact_id": 12854503073,
+        "normal_uncompressed_newtab_js_bytes": 1335463,
+        "optin_uncompressed_newtab_js_bytes": 1332731,
+        "uncompressed_js_delta_bytes": 2732,
+        "normal_original_promo_present": true,
+        "optin_original_promo_absent": true,
+        "protected_adbanner_and_vendor_bundle_retained": true,
+        "warning": "This is generated JS bytes only; not package tar.xz savings or native acceptance."
+      },
+      "native_trial": {
+        "source_commit": "c9e520f5d844990d6eb19c1611dc7f62adf5a811",
+        "lean_run": 40777472270,
+        "normal_run": 40777472244,
+        "comparator_workflow": ".github/workflows/m3-promocard-size-compare.yml",
+        "status": "running; no complete native or package-size proof yet"
+      },
+      "protected": [
+        "AdBanner main image, sponsored label, context menu and impressions",
+        "both legacy/modern New Tab recommendation feeds",
+        "Top Sites, AdsClient, AdsFeed, Nimbus, Sync, DevTools, Linux Wayland, WebExtensions and Firefox profile",
+        "ordinary default PromoCard JSX and click/dismiss/impression handlers"
+      ],
+      "next": "Wait for exact-source full and opt-in native compile/package plus actual New Tab bundle presence/absence and real Wayland/JS/about:newtab/WebExtension/Nimbus/profile checks. Event-driven comparator records signed full-minus-optin tar.xz and JS bundle differences, even when nonpositive. Audit mascot asset/localization independently before ever deleting them; don't treat shared resource as optional."
     }
   ],
   "observed_native_config": {
