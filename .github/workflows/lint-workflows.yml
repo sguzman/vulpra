@@ -46,5 +46,6 @@ jobs:
             .github/workflows/m3-promocard-native.yml
             .github/workflows/m3-promocard-matched-baseline.yml
             .github/workflows/m3-promocard-size-compare.yml
+            .github/workflows/m3-promocard-asset-audit.yml
             .github/workflows/m3-sync-reference-audit.yml
             .github/workflows/m3-telemetry-reference-audit.yml

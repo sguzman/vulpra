@@ -1,0 +1,50 @@
+# Narrow PromoCard asset/l10n scope proof; not a browser build.
+name: M3 PromoCard Asset and Localization Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-promocard-asset-audit.py
+      - .github/workflows/m3-promocard-asset-audit.yml
+      - browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/**
+      - browser/extensions/newtab/data/content/assets/firefox-mascot-prop-paintbucket-rgb.svg
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  asset-audit:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Sparse source checkout with pinned Git metadata
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+            browser/extensions/newtab
+            browser/locales/en-US/browser/newtab
+            browser/components/newtab
+      - name: Classify actual tracked asset and localization source references
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 ci/m3-promocard-asset-audit.py \
+            --output "$RUNNER_TEMP/m3-promocard-asset-audit.json"
+          jq -e '.removal_authorized == false and
+                 .asset_tracked == true and
+                 (.terms | length == 5)' \
+            "$RUNNER_TEMP/m3-promocard-asset-audit.json" >/dev/null
+      - name: Upload bounded source-only reference evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-promocard-asset-audit
+          path: ${{ runner.temp }}/m3-promocard-asset-audit.json
+          if-no-files-found: error
+          retention-days: 14
