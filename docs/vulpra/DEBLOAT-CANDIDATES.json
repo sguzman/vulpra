@@ -449,9 +449,10 @@
       "why": "Telemetry reporting preference/configuration is distinct from native telemetry code linked into xul; reporting default depends on mozilla_official but runtime configuration not measured",
       "evidence": [
         "toolkit/moz.configure: MOZ_TELEMETRY_REPORTING option defaults to mozilla_official",
-        "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces"
+        "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces",
+        "https://github.com/sguzman/vulpra/actions/runs/40785850376"
       ],
-      "next": "Focused read-only source audit 40721612576 classified 1,286 literal lines; TelemetryControllerParent calls TelemetryReportingPolicy and TelemetrySend at startup/setup/shutdown, while core native telemetry is linked to xul and Glean/crash reporting have distinct roles. Retain until a verified native configure and actual policy/network test distinguish delivery preference, ping transport and local metrics. Evaluate only a bounded guarded submission opt-out, not full telemetry deletion.",
+      "next": "Focused literal grep 40721612576 and targeted startup/shutdown policy source-boundary CI 40785850376 both PASSED. Preserve core xul metrics, Glean, PingSender and crash reporter, including deletion-request exception. Before an isolated optional upload-transport change, measure real normal/opt-in config, privacy-data lifecycle and actual localhost-captured HTTP upload with consent/opt-out state, followed by native browser acceptance and matched packages. No source deletion or broad gate credit.",
       "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\"",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -510,6 +511,29 @@
           "No changes to telemetry preference defaults, Glean, crash reporting or native code"
         ],
         "removal_authorized": false
+      },
+      "telemetry_lifecycle_boundary_audit": {
+        "source_commit": "d81f106f1f065b5a3f7ec000dfe2c3d452b458f9",
+        "run_id": 40785850376,
+        "artifact_id": 12859376809,
+        "result": "PASSED: pinned real source high-impact sender/controller/reporting policy and native/Glean/crashreporter/desktop preference boundary audit; 6 protected decision boundaries, 11 deliberately broken source mutations rejected.",
+        "protected_components": [
+          "TelemetryControllerParent startup and orderly shutdown",
+          "TelemetrySend upload preference/policy checks and deletion-request exception",
+          "TelemetryReportingPolicy notification and terms-of-use gating",
+          "Telemetry native xul modules and pingsender",
+          "Glean metrics bindings",
+          "Separate MOZ_CRASHREPORTER build gate",
+          "Browser shutdown ping preferences and Privacy UI"
+        ],
+        "decision": "retain_original_telemetry_transport_policy_native_and_crash_pending_network_test",
+        "removal_authorized": false,
+        "limits": [
+          "Source anchors are not a dynamic call graph or proof of network transmission.",
+          "Actual compiled MOZ_TELEMETRY_REPORTING remains unverified in target personal binary.",
+          "Delete-request ping exception means simplistic no-upload module omission could violate privacy lifecycle.",
+          "No native compile, packet capture, upload-policy behavior test, code deletion, package-size credit or completed M3 gate."
+        ]
       }
     },
     {

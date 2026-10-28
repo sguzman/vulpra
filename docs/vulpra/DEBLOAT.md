@@ -42,6 +42,21 @@ The bounded graph now includes `content-src/components/DiscoveryStreamComponents
 
 **Candidate classification:** optional `PromoCard.jsx` is a promising *opt-in conditional-compilation investigation*, not an approved removal. Because of its **static import**, merely defaulting `promoCard.enabled` to false cannot eliminate its module from the generated JS bundle, and deleting the JSX file without modifying/guarding the importer would break build. Follow-up requires mapping source imports, generated bundle generation and asset/locale consumers, then guarding both import and render paths, testing default branch compatibility, real native New Tab/Wayland/JS/extension/telemetry regression, plus source-matched packaged bytes. No default Vulpra behavior change, no deletion, no fabricated byte savings and no new M3 gate.
 
+## Telemetry sending and policy lifecycle: protected source boundaries (2026-10-28)
+
+The [bounded source-pinned lifecycle audit 40785850376](https://github.com/sguzman/vulpra/actions/runs/40785850376) **PASSED**, uploading `m3-telemetry-lifecycle-boundaries` artifact **12859376809** at source commit `d81f106f1f065b5a3f7ec000dfe2c3d452b458f9`. It checks source relationships and expected order rather than relying only on matching words. Eleven mutations deliberately broke representative dependencies and were rejected.
+
+| Runtime/build boundary | Verified source relationship | Conservative decision |
+| --- | --- | --- |
+| `TelemetryControllerParent.sys.mjs` | Sets up reporting policy before starting TelemetrySend; shutdown awaits sender, native telemetry, and desktop PingSender flush | Retain lifecycle |
+| `TelemetrySend.sys.mjs` | Official-build and upload preference checks precede sending; **deletion-request pings are explicitly excepted** from the ordinary opt-out gate; PingSender also tests policy | Do not blindly remove transport |
+| `TelemetryReportingPolicy.sys.mjs` | Upload allowance depends on submission preference, notification state, legacy policy and terms-of-use flow | Preserve policy |
+| `toolkit/components/telemetry/moz.build` | Native xul telemetry, packaged controller/sender/policy and PingSender are linked/included | Preserve native and startup modules |
+| Glean and crash reporter | Separate native Glean bindings and `MOZ_CRASHREPORTER` build gate | Retain independently |
+| Desktop profile prefs and Privacy UI | Legacy PingSender/archive preferences and data-reporting visibility remain in source | Do not infer actual network uploads from default prefs |
+
+**Important privacy boundary:** Normal-data upload disablement and the deletion-request ping path are **not equivalent**. Any future submission-only experiment must prove the intended opt-out and data-deletion behavior with actual configured binaries and a controlled network capture, without breaking sender startup/shutdown, independent Glean/local metrics or crash reporting. No network test, native compile, code removal, package-size measurement or dynamic reachability result is supplied by this source audit. The M3 promotion/Sync/telemetry gate remains **open**, **M3 2/6 (33%), overall 44%**.
+
 ## Focused telemetry submission and policy dependency audit (2026-10-28)
 
 The read-only [full tracked-source workflow 40721612576](https://github.com/sguzman/vulpra/actions/runs/40721612576) **PASSED** at source commit `8af4710591147d7fc110c002ed4b6a8a760d2708`, including synthetic path-class regression, invalid-checkout refusal, actual checked-out `git grep` and bounded artifact upload. Artifact `m3-telemetry-reference-audit` (ID 12830103191) holds exact file names and matching line numbers.
