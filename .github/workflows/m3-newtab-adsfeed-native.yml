@@ -99,6 +99,9 @@ jobs:
           for key in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC","MOZ_NORMANDY"):
               assert str(get(key)) in ("1","True"),(key,get(key))
           assert str(get("VULPRA_NO_ASROUTER_PROMOS")) in ("False","None","0","")
+          definitions=Path("obj-vulpra-linux-m3-newtab-adsfeed-experiment/config.statusd/defines")
+          assert (definitions/"VULPRA_NO_NEWTAB_ADSFEED").is_file(), "experimental macro absent"
+          assert not (definitions/"VULPRA_NO_ASROUTER_PROMOS").exists(), "normal ASRouter macro erroneously defined"
           print("PASS: isolated sponsored-feed omission and protected Linux features")
           PY
 
