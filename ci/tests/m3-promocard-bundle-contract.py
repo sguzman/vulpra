@@ -59,7 +59,7 @@ def verify(f: dict[str, str]) -> None:
 
 def self_test(f: dict[str, str]) -> None:
     changes = (
-        ("configure", 'if disable and not linux:'),
+        ("configure", 'set_config("VULPRA_NO_NEWTAB_PROMOCARD", vulpra_no_newtab_promocard)'),
         ("generator", 'buildconfig.substs.get("VULPRA_NO_NEWTAB_PROMOCARD")'),
         ("webpack", "new webpack.NormalModuleReplacementPlugin("),
         ("webpack", "PromoCardOptOut.jsx"),
