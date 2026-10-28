@@ -1,0 +1,12 @@
+# Isolated Linux New Tab PromoCard bundle experiment.
+# Uses the same compiler settings as the normal M3 baseline, separate objdir.
+# Never modify the proven M2 object tree or normal user's profile.
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux-m3-promocard-experiment
+ac_add_options --with-branding=browser/branding/unofficial
+ac_add_options --with-app-basename=Vulpra
+ac_add_options --disable-tests
+ac_add_options --with-ccache=sccache
+mk_add_options MOZ_PARALLEL_BUILD=1
+
+# The ordinary browser still imports the real React promo card.
+export VULPRA_EXPERIMENT_NO_NEWTAB_PROMOCARD=1

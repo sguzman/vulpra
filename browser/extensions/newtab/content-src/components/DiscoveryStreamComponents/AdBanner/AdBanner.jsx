@@ -49,6 +49,7 @@ export const AdBanner = ({ spoc, dispatch, row, type, prefs }) => {
     };
   };
   const promoCardEnabled =
+    !__VULPRA_NO_NEWTAB_PROMOCARD__ &&
     spoc.format === "billboard" &&
     prefs[PREF_PROMOCARD_ENABLED] &&
     prefs[PREF_PROMOCARD_VISIBLE];

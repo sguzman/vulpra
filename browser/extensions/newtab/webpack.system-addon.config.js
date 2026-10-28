@@ -64,6 +64,23 @@ const dependencyListPlugins = () =>
     ? [new DependencyListPlugin(process.env.MOZ_WEBPACK_DEPS)]
     : [];
 
+// Only an explicitly configured Linux experiment replaces the optional
+// promo card. React still receives a valid component, while Webpack never
+// loads its click/dismiss/impression handlers into the experimental bundle.
+// The normal browser keeps the original dependency and component behavior.
+const withoutPromoCard = process.env.VULPRA_NO_NEWTAB_PROMOCARD === "1";
+const promoCardPlugins = () =>
+  withoutPromoCard
+    ? [
+        new webpack.NormalModuleReplacementPlugin(
+          /^\.\.\/PromoCard\/PromoCard\.jsx$/,
+          absolute(
+            "content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx"
+          )
+        ),
+      ]
+    : [];
+
 const vendorOptimization = {
   minimize: true,
   minimizer: [
@@ -165,6 +182,10 @@ module.exports = (env = {}) => {
           `THIS FILE IS AUTO-GENERATED: ${path.basename(__filename)}`
         ),
         new webpack.optimize.ModuleConcatenationPlugin(),
+        new webpack.DefinePlugin({
+          __VULPRA_NO_NEWTAB_PROMOCARD__: JSON.stringify(withoutPromoCard),
+        }),
+        ...promoCardPlugins(),
         ...dependencyListPlugins(),
       ],
     }),

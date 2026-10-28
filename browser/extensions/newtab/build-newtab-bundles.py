@@ -136,7 +136,16 @@ def generate_js(output, sources_stamp):
             ],
             newtab_dir,
             node_modules,
-            extra_env={"MOZ_WEBPACK_DEPS": deps_file},
+            extra_env={
+                "MOZ_WEBPACK_DEPS": deps_file,
+                # Webpack must consume the immutable build CONFIG, not a
+                # mutable browser preference or an ambient workstation flag.
+                "VULPRA_NO_NEWTAB_PROMOCARD": (
+                    "1"
+                    if buildconfig.substs.get("VULPRA_NO_NEWTAB_PROMOCARD")
+                    else "0"
+                ),
+            },
         )
 
         with open(os.path.join(tmpdir, "vendor.bundle.js"), "rb") as f:

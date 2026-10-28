@@ -1,0 +1,66 @@
+# Real New Tab Webpack-only proof before any expensive native Firefox build.
+# Separate opt-in config must not affect the normal browser's generated bundle.
+name: M3 PromoCard Bundle Preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - browser/moz.configure
+      - browser/extensions/newtab/build-newtab-bundles.py
+      - browser/extensions/newtab/webpack.system-addon.config.js
+      - browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx
+      - browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/**
+      - ci/mozconfig-linux-m3-promocard-experiment
+      - ci/tests/m3-promocard-bundle-contract.py
+      - ci/tests/m3-promocard-bundle-preflight.sh
+      - .github/workflows/m3-promocard-bundle-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-promocard:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Sparse checkout vendored Webpack and affected browser source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+            browser/moz.configure
+            browser/extensions/newtab
+            browser/components/topsites
+            browser/tools
+            browser/modules
+            third_party/node
+          sparse-checkout-cone-mode: false
+      - name: Verify source commit and build/test toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node --version
+          python3 --version
+          test -f third_party/node/node_modules/webpack/bin/webpack.js
+          test -f browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx
+          echo "PASS: source-pinned vendored webpack tools without npm install"
+      - name: Compile both real New Tab Webpack bundles and audit opt-in exclusion
+        shell: bash
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          bash ci/tests/m3-promocard-bundle-preflight.sh "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/promocard-bundle-preflight"
+      - name: Upload source-matched bundle preflight
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-promocard-bundle-preflight
+          path: ${{ runner.temp }}/promocard-bundle-preflight/report.json
+          if-no-files-found: error
+          retention-days: 14
