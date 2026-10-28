@@ -1,0 +1,81 @@
+# Read-only focused M3 telemetry reporting / ping transport dependency census.
+name: M3 Audit Telemetry Reporting and Transport Dependencies
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-telemetry-reference-audit.sh
+      - .github/workflows/m3-telemetry-reference-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-tracked-source:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout complete pinned browser
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Synthetic source classification and missing-checkout refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          git -C "$work" init -q
+          git -C "$work" config user.name QA
+          git -C "$work" config user.email qa@vulpra.invalid
+          mkdir -p "$work/toolkit/components/telemetry/app" \
+            "$work/toolkit/components/telemetry/core" \
+            "$work/toolkit/components/glean" \
+            "$work/toolkit/crashreporter" "$work/browser/components" \
+            "$work/toolkit/components/extensions" "$work/testing" \
+            "$work/docs"
+          printf '#!/bin/sh\n' > "$work/mach"
+          printf 'TelemetrySend.sys.mjs\n' > "$work/toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs"
+          printf 'pingsender\n' > "$work/toolkit/components/telemetry/core/Telemetry.cpp"
+          printf 'GleanPings\n' > "$work/toolkit/components/glean/GleanPings.cpp"
+          printf 'MOZ_DATA_REPORTING\n' > "$work/toolkit/crashreporter/moz.build"
+          printf 'toolkit.telemetry.enabled\n' > "$work/browser/components/BrowserGlue.sys.mjs"
+          printf 'TelemetryReportingPolicy.sys.mjs\n' > "$work/toolkit/components/extensions/ext-telemetry.js"
+          printf 'pingsender\n' > "$work/testing/test_ping.js"
+          printf 'telemetry reporting\n' > "$work/docs/telemetry.md"
+          git -C "$work" add .
+          git -C "$work" commit -qm fixture
+          bash ci/m3-telemetry-reference-audit.sh "$work" "$work/audit"
+          jq -e '.matching_lines==7
+            and .counts_by_class["telemetry-policy-and-sender"]==1
+            and .counts_by_class["telemetry-native-and-other"]==1
+            and .counts_by_class["glean-runtime"]==1
+            and .counts_by_class["crashreporter"]==1
+            and .counts_by_class["browser-consumer"]==1
+            and .counts_by_class["toolkit-consumer"]==1
+            and .counts_by_class["test-only"]==1
+            and .removal_authorized==false' "$work/audit/report.json"
+          if bash ci/m3-telemetry-reference-audit.sh "$work/missing" "$work/invalid" 2>/dev/null; then
+            echo "FAIL: invalid source checkout was accepted" >&2
+            exit 1
+          fi
+          echo "PASS: source classes and invalid-checkout refusal"
+
+      - name: Audit tracked telemetry reporting, native and external caller references
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/m3-telemetry-reference-audit.sh . "$RUNNER_TEMP/m3-telemetry-reference-audit"
+
+      - name: Upload exact source-line evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-telemetry-reference-audit
+          path: ${{ runner.temp }}/m3-telemetry-reference-audit/
+          retention-days: 14
+          if-no-files-found: warn
