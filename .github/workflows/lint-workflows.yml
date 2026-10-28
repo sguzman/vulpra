@@ -41,5 +41,6 @@ jobs:
             .github/workflows/m3-newtab-adsfeed-manifest-audit.yml
             .github/workflows/m3-optout-define-preflight.yml
             .github/workflows/m3-pocket-reference-audit.yml
+            .github/workflows/m3-pocket-live-boundaries.yml
             .github/workflows/m3-sync-reference-audit.yml
             .github/workflows/m3-telemetry-reference-audit.yml

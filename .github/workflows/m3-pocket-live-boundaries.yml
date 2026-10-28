@@ -1,0 +1,59 @@
+# Cheap source-pinned Pocket/DiscoveryStream registration and fallback audit.
+# Complements the full source grep, not a replacement for native experiments.
+name: M3 Pocket Live Boundary Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-pocket-live-boundaries.py
+      - .github/workflows/m3-pocket-live-boundaries.yml
+      - browser/extensions/newtab/lib/ActivityStream.sys.mjs
+      - browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+      - browser/extensions/newtab/lib/TopStoriesFeed.sys.mjs
+      - browser/extensions/newtab/moz.build
+      - browser/extensions/newtab/addon-jar.mn
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-pocket-boundaries:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Sparse checkout CI audit; resolve authoritative source via Git HEAD
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Prove pinned tree and that no full Firefox worktree was expanded
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f ci/m3-pocket-live-boundaries.py
+          test ! -e browser/extensions/newtab/lib/ActivityStream.sys.mjs
+          git cat-file -e HEAD:browser/extensions/newtab/lib/ActivityStream.sys.mjs
+      - name: Verify real registrations, fallback and packaging boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-pocket-live-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/m3-pocket-live-boundaries.json"
+          jq -e '.removal_authorized == false and
+                 .newtab_registration.modern_recommendations and
+                 .newtab_registration.legacy_recommendations and
+                 (.live_source_boundaries | length == 4)' \
+            "$RUNNER_TEMP/m3-pocket-live-boundaries.json" >/dev/null
+      - name: Upload bounded read-only source decision evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-pocket-live-boundaries
+          path: ${{ runner.temp }}/m3-pocket-live-boundaries.json
+          if-no-files-found: error
+          retention-days: 14
