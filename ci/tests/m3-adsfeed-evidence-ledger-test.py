@@ -15,6 +15,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+GIT_SHA40 = re.compile(r"^[a-f0-9]{40}$")
 HEX64 = re.compile(r"^[a-f0-9]{64}$")
 
 
@@ -33,7 +34,7 @@ def validate(candidate: dict, progress: dict) -> dict:
     seen_sources = set()
     for evidence in trials:
         sha = evidence["source_sha"]
-        assert HEX64.fullmatch(sha), "Noncanonical source SHA"
+        assert GIT_SHA40.fullmatch(sha), "Noncanonical Git commit SHA"
         assert sha not in seen_sources, "Two independent trial records have the same source SHA"
         seen_sources.add(sha)
         full = evidence["full_bytes"]
