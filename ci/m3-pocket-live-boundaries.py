@@ -22,6 +22,8 @@ FILES = {
     "legacy": "browser/extensions/newtab/lib/TopStoriesFeed.sys.mjs",
     "bundles": "browser/extensions/newtab/moz.build",
     "jar": "browser/extensions/newtab/addon-jar.mn",
+    "ad_banner": "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx",
+    "promo_card": "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCard.jsx",
 }
 
 
@@ -71,7 +73,10 @@ def registration(registry: str, key: str, constructor: str) -> dict:
 
 
 def validate_source(texts: dict[str, str]) -> dict:
-    registry, modern, legacy, bundles, jar = (texts[name] for name in FILES)
+    registry, modern, legacy, bundles, jar = (
+        texts[name] for name in ("registry", "modern", "legacy", "bundles", "jar")
+    )
+    banner, promo = texts["ad_banner"], texts["promo_card"]
     feeds = section(registry, "const FEEDS_DATA = [", "\n];",
                     "ActivityStream FEEDS_DATA")
     legacy_entry = registration(feeds, "system.topstories", "TopStoriesFeed")
@@ -134,6 +139,33 @@ def validate_source(texts: dict[str, str]) -> dict:
         evidence(registry, '"pocketCta"', "registry"),
     ]
 
+    # The promo card is a static React dependency of the retained sponsored
+    # AdBanner, not a detachable preference. Its renderer is gated by a
+    # billboard placement and *two* prefs. Removing PromoCard.jsx without
+    # rewriting the import leaves the main banner component unable to bundle.
+    for token in (
+        'import { PromoCard } from "../PromoCard/PromoCard.jsx";',
+        'spoc.format === "billboard" &&',
+        "prefs[PREF_PROMOCARD_ENABLED] &&",
+        "prefs[PREF_PROMOCARD_VISIBLE];",
+        "{promoCardEnabled && <PromoCard />}",
+        "<AdBannerContextMenu",
+    ):
+        if token not in banner:
+            raise ValueError(f"Promo card import/render fallback changed: {token}")
+    for token in (
+        "const PromoCard = () => {",
+        "PROMO_CARD_CLICK",
+        "PROMO_CARD_DISMISS",
+        "PROMO_CARD_IMPRESSION",
+        "at.SHOW_PERSONALIZE",
+        "ac.SetPref(PREF_PROMO_CARD_DISMISSED, false)",
+        "firefox-mascot-prop-paintbucket-rgb.svg",
+        "export { PromoCard };",
+    ):
+        if token not in promo:
+            raise ValueError(f"Promo card component behavior changed: {token}")
+
     return {
         "schema_version": 1,
         "mode": "pinned_head_source_boundary_audit_only",
@@ -180,21 +212,40 @@ def validate_source(texts: dict[str, str]) -> dict:
             {
                 "id": "pocket_promo_preferences",
                 "classification": "narrow_optional_pref_only_no_removal",
-                "why": "Promotional-card and Pocket CTA preference strings exist, "
-                       "but renderer imports, remote overrides and page consumers "
-                       "have not been proven safe for packaging omission.",
+                "why": "Pocket CTA preference exists; UI/remote overrides and page "
+                       "consumers are not proven safe for packaged omission.",
                 "evidence": promoted,
+            },
+            {
+                "id": "promo_card_banner_import",
+                "classification": "narrow_jsx_opt_in_candidate_not_removal_ready",
+                "why": "The retained AdBanner statically imports PromoCard, gated "
+                       "by billboard placement and two prefs. The PromoCard component "
+                       "owns click, dismissal, impression, personalization actions and "
+                       "a mascot asset. A future opt-in build must guard the static "
+                       "import and rendering, preserve main AdBanner and prove bundle "
+                       "compile/runtime before any physical omission.",
+                "evidence": [
+                    evidence(banner, 'import { PromoCard } from "../PromoCard/PromoCard.jsx";', "ad_banner"),
+                    evidence(banner, '{promoCardEnabled && <PromoCard />}', "ad_banner"),
+                    evidence(promo, "const PromoCard = () => {", "promo_card"),
+                    evidence(promo, "PROMO_CARD_IMPRESSION", "promo_card"),
+                ],
             },
         ],
         "protected_bundles": [
             FILES["registry"], FILES["modern"], FILES["legacy"],
             FILES["bundles"], FILES["jar"],
+            FILES["ad_banner"], FILES["promo_card"],
         ],
         "removal_authorized": False,
         "candidate_recommendation": "Keep both independent story feeds, generated "
                                     "New Tab bundles, Top Sites, prefs and Nimbus. "
-                                    "Next audit actual promo-card/CTA callers and "
-                                    "renderer fallback before opt-in experiments.",
+                                    "PromoCard now has a bounded static JSX import, "
+                                    "billboard/two-pref render gate and CTA telemetry "
+                                    "handlers; test explicit compile-time import and "
+                                    "renderer fallback before an isolated opt-in build. "
+                                    "Pocket CTA and other consumers still need audit.",
         "limitations": [
             "Source anchor presence is not dynamic runtime reachability.",
             "Only the named, tracked source files were inspected.",
@@ -215,6 +266,8 @@ def self_test(texts: dict[str, str]) -> None:
         ("modern", "this.adsClient = lazy.AdsClient.getClient();"),
         ("bundles", 'JAR_MANIFESTS += ["addon-jar.mn"]'),
         ("jar", "builtin-addons/newtab/lib/ (./lib/*)"),
+        ("ad_banner", 'import { PromoCard } from "../PromoCard/PromoCard.jsx";'),
+        ("promo_card", "PROMO_CARD_IMPRESSION"),
     )
     for name, token in mutations:
         changed = dict(texts)
@@ -226,7 +279,7 @@ def self_test(texts: dict[str, str]) -> None:
         except (ValueError, AssertionError):
             continue
         raise AssertionError(f"Failed to detect missing source dependency: {name}, {token}")
-    print("PASS: seven deliberately broken source dependencies rejected")
+    print("PASS: nine deliberately broken source dependencies rejected")
 
 
 def main() -> int:

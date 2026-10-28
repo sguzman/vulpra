@@ -13,6 +13,8 @@ on:
       - browser/extensions/newtab/lib/TopStoriesFeed.sys.mjs
       - browser/extensions/newtab/moz.build
       - browser/extensions/newtab/addon-jar.mn
+      - browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx
+      - browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCard.jsx
   workflow_dispatch:
 
 permissions:
@@ -48,7 +50,7 @@ jobs:
           jq -e '.removal_authorized == false and
                  .newtab_registration.modern_recommendations and
                  .newtab_registration.legacy_recommendations and
-                 (.live_source_boundaries | length == 4)' \
+                 (.live_source_boundaries | length == 5)' \
             "$RUNNER_TEMP/m3-pocket-live-boundaries.json" >/dev/null
       - name: Upload bounded read-only source decision evidence
         uses: actions/upload-artifact@v4
