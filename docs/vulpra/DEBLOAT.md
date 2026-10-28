@@ -16,6 +16,14 @@
 
 **Boundary:** source matches and factory/call-site guards are not proof of runtime execution or safe deletion. No native compilation, browser smoke, default change, package-size saving or removal authorization is claimed. Before testing a narrower opt-in Pocket promo removal, map renderer imports, all consumers and remotely supplied values, then build a protected fallback and repeat full native/runtime/package acceptance. The promotion/Pocket/Sync/telemetry gate remains OPEN: **M3 2/6 (33%); overall 44%**.
 
+## Narrow Pocket promo render/import boundary (2026-10-28)
+
+[Source-pinned follow-on CI 40773988580](https://github.com/sguzman/vulpra/actions/runs/40773988580) **PASSED** at source `99c4c11d3ede2fc1133b2f6e7fca7c37a1150279`, uploading `m3-pocket-live-boundaries` artifact **12853248394** and rejecting nine deliberately altered source dependencies.
+
+The bounded graph now includes `content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx`, which statically imports `PromoCard/PromoCard.jsx`. The JSX render condition requires **billboard-format SPoC + `discoverystream.promoCard.enabled` + `discoverystream.promoCard.visible`**. PromoCard owns click, dismiss and impression action dispatch, personalized-menu navigation, a dismissal preference and the paintbucket mascot SVG. AdBanner itself contains the existing sponsored image, label, context menu, privacy/report logic: these are protected and are not equivalent to this narrow promo component.
+
+**Candidate classification:** optional `PromoCard.jsx` is a promising *opt-in conditional-compilation investigation*, not an approved removal. Because of its **static import**, merely defaulting `promoCard.enabled` to false cannot eliminate its module from the generated JS bundle, and deleting the JSX file without modifying/guarding the importer would break build. Follow-up requires mapping source imports, generated bundle generation and asset/locale consumers, then guarding both import and render paths, testing default branch compatibility, real native New Tab/Wayland/JS/extension/telemetry regression, plus source-matched packaged bytes. No default Vulpra behavior change, no deletion, no fabricated byte savings and no new M3 gate.
+
 ## Focused telemetry submission and policy dependency audit (2026-10-28)
 
 The read-only [full tracked-source workflow 40721612576](https://github.com/sguzman/vulpra/actions/runs/40721612576) **PASSED** at source commit `8af4710591147d7fc110c002ed4b6a8a760d2708`, including synthetic path-class regression, invalid-checkout refusal, actual checked-out `git grep` and bounded artifact upload. Artifact `m3-telemetry-reference-audit` (ID 12830103191) holds exact file names and matching line numbers.

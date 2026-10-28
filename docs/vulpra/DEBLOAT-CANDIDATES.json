@@ -650,9 +650,10 @@
         "Focused Git source audit, corrected classifications and synthetic regression: https://github.com/sguzman/vulpra/actions/runs/40616102254",
         "New Tab FEEDS_DATA registers TopStoriesFeed and DiscoveryStreamFeed alongside shared widgets: browser/extensions/newtab/lib/ActivityStream.sys.mjs",
         "Built-in New Tab JAR manifest includes wildcard lib/common resources and generated bundles: browser/extensions/newtab/addon-jar.mn; browser/extensions/newtab/moz.build",
-        "Source-pinned Pocket runtime-boundary audit and seven invalid-source mutations passed: https://github.com/sguzman/vulpra/actions/runs/40773515182"
+        "Source-pinned Pocket runtime-boundary audit and seven invalid-source mutations passed: https://github.com/sguzman/vulpra/actions/runs/40773515182",
+        "Extended promo import/renderer source-boundary audit and nine mutation tests PASSED: https://github.com/sguzman/vulpra/actions/runs/40773988580"
       ],
-      "next": "Retain FEEDS_DATA modern+legacy recommendation feed factories and full New Tab renderer, existing TopSites/prefs, Nimbus, AdsClient and cache. Narrow promoCard and pocketCta across renderer/consumer import paths and remote-config overrides before designing any opt-in resource omission; current source anchors are NOT a complete live call graph and authorize NO deletion.",
+      "next": "Continue with narrow PromoCard renderer/bundler and asset/localization impact checks. AdBanner statically imports PromoCard and will not bundle if it is removed without a guarded import/fallback. The 3-part billboard+two-pref render condition is not a compile-time guard. Preserve legacy+modern stories, Top Sites, New Tab UI, ads clients and Nimbus. No opt-in module deletion authorized yet.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -693,7 +694,7 @@
         "source_commit": "5f09f3581889490ff56bb6983a0220a8eefb41ae",
         "workflow_run": 40773515182,
         "artifact_id": 12854235698,
-        "scope": "Source-pinned FEEDS_DATA factories, legacy TopStories fallback, modern DiscoveryStream recommendations, sponsored SPoCs/AdsClient, built-in New Tab bundle/JAR manifest. Seven deliberate missing-dependency mutations were rejected.",
+        "scope": "Source-pinned FEEDS_DATA factories, legacy TopStories fallback, modern DiscoveryStream recommendations, sponsored SPoCs/AdsClient, built-in New Tab bundle/JAR manifest. Seven deliberate missing-dependency mutations were rejected. Extended audit proves static AdBanner→PromoCard JSX import, billboard/two-preference guard and PromoCard's CTA/dismiss/impression/personization actions.",
         "protected": [
           "ActivityStream FEEDS_DATA system.topstories, discoverystreamfeed, system.topsites, prefs",
           "TopStoriesFeed lazyLoadTopStories legacy fallback and story/topic cache",
@@ -710,7 +711,30 @@
           "Not deletion authorization, native build or package byte evidence",
           "Promotional pref existence is not proof of isolated assets or safe omission"
         ],
-        "removal_authorized": false
+        "removal_authorized": false,
+        "latest_source_commit": "99c4c11d3ede2fc1133b2f6e7fca7c37a1150279",
+        "latest_workflow_run": 40773988580,
+        "latest_artifact_id": 12853248394,
+        "mutation_tests": 9,
+        "narrow_optional_component_candidate": {
+          "id": "discovery_stream_promo_card",
+          "path": "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCard.jsx",
+          "import_owner": "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx",
+          "render_gate": [
+            "spoc.format === billboard",
+            "prefs[discoverystream.promoCard.enabled]",
+            "prefs[discoverystream.promoCard.visible]"
+          ],
+          "couplings": [
+            "PROMO_CARD_CLICK",
+            "PROMO_CARD_DISMISS",
+            "PROMO_CARD_IMPRESSION",
+            "SHOW_PERSONALIZE",
+            "firefox-mascot-prop-paintbucket-rgb.svg"
+          ],
+          "classification": "opt_in_component_candidate_only_not_removal_ready",
+          "reason": "AdBanner statically imports PromoCard even when the optional card is pref-off; physical removal requires guarded bundler import and fallback, packaged asset and locale audits, plus native/renderer acceptance. Preserve banner and sponsored label/context menu."
+        }
       }
     },
     {
@@ -732,7 +756,7 @@
         "browser/components/aboutwelcome/moz.build: actors/modules",
         "ACCEPTED opt-in ASRouter two-promo removal: native runtime pass https://github.com/sguzman/vulpra/actions/runs/40547968387; source-matched binary-size pass https://github.com/sguzman/vulpra/actions/runs/40567473401 (3,184 B/0.00366%). All remaining promotional/pocket/sync/reporting bundles unreviewed."
       ],
-      "next": "Retain default modules and core ASRouter. Continue targeted promotion/Pocket/Sync/telemetry dependency and product-value audit; one accepted two-module opt-in resource exclusion does not complete entire promotional-messaging gate.",
+      "next": "Evaluate the narrowly optional PromoCard JSX static import and its single mascot asset/locale hooks as a possible guarded opt-in variant. Protect AdBanner's main sponsored-content rendering/menu, all core New Tab/ASRouter/onboarding, Nimbus and story-feed modules. Map all imports/assets before experimental omission; require real bundled native source-matched runtime acceptance. Do not delete based on pref default.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -780,7 +804,7 @@
         "compressed_reduction_percent": 0.00366
       },
       "runtime_guard_followup": "The prior false-valued VULPRA_NO_ASROUTER_PROMOS global macro was accidentally present under #ifdef in the ordinary build despite CONFIG false. Enabled-only set_define fix 16d8753 restores expected default routing; config-only three-variant CI 40708134402 and native conditional recompilation required before claiming this correction fully verified. Prior matched full/lean promotion resource-byte evidence remains historical evidence, not updated post-fix package sizing.",
-      "pocket_boundary_dependency": "Pocket source-pinned audit 40773515182 retains both story-feed registrations and generated bundles, and leaves promoCard/pocketCta only as unproven narrow preference candidates. No ASRouter or Pocket resource pruning authorized by this audit."
+      "pocket_boundary_dependency": "Pocket source-pinned audit 40773515182 retains both story-feed registrations and generated bundles, and leaves promoCard/pocketCta only as unproven narrow preference candidates. No ASRouter or Pocket resource pruning authorized by this audit. Follow-up CI 40773988580 proves PromoCard static AdBanner import and billboard/two-pref render gating; opt-in omission requires JS bundle compile+fallback and is NOT authorized by a default false preference."
     },
     {
       "id": "core_web_security",
