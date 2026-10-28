@@ -72,6 +72,59 @@ assert len(d["limits"]) >= 3
 PY
 test -s "$repo/.git/vulpra-debloat/m3-package-footprint.md"
 echo 'PASS: exact synthetic archive and omni.ja sizes and hints'
+# Side-by-side forensic diff uses preexisting SHA-attested JSON reports. This
+# synthetic lean variant omits only AdsFeed; the comparator never opens or
+# modifies a package and never claims XZ attribution from ZIP entry bytes.
+python3 - "$repo/.git/vulpra-debloat/m3-package-footprint.json" "$T" <<'PY'
+import json, pathlib, sys
+src=pathlib.Path(sys.argv[1])
+out=pathlib.Path(sys.argv[2])
+full=json.loads(src.read_text())
+lean=json.loads(src.read_text())
+idx=lean["omni_resources"][0]["resource_index"]["newtab_lib_resources"]
+ads=[x for x in idx["entries"] if x["path"].endswith("/AdsFeed.sys.mjs")]
+assert len(ads)==1
+idx["entries"]=[x for x in idx["entries"] if x not in ads]
+idx["count"]-=1
+idx["logical_bytes"]-=ads[0]["logical_bytes"]
+idx["zip_compressed_entry_bytes"]-=ads[0]["zip_compressed_entry_bytes"]
+lean["compressed_archive_bytes"]-=123
+lean["sha256"]="a"*64
+(out/"full.json").write_text(json.dumps(full))
+(out/"lean.json").write_text(json.dumps(lean))
+(out/"ads-zip-compressed.txt").write_text(str(ads[0]["zip_compressed_entry_bytes"]))
+PY
+python3 "$(dirname "$PROBE")/m3-compare-package-footprints.py" \
+  "$T/full.json" "$T/lean.json" "$T/compare.json"
+python3 - "$T/compare.json" "$T/ads-zip-compressed.txt" <<'PY'
+import json, pathlib, sys
+d=json.loads(pathlib.Path(sys.argv[1]).read_text())
+assert d["adsfeed_resource_removed"]
+assert len(d["removed"])==1 and d["removed"][0]["path"].endswith("AdsFeed.sys.mjs")
+assert d["added"]==[] and d["changed"]==[]
+assert d["unchanged_count"]==1
+assert d["observed_outer_archive_byte_difference"]==123
+assert d["removed_zip_entry_compressed_bytes"]==int(pathlib.Path(sys.argv[2]).read_text())
+assert d["removed_zip_entry_compressed_bytes"]!=123
+assert len(d["limitations"])>=5
+PY
+python3 - "$T/lean.json" "$T/duplicate.json" <<'PY'
+import json, pathlib, sys
+src=json.loads(pathlib.Path(sys.argv[1]).read_text())
+idx=src["omni_resources"][0]["resource_index"]["newtab_lib_resources"]
+idx["entries"].append(dict(idx["entries"][0]))
+idx["count"]+=1
+idx["logical_bytes"]+=idx["entries"][0]["logical_bytes"]
+idx["zip_compressed_entry_bytes"]+=idx["entries"][0]["zip_compressed_entry_bytes"]
+pathlib.Path(sys.argv[2]).write_text(json.dumps(src))
+PY
+if python3 "$(dirname "$PROBE")/m3-compare-package-footprints.py" \
+  "$T/full.json" "$T/duplicate.json" "$T/badcompare.json" 2>"$T/duplicate-error"; then
+  echo "FAIL: duplicate ZIP entry incorrectly accepted" >&2
+  exit 1
+fi
+grep -Fq 'Resource duplicated' "$T/duplicate-error"
+echo 'PASS: outer tar.xz vs ZIP resource diff isolated; duplicate and invalid reports rejected'
 package="$p/vulpra-local-fixture.tar.xz"
 printf '%064d  test.tar.xz\n' 0 > "$package.sha256"
 set +e
