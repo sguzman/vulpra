@@ -750,6 +750,34 @@
         "linux_binary_size_saving_bytes": null,
         "m3_gate_credit": "no new gate; mobile/test/localization audit remains open"
       }
+    },
+    {
+      "id": "newtab_adsfeed_optout",
+      "decision": "native_trial_pending; no accepted debloat credit",
+      "surface": "packaged New Tab extension library resource",
+      "paths": [
+        "browser/extensions/newtab/lib/AdsFeed.sys.mjs",
+        "browser/extensions/newtab/lib/ActivityStream.sys.mjs",
+        "browser/extensions/newtab/addon-jar.mn",
+        "browser/extensions/newtab/webext-glue/moz.build"
+      ],
+      "reason": "Isolated optional sponsored tiles/stories feed; New Tab and DiscoveryStream require retained shared rendering and AdsClient. Do not remove whole New Tab.",
+      "source_files_removed": 0,
+      "normal_browser_changed": false,
+      "source_commit": "a8547f9a1cc4e81985cf171c679c1d19a46875b3",
+      "native_trial_run_id": 40617558714,
+      "experiment_flag": "VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED=1",
+      "scope": "Linux-only, opt-in, fixed pinned library inventory; AdsFeed factory not registered and the single module is omitted from alternate New Tab JAR/XPI manifest",
+      "protected": "Retain ActivityStream, DiscoveryStreamFeed, TopStoriesFeed, AdsClient, Store, renderer, prefs, Nimbus, extensions, Sandbox, Wayland, Sync",
+      "native_verification": "pending full compile/package checksum/resource inspection, about:newtab navigation, real Wayland/JS/WebExtension/Nimbus/profile smoke",
+      "compressed_package_bytes": null,
+      "matched_baseline_delta_bytes": null,
+      "next": "Review source-contract test and all literal runtime consumers. Accept only after full native package/runtime trial and a same-source baseline size comparison; address any build or New Tab regression without touching the normal baseline.",
+      "evidence": [
+        "https://github.com/sguzman/vulpra/commit/a8547f9a1cc4e81985cf171c679c1d19a46875b3",
+        "https://github.com/sguzman/vulpra/actions/runs/40617558714"
+      ],
+      "removal_authorized": false
     }
   ],
   "observed_native_config": {

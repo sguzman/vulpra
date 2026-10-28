@@ -82,6 +82,15 @@ The older four-way scan above remains historical evidence for Pocket, promotions
 **Decision:** retain the built-in New Tab extension, its core feed/store, Nimbus, safety/automation, and Glean metadata. Only consider narrowly scoped optional recommendation/sponsorship resources after mapping their dispatch/consumers, default and disabled fallback, packaged-resource registration and feature preference interactions; then require matched-source full/lean native packages and Wayland, JavaScript, WebExtension, Nimbus and profile-isolation acceptance. **No source removal, default behavior change, binary saving, or M3 gate completion is claimed from this scan.**
 
 
+## Isolated New Tab sponsored AdsFeed packaging trial (2026-10-27)
+
+Source commit [a8547f9](https://github.com/sguzman/vulpra/commit/a8547f9a1cc4e81985cf171c679c1d19a46875b3) adds an explicitly opt-in **Linux-only** `VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED=1` candidate. The normal Vulpra and M3 matched-baseline mozconfigs remain unchanged, retaining all New Tab modules. The isolated candidate uses `obj-vulpra-linux-m3-newtab-adsfeed-experiment`, a compile-time AppConstants guard, and a skip for the `adsfeed` factory in `ActivityStream`'s FEEDS_DATA registration; it does not remove other New Tab feeds or browser-level ad protection.
+
+The built-in `addon-jar.mn` ordinarily packages `lib/*`, and the train-hop XPI separately packages `../lib/**`; both remain unchanged for normal builds. In the experimental branch, the same **46 retained pinned-source library entries** are enumerated separately so only `AdsFeed.sys.mjs` is excluded. A pinned-tree source regression checks both lists against Git and verifies the ordinary wildcard, factory guard, protected dependencies and isolated mozconfig. This source-only manifest check alone cannot demonstrate actual packaged omission.
+
+[Native CI 40617558714](https://github.com/sguzman/vulpra/actions/runs/40617558714) is the required experimental gate: supported Mozilla Clang and GTK configure, full C++/Rust build, independently SHA-256 verified package, omni.ja resource presence/absence, real Weston Wayland, JS, about:newtab fallback, WebExtensions, Nimbus and Firefox profile isolation. **Pending at time of this ledger entry.** If it passes, a separate source-matched baseline/native compressed-byte comparison is required before claiming savings. This experiment deletes **zero Git-tracked files** and changes **no default behavior**; no M3 gate or overall progress credit is awarded.
+
+
 ## Isolated ASRouter AI promotion resource experiment (2026-10-27)
 
 The full-source Pocket/promotion/Sync/reporting audit identified two narrow promotional modules packaged via `browser/components/asrouter/moz.build`. A guarded, **opt-in Linux-only** experiment now excludes exactly `SidebarChatBotPromo.sys.mjs` and `SmartWindowNewTabPromo.sys.mjs` from the browser's ASRouter resource map. It does **not** remove ASRouter, onboarding, feature callouts, new-tab UI, telemetry, WebExtensions, Sync or Nimbus.
