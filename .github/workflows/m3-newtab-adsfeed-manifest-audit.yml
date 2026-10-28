@@ -22,10 +22,28 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Checkout complete pinned browser source
+      - name: Checkout pinned New Tab source and full Git tree metadata
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci/tests
+            browser/extensions/newtab/lib
+      - name: Prove sparse checkout kept pinned tree and withheld unrelated sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f ci/tests/m3-newtab-adsfeed-optout-test.sh
+          test -f browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+          test -f browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
+          test ! -e toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          # git show and git ls-tree still resolve the complete source commit.
+          git cat-file -e HEAD:browser/moz.configure
+          git cat-file -e HEAD:browser/extensions/newtab/addon-jar.mn
+          git ls-tree HEAD:browser/extensions/newtab/lib >/dev/null
+          echo "PASS: sparse checkout retains complete source provenance without full worktree"
       - name: Verify real tracked library leaves and both packaging manifests
         shell: bash
         run: |
