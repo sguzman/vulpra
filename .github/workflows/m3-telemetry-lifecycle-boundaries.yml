@@ -1,0 +1,57 @@
+# Protect actual telemetry recording, policy and transport boundaries.
+# Cheap pinned Git tree inspection; NO browser build, network tests or changes.
+name: M3 Telemetry Submission Lifecycle Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-telemetry-lifecycle-boundaries.py
+      - .github/workflows/m3-telemetry-lifecycle-boundaries.yml
+      - toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs
+      - toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+      - toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs
+      - toolkit/components/telemetry/moz.build
+      - toolkit/components/glean/moz.build
+      - toolkit/crashreporter/moz.build
+      - browser/app/profile/firefox.js
+      - browser/components/preferences/privacy.js
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-telemetry-transport-policy:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Sparse checkout source audit and pinned full Git tree metadata
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Check tracked source contract and rejected regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -f ci/m3-telemetry-lifecycle-boundaries.py
+          test ! -e toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          git cat-file -e HEAD:toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          python3 ci/m3-telemetry-lifecycle-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/m3-telemetry-lifecycle.json"
+          jq -e '.removal_authorized == false and
+                 (.source_boundaries | length == 6) and
+                 (.all_source_anchors.sender | length > 3)' \
+            "$RUNNER_TEMP/m3-telemetry-lifecycle.json" >/dev/null
+      - name: Save bounded read-only dependency evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-telemetry-lifecycle-boundaries
+          path: ${{ runner.temp }}/m3-telemetry-lifecycle.json
+          if-no-files-found: error
+          retention-days: 14
