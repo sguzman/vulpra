@@ -1,0 +1,87 @@
+# Read-only focused desktop Sync/FxAccounts dependency census.
+name: M3 Audit Sync and Firefox Accounts Dependencies
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-sync-reference-audit.yml
+      - ci/m3-sync-reference-audit.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan-source:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout full pinned browser source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Test reference classes and refusal on invalid checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          git -C "$work" init -q
+          git -C "$work" config user.email qa@vulpra.invalid
+          git -C "$work" config user.name QA
+          mkdir -p "$work/services/sync/modules" \
+            "$work/services/fxaccounts" \
+            "$work/browser/components" \
+            "$work/browser/base/content" \
+            "$work/browser/extensions/newtab/test/browser" \
+            "$work/toolkit/components/extensions/parent" \
+            "$work/browser/locales/en-US/browser" \
+            "$work/testing" "$work/docs"
+          printf '#!/bin/sh\n' > "$work/mach"
+          printf 'resource://services-sync/UIState.sys.mjs\n' > \
+            "$work/services/sync/modules/engine.sys.mjs"
+          printf 'FxAccounts\n' > "$work/services/fxaccounts/FxAccounts.sys.mjs"
+          printf 'FxAccounts\n' > "$work/browser/components/AccountsGlue.sys.mjs"
+          printf 'SyncedTabs\n' > "$work/browser/base/content/browser-sync.js"
+          printf 'services.sync.pref\n' > "$work/browser/extensions/newtab/test/browser/test_sync.js"
+          printf 'FxAccounts\n' > "$work/toolkit/components/extensions/parent/ext-identity.js"
+          printf 'FxAccounts\n' > "$work/docs/sync.md"
+          printf 'services.sync.pref\n' > "$work/browser/locales/en-US/browser/browser.ftl"
+          printf 'FxAccounts\n' > "$work/testing/test_sync.js"
+          git -C "$work" add .
+          git -C "$work" commit -qm fixture
+          bash ci/m3-sync-reference-audit.sh "$work" "$work/audit"
+          jq -e '.matching_lines==9
+             and .counts_by_class["sync-owned"]==1
+             and .counts_by_class["accounts-owned"]==1
+             and .counts_by_class["browser-integration"]==2
+             and .counts_by_class["webextension-integrations"]==1
+             and .counts_by_class["docs-tooling"]==1
+             and .counts_by_class["localization"]==1
+             and .counts_by_class["test-only"]==2
+             and .removal_authorized==false' "$work/audit/report.json"
+          test "$(wc -l < "$work/audit/references.txt")" -eq 9
+          if bash ci/m3-sync-reference-audit.sh "$work/missing" "$work/invalid" 2>/dev/null; then
+            echo "FAIL: audit accepted invalid checkout" >&2
+            exit 1
+          fi
+          echo 'PASS: distinct owner/consumer classes and invalid-checkout safety'
+
+      - name: Audit all tracked desktop Sync/Firefox Accounts callers
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/m3-sync-reference-audit.sh . "$RUNNER_TEMP/m3-sync-reference-audit"
+          echo '### Native opt-out remains prohibited without guarded caller graph'
+
+      - name: Upload exact source-line and path-class evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-sync-reference-audit
+          path: ${{ runner.temp }}/m3-sync-reference-audit/
+          if-no-files-found: warn
+          retention-days: 14
