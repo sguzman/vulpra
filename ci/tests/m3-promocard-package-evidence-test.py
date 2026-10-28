@@ -52,6 +52,45 @@ def synthesize(out: Path, variant: str) -> Path:
             tf.addfile(info,io.BytesIO(raw))
     return package
 
+def repack_layout(out: Path, variant: str, layout: str) -> Path:
+    """Synthetic relocation of actual ZIP entries, never native acceptance."""
+    initial=synthesize(out,variant)
+    with tarfile.open(initial,"r:xz") as tar:
+        contents={m.name:tar.extractfile(m).read() for m in tar if m.isfile()}
+    original=contents["vulpra/browser/omni.ja"]
+    empty=io.BytesIO()
+    with zipfile.ZipFile(empty,"w"):
+        pass
+    contents["vulpra/browser/omni.ja"]=empty.getvalue()
+    if layout=="xpi":
+        target="vulpra/browser/features/newtab@mozilla.org.xpi"
+        outzip=io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(original)) as z, \
+             zipfile.ZipFile(outzip,"w") as dst:
+            for name in z.namelist():
+                assert name.startswith("builtin-addons/newtab/")
+                dst.writestr(name.removeprefix("builtin-addons/newtab/"),z.read(name))
+        contents[target]=outzip.getvalue()
+    elif layout=="browserjar":
+        contents["vulpra/browser/chrome/browser.jar"]=original
+    elif layout=="prefixed":
+        outzip=io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(original)) as z, \
+             zipfile.ZipFile(outzip,"w") as dst:
+            for name in z.namelist():
+                dst.writestr("chrome/browser/content/browser/"+name,z.read(name))
+        contents["vulpra/browser/omni.ja"]=outzip.getvalue()
+    else:
+        raise ValueError(layout)
+    target=out/(variant+"-"+layout+".tar.xz")
+    with tarfile.open(target,"w:xz") as tar:
+        for name,raw in contents.items():
+            item=tarfile.TarInfo(name)
+            item.size=len(raw)
+            tar.addfile(item,io.BytesIO(raw))
+    return target
+
+
 def call(*args: str, success: bool=True) -> None:
     run=subprocess.run([sys.executable,*map(str,args)],cwd=ROOT,
                        capture_output=True,text=True)
@@ -68,6 +107,17 @@ def main() -> None:
         for v in ("normal","optin"):
             call(ARCHIVE,"--archive",synthesize(out,v),"--source-commit",SHA,
                  "--variant",v,"--output",out/(v+".json"))
+        for layout in ("xpi","browserjar","prefixed"):
+            for variant in ("normal","optin"):
+                archive=repack_layout(out,variant,layout)
+                report_path=out/(variant+"-"+layout+".json")
+                call(ARCHIVE,"--archive",archive,"--source-commit",SHA,
+                     "--variant",variant,"--output",report_path)
+                report=json.loads(report_path.read_text())
+                assert report["verified_newtab_bundle_copies"]==1
+                assert report["promocard_original_code_present"]==(variant=="normal")
+        print("PASS: XPI, browser.jar and prefixed omni ZIP layouts")
+
         f=json.loads((out/"normal.json").read_text())
         l=json.loads((out/"optin.json").read_text())
         assert f["promocard_original_code_present"]
