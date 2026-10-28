@@ -95,7 +95,7 @@ jobs:
           def get(k):
               p=root/"substs"/k
               return json.loads(p.read_text()) if p.exists() else None
-          assert get("VULPRA_NO_NEWTAB_PROMOCARD") in (True,1),get("VULPRA_NO_NEWTAB_PROMOCARD")
+          assert str(get("VULPRA_NO_NEWTAB_PROMOCARD")) in ("True","1"),get("VULPRA_NO_NEWTAB_PROMOCARD")
           assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
           assert get("MOZ_APP_BASENAME")=="Vulpra"
           assert get("MOZ_DEVTOOLS")=="all"
