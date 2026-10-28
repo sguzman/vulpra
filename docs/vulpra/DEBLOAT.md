@@ -180,6 +180,22 @@ Specific desktop blockers worth isolating before a native opt-out:
 
 The dependency map and candidate statuses are recorded in [DEBLOAT-CANDIDATES.json](DEBLOAT-CANDIDATES.json). **M3 remains 2/6 gates (33%), overall 44%.** Next evidence gate: choose one narrow packaged feature, map every non-test caller and runtime fallback, and only then perform source-matched opt-in native build, live behavior and package-size comparison. No telemetry deletion or other candidate is yet authorized.
 
+## Pinned desktop Sync/FxAccounts high-impact dependency proof (2026-10-28)
+
+The source-pinned [Sync/Accounts boundary audit 40783699429](https://github.com/sguzman/vulpra/actions/runs/40783699429) **PASSED** at `72b894f89417e8ae818fd425a09309ef628027e8`, artifact `m3-sync-live-boundaries` ID **12858905238**. A sparse Git checkout reads original tracked source objects directly, verifies **seven concrete high-impact dependency groups**, and rejects **nine deliberately broken** imports/guards, without compiling Firefox or altering the normal browser.
+
+| Protected dependency | Actual source boundary | Decision |
+| --- | --- | --- |
+| Desktop source build | `services/moz.build` includes `fxaccounts` for non-Android regardless of `MOZ_SERVICES_SYNC`, but includes `sync` only under that configuration | Retain both |
+| Browser Sync menu and tabs | `browser-sync.js` imports Sync UIState/SyncedTabs/Weave and FxAccounts | Retain |
+| Startup and notifications | `AccountsGlue.sys.mjs` uses both services for FxA device events, Sync UI state and remote-tab commands | Retain |
+| Settings | `account-sync.mjs` exposes Sync setup and independently handles enabled/disabled FxA preferences | Retain |
+| WebExtensions | `ExtensionStorageSyncKinto.sys.mjs` loads Sync key/record modules and account OAuth | Retain |
+| Firefox View | `SyncedTabsController.sys.mjs` uses Sync tab services and error states | Retain |
+| AI account authentication | `AIWindowAccountAuth.sys.mjs` directly uses FxAccounts for sign-in | Retain |
+
+**Scope limits:** This is source anchor and package traversal evidence, not a complete dynamic call graph or a browser-runtime fallback test. Removing Sync could break browser UI, Extension `storage.sync`, and tabs. Removing FxAccounts independently could break even more authentication features. No deletion, compile-time omission, compressed bytes or new broad M3 gate is authorized. **M3 2/6 (33%); overall 44%.**
+
 ## Focused desktop Sync and Firefox Accounts dependency audit (2026-10-27)
 
 A separate scoped [full checked-out Git source audit 40627908207](https://github.com/sguzman/vulpra/actions/runs/40627908207) passed at commit `0d7ff85261ba3e0e2deb0cf367adbad1228e8239`. Its negative-checkout and synthetic path-class regression passed before the real audit. Artifact `m3-sync-reference-audit` (ID 12790237398) records exact matching file paths and line numbers.

@@ -286,7 +286,7 @@
         "services/moz.build: conditional DIRS += sync",
         "browser/components/AccountsGlue.sys.mjs: references resource://services-sync/UIState.sys.mjs"
       ],
-      "next": "Do not disable services/sync yet: browser-sync, AccountsGlue/UIState, Firefox View, synced tabs, preferences, AI account-auth, and extension storage consumers are unresolved. Map their enabled/disabled fallbacks, then test a single guarded isolated native variant before removal.",
+      "next": "High-impact source boundary audit 40783699429 PASSED seven explicit protected dependency boundaries and nine negative mutations. services/moz.build packages desktop FxAccounts regardless of MOZ_SERVICES_SYNC, while browser-sync, AccountsGlue/UIState, Firefox View, Sync preferences and WebExtension storage.sync depend on Sync. Do NOT disable either until runtime-verified fallback designs and a source-matched native opt-in. Other indirect consumers may remain.",
       "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" (enabled)",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -332,6 +332,27 @@
           "FxAccounts and browser integrations are independently packaged even when Sync build option is off"
         ],
         "removal_authorized": false
+      },
+      "high_impact_source_boundaries": {
+        "source_commit": "72b894f89417e8ae818fd425a09309ef628027e8",
+        "run_id": 40783699429,
+        "artifact_id": 12858905238,
+        "source_boundaries": 7,
+        "negative_mutations_passed": 9,
+        "categories": [
+          "independent desktop FxAccounts build traversal vs conditional Sync build traversal",
+          "browser-sync app menu and tabs UI",
+          "AccountsGlue startup commands and notifications",
+          "preferences account+Sync controls",
+          "WebExtension storage.sync cryptography/auth",
+          "Firefox View synced-tabs controller",
+          "AI-window FxAccounts authentication"
+        ],
+        "method": "Sparse Git checkout; source-pinned import/consumer anchor checks with deliberate broken-source mutations; actual execution paths not observed",
+        "decision": "Retain Sync and FxAccounts. No safe guarded opt-out established.",
+        "removal_authorized": false,
+        "native_runtime_verified": false,
+        "package_bytes_measured": false
       }
     },
     {
@@ -348,7 +369,7 @@
         "services/moz.build: non-Android includes fxaccounts",
         "browser/components/AccountsGlue.sys.mjs: imports FxAccounts.sys.mjs and FxAccountsCommands.sys.mjs"
       ],
-      "next": "Retain: independently traversed services/fxaccounts, AccountsGlue, extension identity and other browser account auth paths must be mapped and protected. Turning off Sync alone does not remove or make safe Firefox Accounts.",
+      "next": "Independent desktop fxaccounts inclusion confirmed 40783699429; AccountsGlue startup, browser Sync UI, WebExtension storage and AI-window account authentication have real source imports. Sync=false is not an account-service removal. Retain; map remaining consumers and runtime fallbacks before any opt-in deletion.",
       "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" but account services separately compiled for gtk",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -393,6 +414,27 @@
           "FxAccounts and browser integrations are independently packaged even when Sync build option is off"
         ],
         "removal_authorized": false
+      },
+      "high_impact_source_boundaries": {
+        "source_commit": "72b894f89417e8ae818fd425a09309ef628027e8",
+        "run_id": 40783699429,
+        "artifact_id": 12858905238,
+        "source_boundaries": 7,
+        "negative_mutations_passed": 9,
+        "categories": [
+          "independent desktop FxAccounts build traversal vs conditional Sync build traversal",
+          "browser-sync app menu and tabs UI",
+          "AccountsGlue startup commands and notifications",
+          "preferences account+Sync controls",
+          "WebExtension storage.sync cryptography/auth",
+          "Firefox View synced-tabs controller",
+          "AI-window FxAccounts authentication"
+        ],
+        "method": "Sparse Git checkout; source-pinned import/consumer anchor checks with deliberate broken-source mutations; actual execution paths not observed",
+        "decision": "Retain Sync and FxAccounts. No safe guarded opt-out established.",
+        "removal_authorized": false,
+        "native_runtime_verified": false,
+        "package_bytes_measured": false
       }
     },
     {
