@@ -48,8 +48,13 @@ export const AdBanner = ({ spoc, dispatch, row, type, prefs }) => {
       height: undefined,
     };
   };
+  // Webpack replaces this build-time constant; unbundled JSX test runners
+  // don't define it, and must retain ordinary PromoCard behavior.
+  const promoCardAvailable =
+    typeof __VULPRA_NO_NEWTAB_PROMOCARD__ === "undefined" ||
+    !__VULPRA_NO_NEWTAB_PROMOCARD__;
   const promoCardEnabled =
-    !__VULPRA_NO_NEWTAB_PROMOCARD__ &&
+    promoCardAvailable &&
     spoc.format === "billboard" &&
     prefs[PREF_PROMOCARD_ENABLED] &&
     prefs[PREF_PROMOCARD_VISIBLE];
