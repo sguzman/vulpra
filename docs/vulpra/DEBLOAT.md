@@ -58,6 +58,30 @@ Specific desktop blockers worth isolating before a native opt-out:
 
 The dependency map and candidate statuses are recorded in [DEBLOAT-CANDIDATES.json](DEBLOAT-CANDIDATES.json). **M3 remains 2/6 gates (33%), overall 44%.** Next evidence gate: choose one narrow packaged feature, map every non-test caller and runtime fallback, and only then perform source-matched opt-in native build, live behavior and package-size comparison. No telemetry deletion or other candidate is yet authorized.
 
+## Focused Pocket / New Tab source dependency classification (2026-10-27)
+
+The older four-way scan above remains historical evidence for Pocket, promotions, Sync and reporting. A **narrower Pocket/DiscoveryStream audit** followed to separate the New Tab production tree from test fixtures and identify external consumers. The corrected [full-source GitHub Actions run 40616102254](https://github.com/sguzman/vulpra/actions/runs/40616102254) **PASSED** at pinned Vulpra source commit `56d42a1f8773aacc239a3ea058a0a9ac09db9f8b`. Git checkout, synthetic class/failure regression, actual `git grep`, and artifact upload passed. Exact locations and classes are in `m3-pocket-reference-audit` artifact (ID 12784464892). The original audit run 40615824272 also passed, but grouped embedded New Tab tests with production code; commit 56d42a1 fixed that classification and retested it. These scoped patterns differ from the older four-way scan, so their counts **cannot be compared as growth/reduction**.
+
+| Literal reference class | Matching source lines |
+| --- | ---: |
+| New Tab extension source (excluding tests/docs) | 607 |
+| New Tab component source (excluding tests) | 36 |
+| Test fixtures, including New Tab tests | 795 |
+| Browser source outside New Tab | 99 |
+| Other source, third-party or data | 312 |
+| Documentation and tooling | 87 |
+| Localization | 9 |
+| **Total literal matching lines** | **1,945** |
+
+**Observed dependency boundaries:**
+- `browser/extensions/newtab/lib/ActivityStream.sys.mjs` registers `TopStoriesFeed` and `DiscoveryStreamFeed` in `FEEDS_DATA`, alongside unrelated Top Sites, wallpaper, weather, widgets and other New Tab feeds. `PrefsFeed.sys.mjs` consumes `NimbusFeatures.pocketNewtab`; `DiscoveryStreamFeed.sys.mjs` also uses `AdsClient`, Remote Settings and shared New Tab layouts. Treating these as an independently deletable Pocket application would be incorrect.
+- `browser/extensions/newtab/addon-jar.mn` packages the built-in New Tab extension's `lib/*` and `common/*`, plus generated renderer bundles and ASRouter external components. `browser/extensions/newtab/moz.build` generates JavaScript/CSS with existing build steps. Source path deletion and packaged runtime resource exclusion are separate operations.
+- Relevant outside definitions include `toolkit/components/nimbus/FeatureManifest.yaml` (102 pattern matches), `browser/app/profile/firefox.js` (71), enterprise `Policies.sys.mjs` (6), and the browser UI's `CustomizableUI.sys.mjs` (3). `ContextId.sys.mjs` and `MozCachedOHTTPProtocolHandler.sys.mjs` also reference New Tab endpoint preferences. These need guard/fallback review before any opt-in package change.
+- **False positives exist**: e.g. `third_party/rust/rure/examples/sherlock.txt` and `security/manager/ssl/nsSTSPreloadList.inc` match Pocket-like text or domains but are not evidence of active Pocket imports. The broad `other-external` class is not an executable dependency count.
+
+**Decision:** retain the built-in New Tab extension, its core feed/store, Nimbus, safety/automation, and Glean metadata. Only consider narrowly scoped optional recommendation/sponsorship resources after mapping their dispatch/consumers, default and disabled fallback, packaged-resource registration and feature preference interactions; then require matched-source full/lean native packages and Wayland, JavaScript, WebExtension, Nimbus and profile-isolation acceptance. **No source removal, default behavior change, binary saving, or M3 gate completion is claimed from this scan.**
+
+
 ## Isolated ASRouter AI promotion resource experiment (2026-10-27)
 
 The full-source Pocket/promotion/Sync/reporting audit identified two narrow promotional modules packaged via `browser/components/asrouter/moz.build`. A guarded, **opt-in Linux-only** experiment now excludes exactly `SidebarChatBotPromo.sys.mjs` and `SmartWindowNewTabPromo.sys.mjs` from the browser's ASRouter resource map. It does **not** remove ASRouter, onboarding, feature callouts, new-tab UI, telemetry, WebExtensions, Sync or Nimbus.

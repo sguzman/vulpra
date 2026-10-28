@@ -528,7 +528,7 @@
     },
     {
       "id": "pocket_integration",
-      "decision": "review_external_newtab_consumers",
+      "decision": "retain_newtab_core; audit_narrow_optional_resource_optout",
       "surface": "runtime_bundled",
       "paths": [
         "browser/extensions/newtab/",
@@ -541,14 +541,46 @@
         "Full checked-out source reference scan: https://github.com/sguzman/vulpra/actions/runs/40544803899",
         "browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs: 42 matching source lines",
         "browser/extensions/newtab/lib/ActivityStream.sys.mjs: 19 matching source lines",
-        "browser/components/newtab/metrics.yaml and toolkit/components/nimbus/FeatureManifest.yaml include Pocket-related definitions"
+        "browser/components/newtab/metrics.yaml and toolkit/components/nimbus/FeatureManifest.yaml include Pocket-related definitions",
+        "Focused Git source audit, corrected classifications and synthetic regression: https://github.com/sguzman/vulpra/actions/runs/40616102254",
+        "New Tab FEEDS_DATA registers TopStoriesFeed and DiscoveryStreamFeed alongside shared widgets: browser/extensions/newtab/lib/ActivityStream.sys.mjs",
+        "Built-in New Tab JAR manifest includes wildcard lib/common resources and generated bundles: browser/extensions/newtab/addon-jar.mn; browser/extensions/newtab/moz.build"
       ],
-      "next": "Map DiscoveryStreamFeed/ActivityStream call sites, prefs, default New Tab fallback and packaged Pocket resources before any narrow opt-in removal; preserve working new-tab navigation, JS, extensions, Nimbus and profile isolation.",
+      "next": "Protect built-in New Tab, its rendering/bundles/feed/store, Nimbus and shared ads/endpoint utilities. Select a narrow optional recommendation/sponsor entry point, map its dispatch and packaged resource guards plus disabled fallback, then verify source-matched native full/lean builds, Wayland, JS, WebExtensions, Nimbus and profile isolation. Existing source scans authorize no deletion.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
         "matching_lines": 3292,
         "non_test_doc_paths": 295,
+        "removal_authorized": false
+      },
+      "focused_reference_audit": {
+        "source_commit": "56d42a1f8773aacc239a3ea058a0a9ac09db9f8b",
+        "run_id": 40616102254,
+        "evidence_artifact_id": 12784464892,
+        "matching_lines": 1945,
+        "counts_by_class": {
+          "newtab-owned": 607,
+          "newtab-component": 36,
+          "test-only": 795,
+          "browser-external": 99,
+          "other-external": 312,
+          "docs-tooling": 87,
+          "localization": 9
+        },
+        "key_external_consumers": [
+          "toolkit/components/nimbus/FeatureManifest.yaml",
+          "browser/app/profile/firefox.js",
+          "browser/components/enterprisepolicies/Policies.sys.mjs",
+          "browser/components/customizableui/CustomizableUI.sys.mjs",
+          "browser/modules/ContextId.sys.mjs",
+          "browser/components/mozcachedohttp/MozCachedOHTTPProtocolHandler.sys.mjs"
+        ],
+        "limitations": [
+          "Literal grep includes inactive comments, samples, URL lists and third-party fixtures",
+          "Regex coverage differs from prior four-way source audit",
+          "No full binary dependency graph or native opt-out validated"
+        ],
         "removal_authorized": false
       }
     },
