@@ -59,9 +59,11 @@ jobs:
             echo "SKIP: Source-matched second successful workflow completion will trigger comparison."
             exit 0
           fi
-          echo "ready=true" >> "$GITHUB_OUTPUT"
-          echo "native_run_id=$native_id" >> "$GITHUB_OUTPUT"
-          echo "baseline_run_id=$baseline_id" >> "$GITHUB_OUTPUT"
+          {
+            echo "ready=true"
+            echo "native_run_id=$native_id"
+            echo "baseline_run_id=$baseline_id"
+          } >> "$GITHUB_OUTPUT"
           echo "PASS: accepted source-matched pair: candidate=$native_id baseline=$baseline_id SHA=$SOURCE_SHA"
 
   compare:
