@@ -45,12 +45,12 @@ def evidence(text: str, anchor: str, source: str, *, count: int = 1) -> dict:
 
 
 def section(text: str, start: str, end: str, source: str) -> str:
-    if text.count(start) != 1 or text.count(end) != 1:
-        raise ValueError(f"Could not isolate {source} section: {start} .. {end}")
+    if text.count(start) != 1:
+        raise ValueError(f"Could not identify unique {source} start: {start}")
     a = text.index(start)
-    b = text.index(end, a + len(start))
-    if b <= a:
-        raise ValueError(f"Out-of-order source section in {source}")
+    b = text.find(end, a + len(start))
+    if b < 0:
+        raise ValueError(f"Could not find closing boundary in {source}: {end}")
     return text[a:b]
 
 
