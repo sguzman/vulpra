@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "Vulpra",
-  "as_of": "2026-10-27",
+  "as_of": "2026-10-28",
   "source_version": "159.0b5",
   "upstream_tag": "FIREFOX_159_0b5_RELEASE",
   "upstream_commit": "34ac0671eb25f31f8c56ace36e1c413dd471eb8d",
@@ -223,7 +223,7 @@
       "acceptance_gates": {
         "passed": 2,
         "total": 6,
-        "method": "Two of six roadmap gates passed: (1) verified source-matched package-byte reductions and full native runtime evidence for accepted opt-in Normandy and ASRouter promo removals plus source-only platform file/blob evidence, and (2) bounded non-Linux widget/installer source prune. The 3,184-byte ASRouter candidate is additional evidence for the existing per-removal validation gate, NOT a newly completed third roadmap gate; promotion/Pocket/Sync/reporting audit remains incomplete.",
+        "method": "Two of six roadmap gates passed: (1) existing per-removal acceptance evidence for isolated opt-in Normandy/ASRouter/AdsFeed packaged resources and source-matched native/runtime results, plus source/blob inventory; (2) bounded non-Linux widget/installer source pruning verified by native Linux/browser checks. Package size measurements across independent builds are not proven isolated or reproducible bytes; they are not additive. Pocket/promotion/Sync/telemetry dependency audits, candidate classification and mobile/testing/localization audits remain incomplete. No new third gate due solely to the accepted guarded AdsFeed trial.",
         "remaining": [
           "Complete feature bundle, binary/build dependency and platform map",
           "Complete candidate keep/disable/compile/remove classification",

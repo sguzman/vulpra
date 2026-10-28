@@ -117,6 +117,9 @@ jobs:
       - name: Test isolated ASRouter promotion resource opt-out
         run: bash ci/tests/m3-asrouter-promos-optout-test.sh "$PWD"
 
+      - name: Validate source-pinned AdsFeed paired evidence and variation
+        run: python3 ci/tests/m3-adsfeed-evidence-ledger-test.py
+
       - name: Validate classified M3 candidate register
         run: |
           jq -e '
