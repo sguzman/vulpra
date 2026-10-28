@@ -42,13 +42,14 @@ awk '
     if (!colon) { print "Invalid line number in: " $0 > "/dev/stderr"; exit 2 }
     line = substr(rest, 1, colon - 1)
     if (line !~ /^[0-9]+$/) { print "Bad line: " $0 > "/dev/stderr"; exit 2 }
-    if (path ~ /^browser\/extensions\/newtab\//) klass = "newtab-owned"
-    else if (path ~ /^browser\/components\/newtab\//) klass = "newtab-component"
-    else if (path ~ /^testing\// || path ~ /(^|\/)(test|tests)\// ||
-             path ~ /(^|\/)test_[^\/]*$/) klass = "test-only"
+    if (path ~ /^testing\// || path ~ /(^|\/)(test|tests)\// ||
+        path ~ /(^|\/)test_[^\/]*$/) klass = "test-only"
     else if (path ~ /^browser\/locales\// || path ~ /^l10n\// ||
              path ~ /\.(ftl|dtd|properties)$/) klass = "localization"
-    else if (path ~ /^(docs|ci|\.github)\// || path ~ /\.(md|rst)$/) klass = "docs-tooling"
+    else if (path ~ /^(docs|ci|\.github)\// || path ~ /(^|\/)docs\// ||
+             path ~ /\.(md|rst)$/) klass = "docs-tooling"
+    else if (path ~ /^browser\/extensions\/newtab\//) klass = "newtab-owned"
+    else if (path ~ /^browser\/components\/newtab\//) klass = "newtab-component"
     else if (path ~ /^browser\//) klass = "browser-external"
     else klass = "other-external"
     printf "%s\t%s\t%s\n", path, line, klass

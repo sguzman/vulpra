@@ -39,17 +39,19 @@ jobs:
           printf 'pocketNewtab\n' > "$work/browser/extensions/newtab/lib/ActivityStream.sys.mjs"
           printf 'DiscoveryStreamFeed\n' > "$work/browser/components/BrowserGlue.sys.mjs"
           printf 'getpocket.com\n' > "$work/testing/test_pocket.js"
+          mkdir -p "$work/browser/extensions/newtab/test/browser"
+          printf 'Pocket test fixture\n' > "$work/browser/extensions/newtab/test/browser/test_pocket.js"
           printf 'Pocket is referenced in documentation\n' > "$work/docs/pocket.md"
           git -C "$work" add .
           git -C "$work" commit -qm fixture
           bash ci/m3-pocket-reference-audit.sh "$work" "$work/audit"
-          jq -e '.matching_lines == 4
+          jq -e '.matching_lines == 5
             and .counts_by_class["newtab-owned"] == 1
             and .counts_by_class["browser-external"] == 1
-            and .counts_by_class["test-only"] == 1
+            and .counts_by_class["test-only"] == 2
             and .counts_by_class["docs-tooling"] == 1
             and .removal_authorized == false' "$work/audit/report.json"
-          test "$(wc -l < "$work/audit/references.txt")" -eq 4
+          test "$(wc -l < "$work/audit/references.txt")" -eq 5
           if bash ci/m3-pocket-reference-audit.sh "$work/does-not-exist" "$work/bad" 2>/dev/null; then
             echo "FAIL: audit accepted missing source checkout" >&2
             exit 1
