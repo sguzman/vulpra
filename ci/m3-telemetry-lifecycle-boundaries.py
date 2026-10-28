@@ -182,7 +182,7 @@ def self_test(src: dict[str, str]) -> None:
         ("controller", "await lazy.TelemetrySend.shutdown();"),
         ("sender", "if (ping && isDeletionRequestPing(ping)) {"),
         ("sender", "if (!this.sendingEnabled(ping)) {"),
-        ("policy", "if (!this.dataSubmissionEnabled) {"),
+        ("policy", "return !this._shouldNotifyDataReportingPolicy() && !this._shouldShowTOU();"),
         ("telemetry_build", '"app/TelemetrySend.sys.mjs",'),
         ("glean_build", '"bindings/GleanPings.cpp",'),
         ("crash_build", 'if CONFIG["MOZ_CRASHREPORTER"]:'),
