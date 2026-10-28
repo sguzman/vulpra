@@ -1,0 +1,72 @@
+# Read-only M3 Pocket/New Tab dependency inventory.
+# This workflow intentionally does not compile or prune browser source.
+name: M3 Audit Pocket and New Tab Dependencies
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-pocket-reference-audit.yml
+      - ci/m3-pocket-reference-audit.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-full-source:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out full pinned source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Regression-test independent classification and failure boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          git -C "$work" init -q
+          git -C "$work" config user.email qa@vulpra.invalid
+          git -C "$work" config user.name QA
+          mkdir -p "$work/browser/extensions/newtab/lib" \
+            "$work/browser/components" "$work/testing" "$work/docs"
+          printf '#!/bin/sh\n' > "$work/mach"
+          printf 'pocketNewtab\n' > "$work/browser/extensions/newtab/lib/ActivityStream.sys.mjs"
+          printf 'DiscoveryStreamFeed\n' > "$work/browser/components/BrowserGlue.sys.mjs"
+          printf 'getpocket.com\n' > "$work/testing/test_pocket.js"
+          printf 'Pocket is referenced in documentation\n' > "$work/docs/pocket.md"
+          git -C "$work" add .
+          git -C "$work" commit -qm fixture
+          bash ci/m3-pocket-reference-audit.sh "$work" "$work/audit"
+          jq -e '.matching_lines == 4
+            and .counts_by_class["newtab-owned"] == 1
+            and .counts_by_class["browser-external"] == 1
+            and .counts_by_class["test-only"] == 1
+            and .counts_by_class["docs-tooling"] == 1
+            and .removal_authorized == false' "$work/audit/report.json"
+          test "$(wc -l < "$work/audit/references.txt")" -eq 4
+          if bash ci/m3-pocket-reference-audit.sh "$work/does-not-exist" "$work/bad" 2>/dev/null; then
+            echo "FAIL: audit accepted missing source checkout" >&2
+            exit 1
+          fi
+          echo "PASS: synthetic source classes and invalid-checkout refusal"
+
+      - name: Scan complete source for Pocket and DiscoveryStream consumers
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/m3-pocket-reference-audit.sh . "$RUNNER_TEMP/m3-pocket-reference-audit"
+
+      - name: Upload bounded source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-pocket-reference-audit
+          path: ${{ runner.temp }}/m3-pocket-reference-audit/
+          if-no-files-found: warn
+          retention-days: 14
