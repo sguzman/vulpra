@@ -1,0 +1,56 @@
+# Pinned source contracts for high-impact desktop Sync / Firefox Accounts
+# features, independent of the broad counted-line source audit.
+name: M3 Sync and FxAccounts Runtime Boundary Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-sync-live-boundaries.py
+      - .github/workflows/m3-sync-live-boundaries.yml
+      - browser/moz.configure
+      - services/moz.build
+      - browser/base/content/browser-sync.js
+      - browser/components/AccountsGlue.sys.mjs
+      - browser/components/preferences/config/account-sync.mjs
+      - toolkit/components/extensions/ExtensionStorageSyncKinto.sys.mjs
+      - browser/components/firefoxview/SyncedTabsController.sys.mjs
+      - browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-protected-sync-calls:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Sparse checkout only audit scripts and complete pinned Git tree
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Validate exact pinned caller/import dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test ! -e browser/base/content/browser-sync.js
+          git cat-file -e HEAD:services/moz.build
+          python3 ci/m3-sync-live-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/m3-sync-live-boundaries.json"
+          jq -e '.removal_authorized == false and
+                 (.boundaries | length == 7) and
+                 (.source_commit == env.GITHUB_SHA)' \
+            "$RUNNER_TEMP/m3-sync-live-boundaries.json" >/dev/null
+      - name: Upload bounded source boundary report
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-sync-live-boundaries
+          path: ${{ runner.temp }}/m3-sync-live-boundaries.json
+          if-no-files-found: error
+          retention-days: 14

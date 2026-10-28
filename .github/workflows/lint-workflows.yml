@@ -42,6 +42,7 @@ jobs:
             .github/workflows/m3-optout-define-preflight.yml
             .github/workflows/m3-pocket-reference-audit.yml
             .github/workflows/m3-pocket-live-boundaries.yml
+            .github/workflows/m3-sync-live-boundaries.yml
             .github/workflows/m3-promocard-bundle-preflight.yml
             .github/workflows/m3-promocard-native.yml
             .github/workflows/m3-promocard-matched-baseline.yml
