@@ -58,6 +58,29 @@ Specific desktop blockers worth isolating before a native opt-out:
 
 The dependency map and candidate statuses are recorded in [DEBLOAT-CANDIDATES.json](DEBLOAT-CANDIDATES.json). **M3 remains 2/6 gates (33%), overall 44%.** Next evidence gate: choose one narrow packaged feature, map every non-test caller and runtime fallback, and only then perform source-matched opt-in native build, live behavior and package-size comparison. No telemetry deletion or other candidate is yet authorized.
 
+## Focused desktop Sync and Firefox Accounts dependency audit (2026-10-27)
+
+A separate scoped [full checked-out Git source audit 40627908207](https://github.com/sguzman/vulpra/actions/runs/40627908207) passed at commit `0d7ff85261ba3e0e2deb0cf367adbad1228e8239`. Its negative-checkout and synthetic path-class regression passed before the real audit. Artifact `m3-sync-reference-audit` (ID 12790237398) records exact matching file paths and line numbers.
+
+| Source reference class | Literal matching lines |
+| --- | ---: |
+| `services/sync` implementation | 332 |
+| `services/fxaccounts` implementation | 281 |
+| Browser integrations outside tests | 587 |
+| WebExtension integrations | 11 |
+| Test fixtures | 1,673 |
+| Docs / tooling | 66 |
+| Other source and generated metadata | 276 |
+| **Total literal matching lines** | **3,226** |
+
+The focused patterns are different from the earlier four-way Sync/Accounts scan (1,616 lines), so the totals cannot be interpreted as growth or code savings. These are literal grep hits, **not distinct live call sites**; they include prefs, comments, test fixtures and generated metadata.
+
+**Concrete build and runtime boundaries:**
+- `browser/moz.configure` implies `MOZ_SERVICES_SYNC=True`. `services/moz.build` traverses Sync conditionally but traverses `services/fxaccounts` **independently** for non-Android builds.
+- `browser/components/AccountsGlue.sys.mjs` imports both `FxAccounts.sys.mjs` and Sync `UIState.sys.mjs` through lazy module getters, while `browser/base/content/browser-sync.js` imports Sync UIState directly. Merely turning off the Sync build flag without guarding these consumers could break account and browser UI.
+- Additional source references in Firefox View, Synced Tabs, preferences, WebExtension Sync storage, and account-auth surfaces need explicit fallback/feature scope; a reference alone does not establish a running call.
+- **Decision:** retain both subsystems, map exact activation/disabled-path behavior, and test an isolated source-matched variant before claiming a removable module. No Sync/Firefox Accounts pruning, native compilation, package saving or additional M3 milestone accepted by this audit.
+
 ## Focused Pocket / New Tab source dependency classification (2026-10-27)
 
 The older four-way scan above remains historical evidence for Pocket, promotions, Sync and reporting. A **narrower Pocket/DiscoveryStream audit** followed to separate the New Tab production tree from test fixtures and identify external consumers. The corrected [full-source GitHub Actions run 40616102254](https://github.com/sguzman/vulpra/actions/runs/40616102254) **PASSED** at pinned Vulpra source commit `56d42a1f8773aacc239a3ea058a0a9ac09db9f8b`. Git checkout, synthetic class/failure regression, actual `git grep`, and artifact upload passed. Exact locations and classes are in `m3-pocket-reference-audit` artifact (ID 12784464892). The original audit run 40615824272 also passed, but grouped embedded New Tab tests with production code; commit 56d42a1 fixed that classification and retested it. These scoped patterns differ from the older four-way scan, so their counts **cannot be compared as growth/reduction**.
@@ -90,6 +113,8 @@ The built-in `addon-jar.mn` ordinarily packages `lib/*`, and the train-hop XPI s
 
 [Native CI 40617558714](https://github.com/sguzman/vulpra/actions/runs/40617558714) is the required experimental gate: supported Mozilla Clang and GTK configure, full C++/Rust build, independently SHA-256 verified package, omni.ja resource presence/absence, real Weston Wayland, JS, about:newtab fallback, WebExtensions, Nimbus and Firefox profile isolation. **Pending at time of this ledger entry.** If it passes, a separate source-matched baseline/native compressed-byte comparison is required before claiming savings. This experiment deletes **zero Git-tracked files** and changes **no default behavior**; no M3 gate or overall progress credit is awarded.
 
+
+**Newest evidence:** [New Tab sponsored AdsFeed native trial 40617558714](https://github.com/sguzman/vulpra/actions/runs/40617558714) **PASSED** real Linux compilation, SHA-256 packaging, omni.ja omission of AdsFeed.sys.mjs and retained New Tab modules, Weston Wayland, about:newtab, JavaScript, WebExtensions, Nimbus and profile safety. Experimental compressed package = **86,932,376 B**. The [exact-source normal baseline 40627016301](https://github.com/sguzman/vulpra/actions/runs/40627016301) was still compiling when this entry was written, so **no package saving is accepted** yet.
 
 ## Isolated ASRouter AI promotion resource experiment (2026-10-27)
 

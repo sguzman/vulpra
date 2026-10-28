@@ -272,7 +272,7 @@
     },
     {
       "id": "sync_services",
-      "decision": "evaluate_compile_optout",
+      "decision": "retain_pending_explicit_browser_sync_ui_and_extension_callers",
       "surface": "compile_condition",
       "paths": [
         "services/sync/"
@@ -286,7 +286,7 @@
         "services/moz.build: conditional DIRS += sync",
         "browser/components/AccountsGlue.sys.mjs: references resource://services-sync/UIState.sys.mjs"
       ],
-      "next": "Enabled in tested configuration. Map AccountsGlue/UI module references and test an isolated opt-out, with native build and extension/navigation regression before touching the known-good baseline.",
+      "next": "Do not disable services/sync yet: browser-sync, AccountsGlue/UIState, Firefox View, synced tabs, preferences, AI account-auth, and extension storage consumers are unresolved. Map their enabled/disabled fallbacks, then test a single guarded isolated native variant before removal.",
       "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" (enabled)",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -298,6 +298,38 @@
           "browser/components/AccountsGlue.sys.mjs",
           "browser/components/preferences/config/account-sync.mjs",
           "services/fxaccounts/FxAccounts.sys.mjs"
+        ],
+        "removal_authorized": false
+      },
+      "focused_reference_audit": {
+        "source_commit": "0d7ff85261ba3e0e2deb0cf367adbad1228e8239",
+        "run_id": 40627908207,
+        "evidence_artifact_id": 12790237398,
+        "matching_lines": 3226,
+        "counts_by_class": {
+          "sync-owned": 332,
+          "accounts-owned": 281,
+          "browser-integration": 587,
+          "webextension-integrations": 11,
+          "test-only": 1673,
+          "docs-tooling": 66,
+          "other-integrations": 276
+        },
+        "key_desktop_consumers": [
+          "browser/base/content/browser-sync.js",
+          "browser/components/AccountsGlue.sys.mjs",
+          "browser/components/preferences/config/account-sync.mjs",
+          "browser/components/firefoxview/firefox-view-tabs-setup-manager.sys.mjs",
+          "browser/components/firefoxview/SyncedTabsController.sys.mjs",
+          "browser/components/syncedtabs/SyncedTabsDeckComponent.sys.mjs",
+          "toolkit/components/extensions/ExtensionStorageSyncKinto.sys.mjs",
+          "browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs"
+        ],
+        "limitations": [
+          "Literal pattern matching, not proof of dynamic imports/runtime reachability",
+          "Broader patterns than previous 1616-line four-way audit; counts not comparable",
+          "Only static source, no native compile opt-out, no package-size measurement",
+          "FxAccounts and browser integrations are independently packaged even when Sync build option is off"
         ],
         "removal_authorized": false
       }
@@ -316,7 +348,7 @@
         "services/moz.build: non-Android includes fxaccounts",
         "browser/components/AccountsGlue.sys.mjs: imports FxAccounts.sys.mjs and FxAccountsCommands.sys.mjs"
       ],
-      "next": "Preserve until AccountsGlue and WebExtension integration dependencies mapped; must not assume toggling Sync removes FxAccounts.",
+      "next": "Retain: independently traversed services/fxaccounts, AccountsGlue, extension identity and other browser account auth paths must be mapped and protected. Turning off Sync alone does not remove or make safe Firefox Accounts.",
       "observed_actual_config": "MOZ_SERVICES_SYNC=\"1\" but account services separately compiled for gtk",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -327,6 +359,38 @@
           "browser/components/AccountsGlue.sys.mjs",
           "services/fxaccounts/FxAccounts.sys.mjs",
           "services/fxaccounts/FxAccountsWebChannel.sys.mjs"
+        ],
+        "removal_authorized": false
+      },
+      "focused_reference_audit": {
+        "source_commit": "0d7ff85261ba3e0e2deb0cf367adbad1228e8239",
+        "run_id": 40627908207,
+        "evidence_artifact_id": 12790237398,
+        "matching_lines": 3226,
+        "counts_by_class": {
+          "sync-owned": 332,
+          "accounts-owned": 281,
+          "browser-integration": 587,
+          "webextension-integrations": 11,
+          "test-only": 1673,
+          "docs-tooling": 66,
+          "other-integrations": 276
+        },
+        "key_desktop_consumers": [
+          "browser/base/content/browser-sync.js",
+          "browser/components/AccountsGlue.sys.mjs",
+          "browser/components/preferences/config/account-sync.mjs",
+          "browser/components/firefoxview/firefox-view-tabs-setup-manager.sys.mjs",
+          "browser/components/firefoxview/SyncedTabsController.sys.mjs",
+          "browser/components/syncedtabs/SyncedTabsDeckComponent.sys.mjs",
+          "toolkit/components/extensions/ExtensionStorageSyncKinto.sys.mjs",
+          "browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs"
+        ],
+        "limitations": [
+          "Literal pattern matching, not proof of dynamic imports/runtime reachability",
+          "Broader patterns than previous 1616-line four-way audit; counts not comparable",
+          "Only static source, no native compile opt-out, no package-size measurement",
+          "FxAccounts and browser integrations are independently packaged even when Sync build option is off"
         ],
         "removal_authorized": false
       }
@@ -753,7 +817,7 @@
     },
     {
       "id": "newtab_adsfeed_optout",
-      "decision": "native_trial_pending; no accepted debloat credit",
+      "decision": "native_runtime_passed; same_source_matched_baseline_compiling; no accepted byte saving",
       "surface": "packaged New Tab extension library resource",
       "paths": [
         "browser/extensions/newtab/lib/AdsFeed.sys.mjs",
@@ -769,15 +833,18 @@
       "experiment_flag": "VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED=1",
       "scope": "Linux-only, opt-in, fixed pinned library inventory; AdsFeed factory not registered and the single module is omitted from alternate New Tab JAR/XPI manifest",
       "protected": "Retain ActivityStream, DiscoveryStreamFeed, TopStoriesFeed, AdsClient, Store, renderer, prefs, Nimbus, extensions, Sandbox, Wayland, Sync",
-      "native_verification": "pending full compile/package checksum/resource inspection, about:newtab navigation, real Wayland/JS/WebExtension/Nimbus/profile smoke",
-      "compressed_package_bytes": null,
+      "native_verification": "PASS: native run 40617558714 compiled Vulpra Linux, packaged and checksum verified, omitted only AdsFeed.sys.mjs from omni.ja, preserved five key New Tab resources, real about:newtab, Weston Wayland, JS, WebExtension install/background/storage/uninstall, Nimbus and profile isolation.",
+      "compressed_package_bytes": 86932376,
       "matched_baseline_delta_bytes": null,
-      "next": "Review source-contract test and all literal runtime consumers. Accept only after full native package/runtime trial and a same-source baseline size comparison; address any build or New Tab regression without touching the normal baseline.",
+      "next": "Native candidate accepted as tested but NO quantified saving until source-pinned full AdsFeed baseline run 40627016301 completes and validates a positive compressed package delta. Baseline is in native compilation. Default/normal package unchanged.",
       "evidence": [
         "https://github.com/sguzman/vulpra/commit/a8547f9a1cc4e81985cf171c679c1d19a46875b3",
-        "https://github.com/sguzman/vulpra/actions/runs/40617558714"
+        "https://github.com/sguzman/vulpra/actions/runs/40617558714",
+        "https://github.com/sguzman/vulpra/actions/runs/40627016301"
       ],
-      "removal_authorized": false
+      "removal_authorized": false,
+      "native_package_sha256": "94720e52420f4da85ffe46c95363be24053223c8d03e29376a2a2f642079f304",
+      "matched_baseline_run_id": 40627016301
     }
   ],
   "observed_native_config": {
