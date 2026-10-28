@@ -186,7 +186,7 @@
     },
     {
       "id": "source_testing",
-      "decision": "retain_pending_dependency_proof",
+      "decision": "protect_core_test_build_and_performance_corpora; audit peripheral fixtures",
       "surface": "source_only",
       "paths": [
         "testing/"
@@ -199,7 +199,76 @@
         "toolkit/toolkit.mozbuild: unconditional /testing/gtest; optional harnesses guarded by ENABLE_TESTS",
         "actual M2 build needed disabled-test manifest workaround"
       ],
-      "next": "Map generators/support files needed for successful native build before any selective test-data prune"
+      "next": "Keep build-wired manifest/mozbase/mozharness, WebDriver/Marionette, WPT, Talos and Raptor. Check narrow peripheral fixture datasets and conditional moz.build manifests before trial deletions; run native build and runtime acceptance for any actual removal.",
+      "manifest_grounded_boundaries": {
+        "source_revision": "2450fb9f86f49ada663cb5cc1a48544265e8bc26",
+        "status": "read_only_source_graph_classification; no deletion authorized",
+        "must_retain_for_current_native_build": [
+          "root moz.build unconditionally traverses testing and third_party/python",
+          "testing/moz.build unconditionally traverses manifest, mozbase, mozharness and includes performance/perftest.toml",
+          "testing/moz.build includes android-test/tests/python.toml in non-JS_STANDALONE builds, even on Linux; deleting that tiny subtree requires manifest correction",
+          "toolkit/toolkit.mozbuild includes /testing/gtest unconditionally, and /testing/geckodriver, /testing/firefox-ui, /testing/marionette for enabled WebDriver/Geckodriver"
+        ],
+        "directly_relevant_future_verification": [
+          "testing/web-platform/tests: web-standard compliance and migration regression corpus; full count/size NOT measured because GitHub recursive tree reply truncates at 60,006 listed blobs",
+          "testing/talos: performance benchmark/latency regression inputs; current Git tree 620 blobs / 39,772,123 Git bytes",
+          "testing/raptor: performance harness; current Git tree 262 blobs / 4,859,505 Git bytes",
+          "testing/marionette and geckodriver: QA automation interface needed by real M2 package testing"
+        ],
+        "measured_bounded_git_trees": [
+          {
+            "path": "testing/manifest",
+            "files": 71,
+            "git_blob_bytes": 576498
+          },
+          {
+            "path": "testing/mozbase",
+            "files": 571,
+            "git_blob_bytes": 9608196
+          },
+          {
+            "path": "testing/mozharness",
+            "files": 265,
+            "git_blob_bytes": 1167199
+          },
+          {
+            "path": "testing/geckodriver",
+            "files": 44,
+            "git_blob_bytes": 447128
+          },
+          {
+            "path": "testing/marionette",
+            "files": 235,
+            "git_blob_bytes": 980402
+          },
+          {
+            "path": "testing/talos",
+            "files": 620,
+            "git_blob_bytes": 39772123
+          },
+          {
+            "path": "testing/raptor",
+            "files": 262,
+            "git_blob_bytes": 4859505
+          }
+        ],
+        "metrics_provenance": "Git tree recursive GitHub blob sizes, limited to individual fully returned tree results; numbers are Git uncompressed blob sizes, not compiled bytes or package savings",
+        "keep_by_default": [
+          "testing/manifest",
+          "testing/mozbase",
+          "testing/mozharness",
+          "testing/geckodriver",
+          "testing/marionette",
+          "testing/web-platform/tests",
+          "testing/talos",
+          "testing/raptor"
+        ],
+        "caveats": [
+          "Disabling Mozilla test suites (--disable-tests) is not proof a test tree is absent from the build-system traversal",
+          "Removing conformance/performance corpora would sacrifice testing needed for later Rust/Gecko changes; do not count them as unnecessary merely because the shipping browser does not include them",
+          "Other unmeasured test fixtures and standalone test directories still require a smaller dependency audit; no blanket testing/ deletion authorized"
+        ]
+      }
     },
     {
       "id": "sync_services",

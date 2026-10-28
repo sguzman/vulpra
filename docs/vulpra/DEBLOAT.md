@@ -70,6 +70,17 @@ The full-source Pocket/promotion/Sync/reporting audit identified two narrow prom
 
 **Accepted, scoped result:** This **opt-in** native feature variant is now an accepted selective package removal under the same M3 per-removal testing gate already satisfied by Normandy and source-only platform pruning. The ordinary/default build still includes the two promotional modules, and ASRouter/other promotions/Pocket/Sync/telemetry remain. The immutable guard prevents remote messages from referencing the absent modules. The measured **3,184-byte** saving is small and must **not** be added mechanically to the separate 27,620-byte Normandy saving; no combined matched build exists. The comprehensive promotional/Pocket/account/Sync/reporting roadmap gate remains open, so M3 stays **2/6 (33%)**, overall **44%**.
 
+## Test-source dependency boundary (read-only audit, 2026-10-27)
+
+The **testing/** tree is not disposable merely because Vulpra's shipping Linux configuration sets `--disable-tests`. This is a classification checkpoint, **not a source deletion or M3 gate pass**.
+
+- Root `moz.build` unconditionally traverses `testing/`; `testing/moz.build` traverses `manifest`, `mozbase` and `mozharness` and includes `performance/perftest.toml`. It also references `android-test/tests/python.toml` for every non-`JS_STANDALONE` application, including the native Linux browser. Therefore even the three-file `testing/android-test` tree is **not safe for direct deletion without a targeted manifest correction**.
+- `toolkit/toolkit.mozbuild` unconditionally pulls in `/testing/gtest`, with additional paths for WebDriver, Marionette and Geckodriver when enabled. Browser automation and future repair/regression testing depend on keeping these contracts intact.
+- `testing/web-platform/tests` is a web-standards conformance corpus for future Gecko/Rust changes; the GitHub tree output is **truncated**, so no complete blob/size claim was made. `testing/talos` contains 620 Git blobs / 39,772,123 uncompressed blob bytes, and `testing/raptor` contains 262 blobs / 4,859,505 bytes. These performance suites are **intentionally retained**, not identified as bloat purely from their unshipped size.
+- Bounded source inventory of build/QA infrastructure: `testing/manifest` 71 blobs / 576,498 B; `testing/mozbase` 571 / 9,608,196 B; `testing/mozharness` 265 / 1,167,199 B; `testing/geckodriver` 44 / 447,128 B; `testing/marionette` 235 / 980,402 B. Sizes are **Git blob bytes**, not compressed Linux binary bytes.
+
+**Decision:** retain the build-wired test infrastructure and performance/standards suites. Continue only with **narrow peripheral test fixtures** when exact build-graph conditions and future regression costs are understood; no blanket `testing/`, web-platform or performance-suite deletion is authorized. This classification addresses one part of the still-open M3 test-source audit, but does not complete the entire gate or change percentages.
+
 ## Accepted Android application source pruning (2026-10-27)
 
 This is a **source-only Linux-first** reduction, not a runtime feature flag or a measured desktop package-size saving. The original unpruned Git parent contains **14,134 files / 115,996,869 Git blob bytes** in exactly these three unselected Android application roots: `mobile/android/fenix/` (3,881 files / 61,071,734 B), `mobile/android/focus-android/` (743 / 9,353,910 B), and `mobile/android/android-components/` (9,510 / 45,571,225 B).
