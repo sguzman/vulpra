@@ -1,0 +1,157 @@
+# Independent same-source normal Linux browser, retaining real PromoCard.
+name: M3 Native Full New Tab PromoCard Baseline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-promocard-native.yml
+      - browser/extensions/newtab/webpack.system-addon.config.js
+      - browser/extensions/newtab/build-newtab-bundles.py
+      - browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx
+      - browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/**
+      - ci/m3-promocard-package-evidence.py
+      - ci/mozconfig-linux-m3-promocard-experiment
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-full-in-parallel:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
+      DEBIAN_FRONTEND: noninteractive
+      MOZ_HEADLESS: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
+    steps:
+      - name: Checkout exact source used by the simultaneous lean native candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify exact source and original PromoCard contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 ci/tests/m3-promocard-bundle-contract.py
+          echo "PASS: normal source includes original JSX and New Tab feeds"
+
+      - name: Prepare Mozilla compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Export Actions compiler-cache credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Bootstrap supported full browser compiler
+        shell: bash
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends python3 python3-venv python3-dev git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+          if ! test -x "$HOME/.mozbuild/clang/bin/clang" || ! test -x "$HOME/.mozbuild/clang/bin/clang++"; then
+            (cd "$HOME/.mozbuild" && "$GITHUB_WORKSPACE/mach" artifact toolchain --from-build linux64-clang)
+          fi
+          major="$("$HOME/.mozbuild/clang/bin/clang" --version | head -1 | sed -E 's/.*version ([0-9]+).*/\1/')"
+          [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 19 ))
+
+      - name: Configure normal Linux browser, PromoCard omission disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach configure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("obj-vulpra-linux-m3-baseline/config.statusd")
+          def get(k):
+              p=root/"substs"/k
+              return json.loads(p.read_text()) if p.exists() else None
+          assert get("VULPRA_NO_NEWTAB_PROMOCARD") in (False,None,0,"")
+          assert get("MOZ_WIDGET_TOOLKIT")=="gtk"
+          assert get("MOZ_APP_BASENAME")=="Vulpra"
+          assert get("MOZ_DEVTOOLS")=="all"
+          for key in ("MOZ_SANDBOX","MOZ_WAYLAND","MOZ_SERVICES_SYNC","MOZ_NORMANDY"):
+              assert str(get(key)) in ("True","1"),(key,get(key))
+          for key in ("VULPRA_NO_NEWTAB_ADSFEED","VULPRA_NO_ASROUTER_PROMOS"):
+              assert get(key) in (False,None,0,"")
+              assert not (root/"defines"/key).exists(),key
+          print("PASS: original normal Linux browser features and JSX preserved")
+          PY
+
+      - name: Reserve matching 24 GiB compilation swap
+        shell: bash
+        run: |
+          set -euo pipefail
+          bytes=$((24*1024*1024*1024))
+          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( available > bytes + 8*1024*1024*1024 ))
+          sudo fallocate -l 24G /mnt/vulpra-m3-promocard-baseline.swap
+          sudo chmod 0600 /mnt/vulpra-m3-promocard-baseline.swap
+          sudo mkswap /mnt/vulpra-m3-promocard-baseline.swap
+          sudo swapon /mnt/vulpra-m3-promocard-baseline.swap
+          grep -Fq '/mnt/vulpra-m3-promocard-baseline.swap' /proc/swaps
+
+      - name: Compile full baseline Linux browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-promocard-baseline-build.log"
+
+      - name: Package actual full baseline and prove original PromoCard included
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist=obj-vulpra-linux-m3-baseline/dist
+          test "$(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' | wc -l)" -eq 1
+          archive="$(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print -quit)"
+          bash packaging/stage.sh "$archive" "$RUNNER_TEMP/vulpra-m3-promocard-full-baseline.tar.xz"
+          (cd "$RUNNER_TEMP" && sha256sum -c vulpra-m3-promocard-full-baseline.tar.xz.sha256)
+          python3 ci/m3-promocard-package-evidence.py \
+            --archive "$RUNNER_TEMP/vulpra-m3-promocard-full-baseline.tar.xz" \
+            --source-commit "$GITHUB_SHA" --variant normal \
+            --output "$RUNNER_TEMP/m3-promocard-full-baseline-evidence.json"
+
+      - name: Upload bounded independent baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-promocard-full-baseline-evidence
+          path: |
+            ${{ runner.temp }}/m3-promocard-full-baseline-evidence.json
+            ${{ runner.temp }}/vulpra-m3-promocard-full-baseline.tar.xz.sha256
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Capture baseline failure tail
+        if: failure()
+        shell: bash
+        run: |
+          if test -f "$RUNNER_TEMP/m3-promocard-baseline-build.log"; then
+            tail -n 3000 "$RUNNER_TEMP/m3-promocard-baseline-build.log" > "$RUNNER_TEMP/m3-promocard-baseline-failure-tail.log"
+          fi
+
+      - name: Upload baseline failure diagnostic
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-promocard-baseline-failure-tail
+          path: ${{ runner.temp }}/m3-promocard-baseline-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
+

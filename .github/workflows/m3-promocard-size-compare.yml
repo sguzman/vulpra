@@ -1,0 +1,129 @@
+# Source-pinned independent artifact comparison; runs on BOTH build completions.
+# First successful build may have no pair yet: SKIP without a failing wait loop.
+# On the second completion the counterpart's evidence is already present.
+name: M3 Compare New Tab PromoCard Native Packages
+
+on:
+  workflow_run:
+    workflows:
+      - M3 Native New Tab PromoCard Opt-out Trial
+      - M3 Native Full New Tab PromoCard Baseline
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  find-source-matched-pair:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      ready: ${{ steps.find.outputs.ready }}
+      native_run_id: ${{ steps.find.outputs.native_run_id }}
+      baseline_run_id: ${{ steps.find.outputs.baseline_run_id }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Find successful same-commit normal and opt-in package builds
+        id: find
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq >/dev/null
+          command -v gh >/dev/null
+          search_run() {
+            local workflow="$1" result
+            result="$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$SOURCE_SHA&per_page=100")"
+            jq -r --arg sha "$SOURCE_SHA" '
+              [.workflow_runs[] | select(
+                .head_sha==$sha and
+                (.event=="push" or .event=="workflow_dispatch") and
+                .conclusion=="success" and .head_branch=="main"
+              )] | sort_by(.id) | last | .id // empty' <<< "$result"
+          }
+          # No waiting runner. Completion of the LAST of the two workflows
+          # dispatches another copy of this job which sees BOTH successful.
+          native_id="$(search_run m3-promocard-native.yml)"
+          baseline_id="$(search_run m3-promocard-matched-baseline.yml)"
+          if [[ -z "$native_id" || -z "$baseline_id" ]]; then
+            echo "No complete pair yet for $SOURCE_SHA: native=${native_id:-pending}, full=${baseline_id:-pending}"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "SKIP: Source-matched second successful workflow completion will trigger comparison."
+            exit 0
+          fi
+          {
+            echo "ready=true"
+            echo "native_run_id=$native_id"
+            echo "baseline_run_id=$baseline_id"
+          } >> "$GITHUB_OUTPUT"
+          echo "PASS: accepted source-matched pair: candidate=$native_id baseline=$baseline_id SHA=$SOURCE_SHA"
+
+  compare:
+    needs: find-source-matched-pair
+    if: needs.find-source-matched-pair.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NATIVE_RUN_ID: ${{ needs.find-source-matched-pair.outputs.native_run_id }}
+      BASELINE_RUN_ID: ${{ needs.find-source-matched-pair.outputs.baseline_run_id }}
+      CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Fetch authenticated successful source-matched build evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/promocard-candidate" "$RUNNER_TEMP/promocard-baseline"
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-promocard-native-evidence \
+            --dir "$RUNNER_TEMP/promocard-candidate"
+          gh run download "$BASELINE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-promocard-full-baseline-evidence \
+            --dir "$RUNNER_TEMP/promocard-baseline"
+      - name: Checkout exact source for pinned comparison parser
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Compare actual native packages and signed difference
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test -f "$RUNNER_TEMP/promocard-baseline/m3-promocard-full-baseline-evidence.json"
+          test -f "$RUNNER_TEMP/promocard-candidate/m3-promocard-evidence.json"
+          python3 ci/m3-promocard-match-evidence.py \
+            "$RUNNER_TEMP/promocard-baseline/m3-promocard-full-baseline-evidence.json" \
+            "$RUNNER_TEMP/promocard-candidate/m3-promocard-evidence.json" \
+            "$RUNNER_TEMP/m3-promocard-matched-size.json" \
+            --source-commit "$CANDIDATE_SHA"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"m3-promocard-matched-size.json"
+          report=json.loads(p.read_text())
+          report["native_candidate_run_id"]=int(os.environ["NATIVE_RUN_ID"])
+          report["baseline_run_id"]=int(os.environ["BASELINE_RUN_ID"])
+          p.write_text(json.dumps(report,indent=2)+"\n")
+          print("PASS: source-matched workflow provenance recorded")
+          PY
+
+      - name: Upload verified paired package-size evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-promocard-matched-size
+          path: ${{ runner.temp }}/m3-promocard-matched-size.json
+          if-no-files-found: warn
+          retention-days: 14
