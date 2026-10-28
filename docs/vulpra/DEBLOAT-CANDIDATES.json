@@ -878,7 +878,7 @@
       "native_verification": "Corrected native Linux build 40708368192 PASSED compiled/packaged SHA-256, actual AdsFeed omitted in omni.ja with ActivityStream/DiscoveryStreamFeed/AdsClient/Store/TopStories retained, Weston Wayland, about:newtab, JavaScript, temporary WebExtensions, Nimbus and Firefox-profile isolation. Exact same-source full baseline 40708368442 PASSED native compile/package and verified AdsFeed present.",
       "compressed_package_bytes": 86928124,
       "matched_baseline_delta_bytes": 219360,
-      "next": "Accepted isolated Linux opt-in only, not permanent deletion. Retain default New Tab and shared client, rendering, feeds, Nimbus and browser security features. Continue remaining Pocket/promotions/Sync/telemetry boundary audits; each further feature needs its own source/runtime/package evidence. Do not sum independent experimental deltas.",
+      "next": "Previously accepted original variant remains accepted at 864e5b7, with explicit residual sponsored pathways. Guarded improved variant 956bcdb currently has source regressions plus paired native builds pending 40744304129 and 40744304177; do not credit its bytes before fresh real runtime/comparison. Full sponsor-free claim and source deletions remain unauthorized.",
       "evidence": [
         "https://github.com/sguzman/vulpra/commit/a8547f9a1cc4e81985cf171c679c1d19a46875b3",
         "https://github.com/sguzman/vulpra/actions/runs/40617558714",
@@ -922,6 +922,29 @@
         "verified_adsfeed_present_in_full": true,
         "same_source": true,
         "limitations": "Separate source-matched builds: compressed package difference may include nondeterministic bytes. No cumulative saving with other experiments; no default source/build changed."
+      },
+      "residual_sponsored_path_review": {
+        "source_commit": "956bcdb2b28316aedacd796793f0ccfac7360899",
+        "finding": "Omitting AdsFeed does NOT eliminate all sponsored New Tab pathways. DiscoveryStreamFeed.loadSpocs retains direct MARS/SPoCs and AdsClient branches; TopSitesFeed.ContileIntegration._fetchSites retains direct Contile/MARS/AdsClient sponsor fetches. The opt-in experiment must not be described as universally ad-free.",
+        "remaining_sources": [
+          "browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs",
+          "browser/extensions/newtab/lib/TopSitesFeed.sys.mjs",
+          "browser/extensions/newtab/lib/AdsClient.sys.mjs",
+          "browser/extensions/newtab/lib/TopStoriesFeed.sys.mjs"
+        ],
+        "risk": "A remotely updated unifiedAds.adsFeed.enabled pref could select state.Ads data from an unregistered AdsFeed feed, causing an exception or missing sponsored tiles/stories in the opt-in browser.",
+        "guard_fix_commit": "956bcdb2b28316aedacd796793f0ccfac7360899",
+        "mitigation": "Guard all three relevant direct AdsFeed-pref selections with immutable AppConstants.VULPRA_NO_NEWTAB_ADSFEED and route opt-in browser to retained upstream fallback; keep default behavior unchanged.",
+        "pending_trial": {
+          "candidate_run_id": 40744304129,
+          "baseline_run_id": 40744304177,
+          "config_preflight_run_id": 40744304060,
+          "manifest_audit_run_id": 40744304643,
+          "source_commit": "956bcdb2b28316aedacd796793f0ccfac7360899",
+          "status": "native comparison pending; no new package-size acceptance",
+          "validation": "Source contract requires 2 DiscoveryStreamFeed and 1 TopSitesFeed guard, verifies retained AdsClient/direct paths; fresh native compilation and real Wayland, about:newtab, JS, WebExtensions, Nimbus/profile checks pending."
+        },
+        "acceptance_boundary": "Earlier 219,360-B paired measurement is accepted only for previous source 864e5b7, not automatically transferable to amended source. New variant must complete its own runtime/package check."
       }
     }
   ],
