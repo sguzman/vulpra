@@ -35,3 +35,6 @@ jobs:
             .github/workflows/import-firefox.yml
             .github/workflows/source-metrics.yml
             .github/workflows/lint-workflows.yml
+            .github/workflows/m3-newtab-adsfeed-native.yml
+            .github/workflows/m3-newtab-adsfeed-matched-baseline.yml
+            .github/workflows/m3-pocket-reference-audit.yml
