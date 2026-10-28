@@ -1,0 +1,147 @@
+# Source-pinned independent artifact comparison; runs on BOTH build completions.
+# First successful build may have no pair yet: SKIP without a failing wait loop.
+# On the second completion the counterpart's evidence is already present.
+name: M3 Compare New Tab AdsFeed Accepted Native Packages
+
+on:
+  workflow_run:
+    workflows:
+      - M3 Native New Tab AdsFeed Opt-out Trial
+      - M3 Native Full New Tab AdsFeed Baseline
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  find-source-matched-pair:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      ready: ${{ steps.find.outputs.ready }}
+      native_run_id: ${{ steps.find.outputs.native_run_id }}
+      baseline_run_id: ${{ steps.find.outputs.baseline_run_id }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Find successful same-commit normal and opt-in package builds
+        id: find
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq >/dev/null
+          command -v gh >/dev/null
+          search_run() {
+            local workflow="$1" result
+            result="$(gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$SOURCE_SHA&per_page=100")"
+            jq -r --arg sha "$SOURCE_SHA" '
+              [.workflow_runs[] | select(
+                .head_sha==$sha and
+                (.event=="push" or .event=="workflow_dispatch") and
+                .conclusion=="success" and .head_branch=="main"
+              )] | sort_by(.id) | last | .id // empty' <<< "$result"
+          }
+          # No waiting runner. Completion of the LAST of the two workflows
+          # dispatches another copy of this job which sees BOTH successful.
+          native_id="$(search_run m3-newtab-adsfeed-native.yml)"
+          baseline_id="$(search_run m3-newtab-adsfeed-matched-baseline.yml)"
+          if [[ -z "$native_id" || -z "$baseline_id" ]]; then
+            echo "No complete pair yet for $SOURCE_SHA: native=${native_id:-pending}, full=${baseline_id:-pending}"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "SKIP: Source-matched second successful workflow completion will trigger comparison."
+            exit 0
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          echo "native_run_id=$native_id" >> "$GITHUB_OUTPUT"
+          echo "baseline_run_id=$baseline_id" >> "$GITHUB_OUTPUT"
+          echo "PASS: accepted source-matched pair: candidate=$native_id baseline=$baseline_id SHA=$SOURCE_SHA"
+
+  compare:
+    needs: find-source-matched-pair
+    if: needs.find-source-matched-pair.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NATIVE_RUN_ID: ${{ needs.find-source-matched-pair.outputs.native_run_id }}
+      BASELINE_RUN_ID: ${{ needs.find-source-matched-pair.outputs.baseline_run_id }}
+      CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Fetch authenticated successful source-matched build evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/adsfeed-candidate" "$RUNNER_TEMP/adsfeed-baseline"
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-newtab-adsfeed-native-evidence \
+            --dir "$RUNNER_TEMP/adsfeed-candidate"
+          gh run download "$BASELINE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-newtab-adsfeed-full-baseline-evidence \
+            --dir "$RUNNER_TEMP/adsfeed-baseline"
+      - name: Compare independently checked source-matched package bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,re
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          cs=list((root/"adsfeed-candidate").rglob("m3-newtab-adsfeed-evidence.json"))
+          bs=list((root/"adsfeed-baseline").rglob("m3-newtab-adsfeed-full-baseline-evidence.json"))
+          assert len(cs)==len(bs)==1,(cs,bs)
+          candidate=json.loads(cs[0].read_text())
+          baseline=json.loads(bs[0].read_text())
+          source=os.environ["CANDIDATE_SHA"]
+          assert candidate["source_commit"]==baseline["source_commit"]==source
+          assert candidate["status"]=="native and runtime accepted; matched baseline comparison pending"
+          assert candidate["variant"]=="linux-newtab-adsfeed-experimental-omission"
+          assert baseline["variant"]=="full-newtab-adsfeed-normal-linux"
+          assert baseline["status"]=="full baseline native compilation and exact resource check accepted"
+          assert candidate["omitted_resource"].endswith("/AdsFeed.sys.mjs")
+          assert candidate["tested"]["wayland"] and candidate["tested"]["newtab"]
+          assert candidate["tested"]["webextensions"] and candidate["tested"]["nimbus"]
+          assert baseline["normal_adsfeed_resource_present"] and baseline["protected_resources_present"]
+          assert baseline["omni_jar_count"]>=2 and candidate["omni_jar_count"]>=2
+          for item in (candidate,baseline):
+              assert re.fullmatch("[0-9a-f]{64}",item["sha256"])
+              assert isinstance(item["compressed_package_bytes"],int) and item["compressed_package_bytes"]>0
+          full=baseline["compressed_package_bytes"]
+          lean=candidate["compressed_package_bytes"]
+          report={
+              "schema_version":1,
+              "source_commit":source,
+              "native_candidate_run_id":int(os.environ["NATIVE_RUN_ID"]),
+              "baseline_run_id":baseline["baseline_run_id"],
+              "normal_adsfeed_resource_present":True,
+              "full_compressed_package_bytes":full,
+              "lean_compressed_package_bytes":lean,
+              "saved_compressed_package_bytes":full-lean,
+              "reduction_percent":round((full-lean)/full*100,6),
+              "baseline_package_sha256":baseline["sha256"],
+              "candidate_package_sha256":candidate["sha256"],
+              "same_source_commit":True,
+              "native_candidate_runtime_accepted":True,
+          }
+          outfile=root/"m3-newtab-adsfeed-matched-size.json"
+          outfile.write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          assert full>lean,("No demonstrated positive compressed-package saving",report)
+          print("PASS: source-matched independent real package-byte saving")
+          PY
+
+      - name: Upload verified paired package-size evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-newtab-adsfeed-matched-size
+          path: ${{ runner.temp }}/m3-newtab-adsfeed-matched-size.json
+          if-no-files-found: warn
+          retention-days: 14
