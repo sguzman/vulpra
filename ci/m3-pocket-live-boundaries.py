@@ -152,7 +152,7 @@ def validate_source(texts: dict[str, str]) -> dict:
                 "evidence": [
                     evidence(legacy, "  lazyLoadTopStories(options = {}) {", "legacy"),
                     evidence(legacy, "this.discoveryStreamEnabled = false", "legacy"),
-                    evidence(legacy, "this.initializeProperties();", "legacy"),
+                    evidence(legacy, "if (!this.discoveryStreamEnabled && !this.propertiesInitialized)", "legacy"),
                 ],
             },
             {
