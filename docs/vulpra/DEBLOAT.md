@@ -2,6 +2,34 @@
 
 **Status (2026-10-27):** The working Linux personal baseline remains verified (M2 5/5). M3 has **five independently verified accepted selective changes**: two opt-in packaged resource variants (Normandy runner saves 27,620 compressed bytes; two ASRouter promotional modules save 3,184 compressed bytes; not additive without a combined build), and three source-only pruning passes: 453 Windows/Cocoa/installer files (6,266,676 original Git blob bytes), 14,134 Android app files (115,996,869 bytes), and 280 further Android/iOS/UIKit leaf files (7,704,040 bytes). Total **14,867 files / 129,967,585 original Git blob bytes** permanently removed from `main`. The final eight-root trial [native CI 40600510147](https://github.com/sguzman/vulpra/actions/runs/40600510147) passed compilation, package verification, Wayland, JS, WebExtensions, Nimbus and profile isolation; committed in [8331ca6](https://github.com/sguzman/vulpra/commit/8331ca63f97b84779d6b1765955dff6017d060f8). **M3 remains 2/6 gates (33%) and overall product 44%.** No compiled Linux package-size savings are attributed to the platform source deletions; the tested workstation browser and source have not been updated. Unsupported Android/iOS builds and mobile-specific tests may still reference removed paths.
 
+## Focused telemetry submission and policy dependency audit (2026-10-28)
+
+The read-only [full tracked-source workflow 40721612576](https://github.com/sguzman/vulpra/actions/runs/40721612576) **PASSED** at source commit `8af4710591147d7fc110c002ed4b6a8a760d2708`, including synthetic path-class regression, invalid-checkout refusal, actual checked-out `git grep` and bounded artifact upload. Artifact `m3-telemetry-reference-audit` (ID 12830103191) holds exact file names and matching line numbers.
+
+| Literal reference class | Matching source lines |
+| --- | ---: |
+| Telemetry JS policy/sender app | 74 |
+| Telemetry native/other internals | 32 |
+| Glean runtime / metrics | 34 |
+| Crash reporter | 10 |
+| Browser integration | 92 |
+| Other toolkit consumers | 127 |
+| Tests and fixtures | 663 |
+| Documentation / tooling | 108 |
+| Localization | 3 |
+| Other source and generated metadata | 143 |
+| **Total literal matching lines** | **1,286** |
+
+This scope differs from the earlier 1,736-line reporting audit; its count cannot be interpreted as an increase or decrease. Literal references include comments, preference names and fixtures, and do not establish a dynamic call graph or real network transmission.
+
+**Observed boundaries, not deletion authorization:**
+- `toolkit/components/telemetry/moz.build` links native telemetry code into `xul`, traverses `pingsender`, and packages `TelemetryControllerParent.sys.mjs`, `TelemetryReportingPolicy.sys.mjs` and `TelemetrySend.sys.mjs` independently of the reporting preference. Deleting the sender outright would break packaged imports without guarding startup/shutdown.
+- `TelemetryControllerParent.sys.mjs` calls `TelemetryReportingPolicy.setup()`, `TelemetrySend.earlyInit()`, `TelemetrySend.setup()`, and their shutdown paths; it also manages local telemetry and crash annotations.
+- `MOZ_TELEMETRY_REPORTING` defaults according to `mozilla_official`; `MOZ_DATA_REPORTING` separately accounts for Health Report, Crash Reporter and Normandy. A build-time macro, UI preference or source default **does not prove actual uploads**. Vulpra's actual configured reporting state and policy/network behavior still need a verified check.
+- Glean metric registration/IPC and crash reporting have distinct dependencies and should remain intact. Only a narrow **submission/transport opt-out** can be considered after verified disabled-path behavior, and would still require a native build, runtime/browser test, profile safety and matched package-size result.
+
+**Result:** source evidence improved, zero code pruned and zero binary saving claimed. M3 stays **2/6 (33%)**.
+
 ## AdsFeed default-flag preprocessor repair and source-matched retry (2026-10-28)
 
 The initially successful [experimental native build 40617558714](https://github.com/sguzman/vulpra/actions/runs/40617558714) remains an independently tested **opt-in candidate**, but its first [full AdsFeed baseline 40627016301](https://github.com/sguzman/vulpra/actions/runs/40627016301) FAILED **after successful native compilation and staging**: the default normal package lacked `builtin-addons/newtab/lib/AdsFeed.sys.mjs`. It is not a verified package reduction.

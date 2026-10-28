@@ -397,7 +397,7 @@
     },
     {
       "id": "telemetry_internals",
-      "decision": "retain_pending_dependency_proof",
+      "decision": "retain_native_telemetry_glean_and_crashreporter; evaluate_submission_only_after_policy_and_lifecycle_proof",
       "surface": "runtime_bundled",
       "paths": [
         "toolkit/components/telemetry/"
@@ -409,7 +409,7 @@
         "toolkit/moz.configure: MOZ_TELEMETRY_REPORTING option defaults to mozilla_official",
         "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces"
       ],
-      "next": "Report config missing/unverified; preserve native telemetry and crash reporting while examining configured data-reporting components and package footprint.",
+      "next": "Focused read-only source audit 40721612576 classified 1,286 literal lines; TelemetryControllerParent calls TelemetryReportingPolicy and TelemetrySend at startup/setup/shutdown, while core native telemetry is linked to xul and Glean/crash reporting have distinct roles. Retain until a verified native configure and actual policy/network test distinguish delivery preference, ping transport and local metrics. Evaluate only a bounded guarded submission opt-out, not full telemetry deletion.",
       "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\"",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -426,6 +426,47 @@
           "browser/app/profile/firefox.js enables shutdown/new-profile/first-shutdown legacy pings; this is a source default, not proof of actual Vulpra network transmission"
         ],
         "distinction": "Transport/reporting, browser telemetry consumers, Glean metrics/IPC and crash reporting have different dependencies; source-only audit does not prove safe physical deletion.",
+        "removal_authorized": false
+      },
+      "focused_reference_audit": {
+        "source_commit": "8af4710591147d7fc110c002ed4b6a8a760d2708",
+        "run_id": 40721612576,
+        "evidence_artifact_id": 12830103191,
+        "matching_lines": 1286,
+        "counts_by_class": {
+          "docs-tooling": 108,
+          "other": 143,
+          "browser-consumer": 92,
+          "test-only": 663,
+          "toolkit-consumer": 127,
+          "glean-runtime": 34,
+          "telemetry-policy-and-sender": 74,
+          "telemetry-native-and-other": 32,
+          "crashreporter": 10,
+          "localization": 3
+        },
+        "key_external_consumers": [
+          "modules/libpref/init/all.js",
+          "browser/app/profile/firefox.js",
+          "toolkit/moz.configure",
+          "toolkit/components/nimbus/FeatureManifest.yaml",
+          "browser/components/profiles/SelectableProfileService.sys.mjs",
+          "browser/components/enterprisepolicies/Policies.sys.mjs",
+          "toolkit/xre/nsAppRunner.cpp",
+          "toolkit/components/dap/DAPSender.sys.mjs"
+        ],
+        "analyzed_build_contracts": [
+          "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul with native core and unconditionally bundled TelemetryControllerParent, TelemetryReportingPolicy, TelemetrySend and pingsender",
+          "toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs: calls TelemetryReportingPolicy.setup and TelemetrySend earlyInit, setup and shutdown",
+          "toolkit/moz.configure: MOZ_TELEMETRY_REPORTING defaults to mozilla_official; MOZ_DATA_REPORTING can separately follow healthreport, crashreporter or Normandy",
+          "toolkit/components/glean/moz.build: native generated Glean metrics and IPC remain needed regardless of submission policy"
+        ],
+        "limitations": [
+          "Literal grep, not unique import sites or proof of dynamic reachability",
+          "The focused regex differs from older general reporting scan; 1286 cannot be compared to 1736 as growth or reduction",
+          "Unverified actual target configuration and network transmission; source defaults do not establish outgoing pings",
+          "No changes to telemetry preference defaults, Glean, crash reporting or native code"
+        ],
         "removal_authorized": false
       }
     },
