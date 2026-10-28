@@ -34,6 +34,7 @@ import {
 const lazy = {};
 
 ChromeUtils.defineESModuleGetters(lazy, {
+  AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   AdsClient: "resource://newtab/lib/AdsClient.sys.mjs",
   ContextId: "moz-src:///browser/modules/ContextId.sys.mjs",
   FilterAdult: "resource:///modules/FilterAdult.sys.mjs",
@@ -666,7 +667,11 @@ export class ContileIntegration {
     const unifiedAdsTilesEnabled =
       state.Prefs.values[PREF_UNIFIED_ADS_TILES_ENABLED];
 
-    const adsFeedEnabled = state.Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];
+    // Even when a remote pref enables AdsFeed, the opt-in build never
+    // registers its factory. Fall back to existing direct/AdsClient tiles.
+    const adsFeedEnabled =
+      !lazy.AppConstants.VULPRA_NO_NEWTAB_ADSFEED &&
+      state.Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];
 
     const debugServiceName = unifiedAdsTilesEnabled ? "MARS" : "Contile";
 

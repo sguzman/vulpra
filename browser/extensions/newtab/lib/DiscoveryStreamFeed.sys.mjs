@@ -6,6 +6,7 @@
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
+  AppConstants: "resource://gre/modules/AppConstants.sys.mjs",
   AdsClient: "resource://newtab/lib/AdsClient.sys.mjs",
   ContextId: "moz-src:///browser/modules/ContextId.sys.mjs",
   SectionsLayoutManager: "resource://newtab/lib/SectionsLayoutFeed.sys.mjs",
@@ -1371,7 +1372,11 @@ export class DiscoveryStreamFeed {
     const unifiedAdsEnabled =
       this.store.getState().Prefs.values[PREF_UNIFIED_ADS_SPOCS_ENABLED];
 
+    // No AdsFeed factory exists in the opt-in package even if Nimbus/remote
+    // prefs enable this upstream pref. Use the retained direct-fetch/AdsClient
+    // path instead of reading a nonexistent state.Ads payload.
     const adsFeedEnabled =
+      !lazy.AppConstants.VULPRA_NO_NEWTAB_ADSFEED &&
       this.store.getState().Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];
 
     let spocsState = cachedData.spocs;
@@ -1620,7 +1625,9 @@ export class DiscoveryStreamFeed {
       return;
     }
 
-    const adsFeedEnabled = state.Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];
+    const adsFeedEnabled =
+      !lazy.AppConstants.VULPRA_NO_NEWTAB_ADSFEED &&
+      state.Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];
     const endpointBaseUrl = state.Prefs.values[PREF_UNIFIED_ADS_ENDPOINT];
 
     // Exit if there no DELETE endpoint or AdsFeed is enabled (which will handle the DELETE request)

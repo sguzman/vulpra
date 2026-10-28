@@ -73,6 +73,27 @@ assert feed.index("for (const config of FEEDS_DATA)") < feed.index(
     'if (AppConstants.VULPRA_NO_NEWTAB_ADSFEED && config.name === "adsfeed")'
 )
 assert 'factory: () => new lazy.DiscoveryStreamFeed()' in feed
+# A remote Nimbus experiment can enable unifiedAds.adsFeed.enabled even in
+# the opt-in build that physically omits the module. Both retained consumers
+# must route the preference to their guarded direct-fetch/AdsClient fallbacks,
+# including cleanup paths, instead of dereferencing missing state.Ads.
+discovery = get(src + "lib/DiscoveryStreamFeed.sys.mjs")
+topsites = get(src + "lib/TopSitesFeed.sys.mjs")
+for name, text, required in (
+    ("DiscoveryStreamFeed", discovery, 2),
+    ("TopSitesFeed", topsites, 1),
+):
+    assert 'AppConstants: "resource://gre/modules/AppConstants.sys.mjs"' in text
+    assert text.count("!lazy.AppConstants.VULPRA_NO_NEWTAB_ADSFEED &&") == required, (
+        name,
+        "all direct AdsFeed pref branches must be guarded",
+    )
+    assert "state.Ads" in text, (name, "expected upstream consumer")
+    assert "PREF_UNIFIED_ADS_ADSFEED_ENABLED" in text
+assert "if (unifiedAdsEnabled && !adsFeedEnabled)" in discovery
+assert "if (adsFeedEnabled) {" in discovery
+assert "if (!adsFeedEnabled) {" in topsites
+print("PASS: forced remote AdsFeed pref cannot select missing-feed branches in opt-in code")
 assert 'factory: () => new lazy.TopSitesFeed()' in feed
 assert 'factory: () => new lazy.PrefsFeed(PREFS_CONFIG)' in feed
 

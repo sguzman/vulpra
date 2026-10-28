@@ -9,6 +9,9 @@ on:
     branches: [main]
     paths:
       - .github/workflows/m3-newtab-adsfeed-native.yml
+      - browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+      - browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
+      - ci/tests/m3-newtab-adsfeed-optout-test.sh
   workflow_dispatch:
 
 permissions:
