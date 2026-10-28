@@ -653,7 +653,7 @@
         "Source-pinned Pocket runtime-boundary audit and seven invalid-source mutations passed: https://github.com/sguzman/vulpra/actions/runs/40773515182",
         "Extended promo import/renderer source-boundary audit and nine mutation tests PASSED: https://github.com/sguzman/vulpra/actions/runs/40773988580"
       ],
-      "next": "The narrow guarded PromoCard opt-in now passes real vendored Webpack compile and bundle marker checks (40776956857): normal JSX 1,335,463 B, lean 1,332,731 B (2,732 uncompressed JS bytes). Full native opt-in 40777472270 and normal 40777472244 are running; no source file deletion, no accepted compressed bytes or completed Pocket gate. Keep both feed registrations, AdBanner, Nimbus, SVG and other callers.",
+      "next": "Opt-in real vendored Webpack compile and original PromoCard JS exclusion passed at 2635afe; 2,732 uncompressed JS bytes. First native candidate 40777472270 stopped before compilation on a CI false-negative for config string '1', fixed in 977c7ae; fresh lean/full 40778245764/40778245670 started. Asset audit 40778037014 found shared mascot outside PromoCard and widespread l10n definitions, so preserve SVG and localizations. No native or compressed-package acceptance yet.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -1055,7 +1055,11 @@
         "Real vendored Webpack normal/lean bundles and nine fail-closed source contracts passed: https://github.com/sguzman/vulpra/actions/runs/40776540055",
         "Two real vendored Webpack builds, synthetic archive/parser and negative-byte compare passed: https://github.com/sguzman/vulpra/actions/runs/40776956857",
         "Native lean started: https://github.com/sguzman/vulpra/actions/runs/40777472270",
-        "Native full baseline started: https://github.com/sguzman/vulpra/actions/runs/40777472244"
+        "Native full baseline started: https://github.com/sguzman/vulpra/actions/runs/40777472244",
+        "Initial opt-in configure false-negative: https://github.com/sguzman/vulpra/actions/runs/40777472270",
+        "Corrected native opt-in source: https://github.com/sguzman/vulpra/actions/runs/40778245764",
+        "Fresh same-source normal baseline: https://github.com/sguzman/vulpra/actions/runs/40778245670",
+        "Read-only asset/l10n audit: https://github.com/sguzman/vulpra/actions/runs/40778037014"
       ],
       "preflight": {
         "source_commit": "2635afea3c2d263efacd2f81c676c7602ebe9a33",
@@ -1070,11 +1074,17 @@
         "warning": "This is generated JS bytes only; not package tar.xz savings or native acceptance."
       },
       "native_trial": {
-        "source_commit": "c9e520f5d844990d6eb19c1611dc7f62adf5a811",
-        "lean_run": 40777472270,
-        "normal_run": 40777472244,
+        "source_commit": "977c7ae262a76fb0ca0327857917928810e9108e",
+        "lean_run": 40778245764,
+        "normal_run": 40778245670,
         "comparator_workflow": ".github/workflows/m3-promocard-size-compare.yml",
-        "status": "running; no complete native or package-size proof yet"
+        "status": "Fresh exact-source normal and lean native builds running; corrected string-valued config assertion; no package/runtime/byte evidence accepted.",
+        "previous_failed_run": {
+          "source_commit": "c9e520f5d844990d6eb19c1611dc7f62adf5a811",
+          "lean_run": 40777472270,
+          "reason": "Native configure succeeded, custom CI assertion falsely rejected Mozilla config.statusd/substs enabled flag returned as string '1'; stopped before C++/Rust compilation. Same-source baseline run 40777472244 compiled but cannot be source-matched with next commit; original SHA evidence cannot be combined.",
+          "accepted": false
+        }
       },
       "protected": [
         "AdBanner main image, sponsored label, context menu and impressions",
@@ -1082,7 +1092,22 @@
         "Top Sites, AdsClient, AdsFeed, Nimbus, Sync, DevTools, Linux Wayland, WebExtensions and Firefox profile",
         "ordinary default PromoCard JSX and click/dismiss/impression handlers"
       ],
-      "next": "Wait for exact-source full and opt-in native compile/package plus actual New Tab bundle presence/absence and real Wayland/JS/about:newtab/WebExtension/Nimbus/profile checks. Event-driven comparator records signed full-minus-optin tar.xz and JS bundle differences, even when nonpositive. Audit mascot asset/localization independently before ever deleting them; don't treat shared resource as optional."
+      "next": "Await corrected source SHA 977c7ae source-matched lean 40778245764 and normal 40778245670 native compile/package checks and real browser Wayland/JS/about:newtab/WebExtension/Nimbus/profile acceptance, then event-driven signed compressed archive measurement. Shared mascot SVG has 2 other source references; retain all locale/style assets pending dynamic reachability proof.",
+      "asset_audit": {
+        "source_commit": "b3a90e8548bb108bfba45f10ca90f474598f951d",
+        "workflow_run": 40778037014,
+        "artifact_id": 12855328671,
+        "mascot_svg_total_source_lines": 3,
+        "mascot_svg_other_source_lines": 2,
+        "localization_source_line_counts": {
+          "newtab-promo-card-dismiss-button": 73,
+          "newtab-promo-card-title-addons": 85,
+          "newtab-promo-card-body-addons": 83,
+          "newtab-promo-card-cta-addons": 81
+        },
+        "finding": "Masccot SVG is referenced outside the PromoCard component, and localization identifiers appear across component/localization definitions; no asset or localization removal is justified by JSX omission.",
+        "asset_or_locale_removal_authorized": false
+      }
     }
   ],
   "observed_native_config": {
