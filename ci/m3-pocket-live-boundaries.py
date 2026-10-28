@@ -14,7 +14,7 @@ import re
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 FILES = {
     "registry": "browser/extensions/newtab/lib/ActivityStream.sys.mjs",
