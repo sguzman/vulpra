@@ -51,6 +51,11 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash ci/tests/m3-newtab-adsfeed-optout-test.sh "$GITHUB_WORKSPACE"
           echo "PASS: source manifest coverage only; no native-compile or M3 byte credit"
+      - name: Exercise actual AdsFeed pref predicates with remote override
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/tests/test-m3-adsfeed-fallback-contract.py
       - name: Verify retained New Tab consumers parse after experimental guards
         shell: bash
         run: |
