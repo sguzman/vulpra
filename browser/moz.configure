@@ -41,6 +41,25 @@ def vulpra_no_asrouter_promos(disable, linux):
 
 set_config("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)
 set_define("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)
+
+# Isolated M3 New Tab sponsored-feed resource opt-out. Preserve the default
+# browser and all other ActivityStream/DiscoveryStream/AdsClient features.
+option(
+    env="VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED",
+    help="Experimental Linux browser without New Tab AdsFeed implementation",
+)
+
+
+@depends("VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED", target_has_linux_kernel)
+def vulpra_no_newtab_adsfeed(disable, linux):
+    if disable and not linux:
+        die("Vulpra New Tab AdsFeed opt-out is supported only on Linux")
+    return bool(disable)
+
+
+set_config("VULPRA_NO_NEWTAB_ADSFEED", vulpra_no_newtab_adsfeed)
+set_define("VULPRA_NO_NEWTAB_ADSFEED", vulpra_no_newtab_adsfeed)
+
 imply_option("MOZ_PROFILE_MIGRATOR", True)
 
 

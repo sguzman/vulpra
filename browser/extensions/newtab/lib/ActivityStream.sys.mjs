@@ -2672,6 +2672,11 @@ const FEEDS_DATA = [
 const FEEDS_CONFIG = new Map();
 
 for (const config of FEEDS_DATA) {
+  // Preserve all other New Tab feeds; this opt-in Linux variant does not
+  // register or instantiate the independently packaged sponsored AdsFeed.
+  if (AppConstants.VULPRA_NO_NEWTAB_ADSFEED && config.name === "adsfeed") {
+    continue;
+  }
   const pref = `feeds.${config.name}`;
   FEEDS_CONFIG.set(pref, config.factory);
   PREFS_CONFIG.set(pref, config);

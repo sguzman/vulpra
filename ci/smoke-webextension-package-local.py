@@ -300,6 +300,59 @@ def verify_asrouter_promo_optout(port: int, base: str) -> dict:
     return result
 
 
+def verify_newtab_adsfeed_optout(port: int, base: str) -> dict:
+    """Exercise the packaged New Tab without its opt-in sponsored AdsFeed.
+
+    A compile flag alone is not proof: require that the actual registered
+    ActivityStream feeds omit AdsFeed while still exposing Top Sites and prefs,
+    and that about:newtab loads in a disposable WebDriver browser.
+    """
+    request(port, "POST", base + "/url", {"url": "about:newtab"})
+    page = request(port, "POST", base + "/execute/sync", {
+        "script": """
+            return {url: location.href, document: !!document.documentElement,
+                    ready: document.readyState};
+        """,
+        "args": [],
+    })
+    if not isinstance(page, dict) or not page.get("document") or not (
+        page.get("url", "").startswith("about:newtab") or
+        page.get("url", "").startswith("about:home")
+    ):
+        raise RuntimeError("Packaged New Tab failed to render: " + repr(page))
+    request(port, "POST", base + "/moz/context", {"context": "chrome"})
+    try:
+        state = request(port, "POST", base + "/execute/sync", {
+            "script": """
+                const { AppConstants } = ChromeUtils.importESModule(
+                    "resource://gre/modules/AppConstants.sys.mjs"
+                );
+                if (!AppConstants.VULPRA_NO_NEWTAB_ADSFEED) {
+                    return {status: "wrong-build-flag"};
+                }
+                const { ActivityStream } = ChromeUtils.importESModule(
+                    "resource://newtab/lib/ActivityStream.sys.mjs"
+                );
+                const keys = [...new ActivityStream().feeds.keys()];
+                return {
+                    status: "pass",
+                    omitted: !keys.includes("feeds.adsfeed"),
+                    topsites: keys.includes("feeds.system.topsites"),
+                    prefs: keys.includes("feeds.prefs"),
+                    feed_count: keys.length,
+                };
+            """,
+            "args": [],
+        }, timeout_seconds=25)
+    finally:
+        request(port, "POST", base + "/moz/context", {"context": "content"})
+    if not isinstance(state, dict) or state.get("status") != "pass" or not (
+        state.get("omitted") and state.get("topsites") and state.get("prefs")
+    ):
+        raise RuntimeError("Packaged New Tab AdsFeed guard/fallback failed: " + repr(state))
+    return {"page": page, "factory_guard": state}
+
+
 def verify_uninstall_stays_uninstalled(proof, seconds: float = 2.0) -> int:
     """Require the removed extension to stay absent across an observation window.
 
@@ -336,6 +389,7 @@ def main() -> int:
         )
     nimbus_check = os.environ.get("VULPRA_M3_VERIFY_NIMBUS", "0") == "1"
     promo_check = os.environ.get("VULPRA_M3_VERIFY_NO_ASROUTER_PROMOS", "0") == "1"
+    adsfeed_check = os.environ.get("VULPRA_M3_VERIFY_NO_NEWTAB_ADSFEED", "0") == "1"
     archive = verified_archive(repo)
     print(f"PASS: Verified existing archive {archive.name}", flush=True)
     logdir = repo / ".git/vulpra-native-build"
@@ -381,7 +435,7 @@ def main() -> int:
         try:
             with gecko_log.open("wb") as driver_log:
                 proc = subprocess.Popen([gecko, "--host", "127.0.0.1", "--port", str(port)] +
-                                        (["--allow-system-access"] if nimbus_check or promo_check else []),
+                                        (["--allow-system-access"] if nimbus_check or promo_check or adsfeed_check else []),
                                         env=env, stdout=driver_log, stderr=subprocess.STDOUT,
                                         start_new_session=True)
                 wait_ready(port, proc)
@@ -447,6 +501,10 @@ def main() -> int:
                 if promo_check:
                     promo_result = verify_asrouter_promo_optout(port, base)
                     print("PASS: two omitted ASRouter promo template routes stayed harmless", flush=True)
+                adsfeed_result = None
+                if adsfeed_check:
+                    adsfeed_result = verify_newtab_adsfeed_optout(port, base)
+                    print("PASS: real about:newtab and guarded sponsored AdsFeed omission", flush=True)
                 if fake_firefox.read_bytes() != sentinel:
                     raise RuntimeError("Existing Firefox profile sentinel modified")
                 print("PASS: Temporary HOME and existing Firefox profile preserved", flush=True)
@@ -462,6 +520,7 @@ def main() -> int:
                     "security": {"original_firefox_profile_preserved": True, "temporary_home": True},
                     "nimbus": nimbus_result,
                     "asrouter_promotion_optout": promo_result,
+                    "newtab_adsfeed_optout": adsfeed_result,
                     "limits": ["Not a comprehensive security audit", "Does not test signed AMO extensions",
                                "Does not verify persisted extensions across restarts"],
                 }

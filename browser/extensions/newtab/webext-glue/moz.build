@@ -51,9 +51,61 @@ if CONFIG["MOZ_APP_VERSION"]:
         FINAL_TARGET_FILES["webext-glue"].metrics += ["!" + runtime_metrics_file]
 else:
     warning("New Tab runtime metrics not generated: MOZ_APP_VERSION is unavailable.")
-FINAL_TARGET_FILES.lib += [
-    "../lib/**",
-]
+# Maintain the train-hop XPI's library contents in sync with addon-jar.mn.
+# The ordinary build keeps the existing recursive wildcard.
+if CONFIG["VULPRA_NO_NEWTAB_ADSFEED"]:
+    FINAL_TARGET_FILES.lib += [
+    "../lib/AboutPreferences.sys.mjs",
+    "../lib/ActivityStream.sys.mjs",
+    "../lib/ActivityStreamMessageChannel.sys.mjs",
+    "../lib/ActivityStreamPrefs.sys.mjs",
+    "../lib/actors/**",
+    "../lib/AdsClient.sys.mjs",
+    "../lib/cache.worker.js",
+    "../lib/DefaultSites.sys.mjs",
+    "../lib/DiscoveryStreamFeed.sys.mjs",
+    "../lib/DownloadsManager.sys.mjs",
+    "../lib/ExternalComponentsFeed.sys.mjs",
+    "../lib/FaviconFeed.sys.mjs",
+    "../lib/FrecencyBoostProvider/**",
+    "../lib/HighlightsFeed.sys.mjs",
+    "../lib/ImportHelper.sys.mjs",
+    "../lib/InferredModel/**",
+    "../lib/InferredPersonalizationFeed.sys.mjs",
+    "../lib/NewTabActorRegistry.sys.mjs",
+    "../lib/NewTabAttributionFeed.sys.mjs",
+    "../lib/NewTabAttributionService.sys.mjs",
+    "../lib/NewTabContentPing.sys.mjs",
+    "../lib/NewTabGleanUtils.sys.mjs",
+    "../lib/NewTabInit.sys.mjs",
+    "../lib/NewTabMessaging.sys.mjs",
+    "../lib/PersistentCache.sys.mjs",
+    "../lib/PlacesFeed.sys.mjs",
+    "../lib/PrefsFeed.sys.mjs",
+    "../lib/RemoteRenderer.sys.mjs",
+    "../lib/Screenshots.sys.mjs",
+    "../lib/SectionsLayoutFeed.sys.mjs",
+    "../lib/SectionsManager.sys.mjs",
+    "../lib/SiteClassifier.sys.mjs",
+    "../lib/SmartShortcutsFeed.sys.mjs",
+    "../lib/SmartShortcutsRanker/**",
+    "../lib/SponsoredTopSitesScoreProvider/**",
+    "../lib/StartupCacheInit.sys.mjs",
+    "../lib/Store.sys.mjs",
+    "../lib/SystemTickFeed.sys.mjs",
+    "../lib/TelemetryFeed.sys.mjs",
+    "../lib/TemporaryMerinoClientShim.sys.mjs",
+    "../lib/TopSitesFeed.sys.mjs",
+    "../lib/TopStoriesFeed.sys.mjs",
+    "../lib/Wallpapers/**",
+    "../lib/WeatherFeed.sys.mjs",
+    "../lib/WebNotificationsFeed.sys.mjs",
+    "../lib/Widgets/**",
+    ]
+else:
+    FINAL_TARGET_FILES.lib += [
+        "../lib/**",
+    ]
 FINAL_TARGET_FILES.common += [
     "../common/**",
 ]

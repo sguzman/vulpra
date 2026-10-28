@@ -132,6 +132,14 @@ export var AppConstants = Object.freeze({
   false,
 #endif
 
+  // Opt-in compile-time guard: avoid loading the unbundled AdsFeed module.
+  VULPRA_NO_NEWTAB_ADSFEED:
+#ifdef VULPRA_NO_NEWTAB_ADSFEED
+  true,
+#else
+  false,
+#endif
+
   MOZ_MAINTENANCE_SERVICE: @MOZ_MAINTENANCE_SERVICE_BOOL@,
 
   MOZ_BACKGROUNDTASKS: @MOZ_BACKGROUNDTASKS_BOOL@,
