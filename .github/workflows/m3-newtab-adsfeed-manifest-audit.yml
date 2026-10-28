@@ -1,0 +1,35 @@
+# Cheap source-only coverage proof for the explicit AdsFeed opt-in manifest.
+# Prevent silently omitting nested library assets while retaining the original
+# default New Tab wildcard. DOES NOT compile or measure a native browser.
+name: M3 Verify New Tab AdsFeed Manifest Coverage
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/tests/m3-newtab-adsfeed-optout-test.sh
+      - .github/workflows/m3-newtab-adsfeed-manifest-audit.yml
+      - browser/extensions/newtab/addon-jar.mn
+      - browser/extensions/newtab/webext-glue/moz.build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-source-manifests:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout complete pinned browser source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Verify real tracked library leaves and both packaging manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash ci/tests/m3-newtab-adsfeed-optout-test.sh "$GITHUB_WORKSPACE"
+          echo "PASS: source manifest coverage only; no native-compile or M3 byte credit"

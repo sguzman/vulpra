@@ -38,6 +38,7 @@ jobs:
             .github/workflows/m3-newtab-adsfeed-native.yml
             .github/workflows/m3-newtab-adsfeed-matched-baseline.yml
             .github/workflows/m3-newtab-adsfeed-size-compare.yml
+            .github/workflows/m3-newtab-adsfeed-manifest-audit.yml
             .github/workflows/m3-optout-define-preflight.yml
             .github/workflows/m3-pocket-reference-audit.yml
             .github/workflows/m3-sync-reference-audit.yml

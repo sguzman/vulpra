@@ -29,6 +29,35 @@ assert "AdsFeed.sys.mjs" in names, "candidate must remain in source"
 expected = names - {"AdsFeed.sys.mjs"}
 assert len(expected) >= 40, "unexpected truncated New Tab source inventory"
 
+# The builtin jar's (./lib/<directory>/*) entries are intentionally
+# non-recursive, unlike the XPI's ../lib/<directory>/** entries. Confirm that
+# source subdirectories have no deeper tracked descendants, or else future
+# files could be missing from the opt-in builtin jar despite passing the
+# top-level manifest name equality check.
+recursive_files = subprocess.check_output(
+    ["git", "-C", str(repo), "ls-tree", "-r", "--name-only",
+     "HEAD:" + src + "lib"], text=True
+).splitlines()
+assert "AdsFeed.sys.mjs" in recursive_files
+for name in recursive_files:
+    parts = name.split("/")
+    assert parts[0] in names, ("unlisted top-level library", name)
+    if parts[0] in directories:
+        assert len(parts) == 2, (
+            "nested lib directory would be omitted by jar.mn one-level wildcard",
+            name,
+        )
+    else:
+        assert len(parts) == 1, (
+            "unexpected directory without explicit jar/XPI recursive entry",
+            name,
+        )
+print(
+    f"PASS: {len(recursive_files)} tracked New Tab library leaf paths, "
+    f"{len(directories)} one-level directories; no nested-JAR omissions"
+)
+
+
 config = get("browser/moz.configure")
 assert 'env="VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED"' in config
 assert 'set_config("VULPRA_NO_NEWTAB_ADSFEED", vulpra_no_newtab_adsfeed)' in config
