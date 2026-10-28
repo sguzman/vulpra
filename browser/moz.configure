@@ -40,7 +40,11 @@ def vulpra_no_asrouter_promos(disable, linux):
 
 
 set_config("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)
-set_define("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)
+# A false value in a global define is still present in Mozilla's JAR and JS
+# preprocessing context, so #ifdef would wrongly treat the opt-out as enabled.
+# Keep the CONFIG value False for moz.build, but omit the macro entirely unless
+# the experiment was explicitly selected.
+set_define("VULPRA_NO_ASROUTER_PROMOS", depends_if(vulpra_no_asrouter_promos)(lambda _: True))
 
 # Isolated M3 New Tab sponsored-feed resource opt-out. Preserve the default
 # browser and all other ActivityStream/DiscoveryStream/AdsClient features.
@@ -58,7 +62,9 @@ def vulpra_no_newtab_adsfeed(disable, linux):
 
 
 set_config("VULPRA_NO_NEWTAB_ADSFEED", vulpra_no_newtab_adsfeed)
-set_define("VULPRA_NO_NEWTAB_ADSFEED", vulpra_no_newtab_adsfeed)
+# Match the actual enabled-only macro contract above: #ifdef in the New Tab
+# jar.mn and AppConstants must be false when the normal variant is configured.
+set_define("VULPRA_NO_NEWTAB_ADSFEED", depends_if(vulpra_no_newtab_adsfeed)(lambda _: True))
 
 imply_option("MOZ_PROFILE_MIGRATOR", True)
 

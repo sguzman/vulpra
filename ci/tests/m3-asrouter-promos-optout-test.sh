@@ -27,7 +27,8 @@ assert options(lean)==options(baseline), (options(lean),options(baseline))
 cfg=src("browser/moz.configure")
 assert 'env="VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS"' in cfg
 assert 'set_config("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)' in cfg
-assert 'set_define("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)' in cfg
+assert 'set_define("VULPRA_NO_ASROUTER_PROMOS", depends_if(vulpra_no_asrouter_promos)(lambda _: True))' in cfg
+assert 'set_define("VULPRA_NO_ASROUTER_PROMOS", vulpra_no_asrouter_promos)' not in cfg
 assert 'if disable and not linux:' in cfg
 
 app=src("toolkit/modules/AppConstants.sys.mjs")

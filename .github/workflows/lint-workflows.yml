@@ -37,5 +37,6 @@ jobs:
             .github/workflows/lint-workflows.yml
             .github/workflows/m3-newtab-adsfeed-native.yml
             .github/workflows/m3-newtab-adsfeed-matched-baseline.yml
+            .github/workflows/m3-optout-define-preflight.yml
             .github/workflows/m3-pocket-reference-audit.yml
             .github/workflows/m3-sync-reference-audit.yml

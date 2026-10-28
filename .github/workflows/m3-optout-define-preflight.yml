@@ -1,0 +1,91 @@
+# Verify compile flag macro semantics before any costly full Firefox rebuild.
+name: M3 Preflight New Tab and ASRouter Opt-out Defines
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - browser/moz.configure
+      - ci/tests/m3-newtab-adsfeed-optout-test.sh
+      - ci/tests/m3-asrouter-promos-optout-test.sh
+      - .github/workflows/m3-optout-define-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-macro-presence:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Checkout complete pinned browser
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Enforce source flag contracts in both experiments
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/tests/m3-newtab-adsfeed-optout-test.sh "$GITHUB_WORKSPACE"
+          bash ci/tests/m3-asrouter-promos-optout-test.sh "$GITHUB_WORKSPACE"
+
+      - name: Bootstrap supported Mozilla configure toolchain
+        shell: bash
+        timeout-minutes: 50
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends python3 python3-venv python3-dev git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+          test -x "$HOME/.mozbuild/clang/bin/clang"
+          major="$("$HOME/.mozbuild/clang/bin/clang" --version | head -1 | sed -E 's/.*version ([0-9]+).*/\1/')"
+          [[ "$major" =~ ^[0-9]+$ ]] && ((major>=19))
+
+      - name: Configure ordinary and both isolated opt-in builds WITHOUT compiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          MOZCONFIG="$GITHUB_WORKSPACE/ci/mozconfig-linux-m3-baseline" ./mach configure
+          MOZCONFIG="$GITHUB_WORKSPACE/ci/mozconfig-linux-m3-newtab-adsfeed-experiment" ./mach configure
+          MOZCONFIG="$GITHUB_WORKSPACE/ci/mozconfig-linux-m3-promos-experiment" ./mach configure
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          names = {
+              "baseline": "obj-vulpra-linux-m3-baseline",
+              "adsfeed_optout": "obj-vulpra-linux-m3-newtab-adsfeed-experiment",
+              "promos_optout": "obj-vulpra-linux-m3-promos-experiment",
+          }
+          macros = ("VULPRA_NO_NEWTAB_ADSFEED", "VULPRA_NO_ASROUTER_PROMOS")
+          required = {
+              "baseline": (False, False),
+              "adsfeed_optout": (True, False),
+              "promos_optout": (False, True),
+          }
+          for variant, folder in names.items():
+              root = Path(folder) / "config.statusd"
+              assert root.is_dir(), (variant, root)
+              defines = root / "defines"
+              substs = root / "substs"
+              observed = []
+              for macro in macros:
+                  d = defines / macro
+                  s = substs / macro
+                  # Critical: #ifdef tests key PRESENCE, not False's value.
+                  observed.append(d.is_file())
+                  if d.is_file():
+                      value = json.loads(d.read_text())
+                      assert value in (1, True), (variant, macro, value)
+                  assert s.is_file(), (variant, macro, "missing CONFIG value")
+                  assert bool(json.loads(s.read_text())) == d.is_file(), (variant, macro)
+              assert tuple(observed) == required[variant], (variant, observed, required[variant])
+              print(f"PASS: {variant}: AdsFeed flag present={observed[0]}, ASRouter flag present={observed[1]}")
+          print("PASS: all 3 native configure variants have correct preprocessing macro presence")
+          print("NO NATIVE BUILD: This is a cheap prerequisite, not package/runtime acceptance.")
+          PY

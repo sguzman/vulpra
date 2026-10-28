@@ -32,7 +32,8 @@ assert len(expected) >= 40, "unexpected truncated New Tab source inventory"
 config = get("browser/moz.configure")
 assert 'env="VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED"' in config
 assert 'set_config("VULPRA_NO_NEWTAB_ADSFEED", vulpra_no_newtab_adsfeed)' in config
-assert 'set_define("VULPRA_NO_NEWTAB_ADSFEED", vulpra_no_newtab_adsfeed)' in config
+assert 'set_define("VULPRA_NO_NEWTAB_ADSFEED", depends_if(vulpra_no_newtab_adsfeed)(lambda _: True))' in config
+assert 'set_define("VULPRA_NO_NEWTAB_ADSFEED", vulpra_no_newtab_adsfeed)' not in config
 assert "if disable and not linux:" in config
 app = get("toolkit/modules/AppConstants.sys.mjs")
 assert 'VULPRA_NO_NEWTAB_ADSFEED:' in app
