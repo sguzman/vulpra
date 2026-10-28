@@ -633,7 +633,7 @@
     },
     {
       "id": "pocket_integration",
-      "decision": "retain_newtab_core; audit_narrow_optional_resource_optout",
+      "decision": "retain_both_legacy_and_modern_recommendation_feeds_audit_promo_pref",
       "surface": "runtime_bundled",
       "paths": [
         "browser/extensions/newtab/",
@@ -649,9 +649,10 @@
         "browser/components/newtab/metrics.yaml and toolkit/components/nimbus/FeatureManifest.yaml include Pocket-related definitions",
         "Focused Git source audit, corrected classifications and synthetic regression: https://github.com/sguzman/vulpra/actions/runs/40616102254",
         "New Tab FEEDS_DATA registers TopStoriesFeed and DiscoveryStreamFeed alongside shared widgets: browser/extensions/newtab/lib/ActivityStream.sys.mjs",
-        "Built-in New Tab JAR manifest includes wildcard lib/common resources and generated bundles: browser/extensions/newtab/addon-jar.mn; browser/extensions/newtab/moz.build"
+        "Built-in New Tab JAR manifest includes wildcard lib/common resources and generated bundles: browser/extensions/newtab/addon-jar.mn; browser/extensions/newtab/moz.build",
+        "Source-pinned Pocket runtime-boundary audit and seven invalid-source mutations passed: https://github.com/sguzman/vulpra/actions/runs/40773515182"
       ],
-      "next": "Protect built-in New Tab, its rendering/bundles/feed/store, Nimbus and shared ads/endpoint utilities. Select a narrow optional recommendation/sponsor entry point, map its dispatch and packaged resource guards plus disabled fallback, then verify source-matched native full/lean builds, Wayland, JS, WebExtensions, Nimbus and profile isolation. Existing source scans authorize no deletion.",
+      "next": "Retain FEEDS_DATA modern+legacy recommendation feed factories and full New Tab renderer, existing TopSites/prefs, Nimbus, AdsClient and cache. Narrow promoCard and pocketCta across renderer/consumer import paths and remote-config overrides before designing any opt-in resource omission; current source anchors are NOT a complete live call graph and authorize NO deletion.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -685,6 +686,29 @@
           "Literal grep includes inactive comments, samples, URL lists and third-party fixtures",
           "Regex coverage differs from prior four-way source audit",
           "No full binary dependency graph or native opt-out validated"
+        ],
+        "removal_authorized": false
+      },
+      "live_boundary_audit": {
+        "source_commit": "5f09f3581889490ff56bb6983a0220a8eefb41ae",
+        "workflow_run": 40773515182,
+        "artifact_id": 12854235698,
+        "scope": "Source-pinned FEEDS_DATA factories, legacy TopStories fallback, modern DiscoveryStream recommendations, sponsored SPoCs/AdsClient, built-in New Tab bundle/JAR manifest. Seven deliberate missing-dependency mutations were rejected.",
+        "protected": [
+          "ActivityStream FEEDS_DATA system.topstories, discoverystreamfeed, system.topsites, prefs",
+          "TopStoriesFeed lazyLoadTopStories legacy fallback and story/topic cache",
+          "DiscoveryStreamFeed recommendation and sponsored streams/Nimbus",
+          "AdsClient shared sponsorship fetcher",
+          "New Tab JAR/XPI and generated content bundles"
+        ],
+        "narrow_optional_pref_candidates": [
+          "discoverystream.promoCard.enabled",
+          "pocketCta"
+        ],
+        "limits": [
+          "Source anchor proof only, not dynamic runtime reachability",
+          "Not deletion authorization, native build or package byte evidence",
+          "Promotional pref existence is not proof of isolated assets or safe omission"
         ],
         "removal_authorized": false
       }
@@ -755,7 +779,8 @@
         "saved_compressed_bytes": 3184,
         "compressed_reduction_percent": 0.00366
       },
-      "runtime_guard_followup": "The prior false-valued VULPRA_NO_ASROUTER_PROMOS global macro was accidentally present under #ifdef in the ordinary build despite CONFIG false. Enabled-only set_define fix 16d8753 restores expected default routing; config-only three-variant CI 40708134402 and native conditional recompilation required before claiming this correction fully verified. Prior matched full/lean promotion resource-byte evidence remains historical evidence, not updated post-fix package sizing."
+      "runtime_guard_followup": "The prior false-valued VULPRA_NO_ASROUTER_PROMOS global macro was accidentally present under #ifdef in the ordinary build despite CONFIG false. Enabled-only set_define fix 16d8753 restores expected default routing; config-only three-variant CI 40708134402 and native conditional recompilation required before claiming this correction fully verified. Prior matched full/lean promotion resource-byte evidence remains historical evidence, not updated post-fix package sizing.",
+      "pocket_boundary_dependency": "Pocket source-pinned audit 40773515182 retains both story-feed registrations and generated bundles, and leaves promoCard/pocketCta only as unproven narrow preference candidates. No ASRouter or Pocket resource pruning authorized by this audit."
     },
     {
       "id": "core_web_security",

@@ -2,6 +2,20 @@
 
 **Status (2026-10-28):** The working Linux personal baseline remains verified (M2 5/5). M3 has **six independently verified accepted selective changes**: three opt-in packaged resource experiments (Normandy runner's measured archive difference 27,620 compressed bytes; two ASRouter promotional modules 3,184 bytes; New Tab AdsFeed 7,120 bytes in the guarded paired build versus 219,360 bytes in the earlier paired build, not a reproducible component-level saving; these separate measurements may include packaging nondeterminism and are **not additive** without a combined build), and three source-only pruning passes: 453 Windows/Cocoa/installer files (6,266,676 original Git blob bytes), 14,134 Android app files (115,996,869 bytes), and 280 further Android/iOS/UIKit leaf files (7,704,040 bytes). Total **14,867 files / 129,967,585 original Git blob bytes** permanently removed from `main`. The final eight-root trial [native CI 40600510147](https://github.com/sguzman/vulpra/actions/runs/40600510147) passed compilation, package verification, Wayland, JS, WebExtensions, Nimbus and profile isolation; committed in [8331ca6](https://github.com/sguzman/vulpra/commit/8331ca63f97b84779d6b1765955dff6017d060f8). **M3 remains 2/6 gates (33%) and overall product 44%.** No compiled Linux package-size savings are attributed to the platform source deletions; the tested workstation browser and source have not been updated. Unsupported Android/iOS builds and mobile-specific tests may still reference removed paths.
 
+## Pocket: two live source registrations and legacy fallback (2026-10-28)
+
+[Source-pinned Pocket/New Tab boundary workflow 40773515182](https://github.com/sguzman/vulpra/actions/runs/40773515182) **PASSED**, artifact `m3-pocket-live-boundaries` ID **12854235698**, at exact checkout SHA `5f09f3581889490ff56bb6983a0220a8eefb41ae`. This complements the earlier 1,945-line broad Pocket grep by verifying *specific* source-to-registration relationships and expected fallback branches; the workflow uses sparse Git objects, not a full 469k-file checkout. Seven deliberately broken registration, fallback and package-source anchors were rejected.
+
+| Source boundary | Observed relationship | Candidate decision |
+| --- | --- | --- |
+| `ActivityStream.sys.mjs` | Registers `system.topstories` → `TopStoriesFeed` and `discoverystreamfeed` → `DiscoveryStreamFeed` while keeping `system.topsites` and `prefs` | Retain |
+| `TopStoriesFeed.sys.mjs` | Has a legacy discovery-disabled/pref-parse fallback, its own stories/topics and cache, and Pocket CTA | Retain |
+| `DiscoveryStreamFeed.sys.mjs` | Connects modern recommendations, `showStories`, SPoCs, shared `AdsClient` and Nimbus-pref updates | Retain |
+| `addon-jar.mn` and New Tab `moz.build` | Bundle both source feeds, default wildcard and generated content UI resources | Retain |
+| `discoverystream.promoCard.enabled` / `pocketCta` | Preference keys exist in the source; consumer/rendering/deletion consequences NOT proven | Investigate only |
+
+**Boundary:** source matches and factory/call-site guards are not proof of runtime execution or safe deletion. No native compilation, browser smoke, default change, package-size saving or removal authorization is claimed. Before testing a narrower opt-in Pocket promo removal, map renderer imports, all consumers and remotely supplied values, then build a protected fallback and repeat full native/runtime/package acceptance. The promotion/Pocket/Sync/telemetry gate remains OPEN: **M3 2/6 (33%); overall 44%**.
+
 ## Focused telemetry submission and policy dependency audit (2026-10-28)
 
 The read-only [full tracked-source workflow 40721612576](https://github.com/sguzman/vulpra/actions/runs/40721612576) **PASSED** at source commit `8af4710591147d7fc110c002ed4b6a8a760d2708`, including synthetic path-class regression, invalid-checkout refusal, actual checked-out `git grep` and bounded artifact upload. Artifact `m3-telemetry-reference-audit` (ID 12830103191) holds exact file names and matching line numbers.
