@@ -38,6 +38,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           python3 -m py_compile ci/m3-package-localization-census.py
+          test ! -f ./browser/moz.build # audit uses source-free sparse checkout
           python3 ci/m3-package-localization-census.py --self-test
 
       - name: Retrieve historical accepted checksum-verified FULL Vulpra package
