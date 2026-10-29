@@ -70,6 +70,7 @@ def main():
     print("PASS: localhost-only request types, bounded fixed/chunked bodies and redaction")
 
     record = {"status":"observed", "observer_seen":True, "test_override":True,
+        "naturally_initialized":False, "test_setup_used":True,
         "before":{"ordinary":True, "deletion":True, "policy":True,
                   "sender_ready":True, "server_matches_loopback":True},
         "disabled":{"ordinary":False, "deletion":True, "policy":True},
@@ -88,6 +89,8 @@ def main():
         lambda r,a,b: r.update(status="mocked"),
         lambda r,a,b: r["before"].update(sender_ready=False),
         lambda r,a,b: r["before"].update(server_matches_loopback=False),
+        lambda r,a,b: r.update(naturally_initialized=None),
+        lambda r,a,b: r.update(test_setup_used=False),
     )
     for mutation in mutations:
         copy, before, after = deepcopy(record), dict(full), dict(full)
