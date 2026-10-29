@@ -37,10 +37,12 @@ def source_texts():
         text=True,stderr=subprocess.PIPE) for key,path in FILES.items()}
 
 def anchor(texts, source, literal):
-    lines=[i+1 for i,line in enumerate(texts[source].splitlines()) if literal in line]
-    if len(lines)!=1:
-        raise ValueError(f"Missing/ambiguous {source}: {literal!r}, lines {lines}")
-    return {"path":FILES[source],"line":lines[0],"anchor":literal}
+    raw=texts[source]
+    occurrences=raw.count(literal)
+    if occurrences!=1:
+        raise ValueError(f"Missing/ambiguous {source}: {literal!r}, hits {occurrences}")
+    line=raw.count("\n",0,raw.index(literal))+1
+    return {"path":FILES[source],"line":line,"anchor":literal}
 
 def guarded(texts,source,start,end,*needed):
     raw=texts[source]
