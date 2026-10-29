@@ -2171,5 +2171,27 @@
     "source_removal_authorized": false,
     "compressed_package_savings": null,
     "documentation": "docs/vulpra/M3-HUNGARIAN-NATIVE-CSS-RUNTIME.md"
+  },
+  "historical_native_host_cache_preflight": {
+    "status": "accepted_bounded_ubuntu_host_elf_cache_presence_audit",
+    "success_run_id": 40947019427,
+    "evidence_artifact_id": 12928349526,
+    "underlying_archive_original_native_run_id": 40567473401,
+    "underlying_archive_compiled_source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "original_archived_elf_members": 28,
+    "original_archived_direct_needed_edges": 268,
+    "unique_direct_needed_names": 50,
+    "package_regular_library_name_matches": 14,
+    "external_names_checked": 36,
+    "ubuntu_24_04_x86_64_host_elf_cache_matches": 36,
+    "no_host_cache_match_names": 0,
+    "native_package_elf_executed": false,
+    "host_runtime_loader_searchpath_or_abi_resolution_proven": false,
+    "target_arch_linux_workstation_resolution_proven": false,
+    "transitive_and_dlopen_dependencies_closed": false,
+    "source_matched_to_current_main": false,
+    "compiled_feature_savings_bytes": null,
+    "source_deletion_authorized": false,
+    "evidence_doc": "docs/vulpra/M3-NATIVE-HOST-CACHE-PREFLIGHT.md"
   }
 }
