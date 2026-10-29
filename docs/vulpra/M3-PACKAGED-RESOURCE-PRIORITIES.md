@@ -14,7 +14,7 @@
 | Browser New Tab `activity-stream.bundle.js` | **1,335,252** | Narrow guarded JS substitutions already tried, core feed kept |
 | Root `translations/cld-worker.js.mem` | **1,097,263** | **Keep pending translation fallback** |
 | Browser `security-state/onecrl.json` | **1,055,340** | **Protect** — certificate revocation |
-| Root `hyphenation/hyph_hu.hyf` | **1,048,764** | **Review** — localized language resource, not proven disposable |
+| Root `hyphenation/hyph_hu.hyf` | **1,048,764** | **Keep** — real native `hu` and `hu-HU` automatic hyphenation changes text layout; no safe replacement |
 | Root certificate viewer `pkijs.js` | **954,849** | **Protect** — certificate viewer/crypto UI |
 | Browser add-on `addons-mlbf.bin` | **938,855** | **Protect** — extension blocklist |
 | Root PDF.js `pdf.mjs` | **827,480** | **Keep** — PDF viewer |
@@ -37,6 +37,6 @@ The next safe step is source-matched, opt-in fallback implementation with explic
 
 ## Classification / acceptance
 
-The candidate register now has **20 bounded scopes**: **9 keep, 4 already accepted source-only prunes, 3 opt-in conditional compilation/bundle omissions, 4 requiring more review**. Hungarian hyphenation is also a distinct **review-only** localization subcandidate. Source-only prunes are historical accepted work, not new deletions in this round. An opt-in variant does not alter normal Vulpra. This inventory does not complete the entire dynamic dependency graph, all fallbacks, or an additional M3 acceptance gate.
+The candidate register now has **20 bounded scopes**: **10 keep, 4 already accepted source-only prunes, 3 opt-in conditional compilation/bundle omissions, 3 requiring more review**. Hungarian hyphenation is now **keep/protected by native CSS layout evidence** from [CI 40938478049](https://github.com/sguzman/vulpra/actions/runs/40938478049) and [CI 40937941448](https://github.com/sguzman/vulpra/actions/runs/40937941448); the normal browser showed actual `hu` and `hu-HU` automatic wrapping, with no missing-pattern trial or compressed savings. [Runtime documentation](M3-HUNGARIAN-NATIVE-CSS-RUNTIME.md). Source-only prunes are historical accepted work, not new deletions in this round. An opt-in variant does not alter normal Vulpra. This inventory does not complete the entire dynamic dependency graph, all fallbacks, or an additional M3 acceptance gate.
 
 **M3 remains 2/6 (33%), overall product 44%, Δ 0 pp.**
