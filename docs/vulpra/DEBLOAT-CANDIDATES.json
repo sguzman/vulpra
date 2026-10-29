@@ -1051,7 +1051,7 @@
         "toolkit/toolkit.mozbuild: core security/netwerk/js/dom directories",
         "M2 actual Javascript/WebExtension/browser startup smoke"
       ],
-      "next": "Protect security and automation feature surfaces. Source-pinned 40922064826 confirms ENABLE_WEBDRIVER routes remote, Marionette and telemetry tests independent of ENABLE_TESTS, and package manifest includes remote chrome. Geckodriver has separate guard. Retain protected launcher/WebExtension and remote debugging acceptance; independent updater enabled flag is not a configured update-service proof.",
+      "next": "Keep native Gecko/GTK/Wayland, sandbox, libxul and WebExtension capabilities. Native/Rust feature boundary source audit 40922965533 verifies xul and gkrust FFI linkage and guarded sandbox, not link-time size or approved deletion. Keep native telemetry/Glean, DevTools/remote, security and updater protections; configured updater is not a proven remote update service.",
       "observed_actual_config": "MOZ_SANDBOX=\"1\", MOZ_WAYLAND=\"1\", MOZ_UPDATER=\"1\", MOZ_CRASHREPORTER=\"1\", ENABLE_WEBDRIVER=\"1\""
     },
     {
@@ -1335,6 +1335,49 @@
         "finding": "Masccot SVG is referenced outside the PromoCard component, and localization identifiers appear across component/localization definitions; no asset or localization removal is justified by JSX omission.",
         "asset_or_locale_removal_authorized": false
       }
+    },
+    {
+      "id": "localization_default_and_repack",
+      "decision": "protect_shipped_default_locale_and_language_services; audit optional_l10n_assets_separately",
+      "surface": "packaged_localization_and_source_only_langpack_builds",
+      "paths": [
+        "browser/locales/",
+        "toolkit/locales/",
+        "browser/l10n-registry.manifest",
+        "toolkit/l10n-registry.manifest",
+        "browser/installer/package-manifest.in"
+      ],
+      "why": "Browser and toolkit l10n registries, default.locale generator, Fluent JARs, dictionaries/hyphenation and separate language-pack/repack scripts are build-wired. Historical normal Vulpra package physically includes localized resources inside both omni.ja archives. Physical ZIP entry logical sizes cannot be attributed to independent tar.xz savings.",
+      "evidence": [
+        "Source-pinned 14 relationship and 17 broken-boundary testing/localization audit PASSED: https://github.com/sguzman/vulpra/actions/runs/40922064826",
+        "Historical checksum-verified full Vulpra native package byte census PASSED, 9 archive fixture checks and physical container attribution: https://github.com/sguzman/vulpra/actions/runs/40923776304",
+        "Documentation: docs/vulpra/M3-TESTING-LOCALE-DEPENDENCIES.md and docs/vulpra/M3-PACKAGED-LOCALE-CENSUS.md"
+      ],
+      "historical_package_census": {
+        "status": "read_only_sha_verified_archive_passed",
+        "run_id": 40923776304,
+        "archive_original_run_id": 40567473401,
+        "archive_actual_source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+        "archive_compressed_bytes": 86930792,
+        "archive_regular_file_members": 47,
+        "root_omni_entries": 2674,
+        "browser_omni_entries": 5327,
+        "categorized_localized_jar_logical_bytes": {
+          "browser_localization": 689418,
+          "toolkit_localization": 312382,
+          "dictionaries": 552470,
+          "hyphenation": 4471692,
+          "legacy_chrome_locale": 274525,
+          "default_locale": 6
+        },
+        "categorized_logical_bytes_total": 6300493,
+        "outer_tar_direct_localized_resource_members": 0,
+        "source_matched_to_current_head": false,
+        "reported_compiled_package_savings": null,
+        "native_runtime_tested": false,
+        "removal_authorized": false
+      },
+      "next": "Retain physically packaged default locale, generated locale metadata, dictionaries, hyphenation and browser/toolkit registries. Independently inspect translation consumers and real language-pack contents before any reversible guarded trial, then require exact-source native and locale fallback tests plus physical package-member and paired tar.xz comparison. Never equate 6,300,493 logical JAR bytes with extractable savings."
     }
   ],
   "observed_native_config": {
@@ -1400,5 +1443,28 @@
     "remove_any_source_now": false,
     "claims_compiled_savings": false,
     "broader_m3_gate_passed": false
+  },
+  "native_feature_boundary_audit": {
+    "status": "source_only_passed",
+    "run_id": 40922965533,
+    "boundary_count": 14,
+    "invalid_mutations_rejected": 18,
+    "documentation": "docs/vulpra/M3-NATIVE-FEATURE-DEPENDENCIES.md",
+    "source_removal_authorized": false,
+    "compiled_package_saving_bytes": null,
+    "complete_linker_graph": false
+  },
+  "historical_locale_package_census": {
+    "status": "sha256_verified_historical_package_accepted",
+    "run_id": 40923776304,
+    "source_matched_current_main": false,
+    "source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "compressed_archive_bytes": 86930792,
+    "regular_tar_members": 47,
+    "browser_omni_entries": 5327,
+    "root_omni_entries": 2674,
+    "categorized_localized_jar_logical_bytes": 6300493,
+    "claimed_compressed_saving": null,
+    "default_locale_and_registry_remove_authorized": false
   }
 }
