@@ -16,7 +16,9 @@ import sys
 HEX64=re.compile(r"[0-9a-f]{64}\Z")
 HEX40=re.compile(r"[0-9a-f]{40}\Z")
 NAME=re.compile(r"[A-Za-z0-9_.+-]{1,128}\Z")
-PATH=re.compile(r"\./vulpra/[A-Za-z0-9_.+-]{1,128}\Z")
+# Some normal ELF members live under versioned subdirectories such as
+# ./vulpra/gmp-clearkey/0.1/libclearkey.so. Reject traversal, not nested ELF.
+PATH=re.compile(r"\./vulpra/(?:[A-Za-z0-9_+-][A-Za-z0-9_.+-]{0,127}/){0,4}[A-Za-z0-9_+-][A-Za-z0-9_.+-]{0,127}\Z")
 
 def validate_graph(graph):
     if not isinstance(graph,dict) or graph.get("schema_version")!=1:
@@ -108,6 +110,9 @@ def selftest():
                     {"path":"./vulpra/libxul.so","sha256":"c"*64,
                      "soname":"libxul.so","needed":["libc.so.6"]}]}
     a,b=graph("a"),graph("b")
+    assert PATH.fullmatch("./vulpra/gmp-clearkey/0.1/libclearkey.so")
+    assert not PATH.fullmatch("./vulpra/../libxul.so")
+    assert not PATH.fullmatch("./vulpra/gmp-clearkey/../../libxul.so")
     b["source_commit"]="1"*40
     report=compare(a,b)
     assert report["changed_per_file_DT_NEEDED_or_SONAME"]==[]
