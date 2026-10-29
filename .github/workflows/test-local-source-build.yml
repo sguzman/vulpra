@@ -111,6 +111,11 @@ jobs:
           python3 -m py_compile ci/m3-configure-only-substs.py
           python3 ci/m3-configure-only-substs.py --self-test
 
+      - name: Validate exact source configure snapshot against evidence and rejected mutants
+        run: |
+          python3 -m py_compile ci/tests/m3-exact-source-config-snapshot-test.py
+          python3 ci/tests/m3-exact-source-config-snapshot-test.py
+
       - name: Test read-only target configuration flag reader
         run: bash ci/tests/m3-config-baseline-test.sh "$PWD/ci/m3-config-baseline-local.sh"
 
