@@ -53,3 +53,4 @@ jobs:
             .github/workflows/m3-telemetry-lifecycle-boundaries.yml
             .github/workflows/m3-telemetry-deletion-boundaries.yml
             .github/workflows/m3-telemetry-runtime-native.yml
+            .github/workflows/m3-telemetry-artifact-replay.yml
