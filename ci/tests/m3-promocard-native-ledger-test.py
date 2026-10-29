@@ -59,6 +59,19 @@ def validate(e: dict, register: dict, progress: dict, roadmap: str) -> None:
     candidates = register["candidates"]
     pocket, = (c for c in candidates if c["id"] == "pocket_integration")
     trial = pocket["promocard_native_pair"]
+    compared = e["comparison"]
+    assert compared["status"] == "passed"
+    assert compared["compared_source_sha"] == source
+    assert compared["comparator_passed"] is True
+    assert compared["signed_byte_delta"] == diff["signed_full_minus_optin_compressed_archive_bytes"]
+    assert compared["comparison_percent"] == diff["compressed_archive_difference_percent"]
+    assert compared["replay_workflow_run"] not in (
+        normal["workflow_run"], lean["workflow_run"])
+    assert compared["failed_original_workflow_run"] != compared["replay_workflow_run"]
+    assert trial["comparison_run_id"] == compared["replay_workflow_run"]
+    assert trial["comparison_artifact_id"] == compared["artifact_id"]
+    assert trial["comparison_passed"] is True
+    assert trial["initial_comparison_failed_run_id"] == compared["failed_original_workflow_run"]
     assert trial["source_sha"] == source
     assert trial["normal_native_run_id"] == normal["workflow_run"]
     assert trial["optin_native_run_id"] == lean["workflow_run"]
@@ -89,6 +102,10 @@ def validate(e: dict, register: dict, progress: dict, roadmap: str) -> None:
     records = [r for r in m3["verified_removals"] if r["id"] == "opt-in-newtab-promocard-jsx"]
     assert len(records) == 1
     record = records[0]
+    assert record["comparison_run"] == compared["replay_workflow_run"]
+    assert record["comparison_artifact_id"] == compared["artifact_id"]
+    assert record["comparison_passed"] is True
+    assert record["initial_comparison_failed_run"] == compared["failed_original_workflow_run"]
     assert record["source_commit"] == source
     assert record["candidate_run"] == lean["workflow_run"]
     assert record["matched_full_run"] == normal["workflow_run"]
@@ -106,6 +123,8 @@ def negative_tests(e: dict, register: dict, progress: dict, roadmap: str) -> Non
         lambda a, b, c: a["normal"].update(package_sha256="a" * 64),
         lambda a, b, c: a["optin"].update(original_promocard_included=True),
         lambda a, b, c: a["confidence"].update(repeatability_established=True),
+        lambda a, b, c: a["comparison"].update(comparator_passed=False),
+        lambda a, b, c: a["comparison"].update(signed_byte_delta=219360),
         lambda a, b, c: b["candidates"][next(i for i, x in enumerate(b["candidates"])
                                                   if x["id"] == "pocket_integration")]["promocard_native_pair"].update(normal_build_unchanged=False),
         lambda a, b, c: c["overall"].update(percent=45),
@@ -129,7 +148,7 @@ def main() -> None:
     validate(evidence, register, progress, roadmap)
     negative_tests(evidence, register, progress, roadmap)
     print("PASS: source-matched native PromoCard metadata, bytes, hashes and protected paths")
-    print("PASS: seven mutation cases rejected and no unjustified M3 credit")
+    print("PASS: nine mutation cases rejected and no unjustified M3 credit")
     print("METADATA ONLY: real browser evidence remains in immutable native workflow artifacts")
 
 
