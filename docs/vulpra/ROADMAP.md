@@ -37,6 +37,7 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 
 ### 🧭 Phase 1 — Evidence inventory
 - [ ] 🗺️ Map feature bundles, binary dependencies, build dependencies and platform-specific modules.
+  - [x] **Bounded testing/WebDriver/localization source submap**: [read-only CI 40922064826 PASSED](https://github.com/sguzman/vulpra/actions/runs/40922064826) at its exact Git HEAD, recording **14 guarded build/packaging relationships and rejecting 17 deliberate source mutations**, without a Firefox compile. [Crosswalk](M3-TESTING-LOCALE-DEPENDENCIES.md) distinguishes always-wired root `testing`, `mozbase`/`mozharness`/manifest from `ENABLE_TESTS`-guarded suites; `ENABLE_WEBDRIVER`-guarded remote/Marionette/package paths from separate `MOZ_GECKODRIVER`; browser/toolkit Fluent registries and `default.locale` from language repacks; and MOZ_UPDATER conditional localization inputs. **No compiled-size, runtime, localization-deletion or entire feature-graph gate credit.**
 - [ ] 🔬 Classify candidates as keep, disable, conditionally compile or remove. Include fallback and safety impact.
 
 ### 🧪 Telemetry localhost runtime harness (2026-10-29)
