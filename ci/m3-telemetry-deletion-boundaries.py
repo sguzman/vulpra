@@ -216,7 +216,14 @@ def self_test(src: dict[str, str]) -> None:
     for key, anchor in mutations:
         changed = deepcopy(src)
         assert anchor in changed[key], (key, anchor)
-        changed[key] = changed[key].replace(anchor, "INVALID_AUDIT_MUTATION", 1)
+        # setCanaryIdentifiers also occurs in other legitimate code paths.
+        # Mutate the exact upload-disabled branch, not an unrelated caller.
+        if key == "controller" and anchor == "await lazy.ClientID.setCanaryIdentifiers();":
+            at = changed[key].index("  _onUploadPrefChange() {")
+            changed[key] = (changed[key][:at] +
+                            changed[key][at:].replace(anchor, "INVALID_AUDIT_MUTATION", 1))
+        else:
+            changed[key] = changed[key].replace(anchor, "INVALID_AUDIT_MUTATION", 1)
         try:
             validate(changed)
         except (AssertionError, ValueError):
