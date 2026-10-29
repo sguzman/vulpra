@@ -69,7 +69,14 @@ jobs:
           assert x["archive_compressed_bytes"]==86930792
           assert x["archive_regular_members"]==47
           assert x["archive_regular_logical_bytes"]==339565212
-          assert len(x["elf_members"]) >= 5
+          assert len(x["elf_members"]) == 28
+          assert x["direct_needed_edges"] == 268
+          assert x["unique_needed_names"] == 50
+          assert len(x["packaged_elf_needed_names"]) == 14
+          assert len(x["archive_link_only_needed_names"]) == 0
+          assert len(x["not_packaged_needed_names"]) == 36
+          assert "libmozavutil.so" in x["packaged_elf_needed_names"]
+          assert "libgtk-3.so.0" in x["not_packaged_needed_names"]
           assert sum(m["name"]=="libxul.so" for m in x["elf_members"])==1
           assert x["all_native_binary_execution_avoided"] is True
           assert x["host_dependency_resolution_verified"] is False
