@@ -565,7 +565,7 @@
         ]
       },
       "loopback_runtime_harness": {
-        "status": "historical_native_test_mode_replay_passed_current_source_matched_runtime_still_unverified",
+        "status": "historical_native_test_mode_loopback_post_assertions_passed_whole_browser_source_match_pending",
         "script": "ci/smoke-telemetry-loopback-package.py",
         "offline_run_id": 40803048273,
         "offline_checks": [
@@ -592,7 +592,27 @@
         "critical_telemetry_source_blobs_identical_to_current_main": 6,
         "historical_replay_workflow": ".github/workflows/m3-telemetry-artifact-replay.yml",
         "normal_startup_sender_initialized": false,
-        "explicit_test_setup_required": true
+        "explicit_test_setup_required": true,
+        "strict_native_deletion_post_replay_run_id": 40918610943,
+        "strict_native_deletion_post_conclusion": "success",
+        "native_post_counts_before_optout": {
+          "vulpra-probe": 1,
+          "deletion-request": 0,
+          "other": 0
+        },
+        "native_post_counts_after_optout": {
+          "vulpra-probe": 1,
+          "deletion-request": 1,
+          "other": 0
+        },
+        "native_receiver_rejections": {
+          "oversize": 0,
+          "bad_framing": 0,
+          "truncated": 0
+        },
+        "deletion_post_received_in_test_mode": true,
+        "real_remote_deletion_verified": false,
+        "production_mode_telemetry_verified": false
       }
     },
     {
