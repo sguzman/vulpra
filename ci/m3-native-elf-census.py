@@ -116,6 +116,42 @@ def header(raw):
         raise ValueError("Not ELF dynamic object")
     return data
 
+def packaged_dependency_scope(archive, needed):
+    """Classify direct loader declarations using archive member names only."""
+    by_name={name:[] for name in needed}
+    regular=0;links=0
+    with tarfile.open(archive,"r:xz") as tf:
+        for entry in tf:
+            if entry.isfile(): regular+=1
+            elif entry.issym() or entry.islnk(): links+=1
+            else: continue
+            base=Path(entry.name).name
+            if base in by_name:
+                kind="archive_regular" if entry.isfile() else "archive_link_unresolved"
+                by_name[base].append({"path":entry.name,"kind":kind})
+    classified=[]
+    for name in needed:
+        matches=by_name[name]
+        if any(m["kind"]=="archive_regular" for m in matches):
+            status="bundled_regular"
+        elif matches:
+            status="bundled_link_only_unverified"
+        else:
+            status="absent_from_archive_loader_must_resolve_elsewhere"
+        classified.append({"needed":name,"status":status,"matching_members":matches})
+    counts={kind:sum(x["status"]==kind for x in classified)
+            for kind in ("bundled_regular","bundled_link_only_unverified",
+                         "absent_from_archive_loader_must_resolve_elsewhere")}
+    if sum(counts.values())!=len(needed):
+        raise ValueError("Incomplete dependency classification")
+    return {"archive_regular_members":regular,"archive_link_members":links,
+            "classification_counts":counts,"needed_members":classified,
+            "limitations":[
+              "Archive presence is not proof the dynamic loader resolves the member.",
+              "Symlink/hardlink declarations are never followed or trusted.",
+              "Absent dependency may be resolved by the host; host availability untested.",
+              "Only direct DT_NEEDED entries, no transitive dependency or dlopen scan."]}
+
 def inspect(archive):
     archive=archive.resolve()
     checked=digest(archive)
@@ -127,16 +163,19 @@ def inspect(archive):
         names=NEEDED.findall(readelf(tmp,"-dW"))
         if not names or len(names)!=len(set(names)):
             raise ValueError("No unique DT_NEEDED dependencies")
+        packaged=packaged_dependency_scope(archive,names)
     return {"schema_version":1,"test":"sha256_verified_archived_native_elf_metadata",
             "archive_name":archive.name,"archive_sha256":checked,
             "archive_compressed_bytes":archive.stat().st_size,
             "libxul":member,"elf_header":elf,"elf_sections":sections,
-            "dt_needed":names,"runtime_library_loaded":False,
+            "dt_needed":names,"packaged_dependency_scope":packaged,
+            "runtime_library_loaded":False,
             "feature_bytes_attributed":False,"source_removal_authorized":False,
             "compressed_package_savings_bytes":None,
             "limitations":[
               "Historical native package not a current-source-matched compiled binary.",
               "DT_NEEDED names are declarations, not verified dependency resolution.",
+              "Absence from the package does not establish host library availability.",
               "ELF sections can overlap; section sizes are not per-feature removable bytes.",
               "NOBITS virtual section bytes are not equivalent physical file length.",
               "No native execution, linker map, Rust/C++ symbol attribution or alternative build."]}
@@ -150,7 +189,7 @@ def self_test():
     assert group(".bss")=="writable_or_tls_data"
     with tempfile.TemporaryDirectory(prefix="vulpra-elf-fixtures-") as tmp:
         path=Path(tmp)/"fixture.tar.xz"
-        def make(duplicate=False,symlink=False):
+        def make(duplicate=False,symlink=False,bundle_needed=False,linked_needed=False):
             with tarfile.open(path,"w:xz") as tf:
                 member=tarfile.TarInfo("./vulpra/libxul.so")
                 if symlink:
@@ -160,12 +199,28 @@ def self_test():
                     blob=fixture.read_bytes();member.size=len(blob)
                     tf.addfile(member,BytesIO(blob))
                     if duplicate: tf.addfile(member,BytesIO(blob))
+                if bundle_needed:
+                    dep=tarfile.TarInfo("./vulpra/libc.so.6")
+                    dep.size=3;tf.addfile(dep,BytesIO(b"abc"))
+                if linked_needed:
+                    dep=tarfile.TarInfo("./vulpra/libc.so.6")
+                    dep.type=tarfile.SYMTYPE;dep.linkname="/outside/untrusted"
+                    tf.addfile(dep)
             Path(str(path)+".sha256").write_text(
                 sha256(path.read_bytes()).hexdigest()+"  "+path.name+"\n")
         make();answer=inspect(path)
         assert answer["libxul"]["logical_bytes"]==fixture.stat().st_size
         assert answer["runtime_library_loaded"] is False
         assert answer["compressed_package_savings_bytes"] is None
+        deps=answer["packaged_dependency_scope"]["needed_members"]
+        assert next(x for x in deps if x["needed"]=="libc.so.6")["status"]=="absent_from_archive_loader_must_resolve_elsewhere"
+        make(bundle_needed=True)
+        answer=inspect(path)
+        assert next(x for x in answer["packaged_dependency_scope"]["needed_members"] if x["needed"]=="libc.so.6")["status"]=="bundled_regular"
+        make(linked_needed=True)
+        answer=inspect(path)
+        assert next(x for x in answer["packaged_dependency_scope"]["needed_members"] if x["needed"]=="libc.so.6")["status"]=="bundled_link_only_unverified"
+        make()
         Path(str(path)+".sha256").write_text("0"*64+"  "+path.name+"\n")
         try:inspect(path)
         except ValueError as e:assert "SHA-256 mismatch" in str(e)
@@ -178,7 +233,7 @@ def self_test():
         try:inspect(path)
         except ValueError as e:assert "regular-file" in str(e)
         else:raise AssertionError("Untrusted symlink accepted")
-    return 9
+    return 12
 
 def main():
     ap=argparse.ArgumentParser()
