@@ -76,7 +76,8 @@ def main():
         "disabled":{"ordinary":False, "deletion":True, "policy":True},
         "master_off":{"ordinary":False, "deletion":True, "policy":False}}
     full = {"vulpra-probe":1, "deletion-request":0, "other":0}
-    probe.validate(record, full, full, {"oversize":0,"bad_framing":0,"truncated":0})
+    received = {**full, "deletion-request":1}
+    probe.validate(record, full, received, {"oversize":0,"bad_framing":0,"truncated":0})
     mutations = (
         lambda r,a,b: r["disabled"].update(ordinary=True),
         lambda r,a,b: r["disabled"].update(deletion=False),
@@ -91,13 +92,14 @@ def main():
         lambda r,a,b: r["before"].update(server_matches_loopback=False),
         lambda r,a,b: r.update(naturally_initialized=None),
         lambda r,a,b: r.update(test_setup_used=False),
+        lambda r,a,b: b.update({"deletion-request":0}),
     )
     for mutation in mutations:
-        copy, before, after = deepcopy(record), dict(full), dict(full)
+        copy, before, after = deepcopy(record), dict(full), dict(received)
         mutation(copy, before, after)
         must_fail(lambda: probe.validate(copy, before, after))
     print(f"PASS: {len(mutations)} invalid observer, sender, capture and master-policy fixtures rejected")
-    must_fail(lambda: probe.validate(record, full, full,
+    must_fail(lambda: probe.validate(record, full, received,
         {"oversize":1, "bad_framing":0, "truncated":0}))
     print("PASS: rejected local HTTP receiver body-size/framing failure evidence")
     print("MOCK ONLY: live Vulpra/WebDriver and remote deletion delivery untested")
