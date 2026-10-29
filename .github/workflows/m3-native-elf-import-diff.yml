@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/m3-native-elf-import-diff.yml
+      - ci/m3-native-elf-import-diff.py
   workflow_dispatch:
 permissions:
   contents: read
