@@ -1756,5 +1756,60 @@
     "no_new_source_deletion": true,
     "no_normal_browser_feature_changed": true,
     "new_compiled_savings_bytes": null
+  },
+  "historical_native_elf_census": {
+    "status": "sha256_verified_historical_libxul_elf_and_direct_dependency_members_passed",
+    "source_archive_compiled_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "source_archive_run_id": 40567473401,
+    "successful_elf_census_run_id": 40927060259,
+    "evidence_artifact_id": 12920961955,
+    "elf_type": "ELF64 DYN X86-64",
+    "libxul_so_logical_bytes": 189486920,
+    "dt_needed_direct_count": 49,
+    "dt_needed_bundled_regular_count": 13,
+    "dt_needed_link_only_count": 0,
+    "dt_needed_absent_from_archive_count": 36,
+    "elf_section_file_backed_bytes": {
+      "executable_sections": 128114504,
+      "read_only_or_relocated_data": 43537784,
+      "unwind_exception_metadata": 16488572,
+      "writable_or_tls_data": 1004352,
+      "relocations": 84264,
+      "symbols_and_names": 144257,
+      "other_named_sections": 108769
+    },
+    "source_matched_to_current_main": false,
+    "transitive_or_dlopen_dependencies_examined": false,
+    "host_library_resolution_examined": false,
+    "compiled_feature_bytes_attributed": false,
+    "new_source_or_package_savings_bytes": null,
+    "new_source_removal_authorized": false,
+    "docs": "docs/vulpra/M3-NATIVE-ELF-DEPENDENCIES.md"
+  },
+  "measured_package_resource_priorities": {
+    "status": "sha256_verified_historical_package_zip_entry_ranking_passed",
+    "run_id": 40926977310,
+    "docs": "docs/vulpra/M3-PACKAGED-RESOURCE-PRIORITIES.md",
+    "risk_note": "Logical ZIP-entry sizes are not marginal compressed tar.xz savings; security/DevTools/PDF/translation consumers require explicit guard/fallback.",
+    "largest_known_review_asset": {
+      "id": "aiwindow_prompt_seed",
+      "path": "defaults/settings/main/ai-window-prompts.json",
+      "jar": "browser/omni.ja",
+      "logical_bytes": 1577264,
+      "source_seed_bytes": 1577264,
+      "source_contract_run_id": 40927627334,
+      "source_contract_artifact_id": 12921221539,
+      "verified_boundaries": 6,
+      "negative_mutations_rejected": 12,
+      "first_run_offline_fallback_verified": false,
+      "removal_approved": false
+    },
+    "hyphenation_review_asset": {
+      "path": "hyphenation/hyph_hu.hyf",
+      "jar": "omni.ja",
+      "logical_bytes": 1048764,
+      "reachability_review_done": false,
+      "removal_approved": false
+    }
   }
 }
