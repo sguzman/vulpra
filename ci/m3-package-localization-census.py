@@ -30,6 +30,16 @@ def group(path):
     if "/chrome/" in name and ("/locale/" in name or "/locales/" in name):
         return "legacy_chrome_locale"
     return "other"
+def jar_group(path, container):
+    category=group(path)
+    # Both JARs can use the same localization/ prefix. Use the physical
+    # browser/omni.ja container as provenance for browser-localized resources.
+    if category == "toolkit_l10n" and (
+        "/browser/omni.ja" in "/" + container.lstrip("./")
+    ):
+        return "browser_l10n"
+    return category
+
 def stat():
     return {"files":0,"logical_bytes":0,"inner_zip_compressed_bytes":0}
 def record(report,kind,size,compressed=0):
@@ -73,11 +83,15 @@ def census(archive):
                 if inp is None: raise ValueError("Unextractable omni resource archive")
                 with zipfile.ZipFile(BytesIO(inp.read())) as jar:
                     entries=[entry for entry in jar.infolist() if not entry.is_dir()]
+                jar_counts={name:stat() for name in KINDS}
                 for entry in entries:
-                    record(inside,group(entry.filename),
-                           entry.file_size,entry.compress_size)
+                    bucket=jar_group(entry.filename,member.name)
+                    record(inside,bucket,entry.file_size,entry.compress_size)
+                    record(jar_counts,bucket,entry.file_size,entry.compress_size)
                 jars.append({"archive_member":member.name,"status":"readable",
-                             "entries":len(entries)})
+                             "entries":len(entries),
+                             "locale_group_by_jar":{k:v for k,v in jar_counts.items()
+                                                 if k!="other"}})
     if members==0: raise ValueError("Empty packaged browser archive")
     if not jars: raise ValueError("No packaged omni.ja resource archive")
     return {
@@ -104,6 +118,7 @@ def census(archive):
       "limitations":[
         "Historical browser archive may not match HEAD source/flags.",
         "ZIP entry compressed bytes are not independent contributions to tar.xz size.",
+        "Browser/toolkit label for localization/ entries uses the physical omni.ja container.",
         "Logical member bytes are not disk allocation or removable bytes.",
         "Some localized resources may use legacy or generated paths outside these categories.",
         "No language-pack archive or non-default locale content inspected.",
@@ -114,6 +129,8 @@ def self_test():
     assert group("vulpra/browser/localization/en-US/browser.ftl")=="browser_l10n"
     assert group("vulpra/localization/en-US/toolkit.ftl")=="toolkit_l10n"
     assert group("vulpra/default.locale")=="default_locale"
+    assert jar_group("localization/en-US/browser.ftl","vulpra/browser/omni.ja")=="browser_l10n"
+    assert jar_group("localization/en-US/toolkit.ftl","vulpra/omni.ja")=="toolkit_l10n"
     assert group("vulpra/hyphenation/hyph_en_US.dic")=="hyphenation"
     assert group("vulpra/dictionaries/en-US.dic")=="dictionaries"
     with tempfile.TemporaryDirectory(prefix="vulpra-l10n-fixture-") as tmp:
@@ -149,7 +166,7 @@ def self_test():
         try: census(p)
         except ValueError as e: assert "identify verified archive" in str(e)
         else: raise AssertionError("Wrong sidecar archive name accepted")
-    return 7
+    return 9
 
 def main():
     parser=argparse.ArgumentParser()
@@ -169,6 +186,9 @@ def main():
         print("Tar members:",info["tar_regular_members"])
         print("Locale tar categories:",{k:v["logical_bytes"] for k,v in info["outer_tar_members"].items() if k!="other"})
         print("Locale omni categories:",{k:v["logical_bytes"] for k,v in info["nested_omni_ja_members"].items() if k!="other"})
+        print("Locale JAR containers:",[(j["archive_member"],j.get("entries"),{
+              k:v["logical_bytes"] for k,v in j.get("locale_group_by_jar",{}).items()
+              if v["logical_bytes"]}) for j in info["omni_ja"]])
         print("No compiled saving, native runtime or safe removal inferred")
     elif not args.self_test:
         parser.error("Provide archive path or --self-test")
