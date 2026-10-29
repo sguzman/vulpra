@@ -15,6 +15,22 @@
 
 The important distinction is between a *missing* language pattern and *safe typography*. A page containing `lang="hu"` and `hyphens:auto` may wrap differently if Hungarian patterns are unavailable. This can affect reading, layout, narrow columns and site-specific behavior even though Gecko's manager returns null instead of throwing.
 
+## Real unmodified native-browser CSS layout baseline (accepted)
+
+[Historical native runtime 40937941448](https://github.com/sguzman/vulpra/actions/runs/40937941448) **PASSED**, artifact **12924908962**. It independently verified the complete original package's SHA-256, extracted it only into an isolated temporary application directory, ran real Vulpra on localhost with headless geckodriver, and used a temporary HOME and existing-Firefox-profile sentinel. No external network content or model API was used. Eight deliberately invalid layout-result mutations were rejected by the harness.
+
+The test held font, width (**112px**), size (**22px**) and word constant, comparing `hyphens:auto` versus `hyphens:none` for one long Hungarian word. DOM geometry from real packaged Gecko:
+
+| Language | CSS hyphenation | Measured text lines | scrollWidth | scrollHeight |
+| --- | --- | ---: | ---: | ---: |
+| `hu` | auto | **6** | **112px** | **168px** |
+| `hu-HU` | auto | **6** | **112px** | **168px** |
+| `hu` | none | 1 overflowing line | 524px | 28px |
+| `en-US` | auto | **3** | 112px | 84px |
+| `en-US` | none | 1 overflowing line | 194px | 28px |
+
+The actual packaged Hungarian resource **does affect page layout**, which makes silent omission unsuitable as a default optimization. The two Hungarian language forms both produced automatic hyphenated wrapping. This is a positive *normal browser* baseline; it does **not** test a missing dictionary, guarantee all Hungarian typography or language-pack fallback, or demonstrate savings. In particular the package at the time of the test was historically compiled at `1683ca67...`, not at current main.
+
 ## Next legitimate trial
 
 Keep `hyph_hu.hyf` in normal Vulpra. To justify an **opt-in** omission, first create a targeted native visual/layout regression for Hungarian and `hu-HU`, compare explicit `hyphens:none` and `hyphens:auto`, include an English control, test profile-supplied pattern precedence, and inspect local alias fallback. Then create a reversible *isolated* build guard, retain the full default version, and compile a source-matched lean/full pair with Wayland/JS/WebExtensions/privacy acceptance. Attribute real compressed bytes only from independently hashed paired packages; **1,048,764 logical ZIP-entry bytes is not a claim of tar.xz savings**.
