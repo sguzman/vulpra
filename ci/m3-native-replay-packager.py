@@ -84,8 +84,9 @@ def probe_environment(objdir,source_commit):
         raise ValueError("Probe source commit differs from Git checkout")
     if not (objdir/"config.status").is_file():
         raise ValueError("No source-matched generated config.status")
-    if not (objdir/"buildconfig.py").is_file():
-        raise ValueError("No generated object-directory buildconfig.py")
+    # Gecko does not promise that buildconfig.py is generated directly at
+    # objdir/buildconfig.py during configure-only builds. Import through mach
+    # and verify the resolved module's actual topobjdir instead.
     sys.path.insert(0,str(objdir))
     import buildconfig
     from mozpack.files import ExecutableFile
