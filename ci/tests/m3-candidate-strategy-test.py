@@ -67,6 +67,22 @@ def validate(reg,paired,progress):
     assert control["no_new_source_deletion"] is True
     assert control["no_normal_browser_feature_changed"] is True
     assert control["new_compiled_savings_bytes"] is None
+    loader=reg["historical_native_loader_order_preflight"]
+    assert loader["status"]=="verified_historical_physical_normal_package_order"
+    assert loader["run_id"]==40936431756
+    assert loader["dependentlibs_name_count"]==14
+    assert loader["libmozgtk_before_libmozwayland"] is True
+    assert loader["libxul_loaded_after_both"] is True
+    assert loader["current_source_matched_native_loader_order_verified"] is False
+    assert loader["source_deletion_authorized"] is False
+    assert loader["compressed_feature_saving_bytes"] is None
+    pending=reg["pending_current_source_link_input_acceptance"]
+    assert pending["workflow_run_id"]==40935344279
+    assert pending["source_commit"]=="3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f"
+    assert pending["state"].startswith("native_compilation_observed_in_progress_")
+    assert pending["full_linker_symbol_map_claimed"] is False
+    assert pending["compiled_feature_savings_established"] is False
+    assert pending["broad_m3_gate_advanced"] is False
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -160,6 +176,9 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns").update(removal_authorized=True),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns").update(package_logical_bytes=0),
         lambda a,b,c:a["hungarian_hyphenation_boundary_audit"].update(locale_layout_omission_runtime_checked=True),
+        lambda a,b,c:a["historical_native_loader_order_preflight"].update(libmozgtk_before_libmozwayland=False),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(broad_m3_gate_advanced=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(full_linker_symbol_map_claimed=True),
     ]
     for mutate in mutations:
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
