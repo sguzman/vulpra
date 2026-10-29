@@ -155,6 +155,41 @@ def validate(reg,paired,progress):
     assert pending["full_linker_symbol_map_claimed"] is False
     assert pending["compiled_feature_savings_established"] is False
     assert pending["broad_m3_gate_advanced"] is False
+    # The first/second/third failed or incomplete native evidence remains
+    # historical. Accept only the separately pinned fourth full native run.
+    assert pending["historical_scope_only"] is True
+    assert pending["superseded_by_accepted_native_run_id"]==40963098075
+    accepted=reg["accepted_current_source_native_link_runtime_evidence"]
+    assert accepted["source_commit"]=="cde4d83043f8c476173c8dbc78b66b078c3f6b5b"
+    assert accepted["original_full_native_run_id"]==40963098075
+    assert accepted["source_native_artifact_id"]==12938864326
+    assert accepted["separate_reconciliation_run_id"]==40969046569
+    assert accepted["reconciliation_artifact_id"]==12939456325
+    assert accepted["status"]=="passed_full_native_evidence_reconciliation"
+    assert accepted["original_native_run_conclusion"]=="success"
+    for flag in ("independent_reconciliation_passed","compiler_and_packaging_succeeded",
+                 "matched_reproducible_mozpack_copy",
+                 "staged_shipped_and_reproduced_libxul_sha256_identical",
+                 "configured_strip_enabled","verified_libmozgtk_precedes_libmozwayland",
+                 "private_weston_wayland_js_webextension_profile_nimbus_passed"):
+        assert accepted[flag] is True,flag
+    for flag in ("compiled_raw_library_equals_staged_library","configured_elfhack_enabled",
+                 "complete_resolved_linker_symbol_map","host_transitive_and_dlopen_dependencies_closed",
+                 "compiled_per_feature_byte_attribution","current_head_binary_after_future_commits_proven",
+                 "full_vs_lean_feature_omission_pair_from_this_run",
+                 "additional_source_removal_authorized","whole_m3_gate_advanced"):
+        assert accepted[flag] is False,flag
+    assert accepted["new_compiled_savings_bytes"] is None
+    assert accepted["source_original_libxul_sha256"]=="0ec00c074bd7b846e6b0bd621f43b92f49c3dc4ce9bff8b1c020e6a3d0521eb4"
+    assert accepted["packaged_libxul_sha256"]=="a6139ee9ec4d0d8df7bec6b89bab6c41c553703842486ddfe773a1acc50a76c2"
+    assert accepted["package_sha256"]=="18798900c5307fd136f7d93db6681741616981b609741a4b2209a1810273eb51"
+    assert accepted["linker_response_sha256"]=="3e1926f4674246622013393366071c80ca2b492afc15463e4a92eb17e1746126"
+    assert (accepted["package_compressed_bytes"],accepted["packaged_libxul_bytes"],
+            accepted["linker_response_object_inputs"])==(87154700,189486696,2435)
+    assert (accepted["regular_packaged_elf_members"],accepted["packaged_direct_dt_needed_edges"],
+            accepted["external_direct_needs_names"])==(28,268,36)
+    assert accepted["packaging_method"]=="mozpack.files.ExecutableFile.copy"
+
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -336,6 +371,17 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(schema_compatibility_accepted_as_native_runtime_evidence=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(schema_compatibility_proves_real_packager_transform=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(schema_compatibility_new_gate_credit=True),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(independent_reconciliation_passed=False),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(compiled_raw_library_equals_staged_library=True),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(whole_m3_gate_advanced=True),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(complete_resolved_linker_symbol_map=True),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(host_transitive_and_dlopen_dependencies_closed=True),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(full_vs_lean_feature_omission_pair_from_this_run=True),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(additional_source_removal_authorized=True),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(new_compiled_savings_bytes=100),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(package_sha256="f"*64),
+        lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(original_full_native_run_id=40944392090),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(historical_scope_only=False),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
