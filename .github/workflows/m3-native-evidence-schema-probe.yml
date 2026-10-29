@@ -1,0 +1,97 @@
+# Test only the reconciler's *schema compatibility* against a real completed native
+# evidence artifact. It inserts a SYNTHETIC, deliberately unverified packager
+# transform and NEVER publishes or accepts the fabricated result as native proof.
+name: M3 Native Evidence Schema Compatibility Probe
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-link-evidence-ledger.py
+      - .github/workflows/m3-native-evidence-schema-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  probe-real-schema-with-synthetic-packager-transform:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout source-only acceptance validator
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Pass local negative fixture tests
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-native-link-evidence-ledger.py
+          python3 ci/m3-native-link-evidence-ledger.py --self-test
+      - name: Retrieve real successful native browser evidence but not its binary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/"$GITHUB_REPOSITORY"/actions/runs/40935344279 \
+            --jq '.head_sha == "3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f" and .conclusion == "success"' \
+            | grep -Fx true
+          gh run download 40935344279 --repo "$GITHUB_REPOSITORY" \
+            --name m3-source-matched-native-link-evidence \
+            --dir "$RUNNER_TEMP/real-native-evidence"
+      - name: Validate only record compatibility under explicitly fabricated transform
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import importlib.util, json, os
+          root=Path(os.environ["RUNNER_TEMP"])/"real-native-evidence"
+          def one(pattern):
+              found=list(root.rglob(pattern))
+              assert len(found)==1,(pattern,len(found))
+              return found[0]
+          def load(pattern):
+              return json.loads(one(pattern).read_text())
+          spec=importlib.util.spec_from_file_location("verifier","ci/m3-native-link-evidence-ledger.py")
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          config=load("m3-native-link-config.json")
+          link=load("m3-native-link-inputs.json")
+          elf=load("m3-native-link-elf-package-graph.json")
+          localhost=load("m3-localhost-acceptance.json")
+          webext=load("webextension-smoke-*.json")
+          sidecar=one("vulpra-local-m3-native-link-ci.tar.xz.sha256").read_text()
+          source="3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f"
+          real_package_sha=link["package"]["libxul_member"]["sha256"]
+          original_sha=link["built_libxul_sha256"]
+          assert original_sha!=real_package_sha
+          assert "packaging_transform_replay" not in link
+          # FAKE PACKAGER REPLAY: this is a schema-only probe, not a verified
+          # native acceptance. Never upload or persist this modified record.
+          link["packaging_transform_replay"]={
+              "method":"mozpack.files.ExecutableFile.copy",
+              "source_commit":source,
+              "deterministic_reproduction_verified":True,
+              "original_and_packaged_hash_equal":False,
+              "original_libxul_sha256":original_sha,
+              "staged_and_reproduced_libxul_sha256":real_package_sha,
+              "complete_linker_map_claimed":False,
+              "compiled_feature_bytes_attributed":False
+          }
+          result=mod.check(config,link,elf,localhost,webext,sidecar,source,40935344279)
+          assert result["package_sha256"]==link["package"]["package_sha256"]
+          assert result["link_response_entry_count"]==2435
+          assert result["GTK_before_Wayland"] is True
+          assert result["additional_source_removal_authorized"] is False
+          assert result["compiled_package_savings_bytes"] is None
+          print("PASS: actual native JSON schemas fit strict verifier under TEST-ONLY SYNTHETIC transformation")
+          print("NOT NATIVE ACCEPTANCE: original binaries are not replayed and transform identity NOT proved")
+          print("NO PROGRESS CREDIT, NO SIZE ATTRIBUTION, NO REMOVAL AND NO FABRICATED REPORT PERSISTED")
+          PY
