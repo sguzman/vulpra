@@ -18,6 +18,8 @@ The **14** matched packaged library names are `libgkcodecs.so`, `liblgpllibs.so`
 
 The **36** external-resolution names include GTK/GDK/Pango/Cairo/GLib, X11/XCB, ALSA, fonts, C/C++ runtime, DBus and other system libraries. **Absent from tarball is not equivalent to absent at runtime.** No target machine's libraries, ABI versions or search paths were checked.
 
+**Later, separately scoped Ubuntu-only follow-up:** [host-cache audit 40947019427](https://github.com/sguzman/vulpra/actions/runs/40947019427) verified that all **36/36** direct package-external SONAMEs had architecture-compatible ELF file candidates in the Ubuntu 24.04 runner's `ldconfig -p` cache. [Transitive metadata audit 40947712769](https://github.com/sguzman/vulpra/actions/runs/40947712769) statically followed those host files' own `DT_NEEDED` entries: **76 distinct names, 246 edges, 76/76 cache file candidates, zero misses**. Both checks used `readelf` only, **not** `ldd`, `dlopen`, runtime loader resolution or an Arch host. Their files-present crosswalk does not supersede this original archive's absence-from-package categories or establish ABI/symbol compatibility. See [host direct crosswalk](M3-NATIVE-HOST-CACHE-PREFLIGHT.md) and [host transitive graph](M3-NATIVE-HOST-TRANSITIVE-MAP.md).
+
 ## What this does and does not close
 
 The census records *every package-regular ELF's direct loader declarations* and groups package presence by names. This is materially broader than reading the one largest `libxul.so`. The output contains requesting ELF path, requested library name and any matching physical archive members, plus member SHA-256. It is enough to identify the **direct native package interface**, including the mix of bundled Mozilla libraries and system dependencies.
