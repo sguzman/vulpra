@@ -4,7 +4,7 @@
   "phase": "M3",
   "source": "Firefox 159.0b5",
   "basis_local_commit": "ee22392142889ed2d8f7d3953332901cafd964ef",
-  "as_of": "2026-10-27",
+  "as_of": "2026-10-29",
   "definitions": {
     "source_only": "Candidate changes only Git-tracked source footprint; compiled/runtime benefit not established",
     "compile_condition": "There is a manifest/configuration gate, but behavior and actual configured value still require measurement",
@@ -719,7 +719,7 @@
         "Source-pinned Pocket runtime-boundary audit and seven invalid-source mutations passed: https://github.com/sguzman/vulpra/actions/runs/40773515182",
         "Extended promo import/renderer source-boundary audit and nine mutation tests PASSED: https://github.com/sguzman/vulpra/actions/runs/40773988580"
       ],
-      "next": "Real vendored Webpack paired bundle + actual fileDependencies graph passed 40783148652 at dadfc584: default compiled real PromoCard, experimental compiled only null substitute; original handler/title excluded, JS delta 2,732 uncompressed bytes, vendor identical. Candidate not native accepted: matched full/lean native builds 40778245670 and 40778245764 at source 977c7ae compiling. Preserve shared mascot/locales. No native compressed saving or additional M3 gate credit.",
+      "next": "PromoCard native opt-in experiment now accepted as an isolated bundle-level exclusion; archive delta observed 5,744 B and uncompressed New Tab JS delta 2,732 B. Retain protected Pocket feeds, sponsored AdBanner, mascot/l10n, default behavior, FxAccounts, Sync and telemetry. Audit other narrow candidates and runtime fallbacks separately; do not treat the overall Pocket/promotions gate as complete.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
@@ -798,8 +798,8 @@
             "SHOW_PERSONALIZE",
             "firefox-mascot-prop-paintbucket-rgb.svg"
           ],
-          "classification": "source_and_real_js_bundle_opt_in_passed_native_runtime_pending",
-          "reason": "AdBanner statically imports PromoCard even when the optional card is pref-off; physical removal requires guarded bundler import and fallback, packaged asset and locale audits, plus native/renderer acceptance. Preserve banner and sponsored label/context menu."
+          "classification": "accepted_linux_only_opt_in_js_bundle_omission; source files retained; broad Pocket flows protected",
+          "reason": "Real webpack dependency exclusion and same-source normal/opt-in native browser and packaged runtime passed; normal continues to compile JSX. Retained main AdBanner, shared mascot/locales and feeds. One observed compressed archive delta is not a causal or repeatable component-size estimate."
         }
       },
       "promocard_webpack_dependency_proof": {
@@ -818,6 +818,31 @@
         "retained_sponsored_banner": true,
         "unchanged_vendor_bundle": true,
         "limits": "Source HEAD differs from in-progress source-matched native runs (977c7ae) due to follow-up test-only/doc changes. No native acceptance, no final tar.xz claim, not a physical source-file deletion."
+      },
+      "promocard_native_pair": {
+        "status": "accepted_isolated_linux_opt_in_packaged_js_exclusion",
+        "source_sha": "befb257961e776311751e09aec8158601a54dd79",
+        "normal_native_run_id": 40787699203,
+        "optin_native_run_id": 40787698972,
+        "normal_artifact_id": 12862697117,
+        "optin_artifact_id": 12862948830,
+        "normal_compressed_bytes": 87154984,
+        "optin_compressed_bytes": 87149240,
+        "observed_archive_delta_bytes": 5744,
+        "observed_archive_difference_percent": 0.00659056,
+        "normal_archive_sha256": "708202e55f4101b5ae51601e4cb67c22d29b9989794d8afea3420c80b76b2a78",
+        "optin_archive_sha256": "8e08f6ab18b323a5e7c084eab97d0664f7f93b95f174e7aeffb6465d856a38d5",
+        "normal_newtab_js_bytes": 1335463,
+        "optin_newtab_js_bytes": 1332731,
+        "newtab_js_delta_bytes": 2732,
+        "original_jsx_present_only_in_normal": true,
+        "protected_adbanner_adsfeed_and_feeds_retained": true,
+        "optin_native_runtime_passed": true,
+        "normal_build_unchanged": true,
+        "permanent_source_deletion_authorized": false,
+        "repeatability_or_causal_size_established": false,
+        "evidence_file": "docs/vulpra/M3-PROMOCARD-NATIVE-PAIR.json",
+        "limitations": "Independent same-source native packages can differ for unrelated reasons, and cumulative savings from separate opt-in trials cannot be added; this experiment does not close the broad Pocket/Sync/telemetry gate."
       }
     },
     {
@@ -839,7 +864,7 @@
         "browser/components/aboutwelcome/moz.build: actors/modules",
         "ACCEPTED opt-in ASRouter two-promo removal: native runtime pass https://github.com/sguzman/vulpra/actions/runs/40547968387; source-matched binary-size pass https://github.com/sguzman/vulpra/actions/runs/40567473401 (3,184 B/0.00366%). All remaining promotional/pocket/sync/reporting bundles unreviewed."
       ],
-      "next": "Source-only Webpack pair and graph checked (40783148652) including physical module resolution; native linux full/opt-in jobs at same commit 977c7ae, 40778245670/40778245764 compiling. Earlier lean 40777472270 failed in configure before compilation and cannot be paired with old baseline. Runtime, package ZIP markers and signed tar.xz comparison still pending. No source/permanent deletion or byte credit.",
+      "next": "PromoCard native pair at befb257 passed normal and Linux-only opt-in with protected New Tab/WebExtensions/Nimbus/Wayland/JS; archive delta 5,744 B observed (noncausal), not part of any combined opt-ins. Preserve broad ASRouter/New Tab and continue narrowly scoped remaining promotional callers. No default-build change or extra broad M3 gate.",
       "audit_result": {
         "source_audit_run": 40544803899,
         "source_commit": "dfdc1915b279f33d4d91992355aa8da48384b1a0",
