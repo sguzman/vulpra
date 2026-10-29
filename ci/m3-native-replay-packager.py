@@ -7,6 +7,7 @@ Never modify dist/bin, staged package, or original browser profiles.
 """
 from __future__ import annotations
 import argparse
+import importlib.util
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -34,17 +35,46 @@ def digest(path):
             h.update(chunk)
     return h.hexdigest()
 
-def replay(objdir,source_commit):
+def source_matched_buildconfig(objdir,source_commit):
+    """Use Gecko's own generated config.statusd instead of assuming an object-dir buildconfig.py.
+
+    Every configuration value is loaded from the exact source's generated
+    PartialConfigEnvironment. This does not change any on-disk build input.
+    """
     if subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()!=source_commit:
         raise ValueError("Mismatched exact source commit")
-    # Honor the generated buildconfig when mach-python itself has not
-    # inserted the current object directory on sys.path.
-    if (objdir/"buildconfig.py").is_file():
-        sys.path.insert(0,str(objdir))
-    # Import only inside a real configured mach-python environment.
+    if not (objdir/"config.status").is_file():
+        raise ValueError("Missing exact-source config.status")
+    from mozbuild.backend.configenvironment import PartialConfigEnvironment
+    env=PartialConfigEnvironment(str(objdir))
+    if env.substs.get("MOZ_WIDGET_TOOLKIT")!="gtk":
+        raise ValueError("Not a configured Gecko GTK build")
+    if env.substs.get("MOZ_APP_BASENAME")!="Vulpra":
+        raise ValueError("Not configured for the Vulpra app basename")
+    if env.substs.get("MOZ_BUILD_APP")!="browser":
+        raise ValueError("Not configured for a browser build")
+    found=importlib.util.find_spec("buildconfig")
+    if found:
+        import buildconfig
+        if Path(buildconfig.topobjdir).resolve()!=objdir:
+            raise ValueError("Existing buildconfig points at a different objdir")
+        return buildconfig, "imported_buildconfig_exact_objdir", env
+    # The standalone mach-python context can lack the generated buildconfig
+    # module. Mozilla's sanctioned PartialConfigEnvironment contains the
+    # precise config.statusd values used by the normal package build.
+    import types
+    module=types.ModuleType("buildconfig")
+    module.substs=env.substs
+    module.defines=env.defines
+    module.topobjdir=str(objdir)
+    sys.modules["buildconfig"]=module
+    return module, "reconstructed_from_generated_config_statusd", env
+
+
+def replay(objdir,source_commit):
+    buildconfig,config_origin,_=source_matched_buildconfig(objdir,source_commit)
     from mozpack.files import ExecutableFile
     from mozpack.executables import may_strip,may_elfhack
-    import buildconfig
     built=objdir/"dist/bin/libxul.so"
     stage=objdir/"dist/vulpra/libxul.so"
     before=digest(built)
@@ -60,6 +90,7 @@ def replay(objdir,source_commit):
     return {
         "schema_version":1,"source_commit":source_commit,
         "method":"mozpack.files.ExecutableFile.copy",
+        "buildconfig_origin":config_origin,
         "mozpack_copy_ran_on_temporary_file":True,
         "configured_strip_enabled":bool(may_strip(str(stage))),
         "configured_elfhack_enabled":bool(may_elfhack(str(stage))),
@@ -78,27 +109,19 @@ def replay(objdir,source_commit):
         ],
     }
 
+
 def probe_environment(objdir,source_commit):
-    """Verify only the configured source/object environment; do not copy ELF."""
-    if subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()!=source_commit:
-        raise ValueError("Probe source commit differs from Git checkout")
-    if not (objdir/"config.status").is_file():
-        raise ValueError("No source-matched generated config.status")
-    # Gecko does not promise that buildconfig.py is generated directly at
-    # objdir/buildconfig.py during configure-only builds. Import through mach
-    # and verify the resolved module's actual topobjdir instead.
-    sys.path.insert(0,str(objdir))
-    import buildconfig
+    """Verify official generated configuration and packager imports; do not copy ELF."""
+    config,origin,env=source_matched_buildconfig(objdir,source_commit)
     from mozpack.files import ExecutableFile
     from mozpack.executables import may_strip,may_elfhack
-    if Path(buildconfig.topobjdir).resolve()!=objdir:
-        raise ValueError("Imported buildconfig points to a different object directory")
     if not callable(ExecutableFile.copy) or not callable(may_strip) or not callable(may_elfhack):
         raise ValueError("Missing Gecko native packager executable-copy functions")
     return {"source_commit":source_commit,"objdir":str(objdir),
-            "configured_MOZ_WIDGET_TOOLKIT":buildconfig.substs.get("MOZ_WIDGET_TOOLKIT"),
-            "configured_PKG_STRIP":bool(buildconfig.substs.get("PKG_STRIP")),
-            "configured_USE_ELF_HACK":bool(buildconfig.substs.get("USE_ELF_HACK")),
+            "buildconfig_origin":origin,
+            "configured_MOZ_WIDGET_TOOLKIT":config.substs.get("MOZ_WIDGET_TOOLKIT"),
+            "configured_PKG_STRIP":bool(config.substs.get("PKG_STRIP")),
+            "configured_USE_ELF_HACK":bool(config.substs.get("USE_ELF_HACK")),
             "native_libxul_built":False,
             "native_packager_replay_executed":False,
             "runtime_package_accepted":False}
