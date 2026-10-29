@@ -114,8 +114,12 @@ def check(config,link,elf,localhost,extension,sidecar,source_sha,run_id):
              "isolated profile and WebExtension","Nimbus check"}==set(gates),
             "Missing native runtime gate")
     lib=package.get("libxul_member",{})
-    require(sha(lib.get("sha256")) and lib["sha256"]==link.get("built_libxul_sha256"),
-            "Compiled and packaged libxul digest mismatch")
+    require(sha(lib.get("sha256")) and sha(link.get("built_libxul_sha256")),
+            "Malformed compiled or packaged libxul digest")
+    require(same==(lib["sha256"]==link["built_libxul_sha256"]),
+            "Incorrect original-versus-packaged library hash comparison")
+    require(lib["sha256"]==replay["staged_and_reproduced_libxul_sha256"],
+            "Packaged libxul differs from deterministic packager replay")
     require(isinstance(lib.get("bytes"),int) and lib["bytes"]>10_000_000,
             "Invalid compiled native libxul size")
     elfs=elf.get("elf_members",[])
