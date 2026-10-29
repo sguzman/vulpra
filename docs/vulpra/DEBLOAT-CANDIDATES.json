@@ -1694,7 +1694,8 @@
       "evidence": [
         "Physical root omni.ja hyphenation/hyph_hu.hyf 1,048,764 logical bytes in checksum-verified historical native archive, ranked in native package scan https://github.com/sguzman/vulpra/actions/runs/40926977310",
         "Source-pinned source-only hyphenation audit 6 boundaries and 12 negative fixtures passed https://github.com/sguzman/vulpra/actions/runs/40935728156",
-        "intl/locales/moz.build includes hu desktop .hyf under FINAL_TARGET_FILES.hyphenation; nsHyphenationManager.cpp uses greedy locale alias and truncation fallback, returns nullptr for unavailable patterns."
+        "intl/locales/moz.build includes hu desktop .hyf under FINAL_TARGET_FILES.hyphenation; nsHyphenationManager.cpp uses greedy locale alias and truncation fallback, returns nullptr for unavailable patterns.",
+        "Real original normal Vulpra headless Gecko 159 isolated profile localhost CSS hyphens:auto versus none succeeded CI https://github.com/sguzman/vulpra/actions/runs/40937941448 artifact 12924908962: hu and hu-HU 6 lines each vs 1 overflowing line without hyphenation; English control 3 lines vs 1. No omitted dictionary tested."
       ],
       "m3_strategy": {
         "strategy": "review",
@@ -1706,7 +1707,27 @@
         "requires_further_source_or_runtime_verification": true,
         "provenance": "Source-pinned C++/packaging guard audit plus real historical regular package ZIP entry size; no changed native build."
       },
-      "next": "Retain hu precompiled .hyf by default. Before reversible optional omission, test native CSS hyphens:auto in hu and hu-HU, aliases and profile dictionary precedence, compare with en-US in exact-source normal package, then test guarded opt-in fallback and paired SHA256-verified tar.xz for actual compressed delta; do not equate 1,048,764 logical bytes with saving."
+      "next": "Real baseline proves hu and hu-HU hyphenation has material layout effects in the shipped old native browser; retain dictionary in normal Vulpra. Next test opt-in missing-resource handling and Hungarian page layout against full version with same-source native binary before any removal or compressed byte claim. Profile override, langpack fallback, and current-main runtime remain unverified.",
+      "historical_normal_css_runtime": {
+        "status": "passed_real_unmodified_historical_native_hu_huHU_enUS_css_layout",
+        "run_id": 40937941448,
+        "evidence_artifact_id": 12924908962,
+        "archive_compiled_source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+        "archive_original_run_id": 40567473401,
+        "temporary_home_and_firefox_profile": true,
+        "localhost_only": true,
+        "hungarian_auto_lines": 6,
+        "hungarian_none_lines": 1,
+        "hungarian_none_overflow_px": 524,
+        "hungarian_auto_scroll_width_px": 112,
+        "hungarian_huHU_auto_lines": 6,
+        "english_auto_lines": 3,
+        "english_none_lines": 1,
+        "original_package_unchanged": true,
+        "missing_hungarian_pattern_css_fallback_verified": false,
+        "optin_hungarian_pattern_omission_built": false,
+        "compressed_savings_bytes": null
+      }
     }
   ],
   "observed_native_config": {
@@ -2015,7 +2036,27 @@
     "hu_pattern_historical_logical_zip_bytes": 1048764,
     "locale_layout_omission_runtime_checked": false,
     "compressed_savings_bytes": null,
-    "normal_source_changed": false
+    "normal_source_changed": false,
+    "historical_normal_native_css_runtime": {
+      "status": "passed_real_unmodified_historical_native_hu_huHU_enUS_css_layout",
+      "run_id": 40937941448,
+      "evidence_artifact_id": 12924908962,
+      "archive_compiled_source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+      "archive_original_run_id": 40567473401,
+      "temporary_home_and_firefox_profile": true,
+      "localhost_only": true,
+      "hungarian_auto_lines": 6,
+      "hungarian_none_lines": 1,
+      "hungarian_none_overflow_px": 524,
+      "hungarian_auto_scroll_width_px": 112,
+      "hungarian_huHU_auto_lines": 6,
+      "english_auto_lines": 3,
+      "english_none_lines": 1,
+      "original_package_unchanged": true,
+      "missing_hungarian_pattern_css_fallback_verified": false,
+      "optin_hungarian_pattern_omission_built": false,
+      "compressed_savings_bytes": null
+    }
   },
   "historical_native_loader_order_preflight": {
     "status": "verified_historical_physical_normal_package_order",
