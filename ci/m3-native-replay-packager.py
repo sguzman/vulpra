@@ -7,7 +7,6 @@ Never modify dist/bin, staged package, or original browser profiles.
 """
 from __future__ import annotations
 import argparse
-import importlib.util
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -36,39 +35,29 @@ def digest(path):
     return h.hexdigest()
 
 def source_matched_buildconfig(objdir,source_commit):
-    """Use Gecko's own generated config.statusd instead of assuming an object-dir buildconfig.py.
-
-    Every configuration value is loaded from the exact source's generated
-    PartialConfigEnvironment. This does not change any on-disk build input.
-    """
+    """Use Gecko's real mach-python buildconfig and verify generated substitutions."""
     if subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()!=source_commit:
         raise ValueError("Mismatched exact source commit")
     if not (objdir/"config.status").is_file():
         raise ValueError("Missing exact-source config.status")
+    # Gecko's mach-python environment resolves buildconfig. A source-matched
+    # configure-only GitHub Actions preflight proves this import works. Never
+    # insert a fabricated buildconfig module into sys.modules.
+    sys.path.insert(0,str(objdir))
+    import buildconfig
     from mozbuild.backend.configenvironment import PartialConfigEnvironment
-    env=PartialConfigEnvironment(str(objdir))
-    if env.substs.get("MOZ_WIDGET_TOOLKIT")!="gtk":
-        raise ValueError("Not a configured Gecko GTK build")
-    if env.substs.get("MOZ_APP_BASENAME")!="Vulpra":
-        raise ValueError("Not configured for the Vulpra app basename")
-    if env.substs.get("MOZ_BUILD_APP")!="browser":
-        raise ValueError("Not configured for a browser build")
-    found=importlib.util.find_spec("buildconfig")
-    if found:
-        import buildconfig
-        if Path(buildconfig.topobjdir).resolve()!=objdir:
-            raise ValueError("Existing buildconfig points at a different objdir")
-        return buildconfig, "imported_buildconfig_exact_objdir", env
-    # The standalone mach-python context can lack the generated buildconfig
-    # module. Mozilla's sanctioned PartialConfigEnvironment contains the
-    # precise config.statusd values used by the normal package build.
-    import types
-    module=types.ModuleType("buildconfig")
-    module.substs=env.substs
-    module.defines=env.defines
-    module.topobjdir=str(objdir)
-    sys.modules["buildconfig"]=module
-    return module, "reconstructed_from_generated_config_statusd", env
+    if Path(buildconfig.topobjdir).resolve()!=objdir:
+        raise ValueError("Imported buildconfig belongs to another object directory")
+    generated=PartialConfigEnvironment(str(objdir))
+    for name,expected in (
+        ("MOZ_WIDGET_TOOLKIT","gtk"),("MOZ_APP_BASENAME","Vulpra"),
+        ("MOZ_BUILD_APP","browser")
+    ):
+        if generated.substs.get(name)!=expected:
+            raise ValueError("Missing protected source-generated flag: "+name)
+        if buildconfig.substs.get(name)!=generated.substs.get(name):
+            raise ValueError("Gecko buildconfig disagrees with generated flag: "+name)
+    return buildconfig,"real_mach_python_buildconfig_verified_against_generated_substs",generated
 
 
 def replay(objdir,source_commit):
