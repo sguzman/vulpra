@@ -100,7 +100,41 @@ def inside_package(path):
             "packaged_native_loader_order":target_deps[0],
             "native_binary_executed":False}
 
-def audit(objdir,package,expected_sha):
+def accept_replay(link_report, replay):
+    if not isinstance(replay,dict) or replay.get("schema_version")!=1:
+        raise ValueError("Missing typed packaging transformation replay")
+    if replay.get("source_commit")!=link_report["source_commit"]:
+        raise ValueError("Transform source commit mismatch")
+    if replay.get("method")!="mozpack.files.ExecutableFile.copy":
+        raise ValueError("Unrecognized packaging transformation method")
+    for key in ("mozpack_copy_ran_on_temporary_file","reproduced_matches_staged",
+                "source_binary_intact_after_replay","staged_binary_intact_after_replay"):
+        if replay.get(key) is not True:
+            raise ValueError("Unverified packaging replay: "+key)
+    if replay.get("packaged_archive_member_verified_by_other_report") is not False:
+        raise ValueError("Replay falsely claims independent tar verification")
+    if replay.get("source_libxul_sha256")!=link_report["built_libxul_sha256"]:
+        raise ValueError("Transform original binary SHA256 mismatch")
+    package_sha=link_report["package"]["libxul_member"]["sha256"]
+    if replay.get("staged_libxul_sha256")!=package_sha or (
+        replay.get("reproduced_libxul_sha256")!=package_sha
+    ):
+        raise ValueError("Reproduced libxul differs from actual packaged tar member")
+    link_report["packaging_transform_replay"]={
+        "method":replay["method"],"source_commit":replay["source_commit"],
+        "original_libxul_sha256":replay["source_libxul_sha256"],
+        "staged_and_reproduced_libxul_sha256":package_sha,
+        "configured_strip_enabled":replay.get("configured_strip_enabled"),
+        "configured_elfhack_enabled":replay.get("configured_elfhack_enabled"),
+        "deterministic_reproduction_verified":True,
+        "original_and_packaged_hash_equal":link_report["built_libxul_matches_packaged_libxul"],
+        "complete_linker_map_claimed":False,
+        "compiled_feature_bytes_attributed":False,
+    }
+    return link_report
+
+
+def audit(objdir,package,expected_sha,replay_report=None):
     actual=subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()
     if actual!=expected_sha:raise ValueError("Source HEAD differs from claimed native build SHA")
     links=inspect_response(objdir/"toolkit/library/build/libxul_so.list")
@@ -113,7 +147,7 @@ def audit(objdir,package,expected_sha):
     binary=objdir/"dist/bin/libxul.so"
     if not binary.is_file():raise ValueError("No native compiled libxul.so")
     built_lib_hash=file_digest(binary)
-    return {"schema_version":1,"project":"Vulpra",
+    report={"schema_version":1,"project":"Vulpra",
       "scope":"same-source successful generated libxul response object list and native preload order",
       "source_commit":actual,
       "objdir":objdir.name,
@@ -136,6 +170,9 @@ def audit(objdir,package,expected_sha):
         "Package matches build library only if observed hashes are identical.",
         "Runtime GTK/Wayland behavior needs separate graphics/browser smoke.",
         "No feature omission or normal/lean paired archive comparison."]}
+    if replay_report is not None:
+        report=accept_replay(report,replay_report)
+    return report
 
 def selftest():
     with tempfile.TemporaryDirectory(prefix="vulpra-m3-native-link-test-") as d:
@@ -156,13 +193,44 @@ def selftest():
         try:inspect_response(p)
         except ValueError as ex:assert "Unbounded/empty" in str(ex) or "Implausible" in str(ex)
         else:raise AssertionError("Incomplete linker input accepted")
-    return 5
+        fake={
+            "schema_version":1,"source_commit":"a"*40,
+            "built_libxul_sha256":"b"*64,
+            "built_libxul_matches_packaged_libxul":False,
+            "package":{"libxul_member":{"sha256":"c"*64}},
+        }
+        proof={
+            "schema_version":1,"source_commit":"a"*40,
+            "method":"mozpack.files.ExecutableFile.copy",
+            "mozpack_copy_ran_on_temporary_file":True,
+            "reproduced_matches_staged":True,
+            "source_binary_intact_after_replay":True,
+            "staged_binary_intact_after_replay":True,
+            "packaged_archive_member_verified_by_other_report":False,
+            "source_libxul_sha256":"b"*64,
+            "staged_libxul_sha256":"c"*64,
+            "reproduced_libxul_sha256":"c"*64,
+            "configured_strip_enabled":False,
+            "configured_elfhack_enabled":True,
+        }
+        assert accept_replay(dict(fake),proof)["packaging_transform_replay"]["deterministic_reproduction_verified"]
+        for field,value in (("source_commit","d"*40),
+                            ("source_libxul_sha256","d"*64),
+                            ("reproduced_libxul_sha256","d"*64),
+                            ("reproduced_matches_staged",False),
+                            ("method","unverified")):
+            bad=dict(proof);bad[field]=value
+            try:accept_replay(dict(fake),bad)
+            except ValueError:pass
+            else:raise AssertionError("Falsified packager proof accepted: "+field)
+    return 11
 
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--objdir",type=Path)
     p.add_argument("--package",type=Path)
     p.add_argument("--source-sha")
+    p.add_argument("--transform-report",type=Path)
     p.add_argument("--output",type=Path)
     p.add_argument("--self-test",action="store_true")
     args=p.parse_args()
@@ -170,14 +238,16 @@ def main():
     if not (args.objdir and args.package and args.source_sha):
         if args.self_test:return
         p.error("--objdir, --package and --source-sha required")
-    report=audit(args.objdir.resolve(),args.package.resolve(),args.source_sha)
+    replay_report=json.loads(args.transform_report.read_text()) if args.transform_report else None
+    report=audit(args.objdir.resolve(),args.package.resolve(),args.source_sha,replay_report)
     if args.output:
         args.output.parent.mkdir(parents=True,exist_ok=True)
         args.output.write_text(json.dumps(report,indent=2)+"\n")
     print("PASS: exact-source compiled libxul response list and packaged loader dependency order")
     print("OBJECT INPUTS:",report["libxul_link_input_response"]["entry_count"])
     print("PACKAGE BYTES:",report["package"]["package_compressed_bytes"])
-    print("LIBXUL MATCH:",report["built_libxul_matches_packaged_libxul"])
+    print("LIBXUL RAW MATCH:",report["built_libxul_matches_packaged_libxul"])
+    print("LIBXUL PACKAGER REPLAY:",report.get("packaging_transform_replay",{}).get("deterministic_reproduction_verified"))
     print("No full linker symbol map, runtime, causal savings or source removal")
 if __name__=="__main__":
     try:main()
