@@ -43,19 +43,58 @@ class Sink(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         size = self.headers.get("Content-Length", "")
-        if not size.isdecimal() or int(size) > LIMIT:
-            self.send_response(413)
+        encoding = self.headers.get("Transfer-Encoding", "").lower()
+        received = 0
+        try:
+            if size.isdecimal() and not encoding:
+                remaining = int(size)
+                if remaining > LIMIT:
+                    raise ValueError("oversize")
+                while remaining:
+                    block = self.rfile.read(min(remaining, 65536))
+                    if not block:
+                        raise ConnectionError("truncated")
+                    remaining -= len(block)
+                    received += len(block)
+            elif not size and encoding == "chunked":
+                # Firefox may stream its compressed HTTP body without a length.
+                # Do not decode or retain any part of the telemetry payload.
+                while True:
+                    line = self.rfile.readline(96)
+                    if len(line) > 95 or not line.endswith(b"\r\n"):
+                        raise ValueError("bad_framing")
+                    try:
+                        n = int(line.split(b";", 1)[0].strip(), 16)
+                    except ValueError:
+                        raise ValueError("bad_framing") from None
+                    if received + n > LIMIT:
+                        raise ValueError("oversize")
+                    if n == 0:
+                        if self.rfile.readline(96) != b"\r\n":
+                            raise ValueError("bad_framing")
+                        break
+                    remaining = n
+                    while remaining:
+                        block = self.rfile.read(min(remaining, 65536))
+                        if not block:
+                            raise ConnectionError("truncated")
+                        received += len(block)
+                        remaining -= len(block)
+                    if self.rfile.read(2) != b"\r\n":
+                        raise ValueError("bad_framing")
+            else:
+                raise ValueError("bad_framing")
+        except (ValueError, ConnectionError) as error:
+            reason = str(error)
+            if reason not in ("oversize", "bad_framing", "truncated"):
+                reason = "bad_framing"
+            with self.server.lock:
+                self.server.rejections[reason] += 1
+            self.send_response(413 if reason == "oversize" else 400)
             self.send_header("Content-Length", "0")
             self.end_headers()
             self.close_connection = True
             return
-        remaining = int(size)
-        while remaining:
-            block = self.rfile.read(min(remaining, 65536))
-            if not block:
-                self.close_connection = True
-                return
-            remaining -= len(block)
         with self.server.lock:
             self.server.requests.append(kind(self.path))
         self.send_response(200)
@@ -75,6 +114,7 @@ class Sink(http.server.BaseHTTPRequestHandler):
 def sink():
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Sink)
     server.requests = []
+    server.rejections = {"oversize": 0, "bad_framing": 0, "truncated": 0}
     server.lock = threading.Lock()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -92,6 +132,11 @@ def counts(server):
     return {name: samples.count(name) for name in KINDS}
 
 
+def rejected_counts(server):
+    with server.lock:
+        return dict(server.rejections)
+
+
 SCRIPT = r"""
 const done = arguments[arguments.length - 1];
 const endpoint = arguments[0], phase = arguments[1];
@@ -101,8 +146,8 @@ const endpoint = arguments[0], phase = arguments[1];
   }
   const Services = globalThis.Services ||
     ChromeUtils.importESModule("resource://gre/modules/Services.sys.mjs").Services;
-  const {TelemetrySend} = ChromeUtils.importESModule(
-    "resource://gre/modules/TelemetrySend.sys.mjs");
+  const {TelemetrySend, TelemetrySendImpl, SendScheduler} =
+    ChromeUtils.importESModule("resource://gre/modules/TelemetrySend.sys.mjs");
   const {TelemetryController} = ChromeUtils.importESModule(
     "resource://gre/modules/TelemetryControllerParent.sys.mjs");
   const {TelemetryReportingPolicy} = ChromeUtils.importESModule(
@@ -116,7 +161,13 @@ const endpoint = arguments[0], phase = arguments[1];
   const state = () => ({
     ordinary: TelemetrySend.sendingEnabled(sample),
     deletion: TelemetrySend.sendingEnabled(deletion),
-    policy: TelemetryReportingPolicy.canUpload()
+    policy: TelemetryReportingPolicy.canUpload(),
+    sender_ready: TelemetrySend.getShutdownState().sendingEnabled,
+    server_matches_loopback: TelemetrySendImpl._server === endpoint,
+    pending_count: TelemetrySend.pendingPingCount,
+    in_flight_count: TelemetrySend.getShutdownState().pendingPingRequestCount,
+    scheduler: SendScheduler.getShutdownState().sendTaskState,
+    unified: Services.prefs.getBoolPref(TelemetryUtils.Preferences.Unified, false)
   });
   if (phase === "prepare") {
     TelemetrySend.setServer(endpoint);
@@ -124,10 +175,24 @@ const endpoint = arguments[0], phase = arguments[1];
     TelemetrySend.setTestModeEnabled(true); // explicit debug-only override
     Services.prefs.setBoolPref(master, true);
     Services.prefs.setBoolPref(upload, true);
+    Services.prefs.setBoolPref(TelemetryUtils.Preferences.DisableFuzzingDelay, true);
+    // Wait for the browser's normal sender initialization instead of silently
+    // treating 'sendingEnabled' (a pref check) as an initialized transport.
+    const deadline = Date.now() + 12000;
+    while (!TelemetrySend.getShutdownState().sendingEnabled && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
     const before = state();
+    if (!before.sender_ready) {
+      done({status:"error", reason:"sender_not_initialized", before,
+        official_build:official, test_override:true});
+      return;
+    }
+    // No ping IDs, URLs, profile identifiers or bodies enter the result.
     await TelemetryController.submitExternalPing("vulpra-probe", {synthetic:true});
     await TelemetrySend.testWaitOnOutgoingPings();
-    done({status:"observed", official_build:official, test_override:true, before});
+    done({status:"observed", official_build:official, test_override:true,
+      before, after_submit:state()});
   } else if (phase === "disable") {
     let observer;
     const notified = new Promise(resolve => {
@@ -156,7 +221,9 @@ const endpoint = arguments[0], phase = arguments[1];
 """
 
 
-def validate(observation: dict, before: dict, after: dict):
+def validate(observation: dict, before: dict, after: dict,
+             rejections: dict | None = None):
+    rejections = rejections or {}
     if observation.get("status") != "observed" or observation.get("observer_seen") is not True:
         raise RuntimeError("No real opt-out notification observed: " + repr(observation))
     for section in ("before", "disabled", "master_off"):
@@ -168,6 +235,10 @@ def validate(observation: dict, before: dict, after: dict):
         raise RuntimeError("Deletion-request exemption or upload-disabled guard broken")
     if observation["master_off"]["policy"]:
         raise RuntimeError("Master data-submission policy still permits upload")
+    if any(rejections.values()):
+        raise RuntimeError("Local receiver rejected telemetry framing or body size: " + repr(rejections))
+    if not observation["before"]["sender_ready"] or not observation["before"]["server_matches_loopback"]:
+        raise RuntimeError("Telemetry sender not initialized or URL points off loopback")
     if after["vulpra-probe"] != before["vulpra-probe"]:
         raise RuntimeError("Ordinary telemetry reached sink after user opt-out")
     if observation["before"]["ordinary"] and observation["before"]["policy"] and not before["vulpra-probe"]:
@@ -199,7 +270,7 @@ def run(repo: Path, driver: str) -> dict:
         for key in ("DISPLAY", "WAYLAND_DISPLAY", "MOZ_REMOTE"):
             env.pop(key, None)
         with sink() as server:
-            endpoint = f"http://127.0.0.1:{server.server_port}/submit/telemetry"
+            endpoint = f"http://127.0.0.1:{server.server_port}"
             port = webdriver.find_port()
             proc = None
             session = None
@@ -242,23 +313,32 @@ def run(repo: Path, driver: str) -> dict:
                         time.sleep(1.5)
                         later = counts(server)
                         master = phase("master")
+                        rejections = rejected_counts(server)
                     finally:
                         webdriver.request(port, "POST", base + "/moz/context", {"context":"content"})
                     state = {**initial, **disabled, **master}
-                    validate(state, earlier, later)
-                    if sentinel.read_bytes() != b"Vulpra telemetry test: unrelated profile untouched\n":
-                        raise RuntimeError("Profile isolation failure")
-                    return {"schema_version":1, "status":"native_privileged_telemetry_runtime_observed",
+                    report = {"schema_version":2, "status":"native_runtime_pending_validation",
                         "verified_package_sha256":True, "isolated_profile":True,
                         "nonlocal_connections_blocked_by_gecko_environment":True,
                         "loopback_receiver":"127.0.0.1", "runtime":state,
                         "before_optout_requests":earlier, "after_optout_requests":later,
+                        "receiver_rejections":rejections,
                         "limitations":[
                             "Test-mode override is not proof of production upload behavior.",
                             "Only local HTTP type counts retained; no payload or ping identifiers stored.",
                             "Deletion-request eligibility and observer notification are not server-side deletion.",
                             "A queued deletion request might not be transmitted due to policy and scheduler.",
                             "No assertion about other browser connection surfaces beyond Gecko's nonlocal guard."]}
+                    try:
+                        validate(state, earlier, later, rejections)
+                    except RuntimeError as failure:
+                        report["status"] = "native_runtime_rejected"
+                        report["failure_category"] = str(failure)
+                    else:
+                        report["status"] = "native_privileged_telemetry_runtime_observed"
+                    if sentinel.read_bytes() != b"Vulpra telemetry test: unrelated profile untouched\n":
+                        raise RuntimeError("Profile isolation failure")
+                    return report
             finally:
                 if session:
                     try:
@@ -283,6 +363,9 @@ def main():
     output = repo / ".git/vulpra-native-build/m3-telemetry-loopback.json"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n")
+    if report["status"] != "native_privileged_telemetry_runtime_observed":
+        raise RuntimeError("Native telemetry evidence rejected: " +
+                           report.get("failure_category", "unknown"))
     print("PASS: real packaged browser telemetry opt-out observer and sender policy")
     print("PASS: bounded localhost type counts and isolated temporary profile")
 
