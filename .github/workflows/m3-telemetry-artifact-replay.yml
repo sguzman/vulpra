@@ -1,0 +1,117 @@
+# Diagnose telemetry on an already-built Vulpra package. No compilation.
+# Historical source revision: diagnostic ONLY, not a current-source acceptance gate.
+name: M3 Telemetry Archived Native Runtime Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-telemetry-artifact-replay.yml
+      - ci/smoke-telemetry-loopback-package.py
+      - ci/tests/m3-telemetry-loopback-harness-test.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vulpra-m3-telemetry-artifact-replay
+  cancel-in-progress: false
+
+jobs:
+  replay-old-native-package:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Sparse checkout exact source of diagnostics (no native build)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Test local sink and reject unsupported runtime reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/smoke-telemetry-loopback-package.py
+          python3 ci/tests/m3-telemetry-loopback-harness-test.py
+
+      - name: Restore checksummed older normal Vulpra package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40567473401 --repo "$GITHUB_REPOSITORY" \
+            --name m3-asrouter-promo-matched-baseline --dir "$RUNNER_TEMP/replay"
+          (
+            cd "$RUNNER_TEMP/replay"
+            sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256
+            jq -e '(.source_commit | type) == "string" and .full_promo_resources_present == true' \
+              m3-promo-matched-size.json >/dev/null
+          )
+          pkg="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$pkg"
+          cp "$RUNNER_TEMP/replay/vulpra-promo-full-baseline.tar.xz" \
+            "$pkg/vulpra-local-telemetry-replay.tar.xz"
+          sha256sum "$pkg/vulpra-local-telemetry-replay.tar.xz" \
+            > "$pkg/vulpra-local-telemetry-replay.tar.xz.sha256"
+          echo "PASS: historical normal Vulpra archive SHA-256 independently verified"
+
+      - name: Install Firefox runtime requirements and geckodriver, not compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+
+      - name: Run isolated local telemetry runtime diagnostic
+        shell: bash
+        env:
+          MOZ_HEADLESS: "1"
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH" python3 \
+            ci/smoke-telemetry-loopback-package.py "$GITHUB_WORKSPACE"
+
+      - name: Attach diagnostic provenance even if runtime fails
+        if: always()
+        shell: bash
+        run: |
+          if test -f .git/vulpra-native-build/m3-telemetry-loopback.json; then
+            python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(".git/vulpra-native-build/m3-telemetry-loopback.json")
+          result=json.loads(p.read_text())
+          result["diagnostic_script_commit"]=os.environ["GITHUB_SHA"]
+          result["native_package_origin_run_id"]=40567473401
+          result["native_package_baseline_commit"]="341128fd6f640738ea2fbb0f674eb6319b249235"
+          result["source_matched_for_current_main"]=False
+          result["removal_authorized"]=False
+          p.write_text(json.dumps(result,indent=2)+"\n")
+          PY
+          fi
+
+      - name: Preserve local evidence without browser payloads, IDs or archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-telemetry-archived-native-diagnostic
+          path: |
+            .git/vulpra-native-build/m3-telemetry-loopback.json
+            .git/vulpra-native-build/packages/vulpra-local-telemetry-replay.tar.xz.sha256
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
