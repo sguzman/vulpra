@@ -452,7 +452,7 @@
         "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces",
         "https://github.com/sguzman/vulpra/actions/runs/40785850376"
       ],
-      "next": "Telemetry lifecycle audit 40785850376 and deeper user-upload opt-out/deletion path 40801317928 PASS: FHR upload toggle triggers queue purge, client identifier rotation, special deletion-request with transport exception; dataSubmissionEnabled is a distinct master policy. Preserve both and do not blanket-disable transport/policy. Submission eligibility/persistence is not delivery proof. Require opt-out, deletion-request, policy and actual captured network behavior plus protected Glean/crash functionality before any isolated experiment; no removal or gate credit.",
+      "next": "Code/fixtures complete for optional localhost WebDriver telemetry runtime inspection, CI 40803048273 PASS. Await actual single normal native Vulpra package run 40803276397 before claiming runtime observations. This test uses a debug override and local sink; true production upload safety/deletion delivery still needs separate evaluation. Preserve all sender, privacy cleanup, Glean/crash and master policy code; no omission or M3 gate credit.",
       "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\"",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -563,6 +563,28 @@
           "Does not test Firefox/Vulpra branding-specific usage reporting gates",
           "No binary size, native runtime, default browser changes, or new M3 gate"
         ]
+      },
+      "loopback_runtime_harness": {
+        "status": "offline_fixtures_passed_native_trial_in_progress",
+        "script": "ci/smoke-telemetry-loopback-package.py",
+        "offline_run_id": 40803048273,
+        "offline_checks": [
+          "stdlib HTTP localhost sink receives bounded POST and rejects oversized/non-POST",
+          "does not retain body, ping IDs or full URLs",
+          "nine false runtime source/policy/observer/capture reports rejected",
+          "existing package SHA-256 sidecar and Vulpra native identity before startup",
+          "disposable profile + unrelated Firefox sentinel verification specified",
+          "disabled upload observer observed via privileged test-only WebDriver",
+          "same process compares FHR upload-enabled, FHR disabled, and master data policy disabled"
+        ],
+        "native_workflow": ".github/workflows/m3-telemetry-runtime-native.yml",
+        "native_source_commit": "2e09fcf80b4f3c81506e0b579689a2f4e05e0e5e",
+        "native_run_id": 40803276397,
+        "native_conclusion": "pending",
+        "normal_browser_changed": false,
+        "source_deletion_authorized": false,
+        "network_privacy_verification_complete": false,
+        "notes": "Debug/test-mode override and local HTTP telemetry receiver do not prove production delivery or server-side deletion. Native browser workflow builds one normal Vulpra browser once; the two prior package artifacts contained bounded evidence only, not installable binaries. Strict normal-only test without new opt-out variant; no native status or byte savings claimed yet."
       }
     },
     {
