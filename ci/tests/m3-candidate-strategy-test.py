@@ -115,7 +115,7 @@ def validate(reg,paired,progress):
     pending=reg["pending_current_source_link_input_acceptance"]
     assert pending["workflow_run_id"]==40935344279
     assert pending["source_commit"]=="3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f"
-    assert pending["state"]=="normal_full_native_build_and_runtime_passed_but_independent_package_transform_reconciliation_unaccepted"
+    assert pending["state"]=="first_normal_native_build_and_runtime_passed_packager_replay_retry_unaccepted"
     assert pending["native_full_workflow_success"] is True
     assert pending["configure_and_compile_succeeded"] is True
     assert pending["package_and_loader_order_succeeded"] is True
@@ -131,6 +131,17 @@ def validate(reg,paired,progress):
     assert pending["independent_reconciliation_original_run_passed"] is False
     assert pending["followup_replay_workflow_accepted"] is False
     assert pending["followup_replay_workflow_run_id"]==40944392090
+    assert pending["followup_replay_workflow_completed"] is True
+    assert pending["followup_replay_workflow_conclusion"]=="failure"
+    assert pending["followup_replay_full_compile_and_package_succeeded"] is True
+    assert pending["followup_replay_error_text"]=="Missing or implausibly sized native libxul.so"
+    assert pending["followup_replay_failure_exact_missing_or_oversize_unidentified"] is True
+    assert pending["followup_replay_raw_libxul_size_known"] is False
+    assert pending["followup_replay_oversize_cause_proven"] is False
+    assert pending["next_evidence_replay_workflow_run_id"]==40952352531
+    assert pending["next_evidence_replay_workflow_result"]=="in_progress_not_accepted_at_last_observation"
+    assert pending["next_evidence_replay_checks_input_path_sizes"] is True
+    assert pending["next_evidence_replay_verification_accepted"] is False
     assert "independently_reproduced_exact_source_mozpack_executable_transformation" in pending["requires"]
     assert pending["full_linker_symbol_map_claimed"] is False
     assert pending["compiled_feature_savings_established"] is False
@@ -310,6 +321,9 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(reason_for_hash_difference_proven=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(generated_link_input_objects=0),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(followup_replay_workflow_accepted=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(followup_replay_oversize_cause_proven=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(next_evidence_replay_verification_accepted=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(followup_replay_workflow_conclusion="success"),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
