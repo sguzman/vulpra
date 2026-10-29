@@ -41,6 +41,33 @@ jobs:
           python3 -m py_compile ci/smoke-telemetry-loopback-package.py
           python3 ci/tests/m3-telemetry-loopback-harness-test.py
 
+      - name: Enforce exact source continuity of six telemetry transport modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+          expected={
+            "toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs":
+              "54727bf2024cedb83f39037aed930ac926cc584f",
+            "toolkit/components/telemetry/app/TelemetrySend.sys.mjs":
+              "2ebae13763c51cad5e8652e9ab4a66907197099f",
+            "toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs":
+              "6f0982dbae00342fdd38d537bf2dc18333184787",
+            "toolkit/components/telemetry/app/TelemetryUtils.sys.mjs":
+              "51525bc8f94da207c186ee743a5e23001e0bbd66",
+            "toolkit/components/telemetry/app/TelemetryControllerBase.sys.mjs":
+              "fdd0a947e908a5376c2883d544a67c24a81d3c4d",
+            "toolkit/modules/ServiceRequest.sys.mjs":
+              "74241892821532785a468ffc01ac68cb83e5ba04",
+          }
+          for path, pinned in expected.items():
+              actual=subprocess.check_output(["git","rev-parse","HEAD:"+path],text=True).strip()
+              assert actual==pinned,(path,actual,pinned)
+          print("PASS: 6 telemetry/transport source blobs still match the archived package source")
+          print("LIMIT: all other browser source and runtime configuration is not source-matched")
+          PY
+
       - name: Restore checksummed older normal Vulpra package
         shell: bash
         env:
@@ -52,7 +79,7 @@ jobs:
           (
             cd "$RUNNER_TEMP/replay"
             sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256
-            jq -e '(.source_commit | type) == "string" and .full_promo_resources_present == true' \
+            jq -e '.source_commit == "1683ca67b69389a879717bcd537772c3b40624b6" and .full_promo_resources_present == true' \
               m3-promo-matched-size.json >/dev/null
           )
           pkg="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
@@ -97,10 +124,18 @@ jobs:
           result=json.loads(p.read_text())
           result["diagnostic_script_commit"]=os.environ["GITHUB_SHA"]
           result["native_package_origin_run_id"]=40567473401
-          result["native_package_baseline_commit"]="341128fd6f640738ea2fbb0f674eb6319b249235"
+          result["native_package_baseline_commit"]="1683ca67b69389a879717bcd537772c3b40624b6"
+          result["six_critical_telemetry_source_blobs_matched_current_head"]=True
           result["source_matched_for_current_main"]=False
           result["removal_authorized"]=False
           p.write_text(json.dumps(result,indent=2)+"\n")
+          print("NATIVE TELEMETRY STATUS:",result["status"])
+          print("LOCAL POST COUNTS BEFORE OPTOUT:",result.get("before_optout_requests"))
+          print("LOCAL POST COUNTS AFTER OPTOUT:",result.get("after_optout_requests"))
+          print("RECEIVER REJECTIONS:",result.get("receiver_rejections"))
+          print("TEST INITIALIZATION:",{
+              "naturally_initialized":result.get("runtime",{}).get("naturally_initialized"),
+              "test_setup_used":result.get("runtime",{}).get("test_setup_used")})
           PY
           fi
 
