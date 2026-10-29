@@ -1,0 +1,94 @@
+# No native rebuild: archive is pinned to exact historical compiled source.
+name: M3 Native ELF Link Dependency and Section Census
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-elf-census.py
+      - .github/workflows/m3-native-elf-census.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vulpra-m3-elf-archive-census
+  cancel-in-progress: false
+
+jobs:
+  inspect-real-libxul:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Sparse checkout only the read-only ELF parser
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Test ELF parser and malicious archive rejection without native build
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-native-elf-census.py
+          python3 ci/m3-native-elf-census.py --self-test
+
+      - name: Retrieve existing source-pinned checksum-verified normal browser archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40567473401 --repo "$GITHUB_REPOSITORY" \
+            --name m3-asrouter-promo-matched-baseline --dir "$RUNNER_TEMP/replay"
+          (
+            cd "$RUNNER_TEMP/replay"
+            sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256
+            jq -e '
+              .source_commit == "1683ca67b69389a879717bcd537772c3b40624b6" and
+              .full_promo_resources_present == true
+            ' m3-promo-matched-size.json > /dev/null
+          )
+
+      - name: Inspect DT_NEEDED and ELF sections without binary execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-elf-census.py \
+            "$RUNNER_TEMP/replay/vulpra-promo-full-baseline.tar.xz" \
+            --output "$RUNNER_TEMP/m3-native-elf-census.json"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          p=Path(os.environ["RUNNER_TEMP"])/"m3-native-elf-census.json"
+          d=json.loads(p.read_text())
+          assert d["archive_compressed_bytes"] == 86930792
+          assert d["libxul"]["logical_bytes"] == 189486920
+          assert d["elf_header"]["class"]=="ELF64"
+          assert len(d["dt_needed"]) > 0
+          assert d["elf_sections"]["section_count_excluding_null"] > 5
+          assert d["runtime_library_loaded"] is False
+          assert d["feature_bytes_attributed"] is False
+          assert d["compressed_package_savings_bytes"] is None
+          d["archive_compiled_source_commit"] = "1683ca67b69389a879717bcd537772c3b40624b6"
+          d["source_archive_workflow_run_id"] = 40567473401
+          d["elf_scanner_source_commit"] = os.environ["GITHUB_SHA"]
+          d["current_whole_browser_source_matched"] = False
+          p.write_text(json.dumps(d,indent=2)+"\n")
+          print("PASS: exact archive libxul size, dependencies, ELF sections, no false saving claims")
+          PY
+
+      - name: Upload only privacy-safe ELF layout JSON evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-historical-native-elf-census
+          path: ${{ runner.temp }}/m3-native-elf-census.json
+          if-no-files-found: error
+          retention-days: 14
