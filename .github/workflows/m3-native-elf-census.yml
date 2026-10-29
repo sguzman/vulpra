@@ -72,6 +72,17 @@ jobs:
           assert d["libxul"]["logical_bytes"] == 189486920
           assert d["elf_header"]["class"]=="ELF64"
           assert len(d["dt_needed"]) > 0
+          classes=d["packaged_dependency_scope"]["classification_counts"]
+          assert len(d["dt_needed"]) == 49
+          assert classes["bundled_regular"] == 13
+          assert classes["bundled_link_only_unverified"] == 0
+          assert classes["absent_from_archive_loader_must_resolve_elsewhere"] == 36
+          assert sum(classes.values()) == len(d["dt_needed"])
+          resolved={x["needed"]:x["status"] for x in d["packaged_dependency_scope"]["needed_members"]}
+          assert resolved["libnss3.so"] == "bundled_regular"
+          assert resolved["libmozwayland.so"] == "bundled_regular"
+          assert resolved["libc.so.6"] == "absent_from_archive_loader_must_resolve_elsewhere"
+          print("PASS: 49 direct loader names: 13 packaged, 36 external, 0 archive links")
           assert d["elf_sections"]["section_count_excluding_null"] > 5
           assert d["runtime_library_loaded"] is False
           assert d["feature_bytes_attributed"] is False
