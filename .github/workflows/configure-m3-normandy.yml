@@ -118,7 +118,7 @@ jobs:
           VULPRA_JOB_STATUS: ${{ job.status }}
         run: |
           set -euo pipefail
-          printf '## M3 Normandy-free configure/source gate\n\nCommit: `%s`\nRun: https://github.com/sguzman/vulpra/actions/runs/%s\nResult: **%s**\n\nThis is not native compilation or a runtime/package acceptance.\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$VULPRA_JOB_STATUS" > "$RUNNER_TEMP/normandy-configure-summary.md"
+          printf '## M3 Normandy-free configure/source gate\n\nCommit: %s\nRun: https://github.com/sguzman/vulpra/actions/runs/%s\nResult: **%s**\n\nThis is not native compilation or a runtime/package acceptance.\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$VULPRA_JOB_STATUS" > "$RUNNER_TEMP/normandy-configure-summary.md"
           gh issue comment 1 --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/normandy-configure-summary.md"
 
       - name: Record runner resource diagnostics
