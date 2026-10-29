@@ -62,3 +62,4 @@ jobs:
             .github/workflows/m3-historical-config-provenance.yml
             .github/workflows/m3-native-elf-package-graph.yml
             .github/workflows/m3-configure-only-snapshot.yml
+            .github/workflows/m3-source-matched-native-link.yml
