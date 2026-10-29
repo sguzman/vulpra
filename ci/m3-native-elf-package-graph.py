@@ -141,7 +141,7 @@ def scan(path):
         "source_removal_authorized":False,
         "marginal_compressed_saving_bytes":None,
         "limitations":[
-            "Archive source is historical, not current Git main.",
+            "ELF-only scanning cannot establish which source revision built an archive; source provenance must be verified independently.",
             "Direct DT_NEEDED on package ELF files does not close host-library transitive imports.",
             "Packaged basename/SONAME match does not prove loader search path or ABI compatibility.",
             "Symlink declarations are not followed; only name and presence are noted.",
@@ -174,6 +174,9 @@ def selftest():
         assert len(x["elf_members"])==2
         assert x["host_dependency_resolution_verified"] is False
         assert x["marginal_compressed_saving_bytes"] is None
+        assert x["current_main_compiled_source_matched"] is False
+        assert any("source provenance must be verified independently" in item
+                   for item in x["limitations"])
         make(symlink=True)
         x=scan(p)
         assert x["archive_link_members"]==1
