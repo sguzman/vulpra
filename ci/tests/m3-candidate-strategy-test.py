@@ -28,12 +28,13 @@ EXPECTED={
  "remaining_mobile_platform_leaves":"remove_source",
  "newtab_adsfeed_optout":"conditional_compile",
  "newtab_promocard_optout":"conditional_compile",
- "localization_default_and_repack":"keep"
+ "localization_default_and_repack":"keep",
+ "aiwindow_prompt_seed":"review"
 }
 
 def validate(reg,paired,progress):
     names=[c["id"] for c in reg["candidates"]]
-    assert len(names)==18 and len(set(names))==18
+    assert len(names)==19 and len(set(names))==19
     assert set(names)==set(EXPECTED)
     counts={}
     for c in reg["candidates"]:
@@ -56,15 +57,23 @@ def validate(reg,paired,progress):
             assert c["decision"].startswith("accepted_")
             assert strategy!="remove_source"
     control=reg["m3_decision_classification"]
-    assert control["total_candidates"]==18
+    assert control["total_candidates"]==19
     assert counts==control["categories"]
-    assert counts=={"keep":8,"remove_source":4,"review":3,"conditional_compile":3}
+    assert counts=={"keep":8,"remove_source":4,"review":4,"conditional_compile":3}
     assert control["complete_feature_dependency_inventory"] is False
     assert control["complete_candidate_fallback_validation"] is False
     assert control["whole_m3_gate_passed"] is False
     assert control["no_new_source_deletion"] is True
     assert control["no_normal_browser_feature_changed"] is True
     assert control["new_compiled_savings_bytes"] is None
+
+    ai,=(x for x in reg["candidates"] if x["id"]=="aiwindow_prompt_seed")
+    assert ai["source_files"]==1 and ai["source_bytes"]==1577264
+    assert ai["package_logical_bytes"]==1577264
+    assert ai["source_files_removed"]==0
+    assert ai["normal_browser_changed"] is False
+    assert ai["removal_authorized"] is False
+    assert ai["decision"]=="review_missing_offline_bootstrap_fallback"
 
     promo,=(x for x in reg["candidates"] if x["id"]=="newtab_promocard_optout")
     trial=promo["native_trial"]
@@ -111,6 +120,8 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="source_testing")["m3_strategy"].update(safety_and_fallback=""),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="newtab_adsfeed_optout")["m3_strategy"].update(permanent_removal_accepted=True),
         lambda a,b,c:c["milestones"][2]["acceptance_gates"].update(passed=3),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed").update(removal_authorized=True),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed").update(package_logical_bytes=0),
     ]
     for mutate in mutations:
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
@@ -128,7 +139,7 @@ def main():
     prog=json.loads((docs/"PROGRESS.json").read_text())
     counts=validate(reg,paired,prog)
     negative=negative_fixtures(reg,paired,prog)
-    print("PASS: 18 bounded M3 strategies reconciled:",counts)
+    print("PASS: 19 bounded M3 strategies reconciled:",counts)
     print(f"PASS: {negative} contradictory classifications/evidence mutants rejected")
     print("READ-ONLY LEDGER: no new source removal, runtime, linker or size claim")
 
