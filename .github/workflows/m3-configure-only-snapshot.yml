@@ -1,0 +1,104 @@
+# Single bounded configure-only evidence run. No mach build or package.
+name: M3 Exact Source Linux Configure-Only Snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-configure-only-substs.py
+      - .github/workflows/m3-configure-only-snapshot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vulpra-m3-configure-only-snapshot
+  cancel-in-progress: false
+
+jobs:
+  configure-exact-source:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
+      MOZ_HEADLESS: "1"
+      DEBIAN_FRONTEND: noninteractive
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
+    steps:
+      - name: Checkout exact current source for native GTK configure
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Test generated-substitution parser without native tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-configure-only-substs.py
+          python3 ci/m3-configure-only-substs.py --self-test
+
+      - name: Setup Mozilla compiler cache executable for configure
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Bootstrap toolchains needed by configure, not browser compilation
+        shell: bash
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends python3 python3-venv python3-dev \
+            git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+          echo "PASS: native configure prerequisites bootstrapped; no browser build"
+
+      - name: Run current exact-source Mozilla configure ONLY
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          ./mach configure
+          test -d obj-vulpra-linux-m3-baseline/config.statusd/substs
+          test ! -d obj-vulpra-linux-m3-baseline/dist/vulpra
+          echo "PASS: current Git source configured; no mach build/package invoked"
+
+      - name: Record actual allowlisted generated substitutions and explicit limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-configure-only-substs.py \
+            --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
+            --output "$RUNNER_TEMP/m3-configure-only-current-source.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"m3-configure-only-current-source.json"
+          j=json.loads(p.read_text())
+          assert j["source_commit"]==os.environ["GITHUB_SHA"]
+          assert j["configured_object_directory"]=="obj-vulpra-linux-m3-baseline"
+          assert j["native_browser_compiled"] is False
+          assert j["native_package_generated"] is False
+          assert j["runtime_browser_tested"] is False
+          assert j["feature_removal_authorized"] is False
+          assert j["compiled_package_delta_bytes"] is None
+          assert j["observed_generated_substs"]["MOZ_WIDGET_TOOLKIT"]["value"]=="gtk"
+          assert j["observed_generated_substs"]["MOZ_DEVTOOLS"]["value"]=="all"
+          print("PASS: verified source-pinned and no-compile generated configuration snapshot")
+          PY
+
+      - name: Preserve bounded generated-config evidence without build tree
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-exact-source-configure-only-snapshot
+          path: ${{ runner.temp }}/m3-configure-only-current-source.json
+          if-no-files-found: warn
+          retention-days: 14
