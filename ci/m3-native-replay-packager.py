@@ -28,6 +28,10 @@ def digest(path):
 def replay(objdir,source_commit):
     if subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()!=source_commit:
         raise ValueError("Mismatched exact source commit")
+    # Honor the generated buildconfig when mach-python itself has not
+    # inserted the current object directory on sys.path.
+    if (objdir/"buildconfig.py").is_file():
+        sys.path.insert(0,str(objdir))
     # Import only inside a real configured mach-python environment.
     from mozpack.files import ExecutableFile
     from mozpack.executables import may_strip,may_elfhack
