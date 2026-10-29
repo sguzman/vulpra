@@ -1186,7 +1186,15 @@
       "historical_native_library_evidence": {
         "source_compiled_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
         "libxul_so_logical_bytes": 189486920,
-        "linker_feature_attribution_unverified": true
+        "linker_feature_attribution_unverified": true,
+        "full_package_elf_graph_run_id": 40931403992,
+        "full_package_elf_members": 28,
+        "direct_edges": 268,
+        "unique_needed_names": 50,
+        "matched_package_names": 14,
+        "unpackaged_host_resolution_names": 36,
+        "all_runtime_dependencies_closed": false,
+        "library_feature_byte_attribution_verified": false
       },
       "m3_strategy": {
         "strategy": "keep",
@@ -1811,5 +1819,47 @@
       "reachability_review_done": false,
       "removal_approved": false
     }
+  },
+  "historical_compiled_config_provenance": {
+    "status": "selected_generated_config_assertions_and_exact_compiled_source_verified",
+    "success_run_id": 40931065344,
+    "evidence_artifact_id": 12923200919,
+    "original_native_run_id": 40567473401,
+    "historical_workflow_head_sha": "341128fd6f640738ea2fbb0f674eb6319b249235",
+    "historical_compiled_browser_source_sha": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "complete_generated_config_statusd_saved": false,
+    "historical_selected_config_assertions": {
+      "MOZ_APP_BASENAME": "Vulpra",
+      "MOZ_WIDGET_TOOLKIT": "gtk",
+      "MOZ_DEVTOOLS": "all",
+      "VULPRA_NO_ASROUTER_PROMOS": "disabled_or_unset",
+      "MOZ_SANDBOX": "truthy",
+      "MOZ_WAYLAND": "truthy",
+      "MOZ_SERVICES_SYNC": "truthy",
+      "MOZ_NORMANDY": "truthy"
+    },
+    "historical_mozconfig_requested_disable_tests": true,
+    "historical_generated_disable_tests_observed": false,
+    "current_main_source_matched_package": false,
+    "new_native_compiled_gain_claimed": false,
+    "docs": "docs/vulpra/M3-HISTORICAL-BUILD-CONFIG-PROVENANCE.md"
+  },
+  "archived_native_full_elf_direct_dependency_graph": {
+    "status": "source_pinned_native_package_readelf_only_passed",
+    "success_run_id": 40931403992,
+    "evidence_artifact_id": 12923300697,
+    "archive_compiled_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "archive_regular_members": 47,
+    "native_elf_regular_members": 28,
+    "dt_needed_direct_edges": 268,
+    "unique_dt_needed_names": 50,
+    "matched_regular_packaged_elf_needed_names": 14,
+    "matched_archive_link_only_needed_names": 0,
+    "unbundled_loader_resolution_needed_names": 36,
+    "host_runtime_abi_resolution_verified": false,
+    "dlopen_transitive_dependency_census_complete": false,
+    "marginal_compiled_savings_established": false,
+    "source_removal_authorized": false,
+    "docs": "docs/vulpra/M3-NATIVE-PACKAGE-ELF-GRAPH.md"
   }
 }
