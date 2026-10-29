@@ -1,4 +1,8 @@
 # One full normal exact-source native browser build, no feature omission.
+# Retry native package replay after the recorded 2,590,378,712-byte linked
+# debug ELF exceeded the former 2 GiB check; the bounded source-side self-test
+# now explicitly covers that real size. Runtime and independent acceptance
+# remain mandatory, and source-only self-tests cannot stand in for either.
 name: M3 Source Matched Native Link Inputs and Runtime
 
 on:
