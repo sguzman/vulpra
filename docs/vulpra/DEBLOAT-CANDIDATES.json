@@ -1616,7 +1616,7 @@
     },
     {
       "id": "aiwindow_prompt_seed",
-      "decision": "review_missing_offline_bootstrap_fallback",
+      "decision": "keep_default_offline_prompt_seed_verified_native_runtime",
       "surface": "browser_bundled_remote_settings_default_prompt_seed",
       "paths": [
         "services/settings/dumps/main/ai-window-prompts.json",
@@ -1630,23 +1630,51 @@
       "source_files_removed": 0,
       "normal_browser_changed": false,
       "removal_authorized": false,
-      "why": "Packaged browser-specific Remote Settings seed is loaded from main ai-window-prompts collection; AI Window chat prompt assembly explicitly throws when the required manifest is absent. Remote updates and user overrides do not prove first-run offline fallback. The seed resides inside the browser omni.ja archive, so 1,577,264 uncompressed JSON bytes cannot be claimed as tar.xz savings.",
+      "why": "A real normal Vulpra native package in an isolated offline profile read 214 local AI Window Remote Settings seed records (including chat params and required core modules). The same byte-identical prompt-loader source's synthetic empty/missing-manifest client demonstrably rejects with promptLoadFailure, while a complete fake manifest works. Removing bundled ai-window-prompts.json without an alternate first-run/offline core prompt bootstrap risks breaking AI Window. The historical 1,577,264-byte ZIP entry is not proven removable compressed bytes.",
       "evidence": [
         "Native 86,930,792-byte full Vulpra package physically included defaults/settings/main/ai-window-prompts.json of 1,577,264 bytes in browser/omni.ja: https://github.com/sguzman/vulpra/actions/runs/40926977310",
         "Source-pinned AI Window prompt seed and required-manifest audit passed 6 boundaries, 12 negative mutations, Git JSON blob 1,577,264 bytes: https://github.com/sguzman/vulpra/actions/runs/40927627334",
-        "browser/components/aiwindow/models/Utils.sys.mjs routes RemoteSettings collection ai-window-prompts (bucket main); PromptLoader.sys.mjs throws on missing chat module manifest."
+        "browser/components/aiwindow/models/Utils.sys.mjs routes RemoteSettings collection ai-window-prompts (bucket main); PromptLoader.sys.mjs throws on missing chat module manifest.",
+        "Real native offline AIWindow prompt test CI 40937489359 PASS, artifact 12925766713: original packaged seed 214 records, 21 chat params, 1 identity, 5 response-rules; empty collection/absent required module/absent params all fail closed, full synthetic chat manifest assembles.",
+        "Four exact AIWindow source blobs identical between archived compiled source and current repository; see docs/vulpra/M3-AIWINDOW-OFFLINE-RUNTIME.md."
       ],
       "m3_strategy": {
-        "strategy": "review",
-        "scope": "Bundled offline Remote Settings AI Window prompt seed, distinct from the GenAI engine/UI modules",
-        "safety_and_fallback": "Missing core prompt manifest causes explicit promptLoadFailure. Keep first-run offline chat/feature availability protected until isolated runtime fallback test and safe guard exist.",
+        "strategy": "keep",
+        "scope": "Protected default AI Window Remote Settings seed and required offline identity/rules prompt manifest for first-run and network failures",
+        "safety_and_fallback": "Real offline native browser loads original seed; synthetic missing/empty core prompt data deterministically rejects with promptLoadFailure. Keep default seed until a separately accepted, source-matched offline replacement exists.",
         "guarded_opt_in_omission_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
-        "requires_further_source_or_runtime_verification": true,
-        "provenance": "Accepted source and historical native archive evidence; no source deletion or compiled package delta."
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "Actual archived native browser test with four identical critical module source blobs, checksum-verified packaged seed, no real model or external API."
       },
-      "next": "Retain the shipped AI Window Remote Settings seed. If pursuing opt-in omission, implement a verified fallback for fresh offline profiles and core modular prompt manifests, then run source-matched native/Wayland/AI Window/extension/profile/privacy checks and compare packaged member and actual compressed tar.xz sizes. No source removal authorized."
+      "next": "KEEP default ai-window-prompts.json and local Remote Settings bootstrap. Only revisit if an independently functional offline bootstrap, required core prompt content and all first-run/profile/Wayland tests are accepted; then measure a paired source-matched native archive. No source removal or compression saving currently justified.",
+      "native_offline_prompt_runtime": {
+        "status": "accepted_real_archived_native_browser_protected_default_seed",
+        "success_run_id": 40937489359,
+        "artifact_id": 12925766713,
+        "historical_compiled_source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+        "critical_module_git_blobs_matched_current": true,
+        "all_browser_source_matched_to_current": false,
+        "nonlocal_connections_blocked": true,
+        "temporary_private_profile": true,
+        "seed_record_count": 214,
+        "chat_params_record_count": 21,
+        "identity_record_count": 1,
+        "response_rules_record_count": 5,
+        "synthetic_empty_records_rejected_promptLoadFailure": true,
+        "synthetic_missing_identity_rejected_promptLoadFailure": true,
+        "synthetic_missing_params_rejected_promptLoadFailure": true,
+        "synthetic_complete_manifest_succeeded": true,
+        "real_ai_model_executed": false,
+        "remote_api_called": false,
+        "seed_omission_native_compiled_or_tested": false,
+        "replacement_offline_bootstrap_proven": false,
+        "normal_browser_changed": false,
+        "source_removal_authorized": false,
+        "compressed_savings_bytes": null,
+        "documentation": "docs/vulpra/M3-AIWINDOW-OFFLINE-RUNTIME.md"
+      }
     },
     {
       "id": "hungarian_hyphenation_patterns",
@@ -1790,16 +1818,16 @@
     "next": "Obtain exact-source native linker map/symbol/section allocation and generated build/config values before crediting any compile-time removal; no disassembly or link graph completed by archive-level member census."
   },
   "m3_decision_classification": {
-    "state": "twenty_scoped_candidates_classified_but_unverified_language_layout_and_offline_ai_fallback_remain",
+    "state": "twenty_scoped_candidates_classified; AIWindow default seed now native-offline protected; other caller/fallback gates still open",
     "as_of": "2026-10-29",
     "total_candidates": 20,
     "complete_feature_dependency_inventory": false,
     "complete_candidate_fallback_validation": false,
     "whole_m3_gate_passed": false,
     "categories": {
-      "keep": 8,
+      "keep": 9,
       "remove_source": 4,
-      "review": 5,
+      "review": 4,
       "conditional_compile": 3
     },
     "method": "Per-candidate scoped safety class, preserve prior immutable evidence; remove_source means bounded historical source deletions already accepted, conditional_compile means guarded opt-in native/bundle omission only, keep protects functional/security/privacy dependencies, review means insufficient caller graph.",
@@ -2020,5 +2048,31 @@
     "full_linker_symbol_map_claimed": false,
     "compiled_feature_savings_established": false,
     "broad_m3_gate_advanced": false
+  },
+  "aiwindow_offline_seed_runtime": {
+    "status": "accepted_real_archived_native_browser_protected_default_seed",
+    "success_run_id": 40937489359,
+    "artifact_id": 12925766713,
+    "historical_compiled_source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "critical_module_git_blobs_matched_current": true,
+    "all_browser_source_matched_to_current": false,
+    "nonlocal_connections_blocked": true,
+    "temporary_private_profile": true,
+    "seed_record_count": 214,
+    "chat_params_record_count": 21,
+    "identity_record_count": 1,
+    "response_rules_record_count": 5,
+    "synthetic_empty_records_rejected_promptLoadFailure": true,
+    "synthetic_missing_identity_rejected_promptLoadFailure": true,
+    "synthetic_missing_params_rejected_promptLoadFailure": true,
+    "synthetic_complete_manifest_succeeded": true,
+    "real_ai_model_executed": false,
+    "remote_api_called": false,
+    "seed_omission_native_compiled_or_tested": false,
+    "replacement_offline_bootstrap_proven": false,
+    "normal_browser_changed": false,
+    "source_removal_authorized": false,
+    "compressed_savings_bytes": null,
+    "documentation": "docs/vulpra/M3-AIWINDOW-OFFLINE-RUNTIME.md"
   }
 }
