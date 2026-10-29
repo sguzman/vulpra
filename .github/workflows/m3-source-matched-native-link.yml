@@ -40,6 +40,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           python3 ci/m3-native-build-link-inputs.py --self-test
+          python3 -m py_compile ci/m3-native-replay-packager.py
           python3 ci/m3-configure-only-substs.py --self-test
           python3 ci/tests/m3-promocard-bundle-contract.py
           python3 -m py_compile ci/m3-native-elf-package-graph.py
@@ -134,9 +135,17 @@ jobs:
         run: |
           set -euo pipefail
           package="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz"
+          # Gecko's executable packager may STRIP/elfhack the output of
+          # dist/bin, so independently reproduce the actual transformation.
+          # Never overwrite the linked library, staged package or source.
+          ./mach python ci/m3-native-replay-packager.py \
+            --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/m3-native-packager-replay.json"
           python3 ci/m3-native-build-link-inputs.py \
             --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
             --package "$package" --source-sha "$GITHUB_SHA" \
+            --transform-report "$RUNNER_TEMP/m3-native-packager-replay.json" \
             --output "$RUNNER_TEMP/m3-native-link-inputs.json"
           python3 ci/m3-native-elf-package-graph.py "$package" \
             --output "$RUNNER_TEMP/m3-native-link-elf-package-graph.json"
@@ -151,6 +160,8 @@ jobs:
           assert a["package"]["package_sha256"]==b["archive_sha256"]
           assert len(b["elf_members"])>=20
           assert a["dist_native_loader_order"]["mozgtk_before_mozwayland"]
+          assert a["packaging_transform_replay"]["deterministic_reproduction_verified"] is True
+          assert a["packaging_transform_replay"]["staged_and_reproduced_libxul_sha256"]==a["package"]["libxul_member"]["sha256"]
           a["workflow_run_id"]=int(os.environ["GITHUB_RUN_ID"])
           a["runtime_passed_after_link_audit"]=False
           (p/"m3-native-link-inputs.json").write_text(json.dumps(a,indent=2)+"\n")
@@ -196,6 +207,7 @@ jobs:
           path: |
             ${{ runner.temp }}/m3-native-link-config.json
             ${{ runner.temp }}/m3-native-link-inputs.json
+            ${{ runner.temp }}/m3-native-packager-replay.json
             ${{ runner.temp }}/m3-native-link-elf-package-graph.json
             .git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz.sha256
             .git/vulpra-native-build/m3-localhost-acceptance.json
