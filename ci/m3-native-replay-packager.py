@@ -14,11 +14,20 @@ import subprocess
 import sys
 import tempfile
 
-MAX_LIBXUL=384*1024*1024
+# The linked, unstripped libxul may greatly exceed its compressed or stripped
+# packaged ELF. Do not bound the former by the latter's observed size.
+MAX_LIBXUL=2*1024*1024*1024
+MIN_LIBXUL=10_000_000
+
+def valid_binary_size(size):
+    return isinstance(size,int) and MIN_LIBXUL<size<=MAX_LIBXUL
 
 def digest(path):
-    if not path.is_file() or not 10_000_000 < path.stat().st_size <= MAX_LIBXUL:
-        raise ValueError("Missing or implausibly sized native libxul.so")
+    if not path.is_file():
+        raise ValueError(f"Missing native libxul.so: {path}")
+    size=path.stat().st_size
+    if not valid_binary_size(size):
+        raise ValueError(f"Native libxul.so outside {MIN_LIBXUL}..{MAX_LIBXUL} bytes: {path} ({size} bytes)")
     h=sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda:f.read(1024*1024),b""):
@@ -69,12 +78,27 @@ def replay(objdir,source_commit):
         ],
     }
 
+def selftest():
+    assert not valid_binary_size(MIN_LIBXUL)
+    assert valid_binary_size(MIN_LIBXUL+1)
+    assert valid_binary_size(384*1024*1024+1)
+    assert valid_binary_size(MAX_LIBXUL)
+    assert not valid_binary_size(MAX_LIBXUL+1)
+    assert not valid_binary_size(-1)
+    assert not valid_binary_size("4294967296")
+    return 7
+
 def main():
     ap=argparse.ArgumentParser()
+    ap.add_argument("--self-test",action="store_true")
     ap.add_argument("--objdir",type=Path)
     ap.add_argument("--source-sha")
     ap.add_argument("--output",type=Path)
     a=ap.parse_args()
+    if a.self_test:
+        print("PASS:",selftest(),"native unstripped/staged library size boundaries")
+        if not (a.objdir or a.source_sha or a.output):
+            return
     if not (a.objdir and a.source_sha and a.output):
         ap.error("--objdir, --source-sha and --output required")
     result=replay(a.objdir.resolve(),a.source_sha)
