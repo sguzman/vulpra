@@ -199,7 +199,7 @@
         "toolkit/toolkit.mozbuild: unconditional /testing/gtest; optional harnesses guarded by ENABLE_TESTS",
         "actual M2 build needed disabled-test manifest workaround"
       ],
-      "next": "Keep build-wired manifest/mozbase/mozharness, WebDriver/Marionette, WPT, Talos and Raptor. Check narrow peripheral fixture datasets and conditional moz.build manifests before trial deletions; run native build and runtime acceptance for any actual removal.",
+      "next": "Retain always-wired manifest/mozbase/mozharness and remote/Marionette WebDriver paths. Source audit 40922064826 maps 14 test/localization conditional boundaries and rejects 17 mutations. Need actual generated build graph, optional data size and native acceptance before omitting any ENABLE_TESTS fixtures; app may build standalone tools regardless of suite state.",
       "manifest_grounded_boundaries": {
         "source_revision": "2450fb9f86f49ada663cb5cc1a48544265e8bc26",
         "status": "read_only_source_graph_classification; no deletion authorized",
@@ -268,6 +268,17 @@
           "Removing conformance/performance corpora would sacrifice testing needed for later Rust/Gecko changes; do not count them as unnecessary merely because the shipping browser does not include them",
           "Other unmeasured test fixtures and standalone test directories still require a smaller dependency audit; no blanket testing/ deletion authorized"
         ]
+      },
+      "testing_localization_boundary_audit": {
+        "source_only": true,
+        "ci_run_id": 40922064826,
+        "ci_result": "success",
+        "boundary_count": 14,
+        "negative_mutations_rejected": 17,
+        "doc": "docs/vulpra/M3-TESTING-LOCALE-DEPENDENCIES.md",
+        "decision": "retain manifest/mozbase/mozharness, WebDriver/Marionette, browser/toolkit localization; audit tests gated by ENABLE_TESTS as separate candidates; no removal authorized",
+        "native_verified": false,
+        "compiled_bytes_saved": null
       }
     },
     {
@@ -1040,7 +1051,7 @@
         "toolkit/toolkit.mozbuild: core security/netwerk/js/dom directories",
         "M2 actual Javascript/WebExtension/browser startup smoke"
       ],
-      "next": "Preserve security and automation capabilities; updater enabled is not evidence an independent update service is configured and functional.",
+      "next": "Protect security and automation feature surfaces. Source-pinned 40922064826 confirms ENABLE_WEBDRIVER routes remote, Marionette and telemetry tests independent of ENABLE_TESTS, and package manifest includes remote chrome. Geckodriver has separate guard. Retain protected launcher/WebExtension and remote debugging acceptance; independent updater enabled flag is not a configured update-service proof.",
       "observed_actual_config": "MOZ_SANDBOX=\"1\", MOZ_WAYLAND=\"1\", MOZ_UPDATER=\"1\", MOZ_CRASHREPORTER=\"1\", ENABLE_WEBDRIVER=\"1\""
     },
     {
@@ -1379,5 +1390,15 @@
         "non_test_doc_paths": 142
       }
     }
+  },
+  "testing_localization_boundary_audit": {
+    "status": "source_audit_passed",
+    "ci_run_id": 40922064826,
+    "source_line_boundaries": 14,
+    "deliberately_invalid_mutations_rejected": 17,
+    "documentation": "docs/vulpra/M3-TESTING-LOCALE-DEPENDENCIES.md",
+    "remove_any_source_now": false,
+    "claims_compiled_savings": false,
+    "broader_m3_gate_passed": false
   }
 }
