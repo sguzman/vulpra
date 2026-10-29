@@ -103,6 +103,17 @@ jobs:
           tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
           chmod 0755 "$RUNNER_TEMP/geckodriver"
 
+      - name: Observe natural sender initialization across default 60-second delay
+        shell: bash
+        timeout-minutes: 5
+        env:
+          MOZ_HEADLESS: "1"
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH" python3 \
+            ci/smoke-telemetry-loopback-package.py "$GITHUB_WORKSPACE" \
+            --observe-natural-startup
+
       - name: Run isolated local telemetry runtime diagnostic
         shell: bash
         env:
@@ -146,6 +157,7 @@ jobs:
           name: m3-telemetry-archived-native-diagnostic
           path: |
             .git/vulpra-native-build/m3-telemetry-loopback.json
+            .git/vulpra-native-build/m3-telemetry-natural-startup.json
             .git/vulpra-native-build/packages/vulpra-local-telemetry-replay.tar.xz.sha256
           include-hidden-files: true
           if-no-files-found: warn
