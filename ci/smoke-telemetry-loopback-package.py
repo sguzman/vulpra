@@ -247,6 +247,8 @@ def validate(observation: dict, before: dict, after: dict,
         raise RuntimeError("Telemetry sender not initialized or URL points off loopback")
     if after["vulpra-probe"] != before["vulpra-probe"]:
         raise RuntimeError("Ordinary telemetry reached sink after user opt-out")
+    if after["deletion-request"] <= before["deletion-request"]:
+        raise RuntimeError("Opt-out deletion-request POST never reached the loopback sink")
     if observation["before"]["ordinary"] and observation["before"]["policy"] and not before["vulpra-probe"]:
         raise RuntimeError("Eligible synthetic upload never reached loopback sink")
     if not observation.get("test_override"):
