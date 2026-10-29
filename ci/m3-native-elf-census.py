@@ -252,6 +252,9 @@ def main():
     print("PASS: verified real historical libxul ELF without executing binary")
     print("LIBXUL LOGICAL BYTES:",data["libxul"]["logical_bytes"])
     print("DT_NEEDED:",json.dumps(data["dt_needed"]))
+    print("DT_NEEDED ARCHIVE CLASSES:",json.dumps(data["packaged_dependency_scope"]["classification_counts"],sort_keys=True))
+    print("PACKAGED DIRECT NEEDED:",json.dumps([x["needed"] for x in data["packaged_dependency_scope"]["needed_members"] if x["status"]=="bundled_regular"]))
+    print("EXTERNAL DIRECT NEEDED:",json.dumps([x["needed"] for x in data["packaged_dependency_scope"]["needed_members"] if x["status"]=="absent_from_archive_loader_must_resolve_elsewhere"]))
     print("ELF SECTION BUCKETS:",json.dumps(data["elf_sections"]["groups"],sort_keys=True))
     print("No feature attribution, new removal, current build or compressed savings")
 if __name__=="__main__":
