@@ -2316,5 +2316,33 @@
     "new_source_pruning_authorized": false,
     "whole_m3_gate_advanced": false,
     "documentation": "docs/vulpra/M3-ACCEPTED-NATIVE-LINK-EVIDENCE.md"
+  },
+  "accepted_normandy_second_matched_native_recheck": {
+    "status": "same_source_opt_in_normandy_runner_omission_runtime_and_comparison_passed",
+    "source_commit": "034ddd665a080f173ce45094ae3afb8868b45e1a",
+    "lean_native_build_run_id": 40954193793,
+    "separate_runtime_acceptance_run_id": 40968542013,
+    "source_matched_full_compile_and_compare_run_id": 40968688858,
+    "comparison_artifact_id": 12941182844,
+    "variant_runtime_passed": true,
+    "source_and_non_omission_flags_matched": true,
+    "full_native_build_package_verified": true,
+    "normal_default_browser_unchanged": true,
+    "shared_nimbus_helpers_preserved": true,
+    "optin_runner_physically_absent": true,
+    "new_full_compressed_bytes": 87153852,
+    "new_lean_compressed_bytes": 87138100,
+    "new_signed_delta_bytes": 15752,
+    "new_observed_reduction_percent": 0.018,
+    "new_full_sha256": "4f51ccf82103dd0381702cf925bf0d786a559037f7ecb0633e045e591f9d633e",
+    "new_lean_sha256": "7095a57083a6211177fd182a2c5275d0ef8c8b2398f4eb1b3298ae951861adac",
+    "earlier_independent_source_matched_run_id": 40439793884,
+    "earlier_independent_observed_signed_delta_bytes": 27620,
+    "identical_build_source_across_the_two_experiments": false,
+    "constant_component_compressed_savings_proven": false,
+    "can_add_these_two_experiments_savings": false,
+    "additional_source_deletion_authorized": false,
+    "new_whole_m3_roadmap_gate_passed": false,
+    "documentation": "docs/vulpra/M3-NORMANDY-NATIVE-RECHECK-20261029.md"
   }
 }
