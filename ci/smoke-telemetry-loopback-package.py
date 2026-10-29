@@ -141,7 +141,7 @@ SCRIPT = r"""
 const done = arguments[arguments.length - 1];
 const endpoint = arguments[0], phase = arguments[1];
 (async () => {
-  if (!/^http:\/\/127\.0\.0\.1:\d+\/submit\/telemetry$/.test(endpoint)) {
+  if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(endpoint)) {
     throw Error("Non-local telemetry target");
   }
   const Services = globalThis.Services ||
