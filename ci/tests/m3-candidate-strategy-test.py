@@ -95,6 +95,23 @@ def validate(reg,paired,progress):
     assert cache["source_matched_to_current_main"] is False
     assert cache["compiled_feature_savings_bytes"] is None
     assert cache["source_deletion_authorized"] is False
+    trans=reg["historical_native_host_transitive_map"]
+    assert trans["status"]=="accepted_bounded_ubuntu_host_transitive_declared_ELF_file_presence"
+    assert trans["success_run_id"]==40947712769
+    assert trans["artifact_id"]==12930680277
+    assert trans["source_package_compiled_commit"]=="1683ca67b69389a879717bcd537772c3b40624b6"
+    assert trans["underlying_earlier_direct_host_preflight_run_id"]==40947019427
+    assert (trans["external_root_names"],trans["host_unique_direct_and_transitive_names"],
+            trans["host_to_host_direct_DT_NEEDED_edges"])==(36,76,246)
+    assert trans["host_ELF_file_candidates"]==76
+    assert trans["host_names_without_ldconfig_candidates"]==0
+    assert (trans["host_cache_safety_fixtures"],trans["transitive_map_safety_fixtures"])==(11,6)
+    for flag in ("package_ELF_executed","host_ELF_executed","ldd_dlopen_invoked",
+                 "symbol_versions_or_actual_loader_resolution_verified",
+                 "target_user_Arch_system_verified","source_deletion_authorized",
+                 "whole_M3_gate_passed"):
+        assert trans[flag] is False,flag
+    assert trans["new_compiled_savings_bytes"] is None
     pending=reg["pending_current_source_link_input_acceptance"]
     assert pending["workflow_run_id"]==40935344279
     assert pending["source_commit"]=="3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f"
@@ -281,6 +298,11 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["historical_native_host_cache_preflight"].update(transitive_and_dlopen_dependencies_closed=True),
         lambda a,b,c:a["historical_native_host_cache_preflight"].update(external_names_checked=35),
         lambda a,b,c:a["historical_native_host_cache_preflight"].update(source_deletion_authorized=True),
+        lambda a,b,c:a["historical_native_host_transitive_map"].update(host_ELF_file_candidates=75),
+        lambda a,b,c:a["historical_native_host_transitive_map"].update(symbol_versions_or_actual_loader_resolution_verified=True),
+        lambda a,b,c:a["historical_native_host_transitive_map"].update(target_user_Arch_system_verified=True),
+        lambda a,b,c:a["historical_native_host_transitive_map"].update(ldd_dlopen_invoked=True),
+        lambda a,b,c:a["historical_native_host_transitive_map"].update(whole_M3_gate_passed=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(broad_m3_gate_advanced=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(full_linker_symbol_map_claimed=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(independent_reconciliation_original_run_passed=True),
