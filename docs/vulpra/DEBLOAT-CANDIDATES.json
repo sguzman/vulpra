@@ -2097,7 +2097,7 @@
   "pending_current_source_link_input_acceptance": {
     "workflow_run_id": 40935344279,
     "source_commit": "3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f",
-    "state": "normal_full_native_build_and_runtime_passed_but_independent_package_transform_reconciliation_unaccepted",
+    "state": "first_normal_native_build_and_runtime_passed_packager_replay_retry_unaccepted",
     "normal_browser_variant_only": true,
     "native_full_workflow_success": true,
     "configure_and_compile_succeeded": true,
@@ -2126,7 +2126,21 @@
     "full_linker_symbol_map_claimed": false,
     "compiled_feature_savings_established": false,
     "broad_m3_gate_advanced": false,
-    "documentation": "docs/vulpra/M3-NATIVE-LINK-INPUT-AND-LOADER-ORDER.md"
+    "documentation": "docs/vulpra/M3-NATIVE-LINK-INPUT-AND-LOADER-ORDER.md",
+    "followup_replay_workflow_completed": true,
+    "followup_replay_workflow_conclusion": "failure",
+    "followup_replay_full_compile_and_package_succeeded": true,
+    "followup_replay_stopped_at": "Validate generated libxul inputs, preload order and all packaged native ELFs",
+    "followup_replay_error_text": "Missing or implausibly sized native libxul.so",
+    "followup_replay_failure_exact_missing_or_oversize_unidentified": true,
+    "followup_replay_sandbox_bounded_size_rule_original_max": 402653184,
+    "followup_replay_raw_libxul_size_known": false,
+    "followup_replay_oversize_cause_proven": false,
+    "next_evidence_replay_workflow_run_id": 40952352531,
+    "next_evidence_replay_workflow_result": "in_progress_not_accepted_at_last_observation",
+    "next_evidence_replay_hard_bounded_unstripped_limit": 2147483648,
+    "next_evidence_replay_checks_input_path_sizes": true,
+    "next_evidence_replay_verification_accepted": false
   },
   "aiwindow_offline_seed_runtime": {
     "status": "accepted_real_archived_native_browser_protected_default_seed",
