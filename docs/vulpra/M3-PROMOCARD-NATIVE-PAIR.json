@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "project": "Vulpra",
+  "experiment": "linux-newtab-promocard-optout",
+  "status": "native_source_matched_pair_passed; archive_delta_observed_not_causal",
+  "date_utc": "2026-10-29",
+  "source_commit": "befb257961e776311751e09aec8158601a54dd79",
+  "normal": {
+    "workflow_run": 40787699203,
+    "artifact_id": 12862697117,
+    "compressed_package_bytes": 87154984,
+    "package_sha256": "708202e55f4101b5ae51601e4cb67c22d29b9989794d8afea3420c80b76b2a78",
+    "newtab_js_bytes": 1335463,
+    "newtab_js_sha256": "55fa0d2d8af5f545bc4d8c88bc02359efed8b4db415fa0d578352c48a6afdf2f",
+    "original_promocard_included": true,
+    "protected_newtab_resources": true
+  },
+  "optin": {
+    "workflow_run": 40787698972,
+    "artifact_id": 12862948830,
+    "compressed_package_bytes": 87149240,
+    "package_sha256": "8e08f6ab18b323a5e7c084eab97d0664f7f93b95f174e7aeffb6465d856a38d5",
+    "newtab_js_bytes": 1332731,
+    "newtab_js_sha256": "4d9da5c6d4e86d9a73611b96f13c1e4d666ec6ebc01624787c59f72d32c2bab8",
+    "original_promocard_included": false,
+    "protected_newtab_resources": true,
+    "runtime_checks": [
+      "private Weston Wayland buffer attachment/commit",
+      "packaged localhost screenshot and isolated Firefox profile",
+      "WebDriver JavaScript redirect, HTTP 302, final DOM",
+      "temporary WebExtension installation, background/content messaging, storage.local, uninstall",
+      "Nimbus ExperimentStore and API initialized"
+    ]
+  },
+  "measurements": {
+    "signed_full_minus_optin_compressed_archive_bytes": 5744,
+    "compressed_archive_difference_percent": 0.00659056,
+    "signed_full_minus_optin_uncompressed_newtab_js_bytes": 2732
+  },
+  "confidence": {
+    "same_source": true,
+    "native_build_and_package_both_passed": true,
+    "optin_native_runtime_passed": true,
+    "source_omission_confirmed_in_packaged_newtab": true,
+    "repeatability_established": false,
+    "component_specific_compressed_saving_established": false,
+    "normal_browser_behavior_changed": false
+  },
+  "limitations": [
+    "One independent pair does not prove reproducibility or isolate packaging nondeterminism.",
+    "The normal browser retains PromoCard; omission is gated to Linux opt-in experiment.",
+    "Shared AdBanner, sponsored paths, mascots/locales, DiscoveryStream/TopStories feeds and AdsFeed remain present.",
+    "The signed tar.xz delta must not be added to prior experiments as a combined reduction.",
+    "Recorded package hashes identify immutable completed artifacts; full browser archives were not uploaded, only bounded evidence.",
+    "This experiment does not complete a third broad M3 acceptance gate."
+  ],
+  "links": {
+    "normal": "https://github.com/sguzman/vulpra/actions/runs/40787699203",
+    "optin": "https://github.com/sguzman/vulpra/actions/runs/40787698972",
+    "verifier_fix": "https://github.com/sguzman/vulpra/commit/befb257961e776311751e09aec8158601a54dd79"
+  }
+}
