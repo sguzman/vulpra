@@ -45,11 +45,11 @@
         "strategy": "keep",
         "scope": "Linux GTK/Wayland, browser rendering and WebExtensions",
         "safety_and_fallback": "M2 verified mandatory native/runtime protections; no fallback from removal.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -100,11 +100,11 @@
         "strategy": "remove_source",
         "scope": "Unsupported Windows widget and installer source already pruned",
         "safety_and_fallback": "Do not infer Linux package byte savings; non-Linux builds unsupported.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": true,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -128,11 +128,11 @@
         "strategy": "remove_source",
         "scope": "Unsupported Cocoa widget source already pruned",
         "safety_and_fallback": "No macOS acceptance implied; leave Linux GTK and native modules intact.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": true,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -217,11 +217,11 @@
         "strategy": "remove_source",
         "scope": "Bounded unsupported Android application roots accepted as source-only pruning",
         "safety_and_fallback": "GeckoView/mobile-shared/widget/android and Android build assumptions remain separately audited.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": true,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -324,11 +324,11 @@
         "strategy": "review",
         "scope": "Mixed test root: retain manifest, mozbase, mozharness, WPT and performance corpora; peripheral fixtures need graph",
         "safety_and_fallback": "Deleting tests also removes critical QA/build capabilities; no blanket omit.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": true,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -419,11 +419,11 @@
         "strategy": "keep",
         "scope": "Desktop Sync service and browser/extension/UI consumers",
         "safety_and_fallback": "Missing Sync or extension fallback can break bookmarks, tabs or storage.sync.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -511,11 +511,11 @@
         "strategy": "keep",
         "scope": "Desktop FxAccounts and independent identity UI/authentication",
         "safety_and_fallback": "Disabling Sync does not remove FxAccounts or its consumers.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -723,11 +723,11 @@
         "strategy": "keep",
         "scope": "Telemetry native/transport, Glean, policy, crash reporting and deletion-request lifecycle",
         "safety_and_fallback": "Disabling transmission indiscriminately can break privacy deletion requests.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -835,11 +835,11 @@
         "strategy": "conditional_compile",
         "scope": "Only isolated Normandy recipe runner opt-in omission; HealthReport and Nimbus helpers retained",
         "safety_and_fallback": "The whole umbrella candidate is not disposable; preserve Nimbus/legacy shared utilities.",
-        "normal_browser_omit_accepted": true,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": true,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": true
       }
     },
     {
@@ -863,11 +863,11 @@
         "strategy": "keep",
         "scope": "Full DevTools client, server and debugging services on current baseline",
         "safety_and_fallback": "Preserve user debugging and QA/remote test paths.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -914,11 +914,11 @@
         "strategy": "review",
         "scope": "GenAI source modules and cross-feature consumers pending complete caller audit",
         "safety_and_fallback": "Cannot remove whole GenAI root before external consumers and fallback tests.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": true,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -1077,11 +1077,11 @@
         "strategy": "keep",
         "scope": "Legacy TopStories and modern DiscoveryStream Pocket feeds plus protected sponsor components",
         "safety_and_fallback": "Retain core New Tab and feed fallbacks, opt-in promos have separate candidates.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -1156,11 +1156,11 @@
         "strategy": "review",
         "scope": "Shared New Tab/ASRouter messaging and Nimbus surfaces; narrow promotions separately trialed",
         "safety_and_fallback": "No safe blanket New Tab or messaging removal, dynamic source needs mapping.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": true,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -1192,11 +1192,11 @@
         "strategy": "keep",
         "scope": "Browser security, sandbox, updater safeguards, places and extension infrastructure",
         "safety_and_fallback": "Risk of functional/privacy/security regressions makes blanket debloat unacceptable.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -1281,11 +1281,11 @@
         "strategy": "remove_source",
         "scope": "Eight bounded Android/iOS/UIKit-only leaf roots already pruned after native check",
         "safety_and_fallback": "Shared mobile helpers and unsupported manifest references require further review.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": true,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     },
     {
@@ -1419,11 +1419,11 @@
         "strategy": "conditional_compile",
         "scope": "Guarded opt-in packaged AdsFeed module omission only",
         "safety_and_fallback": "Sponsor pathways outside AdsFeed remain; observed archive delta is not reproducible.",
-        "normal_browser_omit_accepted": true,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": true,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": true
       }
     },
     {
@@ -1536,11 +1536,11 @@
         "strategy": "conditional_compile",
         "scope": "Guarded opt-in PromoCard replacement in shipped New Tab bundle only",
         "safety_and_fallback": "Keep default JSX, AdBanner and reused mascot/locale resources; compressed delta not causal.",
-        "normal_browser_omit_accepted": true,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": true,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": true
       }
     },
     {
@@ -1589,11 +1589,11 @@
         "strategy": "keep",
         "scope": "Default browser/toolkit Fluent registries, dictionaries, hyphenation and langpack tooling",
         "safety_and_fallback": "Physical ZIP contents and locale fallback need separate gated trials.",
-        "normal_browser_omit_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": false,
-        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
+        "guarded_opt_in_omission_accepted": false
       }
     }
   ],
