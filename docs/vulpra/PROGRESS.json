@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "Vulpra",
-  "as_of": "2026-10-28",
+  "as_of": "2026-10-29",
   "source_version": "159.0b5",
   "upstream_tag": "FIREFOX_159_0b5_RELEASE",
   "upstream_commit": "34ac0671eb25f31f8c56ace36e1c413dd471eb8d",
@@ -173,7 +173,8 @@
         "2026-10-28: PromoCard source-pinned real vendored Webpack preflight 40783148652 PASS at dadfc584b3ec11dd2d3c41beaccb15a5397c8886, artifact 12857683303. Webpack's own fileDependencies prove normal activity-stream JS compiled the original PromoCard.jsx (no null substitute) while opt-in JS compiled only PromoCardOptOut.jsx (no original), preserving main AdBanner, sponsored label and identical vendor bundle. JS 1,335,463 vs 1,332,731 bytes = 2,732 B uncompressed, NOT final tar.xz saving. Native source-matched pair already compiling at distinct 977c7ae SHA, runs 40778245764/40778245670. No broad gate credit: M3 2/6 (33%), overall 44%.",
         "2026-10-28: M3 high-impact desktop Sync/FxAccounts source boundary audit https://github.com/sguzman/vulpra/actions/runs/40783699429 PASS at 72b894f89417e8ae818fd425a09309ef628027e8, artifact 12858905238. Seven pinned protected source registrations/import relationships (services/moz.build independent FxAccounts vs conditional Sync; browser Sync app menu, AccountsGlue startup, preferences, Firefox View, ExtensionStorageSyncKinto, AI-window account auth); nine deliberately broken source anchors rejected. No dynamic reachability or safe disable claim, no native run or package bytes, no new M3 gate: 2/6 (33%), overall 44%.",
         "2026-10-28: source-pinned telemetry submission policy/lifecycle audit https://github.com/sguzman/vulpra/actions/runs/40785850376 PASS (artifact 12859376809) at SHA d81f106f1f065b5a3f7ec000dfe2c3d452b458f9. Six protected source boundaries: controller startup and shutdown, sender official-build/upload pref and deletion-request exception, policy notification+TOU, native xul+pingsender, independent Glean and crash reporter, browser prefs/privacy UI. Eleven deliberate source mutations rejected. Dynamic network traffic, actual MOZ_TELEMETRY_REPORTING configuration and deletion-request behavior NOT tested; no safe sender deletion or new broad M3 gate. M3 2/6 (33%), overall 44%.",
-        "2026-10-28: PromoCard old normal native 40778245670 compiled and packaged, but hard-coded omni.ja JS-path evidence check rejected its package (2 omni archives, zero bundles at expected path), not a compiler failure. Commit befb257 changed ZIP lookup to shipped omni/browser.jar/New Tab XPI, rejects conflicting code copies; native browser runtime still unverified. Real Webpack and synthetic ZIP layout fixture 40787698989 PASSED, artifact 12860555743. New exact-source normal 40787699203 and opt-in 40787698972 launched at befb257. No signed compressed tar.xz difference or roadmap percentage credit, M3 remains 33%, overall 44%."
+        "2026-10-28: PromoCard old normal native 40778245670 compiled and packaged, but hard-coded omni.ja JS-path evidence check rejected its package (2 omni archives, zero bundles at expected path), not a compiler failure. Commit befb257 changed ZIP lookup to shipped omni/browser.jar/New Tab XPI, rejects conflicting code copies; native browser runtime still unverified. Real Webpack and synthetic ZIP layout fixture 40787698989 PASSED, artifact 12860555743. New exact-source normal 40787699203 and opt-in 40787698972 launched at befb257. No signed compressed tar.xz difference or roadmap percentage credit, M3 remains 33%, overall 44%.",
+        "2026-10-29: Independent SAME-SOURCE Linux PromoCard native pair at befb257961e776311751e09aec8158601a54dd79 completed: full 40787699203 PASS (artifact 12862697117), opt-in 40787698972 PASS (artifact 12862948830). Actual staged tar.xz full 87,154,984 B SHA256 708202e55f4101b5ae51601e4cb67c22d29b9989794d8afea3420c80b76b2a78 vs opt-in 87,149,240 B SHA256 8e08f6ab18b323a5e7c084eab97d0664f7f93b95f174e7aeffb6465d856a38d5 = observed 5,744 B / 0.00659056% independent-package delta. Actual shipped New Tab JS 1,335,463 vs 1,332,731 B (2,732 B); original PromoCard marker present only in normal, sponsored banner/AdsFeed and protected modules retained. Opt-in real packaged Weston/Wayland, JS redirect/DOM, screenshot, WebExtensions/Nimbus/profile isolation PASS. See docs/vulpra/M3-PROMOCARD-NATIVE-PAIR.json. This one matched pair is not repeatable causal per-component saving and not additive with other independent experiments. Source still contains JSX; Linux-only opt-in flag changes bundle, default normal preserved. Broad promotion/Sync/telemetry inventory open; M3 2/6 33%, overall 44% Δ0pp."
       ],
       "verified_preparatory_tasks": [
         {
@@ -390,6 +391,42 @@
             "target is Linux-first Vulpra; acceptance does not prove Android build or every developer task",
             "broad M3 test/localization/mobile-source audit gate remains open"
           ]
+        },
+        {
+          "id": "opt-in-newtab-promocard-jsx",
+          "status": "accepted_isolated_opt_in_native_trial",
+          "source_commit": "befb257961e776311751e09aec8158601a54dd79",
+          "candidate_run": 40787698972,
+          "matched_full_run": 40787699203,
+          "normal_artifact_id": 12862697117,
+          "optin_artifact_id": 12862948830,
+          "full_compressed_bytes": 87154984,
+          "lean_compressed_bytes": 87149240,
+          "observed_signed_archive_delta_bytes": 5744,
+          "observed_compressed_delta_percent": 0.00659056,
+          "normal_package_sha256": "708202e55f4101b5ae51601e4cb67c22d29b9989794d8afea3420c80b76b2a78",
+          "optin_package_sha256": "8e08f6ab18b323a5e7c084eab97d0664f7f93b95f174e7aeffb6465d856a38d5",
+          "normal_newtab_js_bytes": 1335463,
+          "optin_newtab_js_bytes": 1332731,
+          "observed_uncompressed_js_delta_bytes": 2732,
+          "checks": [
+            "full and opt-in from same exact Git source SHA",
+            "real normal native compile/packaged archive/checksum and original code present",
+            "real opt-in native compile/packaged archive/checksum and original code absent",
+            "same original AdBanner sponsored label and protected New Tab modules retained",
+            "actual opt-in Weston Wayland compositor surface attach/commit",
+            "actual browser localhost JS redirect/DOM/screenshot",
+            "temporary unsigned WebExtension content/background/storage/uninstall",
+            "Nimbus and original Firefox profile isolation"
+          ],
+          "limitations": [
+            "Only opt-in Linux bundle excludes component; no permanent source deletion and default browser unchanged",
+            "Archive delta from one independent pair cannot prove repeatable or causal component bytes",
+            "Separate independent experiments' observed bytes must not be added",
+            "Shared mascot/l10n and other sponsored pathways remain",
+            "Does not close broad M3 promotional/Pocket/Sync/telemetry audit gate"
+          ],
+          "evidence_file": "docs/vulpra/M3-PROMOCARD-NATIVE-PAIR.json"
         }
       ]
     },
