@@ -206,13 +206,13 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(broad_m3_gate_advanced=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(full_linker_symbol_map_claimed=True),
     ]
-    for mutate in mutations:
+    for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
         mutate(a,b,c)
         try:validate(a,b,c)
         except (AssertionError,ValueError,KeyError,TypeError):
             continue
-        raise AssertionError("Contradictory M3 strategy accepted")
+        raise AssertionError(f"Contradictory M3 strategy accepted: mutation case {index}")
     return len(mutations)
 
 def main():
