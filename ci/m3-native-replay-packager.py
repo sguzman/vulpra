@@ -16,7 +16,10 @@ import tempfile
 
 # The linked, unstripped libxul may greatly exceed its compressed or stripped
 # packaged ELF. Do not bound the former by the latter's observed size.
-MAX_LIBXUL=2*1024*1024*1024
+# A normal source-matched native Vulpra build at fb9ffa09 produced a
+# 2,590,378,712-byte linked ELF (debug_info included). Gecko's packaging
+# strips it to 189,486,696 bytes. Keep a 4 GiB safety bound for either file.
+MAX_LIBXUL=4*1024*1024*1024
 MIN_LIBXUL=10_000_000
 
 def valid_binary_size(size):
@@ -120,11 +123,13 @@ def selftest():
     assert not valid_binary_size(MIN_LIBXUL)
     assert valid_binary_size(MIN_LIBXUL+1)
     assert valid_binary_size(384*1024*1024+1)
+    # Actual size and exact prior 2 GiB false-negative reproducer, no ELF needed.
+    assert valid_binary_size(2_590_378_712)
     assert valid_binary_size(MAX_LIBXUL)
     assert not valid_binary_size(MAX_LIBXUL+1)
     assert not valid_binary_size(-1)
     assert not valid_binary_size("4294967296")
-    return 7
+    return 8
 
 def main():
     ap=argparse.ArgumentParser()
