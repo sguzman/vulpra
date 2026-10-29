@@ -452,7 +452,7 @@
         "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces",
         "https://github.com/sguzman/vulpra/actions/runs/40785850376"
       ],
-      "next": "Do not remove sender or master-policy modules. If telemetry transport removal becomes a viable candidate, verify production-mode normal sender startup and deletion request server transport with a source-matched native package, respecting client ID rotation/pending queues/Glean/crash. Historical test-mode replay proves harness works, not product privacy deletion outcomes. M3 2/6 remains unchanged.",
+      "next": "Do not delete/disable privacy cleanup, telemetry transport, Glean, crash or policy components. Original smoke false alarm was due inspecting before natural 60s deferred initialization. For M3, next substantial requirement is verifying full feature/dependency inventory and, before any transport candidate omission, exact-source whole-browser production-policy/deletion behavior without test override. No additional full compilation justified solely to reconfirm known normal delay.",
       "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\"",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -565,7 +565,7 @@
         ]
       },
       "loopback_runtime_harness": {
-        "status": "historical_native_test_mode_loopback_post_assertions_passed_whole_browser_source_match_pending",
+        "status": "historical_package_natural_sender_delay_and_test_mode_deletion_post_verified_whole_source_match_pending",
         "script": "ci/smoke-telemetry-loopback-package.py",
         "offline_run_id": 40803048273,
         "offline_checks": [
@@ -584,7 +584,7 @@
         "normal_browser_changed": false,
         "source_deletion_authorized": false,
         "network_privacy_verification_complete": false,
-        "notes": "Native current-source build 40803276397 succeeded but runtime failed due synthetic ping not reaching receiver. Historical identical-six-telemetry-module package from 40567473401 reproduced that normal sender was not initialized in a short-lived WebDriver profile; actual TelemetryController.testSetup() initialized the sender and allowed full loopback test to pass in 40917517371. Historical whole browser is not source matched; test mode bypasses official build gate, upload-disabled deletion exception is only eligibility; no proof of server-side deletion or production behavior. No default product code changed.",
+        "notes": "Archived package source commit 1683ca67b69389a879717bcd537772c3b40624b6 has six telemetry/transport modules identical with current HEAD. Real natural startup after no testSetup, observed 0s false/30s false/75s true; confirms delayed normal sender setup consistent with 60s pref default. Separate test-mode local HTTP opt-out sees 1 ordinary before/after, deletion 0->1. No actual production Mozilla data submission, remote deletion, or safe sender omission established.",
         "historical_archive_run_id": 40567473401,
         "historical_archived_source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
         "historical_test_mode_diagnostic_run_id": 40917517371,
@@ -612,7 +612,31 @@
         },
         "deletion_post_received_in_test_mode": true,
         "real_remote_deletion_verified": false,
-        "production_mode_telemetry_verified": false
+        "production_mode_telemetry_verified": false,
+        "natural_sender_startup_replay_run_id": 40920175855,
+        "natural_startup_no_test_controller": true,
+        "natural_startup_no_sender_override": true,
+        "natural_startup_samples": [
+          {
+            "seconds": 0,
+            "sender_ready": false,
+            "server_matches_loopback": false
+          },
+          {
+            "seconds": 30,
+            "sender_ready": false,
+            "server_matches_loopback": false
+          },
+          {
+            "seconds": 75,
+            "sender_ready": true,
+            "server_matches_loopback": true
+          }
+        ],
+        "default_normal_init_delay_seconds": 60,
+        "expected_early_sender_inactive": true,
+        "initial_missing_post_diagnostic": "Original early synthetic test ran before normal sender delay; not a demonstrated privacy bug.",
+        "test_mode_deletion_post_after_natural_probe": true
       }
     },
     {
