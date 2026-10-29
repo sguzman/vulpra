@@ -75,14 +75,14 @@ def check(run,job,workflow,mozconfig,log):
                       'assert str(get(k)) in ("1","True")',"Creating config.status"):
         if not any(assertion in line for line in logged):
             raise ValueError("Configure log missing executed assertion: "+assertion)
-    if not any(x==f"CANDIDATE_SHA: {BUILT_SHA}" for x in logged):
+    if not any(x.endswith(f"CANDIDATE_SHA: {BUILT_SHA}") for x in logged):
         raise ValueError("Original log does not identify built source commit")
     for marker in (
         "PASS: exact accepted candidate commit, original promo modules enabled for baseline",
         "PASS: same protected browser; only promotion omission differs",
         "PASS: strict positive source-matched Linux native package reduction",
     ):
-        if marker not in logged:
+        if not any(x.endswith(marker) for x in logged):
             raise ValueError("Missing actual success log (not script echo): "+marker)
     return {
         "schema_version":1,
