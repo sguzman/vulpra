@@ -213,6 +213,30 @@ def validate(reg,paired,progress):
                  "new_source_pruning_authorized","whole_m3_gate_advanced"):
         assert drift[flag] is False,flag
 
+    repeat=reg["accepted_normandy_second_matched_native_recheck"]
+    assert repeat["status"]=="same_source_opt_in_normandy_runner_omission_runtime_and_comparison_passed"
+    assert repeat["source_commit"]=="034ddd665a080f173ce45094ae3afb8868b45e1a"
+    assert (repeat["lean_native_build_run_id"],repeat["separate_runtime_acceptance_run_id"],
+            repeat["source_matched_full_compile_and_compare_run_id"],
+            repeat["comparison_artifact_id"])==(40954193793,40968542013,40968688858,12941182844)
+    for flag in ("variant_runtime_passed","source_and_non_omission_flags_matched",
+                 "full_native_build_package_verified","normal_default_browser_unchanged",
+                 "shared_nimbus_helpers_preserved","optin_runner_physically_absent"):
+        assert repeat[flag] is True,flag
+    assert (repeat["new_full_compressed_bytes"],repeat["new_lean_compressed_bytes"],
+            repeat["new_signed_delta_bytes"])==(87153852,87138100,15752)
+    assert repeat["new_full_compressed_bytes"]-repeat["new_lean_compressed_bytes"]==repeat["new_signed_delta_bytes"]
+    assert repeat["new_observed_reduction_percent"]==0.018
+    assert repeat["new_full_sha256"]=="4f51ccf82103dd0381702cf925bf0d786a559037f7ecb0633e045e591f9d633e"
+    assert repeat["new_lean_sha256"]=="7095a57083a6211177fd182a2c5275d0ef8c8b2398f4eb1b3298ae951861adac"
+    assert repeat["earlier_independent_source_matched_run_id"]==40439793884
+    assert repeat["earlier_independent_observed_signed_delta_bytes"]==27620
+    for flag in ("identical_build_source_across_the_two_experiments",
+                 "constant_component_compressed_savings_proven",
+                 "can_add_these_two_experiments_savings",
+                 "additional_source_deletion_authorized","new_whole_m3_roadmap_gate_passed"):
+        assert repeat[flag] is False,flag
+
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -412,6 +436,12 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(different_source_archive_size_difference_is_feature_savings=True),
         lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(historical_compiler_commit_declared_in_elf_graph="a"*40),
         lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(differing_ELF_payload_sha256_count=0),
+        lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(variant_runtime_passed=False),
+        lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(source_and_non_omission_flags_matched=False),
+        lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(new_signed_delta_bytes=27620),
+        lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(new_whole_m3_roadmap_gate_passed=True),
+        lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(constant_component_compressed_savings_proven=True),
+        lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(can_add_these_two_experiments_savings=True),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
