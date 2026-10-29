@@ -170,29 +170,35 @@ const endpoint = arguments[0], phase = arguments[1];
     unified: Services.prefs.getBoolPref(TelemetryUtils.Preferences.Unified, false)
   });
   if (phase === "prepare") {
-    TelemetrySend.setServer(endpoint);
     const official = Services.telemetry.isOfficialTelemetry;
-    TelemetrySend.setTestModeEnabled(true); // explicit debug-only override
+    const naturallyInitialized = TelemetrySend.getShutdownState().sendingEnabled;
     Services.prefs.setBoolPref(master, true);
     Services.prefs.setBoolPref(upload, true);
     Services.prefs.setBoolPref(TelemetryUtils.Preferences.DisableFuzzingDelay, true);
-    // Wait for the browser's normal sender initialization instead of silently
-    // treating 'sendingEnabled' (a pref check) as an initialized transport.
-    const deadline = Date.now() + 12000;
-    while (!TelemetrySend.getShutdownState().sendingEnabled && Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 150));
+    let explicitlyInitialized = false;
+    if (!naturallyInitialized) {
+      // This is a DISPOSABLE PROFILE and deliberately test-only: inactive
+      // normal startup is not proof of broken telemetry or successful deletion.
+      // Use the actual controller to install its pref observers and initialize
+      // sender/storage/IDs rather than creating a fake sender state.
+      await TelemetryController.testSetup();
+      explicitlyInitialized = true;
     }
+    TelemetrySend.setServer(endpoint); // testSetup may replace the server
+    TelemetrySend.setTestModeEnabled(true); // explicit debug-only override
     const before = state();
-    if (!before.sender_ready) {
-      done({status:"error", reason:"sender_not_initialized", before,
-        official_build:official, test_override:true});
+    if (!before.sender_ready || !before.server_matches_loopback) {
+      done({status:"error", reason:"test_setup_sender_not_initialized",
+        naturally_initialized:naturallyInitialized, test_setup_used:explicitlyInitialized,
+        before, official_build:official, test_override:true});
       return;
     }
     // No ping IDs, URLs, profile identifiers or bodies enter the result.
     await TelemetryController.submitExternalPing("vulpra-probe", {synthetic:true});
     await TelemetrySend.testWaitOnOutgoingPings();
     done({status:"observed", official_build:official, test_override:true,
-      before, after_submit:state()});
+      naturally_initialized:naturallyInitialized,
+      test_setup_used:explicitlyInitialized, before, after_submit:state()});
   } else if (phase === "disable") {
     let observer;
     const notified = new Promise(resolve => {
@@ -245,6 +251,12 @@ def validate(observation: dict, before: dict, after: dict,
         raise RuntimeError("Eligible synthetic upload never reached loopback sink")
     if not observation.get("test_override"):
         raise RuntimeError("Privileged test override provenance absent")
+    if type(observation.get("naturally_initialized")) is not bool or (
+        type(observation.get("test_setup_used")) is not bool
+    ):
+        raise RuntimeError("Missing automatic vs explicit test initialization provenance")
+    if not observation["naturally_initialized"] and not observation["test_setup_used"]:
+        raise RuntimeError("Sender turned on without a documented test-only controller setup")
 
 
 def run(repo: Path, driver: str) -> dict:
@@ -324,6 +336,7 @@ def run(repo: Path, driver: str) -> dict:
                         "before_optout_requests":earlier, "after_optout_requests":later,
                         "receiver_rejections":rejections,
                         "limitations":[
+                            "Natural sender startup is recorded separately from deliberate testSetup() initialization.",
                             "Test-mode override is not proof of production upload behavior.",
                             "Only local HTTP type counts retained; no payload or ping identifiers stored.",
                             "Deletion-request eligibility and observer notification are not server-side deletion.",
