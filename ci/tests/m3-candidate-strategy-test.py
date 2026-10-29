@@ -79,7 +79,23 @@ def validate(reg,paired,progress):
     pending=reg["pending_current_source_link_input_acceptance"]
     assert pending["workflow_run_id"]==40935344279
     assert pending["source_commit"]=="3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f"
-    assert pending["state"].startswith("native_compilation_observed_in_progress_")
+    assert pending["state"]=="normal_full_native_build_and_runtime_passed_but_independent_package_transform_reconciliation_unaccepted"
+    assert pending["native_full_workflow_success"] is True
+    assert pending["configure_and_compile_succeeded"] is True
+    assert pending["package_and_loader_order_succeeded"] is True
+    assert pending["Wayland_js_webextension_profile_nimbus_passed"] is True
+    assert pending["native_evidence_artifact_id"]==12927213408
+    assert pending["generated_link_input_objects"]==2435
+    assert pending["archive_compressed_bytes"]==87147080
+    assert pending["packaged_libxul_bytes"]==189486696
+    assert pending["packaged_ELF_count"]==28 and pending["direct_DT_NEEDED_edges"]==268
+    assert pending["raw_dist_libxul_hash_matches_packaged_libxul"] is False
+    assert pending["reason_for_hash_difference_proven"] is False
+    assert pending["reproduction_proof_present_in_original_artifact"] is False
+    assert pending["independent_reconciliation_original_run_passed"] is False
+    assert pending["followup_replay_workflow_accepted"] is False
+    assert pending["followup_replay_workflow_run_id"]==40944392090
+    assert "independently_reproduced_exact_source_mozpack_executable_transformation" in pending["requires"]
     assert pending["full_linker_symbol_map_claimed"] is False
     assert pending["compiled_feature_savings_established"] is False
     assert pending["broad_m3_gate_advanced"] is False
@@ -243,6 +259,11 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["historical_native_loader_order_preflight"].update(libmozgtk_before_libmozwayland=False),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(broad_m3_gate_advanced=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(full_linker_symbol_map_claimed=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(independent_reconciliation_original_run_passed=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(reproduction_proof_present_in_original_artifact=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(reason_for_hash_difference_proven=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(generated_link_input_objects=0),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(followup_replay_workflow_accepted=True),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
