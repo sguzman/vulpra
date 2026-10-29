@@ -842,7 +842,12 @@
         "permanent_source_deletion_authorized": false,
         "repeatability_or_causal_size_established": false,
         "evidence_file": "docs/vulpra/M3-PROMOCARD-NATIVE-PAIR.json",
-        "limitations": "Independent same-source native packages can differ for unrelated reasons, and cumulative savings from separate opt-in trials cannot be added; this experiment does not close the broad Pocket/Sync/telemetry gate."
+        "limitations": "Independent same-source native packages can differ for unrelated reasons, and cumulative savings from separate opt-in trials cannot be added; this experiment does not close the broad Pocket/Sync/telemetry gate.",
+        "comparison_run_id": 40797808197,
+        "comparison_artifact_id": 12864835886,
+        "comparison_passed": true,
+        "initial_comparison_failed_run_id": 40795895867,
+        "comparison_failure_context": "Original comparator assumed candidate artifact JSON at ZIP root; nested upload paths caused early test -f failure, not mismatched browser packages. Fixed nested locator; replay passed 40797808197."
       }
     },
     {
