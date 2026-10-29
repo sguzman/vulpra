@@ -324,7 +324,7 @@ def validate(observation: dict, before: dict, after: dict,
         raise RuntimeError("Sender turned on without a documented test-only controller setup")
 
 
-def run(repo: Path, driver: str) -> dict:
+def run(repo: Path, driver: str, observe_natural: bool = False) -> dict:
     archive = webdriver.verified_archive(repo)  # full SHA256 sidecar check
     with tempfile.TemporaryDirectory(prefix="vulpra-m3-telemetry-") as tmp:
         root = Path(tmp)
@@ -371,9 +371,36 @@ def run(repo: Path, driver: str) -> dict:
                                 "network.dns.disablePrefetch":True}}}}})
                     session = value["sessionId"]
                     base = f"/session/{session}"
-                    webdriver.request(port, "POST", base + "/timeouts", {"script":70000})
+                    webdriver.request(port, "POST", base + "/timeouts",
+                        {"script":100000 if observe_natural else 70000})
                     webdriver.request(port, "POST", base + "/moz/context", {"context":"chrome"})
                     try:
+                        if observe_natural:
+                            observed = webdriver.request(
+                                port, "POST", base + "/execute/async",
+                                {"script":STARTUP_SCRIPT, "args":[endpoint]},
+                                timeout_seconds=115)
+                            validate_natural_startup(observed)
+                            if sentinel.read_bytes() != (
+                                b"Vulpra telemetry test: unrelated profile untouched\n"
+                            ):
+                                raise RuntimeError("Natural startup changed unrelated Firefox profile")
+                            return {"schema_version":1,
+                                "status":"natural_startup_observed_without_test_init",
+                                "verified_package_sha256":True,
+                                "isolated_profile":True,
+                                "loopback_receiver":"127.0.0.1",
+                                "natural_startup":observed,
+                                "receiver_counts":counts(server),
+                                "receiver_rejections":rejected_counts(server),
+                                "no_explicit_test_controller_setup":True,
+                                "no_sender_test_override":True,
+                                "limitations":[
+                                    "Normal startup observation, not proof of production telemetry delivery.",
+                                    "Historical native package is not current whole-browser source matched.",
+                                    "Default 60-second deferred initialization may be blocked by other conditions.",
+                                    "No ping payloads, URLs, or identifiers retained.",
+                                    "No remote deletion is established."]}
                         def phase(label):
                             result = webdriver.request(port, "POST", base + "/execute/async",
                                 {"script":SCRIPT, "args":[endpoint,label]}, timeout_seconds=85)
@@ -437,10 +464,18 @@ def main():
     driver = shutil.which("geckodriver")
     if not driver:
         raise RuntimeError("geckodriver unavailable; no native Vulpra build attempted")
-    report = run(repo, driver)
-    output = repo / ".git/vulpra-native-build/m3-telemetry-loopback.json"
+    observe_natural = "--observe-natural-startup" in sys.argv[1:]
+    report = run(repo, driver, observe_natural=observe_natural)
+    output = repo / (".git/vulpra-native-build/m3-telemetry-natural-startup.json"
+                     if observe_natural else ".git/vulpra-native-build/m3-telemetry-loopback.json")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + "\n")
+    if observe_natural:
+        if report["status"] != "natural_startup_observed_without_test_init":
+            raise RuntimeError("Natural telemetry startup observation did not complete")
+        print("OBSERVED: natural startup under default telemetry initialization delay")
+        print("NATURAL SNAPSHOTS:", json.dumps(report["natural_startup"]["samples"]))
+        return
     if report["status"] != "native_privileged_telemetry_runtime_observed":
         raise RuntimeError("Native telemetry evidence rejected: " +
                            report.get("failure_category", "unknown"))
