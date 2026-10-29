@@ -145,6 +145,21 @@ def validate(reg,paired,progress):
     assert hyph["locale_layout_omission_runtime_checked"] is False
     assert hyph["compressed_savings_bytes"] is None
     assert hyph["normal_source_changed"] is False
+    hu_native=hyph["historical_normal_native_css_runtime"]
+    assert hu_native==hu["historical_normal_css_runtime"]
+    assert hu_native["status"]=="passed_real_unmodified_historical_native_hu_huHU_enUS_css_layout"
+    assert hu_native["run_id"]==40937941448
+    assert hu_native["evidence_artifact_id"]==12924908962
+    assert hu_native["archive_compiled_source_commit"]=="1683ca67b69389a879717bcd537772c3b40624b6"
+    assert [hu_native[k] for k in ("hungarian_auto_lines","hungarian_huHU_auto_lines",
+                                  "hungarian_none_lines","english_auto_lines",
+                                  "english_none_lines")]==[6,6,1,3,1]
+    assert hu_native["hungarian_none_overflow_px"]==524
+    assert hu_native["hungarian_auto_scroll_width_px"]==112
+    assert hu_native["original_package_unchanged"] is True
+    assert hu_native["missing_hungarian_pattern_css_fallback_verified"] is False
+    assert hu_native["optin_hungarian_pattern_omission_built"] is False
+    assert hu_native["compressed_savings_bytes"] is None
 
     promo,=(x for x in reg["candidates"] if x["id"]=="newtab_promocard_optout")
     trial=promo["native_trial"]
@@ -202,6 +217,9 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns").update(removal_authorized=True),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns").update(package_logical_bytes=0),
         lambda a,b,c:a["hungarian_hyphenation_boundary_audit"].update(locale_layout_omission_runtime_checked=True),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns")["historical_normal_css_runtime"].update(missing_hungarian_pattern_css_fallback_verified=True),
+        lambda a,b,c:a["hungarian_hyphenation_boundary_audit"]["historical_normal_native_css_runtime"].update(hu_missing_dictionary_native_variant=True),
+
         lambda a,b,c:a["historical_native_loader_order_preflight"].update(libmozgtk_before_libmozwayland=False),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(broad_m3_gate_advanced=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(full_linker_symbol_map_claimed=True),
