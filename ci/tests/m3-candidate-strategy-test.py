@@ -142,6 +142,15 @@ def validate(reg,paired,progress):
     assert pending["next_evidence_replay_workflow_result"]=="in_progress_not_accepted_at_last_observation"
     assert pending["next_evidence_replay_checks_input_path_sizes"] is True
     assert pending["next_evidence_replay_verification_accepted"] is False
+    assert pending["schema_compatibility_probe_run_id"]==40953419796
+    assert pending["schema_compatibility_source_native_run_id"]==40935344279
+    assert pending["schema_compatibility_probe_status"]=="passed_test_only_real_evidence_schema_with_unverified_in_memory_packager_record"
+    assert pending["schema_compatibility_used_synthetic_transform_only"] is True
+    for k in ("schema_compatibility_synthetic_report_persisted",
+              "schema_compatibility_proves_real_packager_transform",
+              "schema_compatibility_accepted_as_native_runtime_evidence",
+              "schema_compatibility_new_gate_credit"):
+        assert pending[k] is False,k
     assert "independently_reproduced_exact_source_mozpack_executable_transformation" in pending["requires"]
     assert pending["full_linker_symbol_map_claimed"] is False
     assert pending["compiled_feature_savings_established"] is False
@@ -324,6 +333,9 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(followup_replay_oversize_cause_proven=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(next_evidence_replay_verification_accepted=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(followup_replay_workflow_conclusion="success"),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(schema_compatibility_accepted_as_native_runtime_evidence=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(schema_compatibility_proves_real_packager_transform=True),
+        lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(schema_compatibility_new_gate_credit=True),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
