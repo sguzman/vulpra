@@ -2193,5 +2193,29 @@
     "compiled_feature_savings_bytes": null,
     "source_deletion_authorized": false,
     "evidence_doc": "docs/vulpra/M3-NATIVE-HOST-CACHE-PREFLIGHT.md"
+  },
+  "historical_native_host_transitive_map": {
+    "status": "accepted_bounded_ubuntu_host_transitive_declared_ELF_file_presence",
+    "success_run_id": 40947712769,
+    "artifact_id": 12930680277,
+    "source_package_compiled_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "underlying_earlier_direct_host_preflight_run_id": 40947019427,
+    "external_root_names": 36,
+    "host_unique_direct_and_transitive_names": 76,
+    "host_to_host_direct_DT_NEEDED_edges": 246,
+    "host_ELF_file_candidates": 76,
+    "host_names_without_ldconfig_candidates": 0,
+    "host_cache_safety_fixtures": 11,
+    "transitive_map_safety_fixtures": 6,
+    "host_arch": "Ubuntu 24.04 x86-64 CI",
+    "package_ELF_executed": false,
+    "host_ELF_executed": false,
+    "ldd_dlopen_invoked": false,
+    "symbol_versions_or_actual_loader_resolution_verified": false,
+    "target_user_Arch_system_verified": false,
+    "new_compiled_savings_bytes": null,
+    "source_deletion_authorized": false,
+    "whole_M3_gate_passed": false,
+    "documentation": "docs/vulpra/M3-NATIVE-HOST-TRANSITIVE-MAP.md"
   }
 }
