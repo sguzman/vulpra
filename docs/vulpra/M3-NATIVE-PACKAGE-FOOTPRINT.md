@@ -1,4 +1,4 @@
-# M3 measured native package footprint (historical source-matched archive)
+# M3 measured native package footprint (historical source-pinned archive)
 
 **Verified run:** [GitHub Actions 40924515578](https://github.com/sguzman/vulpra/actions/runs/40924515578) **PASSED** with [downloadable JSON evidence](https://github.com/sguzman/vulpra/actions/runs/40924515578). It independently checksum-verified and inspected the **full normal Vulpra** Linux archive retained from [run 40567473401](https://github.com/sguzman/vulpra/actions/runs/40567473401). Original compiled source is **`1683ca67b69389a879717bcd537772c3b40624b6`**, which is not the current complete main revision. The updated workflow explicitly requires both the locale and native footprint reports before accepting success. No compiler, binary execution, source removal, profiler or comparative build was run.
 
