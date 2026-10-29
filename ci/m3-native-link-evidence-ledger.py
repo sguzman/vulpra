@@ -14,12 +14,14 @@ import re
 import sys
 
 HEX=re.compile(r"[0-9a-f]{64}\Z")
+COMMIT_SHA=re.compile(r"[0-9a-f]{40}\Z")
 def require(cond,message):
     if not cond:raise ValueError(message)
 def sha(value):
     return isinstance(value,str) and HEX.fullmatch(value) is not None
 def check(config,link,elf,localhost,extension,sidecar,source_sha,run_id):
-    require(sha(source_sha),"Invalid build commit")
+    require(isinstance(source_sha,str) and COMMIT_SHA.fullmatch(source_sha) is not None,
+            "Invalid 40-character Git source commit")
     require(isinstance(run_id,int) and run_id>0,"Invalid build run ID")
     for name,data in (("configuration",config),("link",link),("ELF",elf),
                       ("localhost",localhost),("WebExtension",extension)):
@@ -153,7 +155,7 @@ def check(config,link,elf,localhost,extension,sidecar,source_sha,run_id):
                            "No opt-in feature omitted or paired compression comparison."]}
 
 def synthetic():
-    sha0="a"*64;sha1="b"*64;sha2="c"*64
+    sha0="a"*40;sha1="b"*64;sha2="c"*64
     fs={k:{"state":"recorded","value":v} for k,v in
         {"MOZ_BUILD_APP":"browser","MOZ_WIDGET_TOOLKIT":"gtk",
          "MOZ_APP_BASENAME":"Vulpra","MOZ_DEVTOOLS":"all"}.items()}
@@ -203,7 +205,8 @@ def tests():
     with_declared_elf_run[2]["workflow_run_id"]=1234
     check(*with_declared_elf_run)
     cases=[
-      lambda c,l,e,o,x,s:l.update(source_commit="b"*64),
+      lambda c,l,e,o,x,s:l.update(source_commit="b"*40),
+      lambda c,l,e,o,x,s:c.update(source_commit="b"*64),
       lambda c,l,e,o,x,s:e.update(workflow_run_id=9999),
       lambda c,l,e,o,x,s:e.update(workflow_run_id="1234"),
       lambda c,l,e,o,x,s:c["observed_generated_substs"]["MOZ_WAYLAND"].update(value=""),
