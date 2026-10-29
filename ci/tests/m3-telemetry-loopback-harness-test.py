@@ -102,6 +102,35 @@ def main():
     must_fail(lambda: probe.validate(record, full, received,
         {"oversize":1, "bad_framing":0, "truncated":0}))
     print("PASS: rejected local HTTP receiver body-size/framing failure evidence")
+    natural = {
+        "status":"observed",
+        "test_setup_used":False,
+        "sender_override_used":False,
+        "samples":[{
+            "seconds":seconds, "sender_ready":seconds==75,
+            "server_matches_loopback":seconds==75,
+            "policy":True, "base_recording_enabled":True,
+            "official_build":False, "pending_count":0,
+            "scheduler_state":None
+        } for seconds in (0,30,75)]
+    }
+    probe.validate_natural_startup(natural)
+    natural_mutations = (
+        lambda n: n.update(test_setup_used=True),
+        lambda n: n.update(sender_override_used=True),
+        lambda n: n["samples"][2].update(seconds=70),
+        lambda n: n["samples"][2].update(sender_ready="true"),
+        lambda n: n["samples"][2].update(sender_ready=True,server_matches_loopback=False),
+        lambda n: n["samples"][2].update(pending_count=-1),
+        lambda n: n["samples"][2].update(scheduler_state=[]),
+        lambda n: n["samples"].pop(),
+        lambda n: n.update(status="unknown")
+    )
+    for mutation in natural_mutations:
+        invalid = deepcopy(natural)
+        mutation(invalid)
+        must_fail(lambda: probe.validate_natural_startup(invalid))
+    print(f"PASS: {len(natural_mutations)} invalid normal-startup evidence fixtures rejected")
     print("MOCK ONLY: live Vulpra/WebDriver and remote deletion delivery untested")
 
 
