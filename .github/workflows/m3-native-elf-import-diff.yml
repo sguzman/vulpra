@@ -1,0 +1,106 @@
+# Two independently checksum-verified full native browser ELF inventories.
+# Compare static SONAME/DT_NEEDED declarations without running ELF binaries.
+name: M3 Compare Historical and Current Native ELF Imports
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-elf-import-diff.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read-only-elf-import-diff:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - name: Checkout only ELF comparison source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject broken or fabricated ELF graph inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-native-elf-import-diff.py
+          python3 ci/m3-native-elf-import-diff.py --self-test
+      - name: Fetch two immutable source-pinned native ELF metadata reports
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40947019427" |
+            jq -e '.status == "completed" and .conclusion == "success"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40963098075" |
+            jq -e '.status == "completed" and .conclusion == "success" and
+                   .head_sha == "cde4d83043f8c476173c8dbc78b66b078c3f6b5b"' >/dev/null
+          gh run download 40947019427 --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-host-cache-preflight --dir "$RUNNER_TEMP/historical"
+          gh run download 40963098075 --repo "$GITHUB_REPOSITORY" \
+            --name m3-source-matched-native-link-evidence --dir "$RUNNER_TEMP/current"
+      - name: Enforce both archive SHA-256 identities and independent current runtime evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          old=json.loads((root/"historical/m3-host-elf-source-graph.json").read_text())
+          def load_new(name):
+              files=list((root/"current").rglob(name))
+              assert len(files)==1,(name,len(files))
+              return json.loads(files[0].read_text())
+          new=load_new("m3-native-link-elf-package-graph.json")
+          link=load_new("m3-native-link-inputs.json")
+          assert old["archive_sha256"]=="e8717fd10a1ffc330ef96f802a4112da335aaf57c6e68d70e639b3e137c9e97f"
+          assert old["archive_compressed_bytes"]==86930792
+          assert new["archive_sha256"]==link["package"]["package_sha256"]=="18798900c5307fd136f7d93db6681741616981b609741a4b2209a1810273eb51"
+          assert new["source_commit"]==link["source_commit"]=="cde4d83043f8c476173c8dbc78b66b078c3f6b5b"
+          assert link["workflow_run_id"]==40963098075 and link["runtime_passed_after_link_audit"] is True
+          assert link["packaging_transform_replay"]["deterministic_reproduction_verified"] is True
+          assert len(old["elf_members"])==len(new["elf_members"])==28
+          assert old["direct_needed_edges"]==new["direct_needed_edges"]==268
+          (root/"historical-verified.json").write_text(json.dumps(old))
+          (root/"current-verified.json").write_text(json.dumps(new))
+          print("PASS: both real package identities and current native runtime contract")
+          PY
+      - name: Compare ELF library declarations, retain changed binary hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-elf-import-diff.py \
+            --historical "$RUNNER_TEMP/historical-verified.json" \
+            --current "$RUNNER_TEMP/current-verified.json" \
+            --output "$RUNNER_TEMP/m3-native-elf-import-diff.json"
+          jq -e \
+            '.schema_version == 1 and
+             .earlier_ELF_member_count == 28 and .current_ELF_member_count == 28 and
+             .earlier_direct_needed_edges == 268 and .current_direct_needed_edges == 268 and
+             (.removed_ELF_file_paths | length) == 0 and
+             (.added_ELF_file_paths | length) == 0 and
+             (.changed_per_file_DT_NEEDED_or_SONAME | length) == 0 and
+             (.changed_ELF_member_SHA256_paths | length) == 6 and
+             .unchanged_ELF_member_SHA256_count == 22 and
+             .identical_ELF_payloads_claimed == false and
+             .actual_host_loader_resolution_proven == false and
+             .symbol_or_ABI_compatibility_proven == false and
+             .packaged_binary_executed_by_comparison == false and
+             .new_compressed_feature_savings_bytes == null and
+             .source_removal_authorized == false' \
+            "$RUNNER_TEMP/m3-native-elf-import-diff.json" >/dev/null
+          echo "PASS: no direct ELF import/SONAME drift; six physical ELF hashes do differ"
+      - name: Save bounded read-only ELF import difference report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-immutable-native-elf-dependency-diff
+          path: ${{ runner.temp }}/m3-native-elf-import-diff.json
+          if-no-files-found: warn
+          retention-days: 14
