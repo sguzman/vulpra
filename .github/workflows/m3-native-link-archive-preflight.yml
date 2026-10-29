@@ -1,0 +1,88 @@
+# Test historical normal native package layout before source-matched compiler finishes.
+# Read-only archive check; does not attribute current binary source.
+name: M3 Native Loader Order Archived Preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-link-archive-preflight.yml
+      - ci/m3-native-build-link-inputs.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  historic-package-loader-order:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout bounded link parser only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Parser fixture regressions
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-native-build-link-inputs.py
+          python3 ci/m3-native-build-link-inputs.py --self-test
+
+      - name: Retrieve previously SHA-256 verified full browser package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40567473401 --repo "$GITHUB_REPOSITORY" \
+            --name m3-asrouter-promo-matched-baseline --dir "$RUNNER_TEMP/native"
+          (cd "$RUNNER_TEMP/native" && \
+            sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256)
+
+      - name: Check real packaged libxul and GTK-before-Wayland dependency declaration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util,json,os
+          from pathlib import Path
+          import sys
+          spec=importlib.util.spec_from_file_location("m3_link", "ci/m3-native-build-link-inputs.py")
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          path=Path(os.environ["RUNNER_TEMP"])/"native/vulpra-promo-full-baseline.tar.xz"
+          record=mod.inside_package(path)
+          order=record["packaged_native_loader_order"]
+          assert order["mozgtk_before_mozwayland"] is True
+          assert record["libxul_member"]["logical_bytes"]==189486920
+          assert record["package_compressed_bytes"]==86930792
+          report={"schema_version":1,
+                  "archive_original_build_run_id":40567473401,
+                  "historical_compiled_source_commit":"1683ca67b69389a879717bcd537772c3b40624b6",
+                  "inspector_commit":os.environ["GITHUB_SHA"],
+                  "normal_archive_sha256":record["package_sha256"],
+                  "libxul_sha256":record["libxul_member"]["sha256"],
+                  "native_load_order":order,
+                  "source_matched_to_current_inspector":False,
+                  "current_source_native_compiled":False,
+                  "new_source_removal_authorized":False,
+                  "compressed_bytes_saved":None}
+          output=Path(os.environ["RUNNER_TEMP"])/"m3-native-link-archive-preflight.json"
+          output.write_text(json.dumps(report,indent=2)+"\n")
+          print("PASS: historical normal Vulpra packaged libxul and protected GTK-before-Wayland ordering")
+          print("NATIVE LOADER NAMES:",json.dumps(order["ordered_names"]))
+          PY
+
+      - name: Save bounded archived native preload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-link-archive-preflight
+          path: ${{ runner.temp }}/m3-native-link-archive-preflight.json
+          if-no-files-found: error
+          retention-days: 14
