@@ -66,5 +66,6 @@ jobs:
             .github/workflows/m3-hungarian-hyphenation-boundaries.yml
             .github/workflows/m3-native-link-archive-preflight.yml
             .github/workflows/m3-aiwindow-offline-runtime.yml
+            .github/workflows/m3-hungarian-css-native.yml
             .github/workflows/m3-native-link-evidence-reconcile.yml
             .github/workflows/m3-hu-css-native-baseline.yml
