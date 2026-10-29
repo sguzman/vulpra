@@ -1902,5 +1902,39 @@
     "compiled_package_savings_bytes": null,
     "documentation": "docs/vulpra/M3-EXACT-SOURCE-CONFIG-SNAPSHOT.md",
     "machine_readable": "docs/vulpra/M3-EXACT-SOURCE-CONFIG-SNAPSHOT.json"
+  },
+  "accepted_source_pruning_cohort_totals": {
+    "status": "previously_accepted_distinct_source_pruning_cohorts_no_new_deletion",
+    "cohorts": [
+      {
+        "id": "windows_and_cocoa_widget_installer_combined",
+        "removed_git_paths": 453,
+        "original_git_blob_bytes": 6266676,
+        "source": "M3 verified_removals.linux-excluded-widget-installer-source",
+        "individually_allocatable_to_candidate_ids": false
+      },
+      {
+        "id": "android_application_roots",
+        "removed_git_paths": 14134,
+        "original_git_blob_bytes": 115996869,
+        "source": "M3 verified_removals.android-app-source-tree",
+        "individually_allocatable_to_candidate_ids": true
+      },
+      {
+        "id": "extra_android_ios_uikit_leaves",
+        "removed_git_paths": 280,
+        "original_git_blob_bytes": 7704040,
+        "source": "M3 roadmap supported platform leaf source prune",
+        "individually_allocatable_to_candidate_ids": true
+      }
+    ],
+    "aggregate_removed_git_paths": 14867,
+    "aggregate_original_git_blob_bytes": 129967585,
+    "candidate_fields_source_files_not_additive_as_pruned_totals": true,
+    "reason": "Old per-candidate source_files/source_bytes numbers are pre-prune candidate scope/inventory values; combined Windows/Cocoa candidate overlap and Android inventory exceed accepted removed paths. Only cohort-ledger counts are claimable actual source removals.",
+    "compiled_package_bytes_saved": null,
+    "native_library_removed": false,
+    "new_pruning_authorized": false,
+    "broader_m3_gate_advanced_by_this_accounting": false
   }
 }
