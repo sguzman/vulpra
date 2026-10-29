@@ -59,3 +59,4 @@ jobs:
             .github/workflows/m3-package-localization-census.yml
             .github/workflows/m3-native-elf-census.yml
             .github/workflows/m3-aiwindow-prompt-seed-boundaries.yml
+            .github/workflows/m3-historical-config-provenance.yml
