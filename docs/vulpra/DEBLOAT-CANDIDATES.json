@@ -2097,18 +2097,36 @@
   "pending_current_source_link_input_acceptance": {
     "workflow_run_id": 40935344279,
     "source_commit": "3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f",
-    "state": "native_compilation_observed_in_progress_at_last_poll_not_accepted",
+    "state": "normal_full_native_build_and_runtime_passed_but_independent_package_transform_reconciliation_unaccepted",
     "normal_browser_variant_only": true,
+    "native_full_workflow_success": true,
+    "configure_and_compile_succeeded": true,
+    "package_and_loader_order_succeeded": true,
+    "Wayland_js_webextension_profile_nimbus_passed": true,
+    "native_evidence_artifact_id": 12927213408,
+    "generated_link_input_objects": 2435,
+    "archive_compressed_bytes": 87147080,
+    "packaged_libxul_bytes": 189486696,
+    "packaged_ELF_count": 28,
+    "direct_DT_NEEDED_edges": 268,
+    "raw_dist_libxul_hash_matches_packaged_libxul": false,
+    "reason_for_hash_difference_proven": false,
+    "source_packager_can_transform_ELF_with_strip_and_elfhack": true,
+    "independent_reconciliation_original_run_id": 40942832386,
+    "independent_reconciliation_original_run_passed": false,
+    "reproduction_proof_present_in_original_artifact": false,
+    "followup_replay_workflow_run_id": 40944392090,
+    "followup_replay_workflow_accepted": false,
     "requires": [
-      "real_compiler_link_and_package",
-      "libxul_response_list_sha_object_count",
-      "packaged_native_dep_order",
-      "independent_elf_inventory",
-      "Wayland_js_webextension_profile_nimbus_runtime"
+      "independently_reproduced_exact_source_mozpack_executable_transformation",
+      "replayed_staged_and_SHA256_checked_archive_libxul_identity",
+      "original_workflow_success_independent_evidence_ledger_acceptance",
+      "separate_omission_candidate_fallback_acceptance_before_any_removal"
     ],
     "full_linker_symbol_map_claimed": false,
     "compiled_feature_savings_established": false,
-    "broad_m3_gate_advanced": false
+    "broad_m3_gate_advanced": false,
+    "documentation": "docs/vulpra/M3-NATIVE-LINK-INPUT-AND-LOADER-ORDER.md"
   },
   "aiwindow_offline_seed_runtime": {
     "status": "accepted_real_archived_native_browser_protected_default_seed",
