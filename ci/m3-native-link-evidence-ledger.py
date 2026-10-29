@@ -61,8 +61,29 @@ def check(config,link,elf,localhost,extension,sidecar,source_sha,run_id):
             "Unverified per-feature byte attribution")
     require(link.get("compressed_package_savings_claimed") is None,
             "Unverified native omission savings claimed")
-    require(link.get("built_libxul_matches_packaged_libxul") is True,
-            "Native libxul does not hash-match packaged binary")
+    # Mozilla's packager may STRIP/elfhack libxul while copying it. The
+    # original dist/bin SHA therefore need not equal the shipped ELF SHA.
+    # Accept only an exact-source, deterministic replay of the very same
+    # mozpack executable-copy transformation, independently hash-matched to
+    # the actual tar member. Mere explanation by "stripping" is insufficient.
+    same=link.get("built_libxul_matches_packaged_libxul")
+    require(isinstance(same,bool),"Missing original-versus-shipped hash comparison")
+    replay=link.get("packaging_transform_replay",{})
+    require(isinstance(replay,dict) and
+            replay.get("method")=="mozpack.files.ExecutableFile.copy" and
+            replay.get("source_commit")==source_sha and
+            replay.get("deterministic_reproduction_verified") is True,
+            "Unverified libxul packaging transform")
+    require(replay.get("original_and_packaged_hash_equal") is same,
+            "Contradictory original-versus-packaged hash result")
+    require(replay.get("original_libxul_sha256")==link.get("built_libxul_sha256"),
+            "Packager replay original library hash mismatch")
+    require(replay.get("staged_and_reproduced_libxul_sha256")==
+            link.get("package",{}).get("libxul_member",{}).get("sha256"),
+            "Packager replay does not match actual packaged libxul")
+    require(replay.get("complete_linker_map_claimed") is False and
+            replay.get("compiled_feature_bytes_attributed") is False,
+            "Packager transformation falsely claims linker attribution")
     response=link.get("libxul_link_input_response",{})
     require(sha(response.get("sha256")),"Link response checksum missing")
     require(isinstance(response.get("entry_count"),int) and
@@ -136,6 +157,8 @@ def check(config,link,elf,localhost,extension,sidecar,source_sha,run_id):
             "source_commit":source_sha,"workflow_run_id":run_id,
             "package_sha256":digest,"package_compressed_bytes":package["package_compressed_bytes"],
             "libxul_bytes":lib["bytes"],"libxul_sha256":lib["sha256"],
+            "packager_transform_reproduced":True,
+            "original_vs_shipped_libxul_sha256_equal":same,
             "link_response_sha256":response["sha256"],
             "link_response_entry_count":response["entry_count"],
             "native_elf_member_count":len(elfs),
@@ -150,6 +173,7 @@ def check(config,link,elf,localhost,extension,sidecar,source_sha,run_id):
             "additional_source_removal_authorized":False,
             "limitations":["Success of original native workflow separately required, not inferred from JSON alone.",
                            "Compiled source commit is pinned, not automatically latest main.",
+                           "Packaged ELF may be stripped/elfhacked; packager replay must be separately verified.",
                            "Generated response object-list is not a resolved linker symbol map.",
                            "Does not include host ELF transitive dependencies or dlopen.",
                            "No opt-in feature omitted or paired compression comparison."]}
@@ -173,7 +197,15 @@ def synthetic():
     link={"schema_version":1,"source_commit":sha0,"workflow_run_id":1234,
           "source_removal_authorized":False,"linker_full_map_recorded":False,
           "per_feature_native_bytes_attributed":False,"compressed_package_savings_claimed":None,
-          "built_libxul_matches_packaged_libxul":True,"built_libxul_sha256":sha2,
+          "built_libxul_matches_packaged_libxul":False,"built_libxul_sha256":"d"*64,
+          "packaging_transform_replay":{
+              "method":"mozpack.files.ExecutableFile.copy","source_commit":sha0,
+              "deterministic_reproduction_verified":True,
+              "original_and_packaged_hash_equal":False,
+              "original_libxul_sha256":"d"*64,
+              "staged_and_reproduced_libxul_sha256":sha2,
+              "complete_linker_map_claimed":False,
+              "compiled_feature_bytes_attributed":False},
           "libxul_link_input_response":{"sha256":sha1,"entry_count":300,
              "raw_input_paths_retained_in_report":False},
           "package":{"package_sha256":sha1,"package_compressed_bytes":80000000,
@@ -211,7 +243,11 @@ def tests():
       lambda c,l,e,o,x,s:e.update(workflow_run_id="1234"),
       lambda c,l,e,o,x,s:c["observed_generated_substs"]["MOZ_WAYLAND"].update(value=""),
       lambda c,l,e,o,x,s:c["observed_generated_substs"]["VULPRA_NO_ASROUTER_PROMOS"].update(state="absent"),
-      lambda c,l,e,o,x,s:l.update(built_libxul_matches_packaged_libxul=False),
+      lambda c,l,e,o,x,s:l.update(built_libxul_matches_packaged_libxul=True),
+      lambda c,l,e,o,x,s:l["packaging_transform_replay"].update(deterministic_reproduction_verified=False),
+      lambda c,l,e,o,x,s:l["packaging_transform_replay"].update(original_libxul_sha256="e"*64),
+      lambda c,l,e,o,x,s:l["packaging_transform_replay"].update(staged_and_reproduced_libxul_sha256="e"*64),
+      lambda c,l,e,o,x,s:l["packaging_transform_replay"].update(method="unverified"),
       lambda c,l,e,o,x,s:l["package"]["libxul_member"].update(sha256="b"*64),
       lambda c,l,e,o,x,s:l["package"]["packaged_native_loader_order"].update(mozgtk_before_mozwayland=False),
       lambda c,l,e,o,x,s:l.update(runtime_passed_after_link_audit=False),
