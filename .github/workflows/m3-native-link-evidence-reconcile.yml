@@ -18,6 +18,23 @@ permissions:
   actions: read
 
 jobs:
+  reject-unsuccessful-original-native-run:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Explicitly reject failed, timed-out, cancelled or skipped native builds
+        shell: bash
+        env:
+          ORIGINAL_NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
+          ORIGINAL_NATIVE_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          echo "::error::Native browser run ${ORIGINAL_NATIVE_RUN_ID} concluded '${ORIGINAL_NATIVE_CONCLUSION}'; no full package/runtime acceptance is possible."
+          exit 1
+
   validate-negative-fixtures:
     if: github.repository == 'sguzman/vulpra'
     runs-on: ubuntu-24.04
