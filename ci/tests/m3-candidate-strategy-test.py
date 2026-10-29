@@ -29,7 +29,7 @@ EXPECTED={
  "newtab_adsfeed_optout":"conditional_compile",
  "newtab_promocard_optout":"conditional_compile",
  "localization_default_and_repack":"keep",
- "aiwindow_prompt_seed":"review",
+ "aiwindow_prompt_seed":"keep",
  "hungarian_hyphenation_patterns":"review"
 }
 
@@ -60,7 +60,7 @@ def validate(reg,paired,progress):
     control=reg["m3_decision_classification"]
     assert control["total_candidates"]==20
     assert counts==control["categories"]
-    assert counts=={"keep":8,"remove_source":4,"review":5,"conditional_compile":3}
+    assert counts=={"keep":9,"remove_source":4,"review":4,"conditional_compile":3}
     assert control["complete_feature_dependency_inventory"] is False
     assert control["complete_candidate_fallback_validation"] is False
     assert control["whole_m3_gate_passed"] is False
@@ -107,7 +107,30 @@ def validate(reg,paired,progress):
     assert ai["source_files_removed"]==0
     assert ai["normal_browser_changed"] is False
     assert ai["removal_authorized"] is False
-    assert ai["decision"]=="review_missing_offline_bootstrap_fallback"
+    assert ai["decision"]=="keep_default_offline_prompt_seed_verified_native_runtime"
+    native_ai=ai["native_offline_prompt_runtime"]
+    assert native_ai["status"]=="accepted_real_archived_native_browser_protected_default_seed"
+    assert native_ai["success_run_id"]==40937489359
+    assert native_ai["artifact_id"]==12925766713
+    assert native_ai["critical_module_git_blobs_matched_current"] is True
+    assert native_ai["all_browser_source_matched_to_current"] is False
+    assert native_ai["nonlocal_connections_blocked"] is True
+    assert native_ai["temporary_private_profile"] is True
+    assert [native_ai[k] for k in ("seed_record_count","chat_params_record_count",
+                                  "identity_record_count","response_rules_record_count")] == [214,21,1,5]
+    assert all(native_ai[k] is True for k in (
+        "synthetic_empty_records_rejected_promptLoadFailure",
+        "synthetic_missing_identity_rejected_promptLoadFailure",
+        "synthetic_missing_params_rejected_promptLoadFailure",
+        "synthetic_complete_manifest_succeeded"))
+    assert native_ai["real_ai_model_executed"] is False
+    assert native_ai["remote_api_called"] is False
+    assert native_ai["seed_omission_native_compiled_or_tested"] is False
+    assert native_ai["replacement_offline_bootstrap_proven"] is False
+    assert native_ai["normal_browser_changed"] is False
+    assert native_ai["source_removal_authorized"] is False
+    assert native_ai["compressed_savings_bytes"] is None
+    assert reg["aiwindow_offline_seed_runtime"] == native_ai
 
     hu,=(x for x in reg["candidates"] if x["id"]=="hungarian_hyphenation_patterns")
     assert hu["package_logical_bytes"]==1048764
@@ -170,6 +193,9 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:c["milestones"][2]["acceptance_gates"].update(passed=3),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed").update(removal_authorized=True),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed").update(package_logical_bytes=0),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed")["native_offline_prompt_runtime"].update(seed_record_count=0),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed")["native_offline_prompt_runtime"].update(seed_omission_native_compiled_or_tested=True),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed")["native_offline_prompt_runtime"].update(remote_api_called=True),
         lambda a,b,c:a["accepted_source_pruning_cohort_totals"].update(aggregate_removed_git_paths=16182),
         lambda a,b,c:a["accepted_source_pruning_cohort_totals"]["cohorts"][1].update(removed_git_paths=15441),
         lambda a,b,c:a["accepted_source_pruning_cohort_totals"].update(candidate_fields_source_files_not_additive_as_pruned_totals=False),
