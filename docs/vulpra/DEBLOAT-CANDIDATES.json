@@ -50,6 +50,16 @@
         "requires_further_source_or_runtime_verification": false,
         "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
         "guarded_opt_in_omission_accepted": false
+      },
+      "native_gtk_wayland_preload_protection": {
+        "normal_archived_package_run_id": 40936431756,
+        "expected_order": [
+          "libmozgtk.so",
+          "libmozwayland.so",
+          "libxul.so"
+        ],
+        "risk": "Native loader symbol resolution requires GTK compatibility preload before mozwayland; never remove/reorder as bloat",
+        "verified_current_binary": false
       }
     },
     {
@@ -1978,5 +1988,37 @@
     "locale_layout_omission_runtime_checked": false,
     "compressed_savings_bytes": null,
     "normal_source_changed": false
+  },
+  "historical_native_loader_order_preflight": {
+    "status": "verified_historical_physical_normal_package_order",
+    "run_id": 40936431756,
+    "evidence_artifact_id": 12924836902,
+    "source_compiled_sha": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "normal_archive_verified": true,
+    "libxul_logical_bytes": 189486920,
+    "dependentlibs_name_count": 14,
+    "libmozgtk_before_libmozwayland": true,
+    "libxul_loaded_after_both": true,
+    "current_source_matched_native_loader_order_verified": false,
+    "system_runtime_loader_symbol_resolution_tested": false,
+    "source_deletion_authorized": false,
+    "compressed_feature_saving_bytes": null,
+    "documentation": "docs/vulpra/M3-NATIVE-LINK-INPUT-AND-LOADER-ORDER.md"
+  },
+  "pending_current_source_link_input_acceptance": {
+    "workflow_run_id": 40935344279,
+    "source_commit": "3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f",
+    "state": "native_compilation_observed_in_progress_at_last_poll_not_accepted",
+    "normal_browser_variant_only": true,
+    "requires": [
+      "real_compiler_link_and_package",
+      "libxul_response_list_sha_object_count",
+      "packaged_native_dep_order",
+      "independent_elf_inventory",
+      "Wayland_js_webextension_profile_nimbus_runtime"
+    ],
+    "full_linker_symbol_map_claimed": false,
+    "compiled_feature_savings_established": false,
+    "broad_m3_gate_advanced": false
   }
 }
