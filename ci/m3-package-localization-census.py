@@ -69,6 +69,7 @@ def census(archive):
     outer={name:stat() for name in KINDS}
     inside={name:stat() for name in KINDS}
     jars=[]
+    nested_entries=[]
     members=0
     with tarfile.open(archive,"r:xz") as tar:
         for member in tar:
@@ -88,6 +89,11 @@ def census(archive):
                     bucket=jar_group(entry.filename,member.name)
                     record(inside,bucket,entry.file_size,entry.compress_size)
                     record(jar_counts,bucket,entry.file_size,entry.compress_size)
+                    nested_entries.append({"jar":member.name,
+                                           "entry":entry.filename,
+                                           "logical_bytes":entry.file_size,
+                                           "inner_zip_compressed_bytes":entry.compress_size,
+                                           "locale_group":bucket})
                 jars.append({"archive_member":member.name,"status":"readable",
                              "entries":len(entries),
                              "locale_group_by_jar":{k:v for k,v in jar_counts.items()
@@ -104,6 +110,12 @@ def census(archive):
       "outer_tar_members":outer,
       "nested_omni_ja_members":inside,
       "omni_ja":jars,
+      "largest_nested_resources_by_logical_bytes":sorted(
+          nested_entries,
+          key=lambda e:(-e["logical_bytes"],e["jar"],e["entry"]))[:30],
+      "largest_nested_resources_by_inner_zip_compression":sorted(
+          nested_entries,
+          key=lambda e:(-e["inner_zip_compressed_bytes"],e["jar"],e["entry"]))[:30],
       "localized_content_present": (
         outer["browser_l10n"]["files"]+
         outer["toolkit_l10n"]["files"]+
@@ -118,6 +130,7 @@ def census(archive):
       "limitations":[
         "Historical browser archive may not match HEAD source/flags.",
         "ZIP entry compressed bytes are not independent contributions to tar.xz size.",
+        "Largest ZIP resources are physical asset candidates to inspect, NOT proof they are optional or safely omitted.",
         "Browser/toolkit label for localization/ entries uses the physical omni.ja container.",
         "Logical member bytes are not disk allocation or removable bytes.",
         "Some localized resources may use legacy or generated paths outside these categories.",
@@ -157,6 +170,11 @@ def self_test():
         assert found["nested_omni_ja_members"]["browser_l10n"]["files"]==1
         assert found["nested_omni_ja_members"]["toolkit_l10n"]["files"]==1
         assert found["localized_content_present"] is True
+        assert found["largest_nested_resources_by_logical_bytes"]
+        assert found["largest_nested_resources_by_inner_zip_compression"]
+        assert found["largest_nested_resources_by_logical_bytes"][0]["entry"] in (
+            "localization/en-US/toolkit/global.ftl",
+            "browser/localization/en-US/browser/browser.ftl")
         assert found["compiled_bytes_saved"] is None
         side.write_text("0"*64+"  "+p.name+"\n")
         try: census(p)
@@ -166,7 +184,7 @@ def self_test():
         try: census(p)
         except ValueError as e: assert "identify verified archive" in str(e)
         else: raise AssertionError("Wrong sidecar archive name accepted")
-    return 9
+    return 11
 
 def main():
     parser=argparse.ArgumentParser()
@@ -189,6 +207,12 @@ def main():
         print("Locale JAR containers:",[(j["archive_member"],j.get("entries"),{
               k:v["logical_bytes"] for k,v in j.get("locale_group_by_jar",{}).items()
               if v["logical_bytes"]}) for j in info["omni_ja"]])
+        print("TOP NESTED BY LOGICAL BYTES:",json.dumps([
+              {"jar":x["jar"],"path":x["entry"],"bytes":x["logical_bytes"]}
+              for x in info["largest_nested_resources_by_logical_bytes"][:18]]))
+        print("TOP NESTED BY ZIP COMPRESSED BYTES:",json.dumps([
+              {"jar":x["jar"],"path":x["entry"],"bytes":x["inner_zip_compressed_bytes"]}
+              for x in info["largest_nested_resources_by_inner_zip_compression"][:18]]))
         print("No compiled saving, native runtime or safe removal inferred")
     elif not args.self_test:
         parser.error("Provide archive path or --self-test")
