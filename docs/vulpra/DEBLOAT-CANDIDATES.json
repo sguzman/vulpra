@@ -1861,5 +1861,46 @@
     "marginal_compiled_savings_established": false,
     "source_removal_authorized": false,
     "docs": "docs/vulpra/M3-NATIVE-PACKAGE-ELF-GRAPH.md"
+  },
+  "exact_source_configure_only_snapshot": {
+    "status": "current_revision_native_configure_passed_no_compile",
+    "workflow_run_id": 40932179859,
+    "generated_snapshot_artifact_id": 12924085624,
+    "configured_source_commit": "74e390f8f27ba705fbf26aa4750a21f0929a6ae8",
+    "configured_target": "Linux GTK",
+    "configured_app": "Vulpra",
+    "configured_version": "159.0",
+    "configured_flag_count": 25,
+    "observed_generated_enabled_string_1": [
+      "ENABLE_WEBDRIVER",
+      "MOZ_CRASHREPORTER",
+      "MOZ_HAS_REMOTE",
+      "MOZ_NORMANDY",
+      "MOZ_SANDBOX",
+      "MOZ_SERVICES_HEALTHREPORT",
+      "MOZ_SERVICES_SYNC",
+      "MOZ_UPDATER",
+      "MOZ_WAYLAND",
+      "MOZ_X11"
+    ],
+    "observed_generated_devtools": "all",
+    "observed_generated_no_asrouter_promos": "",
+    "observed_missing_keys": [
+      "ENABLE_TESTS",
+      "MOZILLA_OFFICIAL",
+      "MOZ_APPSERVICES_IN_TREE",
+      "MOZ_BROWSER_BRANDING",
+      "MOZ_CONFIGURE_TRUSTED_PROXY",
+      "MOZ_GECKODRIVER",
+      "MOZ_TELEMETRY_REPORTING"
+    ],
+    "missing_key_means_disabled_code": false,
+    "current_source_native_compilation_done": false,
+    "current_source_link_map_done": false,
+    "source_binary_matched_to_historical_archive": false,
+    "new_removal_approved": false,
+    "compiled_package_savings_bytes": null,
+    "documentation": "docs/vulpra/M3-EXACT-SOURCE-CONFIG-SNAPSHOT.md",
+    "machine_readable": "docs/vulpra/M3-EXACT-SOURCE-CONFIG-SNAPSHOT.json"
   }
 }
