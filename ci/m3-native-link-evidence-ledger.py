@@ -29,7 +29,12 @@ def check(config,link,elf,localhost,extension,sidecar,source_sha,run_id):
     require(link.get("source_commit")==source_sha,"Link source SHA mismatch")
     require(elf.get("source_commit")==source_sha,"ELF source SHA mismatch")
     require(link.get("workflow_run_id")==run_id,"Link workflow run ID mismatch")
-    require(elf.get("workflow_run_id")==run_id,"ELF workflow run ID mismatch")
+    # The generic ELF package scanner does not know its GitHub Actions run ID.
+    # Bind it to the ID-pinned linker report by exact source, package SHA-256,
+    # and compiled-versus-packaged libxul hash instead. Reject a mismatching
+    # run ID if an enriched ELF report actually declares one.
+    if "workflow_run_id" in elf:
+        require(elf["workflow_run_id"]==run_id,"ELF workflow run ID mismatch")
     require(config.get("type")=="exact_source_configure_only_generated_substitution_snapshot",
             "Missing native configure snapshot provenance")
     require(config.get("configure_executed_in_this_run") is True,
@@ -194,9 +199,13 @@ def synthetic():
 def tests():
     arguments=synthetic()
     check(*arguments)
+    with_declared_elf_run=deepcopy(arguments)
+    with_declared_elf_run[2]["workflow_run_id"]=1234
+    check(*with_declared_elf_run)
     cases=[
       lambda c,l,e,o,x,s:l.update(source_commit="b"*64),
       lambda c,l,e,o,x,s:e.update(workflow_run_id=9999),
+      lambda c,l,e,o,x,s:e.update(workflow_run_id="1234"),
       lambda c,l,e,o,x,s:c["observed_generated_substs"]["MOZ_WAYLAND"].update(value=""),
       lambda c,l,e,o,x,s:c["observed_generated_substs"]["VULPRA_NO_ASROUTER_PROMOS"].update(state="absent"),
       lambda c,l,e,o,x,s:l.update(built_libxul_matches_packaged_libxul=False),
