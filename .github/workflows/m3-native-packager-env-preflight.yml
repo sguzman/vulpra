@@ -67,7 +67,10 @@ jobs:
           jq -e \
             --arg sha "$GITHUB_SHA" \
             '.source_commit == $sha and
+             .buildconfig_origin == "real_mach_python_buildconfig_verified_against_generated_substs" and
              .configured_MOZ_WIDGET_TOOLKIT == "gtk" and
+             .configured_PKG_STRIP == true and
+             .configured_USE_ELF_HACK == false and
              .native_libxul_built == false and
              .native_packager_replay_executed == false and
              .runtime_package_accepted == false' \
