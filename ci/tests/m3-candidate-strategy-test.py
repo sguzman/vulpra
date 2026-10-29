@@ -30,7 +30,7 @@ EXPECTED={
  "newtab_promocard_optout":"conditional_compile",
  "localization_default_and_repack":"keep",
  "aiwindow_prompt_seed":"keep",
- "hungarian_hyphenation_patterns":"review"
+ "hungarian_hyphenation_patterns":"keep"
 }
 
 def validate(reg,paired,progress):
@@ -60,7 +60,7 @@ def validate(reg,paired,progress):
     control=reg["m3_decision_classification"]
     assert control["total_candidates"]==20
     assert counts==control["categories"]
-    assert counts=={"keep":9,"remove_source":4,"review":4,"conditional_compile":3}
+    assert counts=={"keep":10,"remove_source":4,"review":3,"conditional_compile":3}
     assert control["complete_feature_dependency_inventory"] is False
     assert control["complete_candidate_fallback_validation"] is False
     assert control["whole_m3_gate_passed"] is False
@@ -137,7 +137,24 @@ def validate(reg,paired,progress):
     assert hu["source_files_removed"]==0
     assert hu["normal_browser_changed"] is False
     assert hu["removal_authorized"] is False
-    assert hu["decision"]=="review_only_localized_css_fallback_unverified"
+    assert hu["decision"]=="keep_default_hungarian_hyphenation_verified_native_css"
+    rendered=hu["native_css_evidence"]
+    assert rendered["status"]=="accepted_hungarian_rendering_observed_full_normal_package"
+    assert rendered["run_id"]==40938478049
+    assert rendered["evidence_artifact_id"]==12925058497
+    assert rendered["critical_hyphen_source_blobs_equal_current"] is True
+    assert rendered["whole_browser_source_equal_current"] is False
+    assert rendered["package_hu_pattern_present"] is True
+    assert all(rendered[k] is True for k in (
+        "hu_auto_wraps_more_than_none",
+        "hu_auto_wraps_more_than_unknown_locale",
+        "hu_HU_auto_wraps_more_than_none",
+        "en_US_auto_wraps_more_than_none"))
+    assert rendered["hu_pattern_omission_runtime_verified"] is False
+    assert rendered["normal_browser_changed"] is False
+    assert rendered["source_removal_authorized"] is False
+    assert rendered["compressed_package_savings"] is None
+    assert reg["hungarian_hyphenation_native_css"] == rendered
     hyph=reg["hungarian_hyphenation_boundary_audit"]
     assert hyph["source_only_passed"] is True and hyph["source_boundaries"]==6
     assert hyph["source_mutation_negatives"]==12
@@ -217,6 +234,9 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns").update(removal_authorized=True),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns").update(package_logical_bytes=0),
         lambda a,b,c:a["hungarian_hyphenation_boundary_audit"].update(locale_layout_omission_runtime_checked=True),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns")["native_css_evidence"].update(hu_auto_wraps_more_than_unknown_locale=False),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns")["native_css_evidence"].update(hu_pattern_omission_runtime_verified=True),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns")["native_css_evidence"].update(compressed_package_savings=1048764),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns")["historical_normal_css_runtime"].update(missing_hungarian_pattern_css_fallback_verified=True),
         lambda a,b,c:a["hungarian_hyphenation_boundary_audit"]["historical_normal_native_css_runtime"].update(hu_missing_dictionary_native_variant=True),
 
