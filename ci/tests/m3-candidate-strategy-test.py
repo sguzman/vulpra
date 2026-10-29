@@ -179,7 +179,7 @@ def negative_fixtures(reg,paired,progress):
     mutations=[
         lambda a,b,c:change_strategy(a,"remove_source"),
         lambda a,b,c:change_strategy(a,"unknown"),
-        lambda a,b,c:a["m3_decision_classification"]["categories"].update(keep=9),
+        lambda a,b,c:a["m3_decision_classification"]["categories"].update(keep=8),
         lambda a,b,c:a["m3_decision_classification"].update(whole_m3_gate_passed=True),
         lambda a,b,c:a["m3_decision_classification"].update(new_compiled_savings_bytes=6000000),
         lambda a,b,c:change_remove(a),
