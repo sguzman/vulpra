@@ -79,11 +79,59 @@ jobs:
           print("PASS: historical checked full-package locale byte census (no removed bytes)")
           PY
 
+      - name: Read independently checked package's native library and bundled resource footprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-package-footprint-local.py "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/replay/vulpra-promo-full-baseline.tar.xz"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["GITHUB_WORKSPACE"])
+          p=root/".git/vulpra-debloat/m3-package-footprint.json"
+          data=json.loads(p.read_text())
+          members=data["largest_regular_files"]
+          libxul=[m for m in members if m["path"].endswith("/libxul.so")]
+          jars=[m for m in members if m["path"].endswith("/omni.ja")]
+          assert len(libxul)==1,("No unique libxul.so in top 25 package members",libxul)
+          assert len(jars)==2,("Expected two large omni.ja members",jars)
+          assert data["compressed_archive_bytes"]==86930792
+          summary={
+            "schema_version":1,
+            "scope":"historical source-pinned actual native tar members",
+            "archive_origin_run_id":40567473401,
+            "archive_source_commit":"1683ca67b69389a879717bcd537772c3b40624b6",
+            "scanner_source_commit":os.environ["GITHUB_SHA"],
+            "current_whole_source_matched":False,
+            "archive_compressed_bytes":data["compressed_archive_bytes"],
+            "regular_file_logical_bytes":data["sum_regular_file_logical_bytes"],
+            "top_25_members":members,
+            "libxul_member":libxul[0],
+            "omni_ja_members":jars,
+            "compiled_package_bytes_saved":None,
+            "source_pruning_authorized":False,
+            "limitations":[
+              "Single historical native package, no native compile or runtime test.",
+              "Top 25 member count is not a complete library/dependency scan.",
+              "Logical bytes are not compressed marginal savings or mapped RSS.",
+              "No source-matched alternative archive was built."
+            ]}
+          output=Path(os.environ["RUNNER_TEMP"])/"m3-historical-package-native-footprint.json"
+          output.write_text(json.dumps(summary,indent=2)+"\n")
+          print("PASS: SHA-256 verified native package libxul and omni resource members")
+          print("NATIVE XUL LOGICAL BYTES:",libxul[0]["logical_bytes"])
+          print("NATIVE OMNI JAR LOGICAL BYTES:",
+                [(j["path"],j["logical_bytes"]) for j in jars])
+          print("HISTORICAL: no compressed feature saving or runtime behavior claimed")
+          PY
+
       - name: Preserve evidence JSON without archive, ping IDs or user data
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: m3-historical-package-localization-census
           path: ${{ runner.temp }}/m3-package-localization-census.json
+            ${{ runner.temp }}/m3-historical-package-native-footprint.json
           if-no-files-found: warn
           retention-days: 14
