@@ -1,0 +1,93 @@
+# Inspect the full archived native ELF dependency graph; archive is checksum verified.
+# Never rebuild Firefox, run ELF binaries, or declare host dependencies resolved.
+name: M3 Archived Native ELF Package Graph
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-elf-package-graph.py
+      - .github/workflows/m3-native-elf-package-graph.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vulpra-m3-native-elf-package-graph
+  cancel-in-progress: false
+
+jobs:
+  package-elf-graph:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Sparse checkout read-only ELF census
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Reject corrupt tar, checksum and ELF fixture cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-native-elf-package-graph.py
+          python3 ci/m3-native-elf-package-graph.py --self-test
+
+      - name: Retrieve original full native Vulpra package by exact archived run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40567473401 --repo "$GITHUB_REPOSITORY" \
+            --name m3-asrouter-promo-matched-baseline --dir "$RUNNER_TEMP/archived"
+          (
+            cd "$RUNNER_TEMP/archived"
+            sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256
+            jq -e '.source_commit == "1683ca67b69389a879717bcd537772c3b40624b6" and .full_promo_resources_present == true' m3-promo-matched-size.json >/dev/null
+          )
+
+      - name: Inspect all regular ELF members without loading code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-elf-package-graph.py \
+            "$RUNNER_TEMP/archived/vulpra-promo-full-baseline.tar.xz" \
+            --output "$RUNNER_TEMP/m3-native-elf-package-graph.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"m3-native-elf-package-graph.json"
+          x=json.loads(p.read_text())
+          assert x["archive_compressed_bytes"]==86930792
+          assert x["archive_regular_members"]==47
+          assert x["archive_regular_logical_bytes"]==339565212
+          assert len(x["elf_members"]) >= 5
+          assert sum(m["name"]=="libxul.so" for m in x["elf_members"])==1
+          assert x["all_native_binary_execution_avoided"] is True
+          assert x["host_dependency_resolution_verified"] is False
+          assert x["dlopen_and_indirect_runtime_dependencies_complete"] is False
+          assert x["source_removal_authorized"] is False
+          assert x["marginal_compressed_saving_bytes"] is None
+          x["archive_compiled_source_commit"]="1683ca67b69389a879717bcd537772c3b40624b6"
+          x["original_archive_run_id"]=40567473401
+          x["inspector_source_commit"]=os.environ["GITHUB_SHA"]
+          p.write_text(json.dumps(x,indent=2)+"\n")
+          print("PASS: physically packaged ELF metadata and direct dependencies, unexecuted")
+          PY
+
+      - name: Upload bounded ELF dependency graph JSON only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-elf-package-graph
+          path: ${{ runner.temp }}/m3-native-elf-package-graph.json
+          if-no-files-found: warn
+          retention-days: 14
