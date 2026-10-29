@@ -126,12 +126,22 @@ jobs:
           print("HISTORICAL: no compressed feature saving or runtime behavior claimed")
           PY
 
+      - name: Require both independent evidence reports before successful acceptance
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/m3-package-localization-census.json"
+          test -s "$RUNNER_TEMP/m3-historical-package-native-footprint.json"
+          echo "PASS: locale and binary native archive evidence files both exist"
+
       - name: Preserve evidence JSON without archive, ping IDs or user data
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: m3-historical-package-localization-census
-          path: ${{ runner.temp }}/m3-package-localization-census.json
+          path: |
+            ${{ runner.temp }}/m3-package-localization-census.json
             ${{ runner.temp }}/m3-historical-package-native-footprint.json
           if-no-files-found: warn
           retention-days: 14
