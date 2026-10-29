@@ -51,3 +51,4 @@ jobs:
             .github/workflows/m3-sync-reference-audit.yml
             .github/workflows/m3-telemetry-reference-audit.yml
             .github/workflows/m3-telemetry-lifecycle-boundaries.yml
+            .github/workflows/m3-telemetry-deletion-boundaries.yml
