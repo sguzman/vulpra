@@ -264,6 +264,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VULPRA_JOB_STATUS: ${{ job.status }}
         run: |
+          # shellcheck disable=SC2016
+          # Literal printf formats and quoted Python snippets are intentional.
           set -euo pipefail
           {
             printf '## M3 Normandy native variant CI\n\n'
