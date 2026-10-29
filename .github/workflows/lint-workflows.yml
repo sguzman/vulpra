@@ -21,51 +21,9 @@ jobs:
           filter: blob:none
           sparse-checkout: |
             .github/workflows
-      - name: Check Vulpra workflows and embedded shell
+      - name: Lint every Vulpra workflow, including newly added workflows
         uses: docker://rhysd/actionlint:1.7.12
         with:
-          args: >-
-            -color
-            .github/workflows/build-linux.yml
-            .github/workflows/configure-linux.yml
-            .github/workflows/test-launcher.yml
-            .github/workflows/test-wayland-harness.yml
-            .github/workflows/audit-license-branding.yml
-            .github/workflows/verify-upstream.yml
-            .github/workflows/import-firefox.yml
-            .github/workflows/source-metrics.yml
-            .github/workflows/lint-workflows.yml
-            .github/workflows/m3-newtab-adsfeed-native.yml
-            .github/workflows/m3-newtab-adsfeed-matched-baseline.yml
-            .github/workflows/m3-newtab-adsfeed-size-compare.yml
-            .github/workflows/m3-newtab-adsfeed-manifest-audit.yml
-            .github/workflows/m3-optout-define-preflight.yml
-            .github/workflows/m3-pocket-reference-audit.yml
-            .github/workflows/m3-pocket-live-boundaries.yml
-            .github/workflows/m3-sync-live-boundaries.yml
-            .github/workflows/m3-promocard-bundle-preflight.yml
-            .github/workflows/m3-promocard-native.yml
-            .github/workflows/m3-promocard-matched-baseline.yml
-            .github/workflows/m3-promocard-size-compare.yml
-            .github/workflows/m3-promocard-asset-audit.yml
-            .github/workflows/m3-sync-reference-audit.yml
-            .github/workflows/m3-telemetry-reference-audit.yml
-            .github/workflows/m3-telemetry-lifecycle-boundaries.yml
-            .github/workflows/m3-telemetry-deletion-boundaries.yml
-            .github/workflows/m3-telemetry-runtime-native.yml
-            .github/workflows/m3-telemetry-artifact-replay.yml
-            .github/workflows/m3-testing-localization-boundaries.yml
-            .github/workflows/m3-native-build-feature-boundaries.yml
-            .github/workflows/m3-package-localization-census.yml
-            .github/workflows/m3-native-elf-census.yml
-            .github/workflows/m3-aiwindow-prompt-seed-boundaries.yml
-            .github/workflows/m3-historical-config-provenance.yml
-            .github/workflows/m3-native-elf-package-graph.yml
-            .github/workflows/m3-configure-only-snapshot.yml
-            .github/workflows/m3-source-matched-native-link.yml
-            .github/workflows/m3-hungarian-hyphenation-boundaries.yml
-            .github/workflows/m3-native-link-archive-preflight.yml
-            .github/workflows/m3-aiwindow-offline-runtime.yml
-            .github/workflows/m3-hungarian-css-native.yml
-            .github/workflows/m3-native-link-evidence-reconcile.yml
-            .github/workflows/m3-hu-css-native-baseline.yml
+          # With no file args actionlint discovers all .github/workflows/*.yml.
+          # Never maintain a brittle explicit list that silently misses new CI.
+          args: -color
