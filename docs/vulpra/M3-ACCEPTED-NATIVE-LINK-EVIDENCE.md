@@ -48,6 +48,37 @@ failed on artificially small original-ELF size limits (384 MiB and 2 GiB).
 Their subsequent packaged-browser runtime steps were skipped. They are not
 accepted native evidence; the new run is separately complete.
 
+## Historical-to-current ELF import stability
+
+[Source-only native ELF import comparison 40973033976](https://github.com/sguzman/vulpra/actions/runs/40973033976)
+**PASSED**, artifact **12939844976**, using two separately real
+native/package-derived and SHA-256-pinned ELF graph reports:
+
+- Historical normal archive SHA-256
+  `e8717fd10a1ffc330ef96f802a4112da335aaf57c6e68d70e639b3e137c9e97f`,
+  **86,930,792 B**; historical original compiled-source attribution is
+  recorded separately in [configuration provenance](M3-HISTORICAL-BUILD-CONFIG-PROVENANCE.md),
+  rather than falsely stamping its ELF scanner JSON with a commit it does not contain.
+- Accepted new normal archive SHA-256
+  `18798900c5307fd136f7d93db6681741616981b609741a4b2209a1810273eb51`,
+  source `cde4d83043f8c476173c8dbc78b66b078c3f6b5b`,
+  **87,154,700 B**.
+
+The package ELF sets have **28 identical member paths**, **268 direct
+`DT_NEEDED` edges in each**, zero added/removed ELF member paths,
+and **zero per-file `DT_NEEDED` or `SONAME` differences**.
+
+The tool also independently reports **6 ELF binaries with differing
+SHA-256 payloads**: `crashhelper`, `crashreporter`,
+`libmozinference.so`, `libxul.so`, `vulpra`, `vulpra-bin`.
+The other **22 member SHA-256** digests agree. These findings reject
+false claims that all binary bytes or product behavior are identical.
+Different-source package-size changes are **not** valid compressed
+feature-removal savings. The parser accepts legitimate nested
+`gmp-clearkey/0.1/libclearkey.so` packaged paths while rejecting
+parent-directory traversals; CI separately runs corruption/false-claim fixtures.
+The comparison executes no binaries.
+
 ## Current source-matched CI host ELF metadata
 
 A **separate read-only Ubuntu host crosswalk** uses only the accepted
