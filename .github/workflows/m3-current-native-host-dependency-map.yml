@@ -1,0 +1,125 @@
+# Read-only map of host ELF names for the completed source-matched normal browser.
+name: M3 Accepted Native Ubuntu ELF Dependency Crosswalk
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/m3-current-native-host-dependency-map.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-current-native-ubuntu-host-subgraph:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SOURCE_NATIVE_RUN: '40963098075'
+      SOURCE_NATIVE_SHA: 'cde4d83043f8c476173c8dbc78b66b078c3f6b5b'
+      SOURCE_ARCHIVE_SHA256: '18798900c5307fd136f7d93db6681741616981b609741a4b2209a1810273eb51'
+    steps:
+      - name: Checkout bounded metadata-only scripts
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject negative fixtures and source-code syntax errors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-native-host-dependency-preflight.py ci/m3-native-host-transitive-map.py
+          python3 ci/m3-native-host-dependency-preflight.py --self-test
+          python3 ci/m3-native-host-transitive-map.py --self-test
+      - name: Install only CI-host library metadata tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            binutils libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          test -x /sbin/ldconfig
+          command -v readelf
+      - name: Verify successful exact-source original native workflow and fetch evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_NATIVE_RUN" \
+            | jq -e --arg sha "$SOURCE_NATIVE_SHA" \
+              '.status == "completed" and .conclusion == "success" and .head_sha == $sha and
+               .name == "M3 Source Matched Native Link Inputs and Runtime"' >/dev/null
+          gh run download "$SOURCE_NATIVE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-source-matched-native-link-evidence \
+            --dir "$RUNNER_TEMP/native-evidence"
+      - name: Bind the ELF graph to real native build, package SHA and runtime gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          root=Path(os.environ["RUNNER_TEMP"])/"native-evidence"
+          def load(name):
+              paths=list(root.rglob(name))
+              assert len(paths)==1,(name,len(paths))
+              return json.loads(paths[0].read_text())
+          graph=load("m3-native-link-elf-package-graph.json")
+          link=load("m3-native-link-inputs.json")
+          config=load("m3-native-link-config.json")
+          sha=os.environ["SOURCE_NATIVE_SHA"]
+          package=os.environ["SOURCE_ARCHIVE_SHA256"]
+          assert graph["source_commit"]==link["source_commit"]==config["source_commit"]==sha
+          assert graph["archive_sha256"]==link["package"]["package_sha256"]==package
+          assert link["workflow_run_id"]==int(os.environ["SOURCE_NATIVE_RUN"])
+          assert link["runtime_passed_after_link_audit"] is True
+          assert link["packaging_transform_replay"]["deterministic_reproduction_verified"] is True
+          assert graph["all_native_binary_execution_avoided"] is True
+          assert graph["source_removal_authorized"] is False
+          assert len(graph["elf_members"])==28
+          assert graph["direct_needed_edges"]==268
+          assert len(graph["not_packaged_needed_names"])==36
+          (Path(os.environ["RUNNER_TEMP"])/"current-native-elf-graph.json").write_text(json.dumps(graph))
+          print("PASS: native source, archive checksum, ELF graph and runtime evidence")
+          PY
+      - name: Derive Ubuntu direct and transitive cache-file mappings without execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-host-dependency-preflight.py \
+            --graph "$RUNNER_TEMP/current-native-elf-graph.json" \
+            --output "$RUNNER_TEMP/current-native-host-cache.json"
+          python3 ci/m3-native-host-transitive-map.py \
+            --graph "$RUNNER_TEMP/current-native-elf-graph.json" \
+            --output "$RUNNER_TEMP/current-native-host-transitive.json"
+          jq -e --arg sha "$SOURCE_ARCHIVE_SHA256" \
+            '.source_archive_sha256 == $sha and .direct_unbundled_names_checked == 36 and
+             .native_package_binary_executed == false and .ldd_or_dlopen_called == false and
+             .target_workstation_library_resolution_proven == false and
+             .source_removal_authorized == false' \
+            "$RUNNER_TEMP/current-native-host-cache.json" >/dev/null
+          jq -e --arg sha "$SOURCE_ARCHIVE_SHA256" --arg commit "$SOURCE_NATIVE_SHA" \
+            '.source_archive_sha256 == $sha and
+             .source_archive_original_compiler_commit == $commit and
+             .source_compiler_commit_in_graph_verified == true and
+             .original_package_external_direct_needs == 36 and
+             .host_direct_and_transitive_unique_names >= 36 and
+             .original_package_ELF_executed == false and .host_ELF_executed == false and
+             .ldd_or_dlopen_invoked == false and
+             .actual_loader_resolution_or_symbol_versions_verified == false and
+             .target_Arch_workstation_verified == false and
+             .compiled_feature_savings_bytes == null and .source_removal_authorized == false' \
+            "$RUNNER_TEMP/current-native-host-transitive.json" >/dev/null
+          echo "PASS: matched current native archive metadata, not loader/ABI/Arch closure"
+      - name: Preserve bounded direct and transitive host evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-accepted-native-ubuntu-host-dependency-map
+          path: |
+            ${{ runner.temp }}/current-native-host-cache.json
+            ${{ runner.temp }}/current-native-host-transitive.json
+          if-no-files-found: warn
+          retention-days: 14
