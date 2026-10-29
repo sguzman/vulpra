@@ -452,7 +452,7 @@
         "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces",
         "https://github.com/sguzman/vulpra/actions/runs/40785850376"
       ],
-      "next": "Code/fixtures complete for optional localhost WebDriver telemetry runtime inspection, CI 40803048273 PASS. Await actual single normal native Vulpra package run 40803276397 before claiming runtime observations. This test uses a debug override and local sink; true production upload safety/deletion delivery still needs separate evaluation. Preserve all sender, privacy cleanup, Glean/crash and master policy code; no omission or M3 gate credit.",
+      "next": "Do not remove sender or master-policy modules. If telemetry transport removal becomes a viable candidate, verify production-mode normal sender startup and deletion request server transport with a source-matched native package, respecting client ID rotation/pending queues/Glean/crash. Historical test-mode replay proves harness works, not product privacy deletion outcomes. M3 2/6 remains unchanged.",
       "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\"",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -565,7 +565,7 @@
         ]
       },
       "loopback_runtime_harness": {
-        "status": "offline_fixtures_passed_native_trial_in_progress",
+        "status": "historical_native_test_mode_replay_passed_current_source_matched_runtime_still_unverified",
         "script": "ci/smoke-telemetry-loopback-package.py",
         "offline_run_id": 40803048273,
         "offline_checks": [
@@ -580,11 +580,19 @@
         "native_workflow": ".github/workflows/m3-telemetry-runtime-native.yml",
         "native_source_commit": "2e09fcf80b4f3c81506e0b579689a2f4e05e0e5e",
         "native_run_id": 40803276397,
-        "native_conclusion": "pending",
+        "native_conclusion": "compiled_and_packaged_passed_runtime_test_failed_inactive_sender",
         "normal_browser_changed": false,
         "source_deletion_authorized": false,
         "network_privacy_verification_complete": false,
-        "notes": "Debug/test-mode override and local HTTP telemetry receiver do not prove production delivery or server-side deletion. Native browser workflow builds one normal Vulpra browser once; the two prior package artifacts contained bounded evidence only, not installable binaries. Strict normal-only test without new opt-out variant; no native status or byte savings claimed yet."
+        "notes": "Native current-source build 40803276397 succeeded but runtime failed due synthetic ping not reaching receiver. Historical identical-six-telemetry-module package from 40567473401 reproduced that normal sender was not initialized in a short-lived WebDriver profile; actual TelemetryController.testSetup() initialized the sender and allowed full loopback test to pass in 40917517371. Historical whole browser is not source matched; test mode bypasses official build gate, upload-disabled deletion exception is only eligibility; no proof of server-side deletion or production behavior. No default product code changed.",
+        "historical_archive_run_id": 40567473401,
+        "historical_archived_source_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+        "historical_test_mode_diagnostic_run_id": 40917517371,
+        "historical_test_mode_diagnostic_conclusion": "success",
+        "critical_telemetry_source_blobs_identical_to_current_main": 6,
+        "historical_replay_workflow": ".github/workflows/m3-telemetry-artifact-replay.yml",
+        "normal_startup_sender_initialized": false,
+        "explicit_test_setup_required": true
       }
     },
     {
