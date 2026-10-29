@@ -1,0 +1,127 @@
+# Cross-check every native-build JSON against one exact source and compiled binary.
+# Does not rebuild Firefox or trust a lone successful workflow label.
+name: M3 Source Matched Native Evidence Reconciliation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-link-evidence-ledger.py
+      - .github/workflows/m3-native-link-evidence-reconcile.yml
+  workflow_run:
+    workflows:
+      - M3 Source Matched Native Link Inputs and Runtime
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate-negative-fixtures:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout bounded evidence validator
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject fabricated native config/hash/runtime attestations
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-native-link-evidence-ledger.py
+          python3 ci/m3-native-link-evidence-ledger.py --self-test
+
+  reconcile-real-native-run:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    needs: validate-negative-fixtures
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
+      NATIVE_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Checkout only bounded verifier, not native build source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Independently confirm successful original native run and exact head SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NATIVE_RUN_ID" \
+            > "$RUNNER_TEMP/native-run-metadata.json"
+          jq -e \
+            --arg sha "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            '.id == $run and .head_sha == $sha and
+             .status == "completed" and .conclusion == "success" and
+             .name == "M3 Source Matched Native Link Inputs and Runtime"' \
+            "$RUNNER_TEMP/native-run-metadata.json" >/dev/null
+          echo "PASS: original full native workflow actually succeeded at expected SHA"
+      - name: Retrieve one bounded original run evidence artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-source-matched-native-link-evidence \
+            --dir "$RUNNER_TEMP/native-evidence"
+      - name: Reconcile all source, binary, SHA and real runtime evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,subprocess,sys
+          root=Path(os.environ["RUNNER_TEMP"])/"native-evidence"
+          names={
+            "config":"m3-native-link-config.json",
+            "link":"m3-native-link-inputs.json",
+            "elf":"m3-native-link-elf-package-graph.json",
+            "localhost":"m3-localhost-acceptance.json",
+            "webextension":"webextension-smoke-*.json",
+            "sidecar":"vulpra-local-m3-native-link-ci.tar.xz.sha256",
+          }
+          args=[]
+          for k,pattern in names.items():
+              matches=list(root.rglob(pattern))
+              if len(matches)!=1:
+                  raise SystemExit("FAIL: expected one "+k+" record; found "+str(len(matches)))
+              args += ["--"+k,str(matches[0])]
+          args += ["--source-sha",os.environ["NATIVE_SOURCE_SHA"],
+                   "--run-id",os.environ["NATIVE_RUN_ID"],
+                   "--output",str(Path(os.environ["RUNNER_TEMP"])/"m3-native-link-reconciled.json")]
+          subprocess.run([sys.executable,"ci/m3-native-link-evidence-ledger.py",*args],check=True)
+          PY
+          jq -e \
+            --arg sha "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            '.source_commit==$sha and .workflow_run_id==$run and
+             .status=="passed_full_native_evidence_reconciliation" and
+             .GTK_before_Wayland == true and
+             .Wayland_JS_WebExtension_Nimbus_passed == true and
+             .complete_resolved_linker_symbol_map == false and
+             .lean_full_source_matched_pair_done == false and
+             .compiled_package_savings_bytes == null and
+             .additional_source_removal_authorized == false' \
+            "$RUNNER_TEMP/m3-native-link-reconciled.json" >/dev/null
+      - name: Preserve only bounded reconciled source and runtime attestations
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-link-reconciled-evidence
+          path: ${{ runner.temp }}/m3-native-link-reconciled.json
+          if-no-files-found: error
+          retention-days: 14
