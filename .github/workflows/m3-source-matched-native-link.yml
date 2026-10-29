@@ -1,0 +1,222 @@
+# One full normal exact-source native browser build, no feature omission.
+name: M3 Source Matched Native Link Inputs and Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-source-matched-native-link.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vulpra-m3-source-matched-native-link
+  cancel-in-progress: false
+
+jobs:
+  compile-link-package-runtime:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
+      MOZ_HEADLESS: "1"
+      DEBIAN_FRONTEND: noninteractive
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
+      VULPRA_M3_VERIFY_NIMBUS: "1"
+    steps:
+      - name: Checkout exactly the source that will be configured and built
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Reject broken link-input and protected normal-browser contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 ci/m3-native-build-link-inputs.py --self-test
+          python3 ci/m3-configure-only-substs.py --self-test
+          python3 ci/tests/m3-promocard-bundle-contract.py
+          python3 -m py_compile ci/m3-native-elf-package-graph.py
+          echo "PASS: exact source and original unomitted normal Vulpra"
+
+      - name: Prepare native compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Export GitHub compiler-cache backend credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Bootstrap supported compiler and private browser test dependencies
+        shell: bash
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends python3 python3-venv python3-dev git curl make jq \
+            weston wayland-utils libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 \
+            libnss3 libgbm1 binutils
+          ./mach --no-interactive bootstrap --application-choice browser
+          if ! test -x "$HOME/.mozbuild/clang/bin/clang" || \
+             ! test -x "$HOME/.mozbuild/clang/bin/clang++"; then
+            (cd "$HOME/.mozbuild" && "$GITHUB_WORKSPACE/mach" artifact toolchain --from-build linux64-clang)
+          fi
+          major="$("$HOME/.mozbuild/clang/bin/clang" --version | head -1 | sed -E 's/.*version ([0-9]+).*/\1/')"
+          [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 19 ))
+
+      - name: Record exact-source generated configure substitutions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          ./mach configure
+          python3 ci/m3-configure-only-substs.py \
+            --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
+            --output "$RUNNER_TEMP/m3-native-link-config.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          x=json.loads((Path(os.environ["RUNNER_TEMP"])/"m3-native-link-config.json").read_text())
+          assert x["source_commit"]==os.environ["GITHUB_SHA"]
+          f=x["observed_generated_substs"]
+          for k in ("MOZ_WAYLAND","MOZ_X11","MOZ_SANDBOX","ENABLE_WEBDRIVER"):
+              assert f[k]["value"]=="1",(k,f[k])
+          assert f["MOZ_DEVTOOLS"]["value"]=="all"
+          assert f["VULPRA_NO_ASROUTER_PROMOS"]["value"]==""
+          print("PASS: current source config identity, Wayland and protected features")
+          PY
+
+      - name: Reserve sufficient swap for native Rust/C++ build
+        shell: bash
+        run: |
+          set -euo pipefail
+          free="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( free > 24*1024*1024*1024 + 8*1024*1024*1024 ))
+          sudo fallocate -l 24G /mnt/vulpra-m3-native-link.swap
+          sudo chmod 0600 /mnt/vulpra-m3-native-link.swap
+          sudo mkswap /mnt/vulpra-m3-native-link.swap
+          sudo swapon /mnt/vulpra-m3-native-link.swap
+          grep -Fq /mnt/vulpra-m3-native-link.swap /proc/swaps
+
+      - name: Compile complete normal exact-source native Vulpra
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-native-link-build.log"
+
+      - name: Package and independently verify native browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline/dist"
+          archive="$(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print -quit)"
+          test -n "$archive"
+          test "$(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' | wc -l)" -eq 1
+          mkdir -p .git/vulpra-native-build/packages
+          bash packaging/stage.sh "$archive" \
+            "$GITHUB_WORKSPACE/.git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz"
+          (cd .git/vulpra-native-build/packages && sha256sum -c vulpra-local-m3-native-link-ci.tar.xz.sha256)
+
+      - name: Validate generated libxul inputs, preload order and all packaged native ELFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz"
+          python3 ci/m3-native-build-link-inputs.py \
+            --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
+            --package "$package" --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/m3-native-link-inputs.json"
+          python3 ci/m3-native-elf-package-graph.py "$package" \
+            --output "$RUNNER_TEMP/m3-native-link-elf-package-graph.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])
+          a=json.loads((p/"m3-native-link-inputs.json").read_text())
+          b=json.loads((p/"m3-native-link-elf-package-graph.json").read_text())
+          c=json.loads((p/"m3-native-link-config.json").read_text())
+          assert a["source_commit"]==c["source_commit"]==os.environ["GITHUB_SHA"]
+          assert a["package"]["package_sha256"]==b["archive_sha256"]
+          assert len(b["elf_members"])>=20
+          assert a["dist_native_loader_order"]["mozgtk_before_mozwayland"]
+          a["workflow_run_id"]=int(os.environ["GITHUB_RUN_ID"])
+          a["runtime_passed_after_link_audit"]=False
+          (p/"m3-native-link-inputs.json").write_text(json.dumps(a,indent=2)+"\n")
+          b["source_commit"]=os.environ["GITHUB_SHA"]
+          (p/"m3-native-link-elf-package-graph.json").write_text(json.dumps(b,indent=2)+"\n")
+          print("PASS: exact-source native libxul response, real ELF and compressed package evidence")
+          PY
+
+      - name: Smoke real packaged Wayland, JS navigation, WebExtensions and Nimbus
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+          folder="$(mktemp -d)"
+          trap 'rm -rf -- "$folder"' EXIT
+          tar -xf .git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz -C "$folder"
+          app="$(find "$folder" -maxdepth 5 -type f -name application.ini -print -quit)"
+          test -n "$app"
+          VULPRA_WAYLAND_TEST_SECONDS=10 bash packaging/test-wayland.sh "$(dirname "$app")"
+          python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"m3-native-link-inputs.json"
+          x=json.loads(p.read_text())
+          x["runtime_passed_after_link_audit"]=True
+          x["runtime_gates"]=["Wayland private Weston","localhost JS navigation",
+                              "isolated profile and WebExtension","Nimbus check"]
+          p.write_text(json.dumps(x,indent=2)+"\n")
+          print("PASS: normal browser packaged runtime acceptance")
+          PY
+
+      - name: Preserve bounded native evidence and checksum without full archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-source-matched-native-link-evidence
+          path: |
+            ${{ runner.temp }}/m3-native-link-config.json
+            ${{ runner.temp }}/m3-native-link-inputs.json
+            ${{ runner.temp }}/m3-native-link-elf-package-graph.json
+            .git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz.sha256
+            .git/vulpra-native-build/m3-localhost-acceptance.json
+            .git/vulpra-native-build/webextension-smoke-*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Preserve bounded failure tail
+        if: failure()
+        shell: bash
+        run: |
+          if test -f "$RUNNER_TEMP/m3-native-link-build.log"; then
+            tail -n 3000 "$RUNNER_TEMP/m3-native-link-build.log" > "$RUNNER_TEMP/m3-native-link-failure-tail.log"
+          fi
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-link-failure-tail
+          path: ${{ runner.temp }}/m3-native-link-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
