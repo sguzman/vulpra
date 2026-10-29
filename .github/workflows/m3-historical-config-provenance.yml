@@ -1,0 +1,85 @@
+# Reconcile source-vs-workflow provenance using GitHub's original immutable run metadata.
+# No native build, no configure execution, no archive download.
+name: M3 Historical Native Configure Provenance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-historical-config-provenance.py
+      - .github/workflows/m3-historical-config-provenance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify-archived-configure-guards:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout read-only provenance analyzer
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Fetch original Actions run, job, source-pinned workflow and mozconfig
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/provenance"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40567473401" \
+            > "$RUNNER_TEMP/provenance/run.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/jobs/122412477192" \
+            > "$RUNNER_TEMP/provenance/job.json"
+          jq -e '.head_sha == "341128fd6f640738ea2fbb0f674eb6319b249235" and .conclusion == "success"' \
+            "$RUNNER_TEMP/provenance/run.json" > /dev/null
+          gh api "repos/$GITHUB_REPOSITORY/contents/.github/workflows/m3-asrouter-promo-matched-baseline.yml?ref=341128fd6f640738ea2fbb0f674eb6319b249235" \
+            --jq '.content' | base64 -d > "$RUNNER_TEMP/provenance/workflow.yml"
+          gh api "repos/$GITHUB_REPOSITORY/contents/ci/mozconfig-linux-m3-baseline?ref=1683ca67b69389a879717bcd537772c3b40624b6" \
+            --jq '.content' | base64 -d > "$RUNNER_TEMP/provenance/mozconfig"
+          gh run view 40567473401 --repo "$GITHUB_REPOSITORY" \
+            --job 122412477192 --log > "$RUNNER_TEMP/provenance/job.log"
+          test -s "$RUNNER_TEMP/provenance/job.log"
+          echo "PASS: original build recipe, compiled-source mozconfig, and workflow logs fetched"
+
+      - name: Verify selected generated config asserts and refuse provenance corruption
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-historical-config-provenance.py
+          python3 ci/m3-historical-config-provenance.py \
+            --run "$RUNNER_TEMP/provenance/run.json" \
+            --job "$RUNNER_TEMP/provenance/job.json" \
+            --workflow "$RUNNER_TEMP/provenance/workflow.yml" \
+            --mozconfig "$RUNNER_TEMP/provenance/mozconfig" \
+            --log "$RUNNER_TEMP/provenance/job.log" \
+            --self-test \
+            --output "$RUNNER_TEMP/m3-historical-config-provenance.json"
+          jq -e '
+            .original_actions_workflow_head_sha == "341128fd6f640738ea2fbb0f674eb6319b249235" and
+            .actual_compiled_browser_source_sha == "1683ca67b69389a879717bcd537772c3b40624b6" and
+            .original_archived_package_artifact_id == 12767756929 and
+            .native_configure_build_and_package_all_passed == true and
+            .complete_generated_config_statusd_available == false and
+            .requested_mozconfig_all_values_verified_in_generated_substs == false and
+            .new_removal_authorized == false and
+            .compressed_feature_savings_measured == null and
+            .invalid_provenance_mutations_rejected == 10
+          ' "$RUNNER_TEMP/m3-historical-config-provenance.json" >/dev/null
+
+      - name: Preserve only bounded provenance attestations, not full raw log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-historical-config-provenance
+          path: ${{ runner.temp }}/m3-historical-config-provenance.json
+          if-no-files-found: warn
+          retention-days: 14
