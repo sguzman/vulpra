@@ -78,6 +78,31 @@ def replay(objdir,source_commit):
         ],
     }
 
+def probe_environment(objdir,source_commit):
+    """Verify only the configured source/object environment; do not copy ELF."""
+    if subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip()!=source_commit:
+        raise ValueError("Probe source commit differs from Git checkout")
+    if not (objdir/"config.status").is_file():
+        raise ValueError("No source-matched generated config.status")
+    if not (objdir/"buildconfig.py").is_file():
+        raise ValueError("No generated object-directory buildconfig.py")
+    sys.path.insert(0,str(objdir))
+    import buildconfig
+    from mozpack.files import ExecutableFile
+    from mozpack.executables import may_strip,may_elfhack
+    if Path(buildconfig.topobjdir).resolve()!=objdir:
+        raise ValueError("Imported buildconfig points to a different object directory")
+    if not callable(ExecutableFile.copy) or not callable(may_strip) or not callable(may_elfhack):
+        raise ValueError("Missing Gecko native packager executable-copy functions")
+    return {"source_commit":source_commit,"objdir":str(objdir),
+            "configured_MOZ_WIDGET_TOOLKIT":buildconfig.substs.get("MOZ_WIDGET_TOOLKIT"),
+            "configured_PKG_STRIP":bool(buildconfig.substs.get("PKG_STRIP")),
+            "configured_USE_ELF_HACK":bool(buildconfig.substs.get("USE_ELF_HACK")),
+            "native_libxul_built":False,
+            "native_packager_replay_executed":False,
+            "runtime_package_accepted":False}
+
+
 def selftest():
     assert not valid_binary_size(MIN_LIBXUL)
     assert valid_binary_size(MIN_LIBXUL+1)
@@ -91,6 +116,7 @@ def selftest():
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--self-test",action="store_true")
+    ap.add_argument("--probe-environment",action="store_true")
     ap.add_argument("--objdir",type=Path)
     ap.add_argument("--source-sha")
     ap.add_argument("--output",type=Path)
@@ -99,6 +125,16 @@ def main():
         print("PASS:",selftest(),"native unstripped/staged library size boundaries")
         if not (a.objdir or a.source_sha or a.output):
             return
+    if a.probe_environment:
+        if not (a.objdir and a.source_sha):
+            ap.error("--objdir and --source-sha are required for --probe-environment")
+        result=probe_environment(a.objdir.resolve(),a.source_sha)
+        if a.output:
+            a.output.parent.mkdir(parents=True,exist_ok=True)
+            a.output.write_text(json.dumps(result,indent=2)+"\n")
+        print("PASS: exact-source generated Gecko packager imports and object-directory configuration")
+        print("NO NATIVE BROWSER BUILD OR PACKAGING PROOF:",result["runtime_package_accepted"])
+        return
     if not (a.objdir and a.source_sha and a.output):
         ap.error("--objdir, --source-sha and --output required")
     result=replay(a.objdir.resolve(),a.source_sha)
