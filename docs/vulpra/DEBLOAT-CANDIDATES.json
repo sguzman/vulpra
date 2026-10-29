@@ -1595,6 +1595,40 @@
         "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
         "guarded_opt_in_omission_accepted": false
       }
+    },
+    {
+      "id": "aiwindow_prompt_seed",
+      "decision": "review_missing_offline_bootstrap_fallback",
+      "surface": "browser_bundled_remote_settings_default_prompt_seed",
+      "paths": [
+        "services/settings/dumps/main/ai-window-prompts.json",
+        "services/settings/dumps/main/moz.build",
+        "browser/components/aiwindow/models/Utils.sys.mjs",
+        "browser/components/aiwindow/models/PromptLoader.sys.mjs"
+      ],
+      "source_files": 1,
+      "source_bytes": 1577264,
+      "package_logical_bytes": 1577264,
+      "source_files_removed": 0,
+      "normal_browser_changed": false,
+      "removal_authorized": false,
+      "why": "Packaged browser-specific Remote Settings seed is loaded from main ai-window-prompts collection; AI Window chat prompt assembly explicitly throws when the required manifest is absent. Remote updates and user overrides do not prove first-run offline fallback. The seed resides inside the browser omni.ja archive, so 1,577,264 uncompressed JSON bytes cannot be claimed as tar.xz savings.",
+      "evidence": [
+        "Native 86,930,792-byte full Vulpra package physically included defaults/settings/main/ai-window-prompts.json of 1,577,264 bytes in browser/omni.ja: https://github.com/sguzman/vulpra/actions/runs/40926977310",
+        "Source-pinned AI Window prompt seed and required-manifest audit passed 6 boundaries, 12 negative mutations, Git JSON blob 1,577,264 bytes: https://github.com/sguzman/vulpra/actions/runs/40927627334",
+        "browser/components/aiwindow/models/Utils.sys.mjs routes RemoteSettings collection ai-window-prompts (bucket main); PromptLoader.sys.mjs throws on missing chat module manifest."
+      ],
+      "m3_strategy": {
+        "strategy": "review",
+        "scope": "Bundled offline Remote Settings AI Window prompt seed, distinct from the GenAI engine/UI modules",
+        "safety_and_fallback": "Missing core prompt manifest causes explicit promptLoadFailure. Keep first-run offline chat/feature availability protected until isolated runtime fallback test and safe guard exist.",
+        "guarded_opt_in_omission_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": true,
+        "provenance": "Accepted source and historical native archive evidence; no source deletion or compiled package delta."
+      },
+      "next": "Retain the shipped AI Window Remote Settings seed. If pursuing opt-in omission, implement a verified fallback for fresh offline profiles and core modular prompt manifests, then run source-matched native/Wayland/AI Window/extension/profile/privacy checks and compare packaged member and actual compressed tar.xz sizes. No source removal authorized."
     }
   ],
   "observed_native_config": {
@@ -1706,16 +1740,16 @@
     "next": "Obtain exact-source native linker map/symbol/section allocation and generated build/config values before crediting any compile-time removal; no disassembly or link graph completed by archive-level member census."
   },
   "m3_decision_classification": {
-    "state": "bounded_candidate_scope_classified; unresolved_review_and_dynamic_consumer_gates_remain",
+    "state": "nineteen_bounded_candidate_scopes_classified; AIWindow offline fallback and other dynamic review gates remain",
     "as_of": "2026-10-29",
-    "total_candidates": 18,
+    "total_candidates": 19,
     "complete_feature_dependency_inventory": false,
     "complete_candidate_fallback_validation": false,
     "whole_m3_gate_passed": false,
     "categories": {
       "keep": 8,
       "remove_source": 4,
-      "review": 3,
+      "review": 4,
       "conditional_compile": 3
     },
     "method": "Per-candidate scoped safety class, preserve prior immutable evidence; remove_source means bounded historical source deletions already accepted, conditional_compile means guarded opt-in native/bundle omission only, keep protects functional/security/privacy dependencies, review means insufficient caller graph.",
