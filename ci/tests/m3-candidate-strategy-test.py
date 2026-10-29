@@ -76,6 +76,25 @@ def validate(reg,paired,progress):
     assert loader["current_source_matched_native_loader_order_verified"] is False
     assert loader["source_deletion_authorized"] is False
     assert loader["compressed_feature_saving_bytes"] is None
+    cache=reg["historical_native_host_cache_preflight"]
+    assert cache["status"]=="accepted_bounded_ubuntu_host_elf_cache_presence_audit"
+    assert cache["success_run_id"]==40947019427
+    assert cache["evidence_artifact_id"]==12928349526
+    assert cache["underlying_archive_original_native_run_id"]==40567473401
+    assert cache["underlying_archive_compiled_source_commit"]=="1683ca67b69389a879717bcd537772c3b40624b6"
+    assert (cache["original_archived_elf_members"],cache["original_archived_direct_needed_edges"])==(28,268)
+    assert cache["unique_direct_needed_names"]==50
+    assert cache["package_regular_library_name_matches"]==14
+    assert cache["external_names_checked"]==36
+    assert cache["ubuntu_24_04_x86_64_host_elf_cache_matches"]==36
+    assert cache["no_host_cache_match_names"]==0
+    assert cache["native_package_elf_executed"] is False
+    assert cache["host_runtime_loader_searchpath_or_abi_resolution_proven"] is False
+    assert cache["target_arch_linux_workstation_resolution_proven"] is False
+    assert cache["transitive_and_dlopen_dependencies_closed"] is False
+    assert cache["source_matched_to_current_main"] is False
+    assert cache["compiled_feature_savings_bytes"] is None
+    assert cache["source_deletion_authorized"] is False
     pending=reg["pending_current_source_link_input_acceptance"]
     assert pending["workflow_run_id"]==40935344279
     assert pending["source_commit"]=="3f9945cbdb4f6ea1bd75c3cf5127e58d72a9762f"
@@ -257,6 +276,11 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["hungarian_hyphenation_boundary_audit"]["historical_normal_native_css_runtime"].update(hu_missing_dictionary_native_variant=True),
 
         lambda a,b,c:a["historical_native_loader_order_preflight"].update(libmozgtk_before_libmozwayland=False),
+        lambda a,b,c:a["historical_native_host_cache_preflight"].update(host_runtime_loader_searchpath_or_abi_resolution_proven=True),
+        lambda a,b,c:a["historical_native_host_cache_preflight"].update(target_arch_linux_workstation_resolution_proven=True),
+        lambda a,b,c:a["historical_native_host_cache_preflight"].update(transitive_and_dlopen_dependencies_closed=True),
+        lambda a,b,c:a["historical_native_host_cache_preflight"].update(external_names_checked=35),
+        lambda a,b,c:a["historical_native_host_cache_preflight"].update(source_deletion_authorized=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(broad_m3_gate_advanced=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(full_linker_symbol_map_claimed=True),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(independent_reconciliation_original_run_passed=True),
