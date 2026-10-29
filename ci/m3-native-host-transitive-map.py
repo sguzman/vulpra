@@ -44,6 +44,15 @@ def host_deps(path):
 
 def trace(graph,ldconfig_output):
     original=HOST.validate_graph(graph)
+    # The underlying ELF scanner records source_commit only for a
+    # source-pinned native run. Historical archived ELF graphs did not carry
+    # one: never stamp their host map with a hardcoded unrelated commit.
+    source_commit=graph.get("source_commit")
+    if source_commit is not None and (
+        not isinstance(source_commit,str) or
+        re.fullmatch(r"[0-9a-f]{40}",source_commit) is None
+    ):
+        raise ValueError("Malformed source-compiled commit provenance")
     cache=HOST.cache_rows(ldconfig_output)
     roots=set(original)
     bundled=set(graph["packaged_elf_needed_names"])
@@ -84,7 +93,8 @@ def trace(graph,ldconfig_output):
     return {
         "schema_version":1,
         "source_archive_sha256":graph["archive_sha256"],
-        "source_archive_original_compiler_commit":"1683ca67b69389a879717bcd537772c3b40624b6",
+        "source_archive_original_compiler_commit":source_commit,
+        "source_compiler_commit_in_graph_verified":source_commit is not None,
         "CI_environment":"ubuntu-24.04-x86_64",
         "original_package_external_direct_needs":len(roots),
         "host_direct_and_transitive_unique_names":len(visited),
@@ -136,7 +146,17 @@ def selftest():
     assert r["host_direct_and_transitive_unique_names"]==1
     assert r["names_without_ldconfig_file_candidate"]==["libnotreal.so.1"]
     assert r["source_removal_authorized"] is False
-    return 6
+    assert r["source_archive_original_compiler_commit"] is None
+    assert r["source_compiler_commit_in_graph_verified"] is False
+    pinned=dict(graph,source_commit="b"*40)
+    tagged=trace(pinned,"")
+    assert tagged["source_archive_original_compiler_commit"]=="b"*40
+    assert tagged["source_compiler_commit_in_graph_verified"] is True
+    for forged in ("b"*64,"oops",True):
+        try:trace(dict(graph,source_commit=forged),"")
+        except ValueError:pass
+        else:raise AssertionError("False native source commitment accepted")
+    return 12
 
 def main():
     ap=argparse.ArgumentParser()
