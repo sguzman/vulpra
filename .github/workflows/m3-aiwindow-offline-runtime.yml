@@ -1,0 +1,127 @@
+# Archived real-browser prompt test, with exact critical source blob continuity.
+# No model connection or remote service; synthetic Remote Settings and localhost only.
+name: M3 Archived AI Window Offline Prompt Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-aiwindow-offline-runtime.yml
+      - ci/smoke-aiwindow-prompt-seed-package.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vulpra-m3-aiwindow-archived-offline-runtime
+  cancel-in-progress: false
+
+jobs:
+  offline-prompt-runtime:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Sparse checkout exact diagnostic scripts
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Reject invalid AIWindow evidence fixtures and source drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/smoke-aiwindow-prompt-seed-package.py
+          python3 ci/smoke-aiwindow-prompt-seed-package.py --self-test
+          python3 - <<'PY'
+          import subprocess
+          expected={
+            "browser/components/aiwindow/models/PromptLoader.sys.mjs":"e4231a54813980171fd67e1aa8ad6dff38b33f2c",
+            "browser/components/aiwindow/models/Utils.sys.mjs":"1a697c87e67806a0f03dfcd61150805be4479082",
+            "browser/components/aiwindow/models/ChatUtils.sys.mjs":"4014eab459610d67d5e54d4492a54c7d816eaf02",
+            "services/settings/dumps/main/moz.build":"88e740b90e53384af710589c9891918db5f7c40d",
+          }
+          for path,digest in expected.items():
+            actual=subprocess.check_output(["git","rev-parse","HEAD:"+path],text=True).strip()
+            assert actual==digest,(path,actual,digest)
+          print("PASS: four exact AIWindow prompt and packaged seed source blobs match historical native archive")
+          print("LIMIT: other full-browser source/build configuration is NOT source-matched")
+          PY
+
+      - name: Restore historical checksummed native browser without compiling
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40567473401 --repo "$GITHUB_REPOSITORY" \
+            --name m3-asrouter-promo-matched-baseline --dir "$RUNNER_TEMP/archived"
+          (
+            cd "$RUNNER_TEMP/archived"
+            sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256
+            jq -e '.source_commit == "1683ca67b69389a879717bcd537772c3b40624b6" and .full_promo_resources_present == true' m3-promo-matched-size.json >/dev/null
+          )
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp "$RUNNER_TEMP/archived/vulpra-promo-full-baseline.tar.xz" "$dest/vulpra-local-aiwindow-archived.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-aiwindow-archived.tar.xz > vulpra-local-aiwindow-archived.tar.xz.sha256)
+
+      - name: Install native Firefox runtime libraries and stock geckodriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+
+      - name: Exercise packaged AIWindow required-manifest fail closed and complete fixture
+        shell: bash
+        timeout-minutes: 8
+        env:
+          MOZ_HEADLESS: "1"
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-aiwindow-prompt-seed-package.py "$GITHUB_WORKSPACE"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          path=Path(".git/vulpra-native-build/m3-aiwindow-offline-prompt-runtime.json")
+          data=json.loads(path.read_text())
+          assert data["status"]=="packaged_aiwindow_fake_records_and_offline_seed_diagnostic_passed"
+          assert data["browser_profile_isolated"] is True
+          assert data["nonlocal_connections_blocked"] is True
+          assert data["real_model_engine_started"] is False
+          assert data["no_remote_prompt_payload_stored"] is True
+          assert data["offline_first_run_without_seed_verified"] is False
+          assert data["packaged_seed_removal_tested"] is False
+          assert data["source_removal_authorized"] is False
+          assert data["marginal_tar_xz_savings_measured"] is None
+          data["historical_compiled_source_commit"]="1683ca67b69389a879717bcd537772c3b40624b6"
+          data["diagnostic_source_commit"]=os.environ["GITHUB_SHA"]
+          data["source_matches_four_critical_aiwindow_modules_only"]=True
+          data["whole_browser_source_matched"]=False
+          data["native_package_origin_run_id"]=40567473401
+          data["workflow_run_id"]=int(os.environ["GITHUB_RUN_ID"])
+          path.write_text(json.dumps(data,indent=2)+"\n")
+          print("PASS: archived native AIWindow module fail-closed and synthetic prompt positive control")
+          PY
+
+      - name: Preserve bounded privacy-safe AI prompt metadata only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-aiwindow-archived-offline-runtime
+          path: .git/vulpra-native-build/m3-aiwindow-offline-prompt-runtime.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
