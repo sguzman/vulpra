@@ -227,6 +227,69 @@ const endpoint = arguments[0], phase = arguments[1];
 """
 
 
+STARTUP_SCRIPT = r"""
+const done = arguments[arguments.length - 1], endpoint = arguments[0];
+(async () => {
+  if (!/^http:\/\/127\.0\.0\.1:\d+$/.test(endpoint)) {
+    throw Error("Non-loopback telemetry origin");
+  }
+  const Services = globalThis.Services ||
+    ChromeUtils.importESModule("resource://gre/modules/Services.sys.mjs").Services;
+  const {TelemetrySend, TelemetrySendImpl, SendScheduler} =
+    ChromeUtils.importESModule("resource://gre/modules/TelemetrySend.sys.mjs");
+  const {TelemetryReportingPolicy} = ChromeUtils.importESModule(
+    "resource://gre/modules/TelemetryReportingPolicy.sys.mjs");
+  const state = seconds => ({
+    seconds,
+    sender_ready: TelemetrySend.getShutdownState().sendingEnabled,
+    server_matches_loopback: TelemetrySendImpl._server === endpoint,
+    policy: TelemetryReportingPolicy.canUpload(),
+    base_recording_enabled: Services.telemetry.canRecordBase,
+    official_build: Services.telemetry.isOfficialTelemetry,
+    pending_count: TelemetrySend.pendingPingCount,
+    scheduler_state: SendScheduler.getShutdownState().sendTaskState
+  });
+  // No testSetup, sender test override, or telemetry preference mutation.
+  // Normal delayed setup defaults to 60 seconds.
+  const observations = [state(0)];
+  for (const seconds of [30, 75]) {
+    await new Promise(resolve =>
+      setTimeout(resolve, (seconds - observations.at(-1).seconds) * 1000));
+    observations.push(state(seconds));
+  }
+  done({status:"observed", samples:observations,
+    test_setup_used:false, sender_override_used:false});
+})().catch(error => done({status:"error", error:String(error)}));
+"""
+
+
+def validate_natural_startup(observation):
+    if observation.get("status") != "observed":
+        raise RuntimeError("No natural telemetry startup observation")
+    if observation.get("test_setup_used") is not False or (
+        observation.get("sender_override_used") is not False
+    ):
+        raise RuntimeError("Natural startup observation used test-only initialization")
+    samples = observation.get("samples")
+    if not isinstance(samples, list) or len(samples) != 3:
+        raise RuntimeError("Missing normal startup samples")
+    if [x.get("seconds") for x in samples if isinstance(x, dict)] != [0, 30, 75]:
+        raise RuntimeError("Incorrect natural startup timestamps")
+    for sample in samples:
+        for key in ("sender_ready", "server_matches_loopback", "policy",
+                    "base_recording_enabled", "official_build"):
+            if type(sample.get(key)) is not bool:
+                raise RuntimeError("Incomplete natural startup state")
+        if type(sample.get("pending_count")) is not int or sample["pending_count"] < 0:
+            raise RuntimeError("Invalid pending count")
+        if sample.get("scheduler_state") is not None and not isinstance(
+            sample["scheduler_state"], str
+        ):
+            raise RuntimeError("Invalid sender scheduler state")
+    if samples[-1]["sender_ready"] and not samples[-1]["server_matches_loopback"]:
+        raise RuntimeError("Initialized sender not bound to loopback")
+
+
 def validate(observation: dict, before: dict, after: dict,
              rejections: dict | None = None):
     rejections = rejections or {}
