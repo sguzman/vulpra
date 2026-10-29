@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "project": "Vulpra",
+  "scope": "allowed generated config.statusd substitutions from completed exact-source configure-only CI",
+  "observed_source_commit": "74e390f8f27ba705fbf26aa4750a21f0929a6ae8",
+  "source_configure_run_id": 40932179859,
+  "source_configure_artifact_id": 12924085624,
+  "recorded_from": "CI final job log SELECTED SUBSTS and successful exact-source snapshot artifact",
+  "original_json_artifact_supersedes_this_reproduction": true,
+  "build_app": "browser",
+  "flag_count": 25,
+  "generated_selected_substs": {
+    "ENABLE_TESTS": {
+      "state": "absent",
+      "value": null
+    },
+    "ENABLE_WEBDRIVER": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZILLA_OFFICIAL": {
+      "state": "absent",
+      "value": null
+    },
+    "MOZ_APPSERVICES_IN_TREE": {
+      "state": "absent",
+      "value": null
+    },
+    "MOZ_APP_BASENAME": {
+      "state": "recorded",
+      "value": "Vulpra"
+    },
+    "MOZ_APP_NAME": {
+      "state": "recorded",
+      "value": "vulpra"
+    },
+    "MOZ_APP_VERSION": {
+      "state": "recorded",
+      "value": "159.0"
+    },
+    "MOZ_BROWSER_BRANDING": {
+      "state": "absent",
+      "value": null
+    },
+    "MOZ_BUILD_APP": {
+      "state": "recorded",
+      "value": "browser"
+    },
+    "MOZ_CONFIGURE_TRUSTED_PROXY": {
+      "state": "absent",
+      "value": null
+    },
+    "MOZ_CRASHREPORTER": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZ_DEVTOOLS": {
+      "state": "recorded",
+      "value": "all"
+    },
+    "MOZ_GECKODRIVER": {
+      "state": "absent",
+      "value": null
+    },
+    "MOZ_HAS_REMOTE": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZ_NORMANDY": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZ_SANDBOX": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZ_SERVICES_HEALTHREPORT": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZ_SERVICES_SYNC": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZ_TELEMETRY_REPORTING": {
+      "state": "absent",
+      "value": null
+    },
+    "MOZ_UPDATER": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZ_WAYLAND": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "MOZ_WIDGET_TOOLKIT": {
+      "state": "recorded",
+      "value": "gtk"
+    },
+    "MOZ_X11": {
+      "state": "recorded",
+      "value": "1"
+    },
+    "OS_TARGET": {
+      "state": "recorded",
+      "value": "Linux"
+    },
+    "VULPRA_NO_ASROUTER_PROMOS": {
+      "state": "empty_string",
+      "value": ""
+    }
+  },
+  "source_binary_compiled": false,
+  "native_package_generated": false,
+  "current_source_runtime_verified": false,
+  "absent_subst_is_not_disabled_feature": true,
+  "unknown_build_settings_remain": true,
+  "compiled_savings_bytes": null,
+  "removal_authorized": false,
+  "limitations": [
+    "The exact run source is pinned, but subsequent README/CI/docs commits differ from it.",
+    "Only 25 allowlisted subst keys; absent means no selected config.statusd/substs file, not disabled code.",
+    "No linker graph or native binary from this source; old binary is pinned to older source SHA.",
+    "The original generated-substitution artifact is the primary record; these are reproduced logged scalar values."
+  ]
+}
