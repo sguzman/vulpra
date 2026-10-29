@@ -59,6 +59,31 @@ def validate(e: dict, register: dict, progress: dict, roadmap: str) -> None:
     candidates = register["candidates"]
     pocket, = (c for c in candidates if c["id"] == "pocket_integration")
     trial = pocket["promocard_native_pair"]
+    promo, = (c for c in candidates if c["id"] == "newtab_promocard_optout")
+    assert promo["decision"] == "accepted_guarded_selective_opt_in_promocard_bundle_omission"
+    assert promo["source_files_removed"] == 0
+    assert promo["normal_browser_changed"] is False
+    assert promo["removal_authorized"] is False
+    native = promo["native_trial"]
+    assert native["status"].startswith("accepted_opt_in_only_native_full_and_lean_pair")
+    assert native["source_commit"] == source
+    assert native["normal_run"] == normal["workflow_run"]
+    assert native["lean_run"] == lean["workflow_run"]
+    assert native["normal_artifact_id"] == normal["artifact_id"]
+    assert native["lean_artifact_id"] == lean["artifact_id"]
+    assert native["comparison_run"] == e["comparison"]["replay_workflow_run"]
+    assert native["comparison_artifact_id"] == e["comparison"]["artifact_id"]
+    assert native["normal_compressed_package_bytes"] == normal["compressed_package_bytes"]
+    assert native["lean_compressed_package_bytes"] == lean["compressed_package_bytes"]
+    assert native["signed_full_minus_optin_archive_bytes"] == diff["signed_full_minus_optin_compressed_archive_bytes"]
+    assert native["signed_uncompressed_newtab_js_bytes"] == diff["signed_full_minus_optin_uncompressed_newtab_js_bytes"]
+    assert native["original_promocard_absent_in_optin"] is True
+    assert native["same_source_verified"] is True
+    assert native["repeatability_established"] is False
+    assert native["component_specific_compressed_saving_established"] is False
+    assert native["source_files_deleted"] == 0
+    assert native["default_browser_changed"] is False
+    assert len(native["runtime_checks"]) >= 5
     compared = e["comparison"]
     assert compared["status"] == "passed"
     assert compared["compared_source_sha"] == source
@@ -127,6 +152,11 @@ def negative_tests(e: dict, register: dict, progress: dict, roadmap: str) -> Non
         lambda a, b, c: a["comparison"].update(signed_byte_delta=219360),
         lambda a, b, c: b["candidates"][next(i for i, x in enumerate(b["candidates"])
                                                   if x["id"] == "pocket_integration")]["promocard_native_pair"].update(normal_build_unchanged=False),
+        lambda a, b, c: next(x for x in b["candidates"] if x["id"] == "newtab_promocard_optout").update(decision="isolated_native_trial_running_not_accepted"),
+        lambda a, b, c: next(x for x in b["candidates"] if x["id"] == "newtab_promocard_optout")["native_trial"].update(source_commit="0" * 40),
+        lambda a, b, c: next(x for x in b["candidates"] if x["id"] == "newtab_promocard_optout")["native_trial"].update(signed_full_minus_optin_archive_bytes=99999),
+        lambda a, b, c: next(x for x in b["candidates"] if x["id"] == "newtab_promocard_optout")["native_trial"].update(repeatability_established=True),
+        lambda a, b, c: next(x for x in b["candidates"] if x["id"] == "newtab_promocard_optout")["native_trial"].update(default_browser_changed=True),
         lambda a, b, c: c["overall"].update(percent=45),
         lambda a, b, c: c["milestones"][2]["acceptance_gates"].update(passed=3),
     )
@@ -148,7 +178,7 @@ def main() -> None:
     validate(evidence, register, progress, roadmap)
     negative_tests(evidence, register, progress, roadmap)
     print("PASS: source-matched native PromoCard metadata, bytes, hashes and protected paths")
-    print("PASS: nine mutation cases rejected and no unjustified M3 credit")
+    print("PASS: fourteen mutation cases rejected and no unjustified M3 credit")
     print("METADATA ONLY: real browser evidence remains in immutable native workflow artifacts")
 
 
