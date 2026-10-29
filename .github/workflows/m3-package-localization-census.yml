@@ -1,0 +1,88 @@
+# Reuse checksummed historical native browser archive to measure real packaged locale assets.
+# Does NOT compile Firefox, test runtime, or attribute any tar.xz savings to removal.
+name: M3 Verified Native Archive Localization Resource Census
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-package-localization-census.yml
+      - ci/m3-package-localization-census.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vulpra-m3-package-locale-census
+  cancel-in-progress: false
+
+jobs:
+  read-archived-package:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Sparse checkout only bounded read-only locale census script
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Verify synthetic tar/ZIP and anti-tamper fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-package-localization-census.py
+          python3 ci/m3-package-localization-census.py --self-test
+
+      - name: Retrieve historical accepted checksum-verified FULL Vulpra package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40567473401 --repo "$GITHUB_REPOSITORY" \
+            --name m3-asrouter-promo-matched-baseline --dir "$RUNNER_TEMP/replay"
+          (
+            cd "$RUNNER_TEMP/replay"
+            sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256
+            jq -e '.source_commit == "1683ca67b69389a879717bcd537772c3b40624b6" and
+                   .full_promo_resources_present == true' m3-promo-matched-size.json >/dev/null
+          )
+
+      - name: Measure packaged localized resources in tar and omni.ja
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-package-localization-census.py \
+            "$RUNNER_TEMP/replay/vulpra-promo-full-baseline.tar.xz" \
+            --output "$RUNNER_TEMP/m3-package-localization-census.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          path=Path(os.environ["RUNNER_TEMP"])/"m3-package-localization-census.json"
+          report=json.loads(path.read_text())
+          report["archive_original_build_source_commit"]="1683ca67b69389a879717bcd537772c3b40624b6"
+          report["archive_original_workflow_run_id"]=40567473401
+          report["census_script_commit"]=os.environ["GITHUB_SHA"]
+          report["full_browser_source_matched_to_script"]=False
+          path.write_text(json.dumps(report,indent=2)+"\n")
+          assert report["localized_content_present"],"No localized resources found; investigate"
+          assert report["omni_ja"],"Missing package resource archives"
+          assert report["compiled_bytes_saved"] is None
+          print("PASS: historical checked full-package locale byte census (no removed bytes)")
+          PY
+
+      - name: Preserve evidence JSON without archive, ping IDs or user data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-historical-package-localization-census
+          path: ${{ runner.temp }}/m3-package-localization-census.json
+          if-no-files-found: warn
+          retention-days: 14
