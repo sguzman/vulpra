@@ -120,6 +120,9 @@ jobs:
       - name: Validate source-pinned AdsFeed paired evidence and variation
         run: python3 ci/tests/m3-adsfeed-evidence-ledger-test.py
 
+      - name: Validate native PromoCard paired evidence and reject inflation
+        run: python3 ci/tests/m3-promocard-native-ledger-test.py
+
       - name: Validate classified M3 candidate register
         run: |
           jq -e '
