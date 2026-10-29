@@ -1678,7 +1678,7 @@
     },
     {
       "id": "hungarian_hyphenation_patterns",
-      "decision": "review_only_localized_css_fallback_unverified",
+      "decision": "keep_default_hungarian_hyphenation_verified_native_css",
       "surface": "default_packaged_precompiled_hungarian_hyphenation_patterns",
       "paths": [
         "intl/locales/moz.build",
@@ -1690,24 +1690,26 @@
       "normal_browser_changed": false,
       "removal_authorized": false,
       "package_logical_bytes": 1048764,
-      "reason": "Linux desktop generates and packages Hungarian hyph_hu.hyf in root omni.ja, while the C++ manager loads from GRE/APP omni and profile, implements aliases and progressive language fallback, and returns null when no patterns. That protects startup but does not establish correct hu/hu-HU CSS hyphens:auto layout after deleting patterns.",
+      "reason": "A real, checksummed native Vulpra package with shipped hu pattern and three hyphenation source blobs matched to current source showed Hungarian-specific CSS hyphens:auto line wrapping relative to hyphens:none and unsupported-language control, including hu-HU locale. Removing the 1,048,764 logical ZIP-entry byte resource would change observed rendering unless equivalent fallback exists. No seed-omitted/native lean source test or marginal compressed savings.",
       "evidence": [
         "Physical root omni.ja hyphenation/hyph_hu.hyf 1,048,764 logical bytes in checksum-verified historical native archive, ranked in native package scan https://github.com/sguzman/vulpra/actions/runs/40926977310",
         "Source-pinned source-only hyphenation audit 6 boundaries and 12 negative fixtures passed https://github.com/sguzman/vulpra/actions/runs/40935728156",
         "intl/locales/moz.build includes hu desktop .hyf under FINAL_TARGET_FILES.hyphenation; nsHyphenationManager.cpp uses greedy locale alias and truncation fallback, returns nullptr for unavailable patterns.",
-        "Real original normal Vulpra headless Gecko 159 isolated profile localhost CSS hyphens:auto versus none succeeded CI https://github.com/sguzman/vulpra/actions/runs/40937941448 artifact 12924908962: hu and hu-HU 6 lines each vs 1 overflowing line without hyphenation; English control 3 lines vs 1. No omitted dictionary tested."
+        "Real original normal Vulpra headless Gecko 159 isolated profile localhost CSS hyphens:auto versus none succeeded CI https://github.com/sguzman/vulpra/actions/runs/40937941448 artifact 12924908962: hu and hu-HU 6 lines each vs 1 overflowing line without hyphenation; English control 3 lines vs 1. No omitted dictionary tested.",
+        "Actual isolated native Vulpra CSS language geometry run 40938478049 PASS, artifact 12925058497: hu and hu-HU automatic wrapping observed over none and unsupported locale, en-US control succeeded; no hu asset omitted or bytes saved.",
+        "Three exact Hungarian pattern build/runtime source blobs matched archived normal compiled package: docs/vulpra/M3-HUNGARIAN-NATIVE-CSS-RUNTIME.md."
       ],
       "m3_strategy": {
-        "strategy": "review",
-        "scope": "Hungarian hu precompiled .hyf in shipped root omnijar, separate from nonoptional cross-language hyphenation engine",
-        "safety_and_fallback": "Keep unchanged normal browser language support. Missing-pattern nullptr allows no dictionary but cannot prove Hungarian layout/word wrapping remains acceptable; requires focused native CSS tests and fallback inventory.",
+        "strategy": "keep",
+        "scope": "Preserve Hungarian hu precompiled hyphenation rendering and hu-HU language fallback in default native browser package",
+        "safety_and_fallback": "Native CSS layout test observed additional Hungarian automatic line wrapping with the packaged pattern. No supported alternate language-pattern delivery or safe omission exists. Keep default.",
         "guarded_opt_in_omission_accepted": false,
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
-        "requires_further_source_or_runtime_verification": true,
-        "provenance": "Source-pinned C++/packaging guard audit plus real historical regular package ZIP entry size; no changed native build."
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "Source-pinned source audit and real native packaged offline CSS layout measurement, full source not current, no omitted asset."
       },
-      "next": "Real baseline proves hu and hu-HU hyphenation has material layout effects in the shipped old native browser; retain dictionary in normal Vulpra. Next test opt-in missing-resource handling and Hungarian page layout against full version with same-source native binary before any removal or compressed byte claim. Profile override, langpack fallback, and current-main runtime remain unverified.",
+      "next": "KEEP default Hungarian precompiled pattern for correct page layout. Only revisit when explicit alternative pattern delivery and hu/hu-HU CSS behavior with missing packaged asset have passed a source-matched native test, then calculate actual paired compressed tar.xz delta. No source removal.",
       "historical_normal_css_runtime": {
         "status": "passed_real_unmodified_historical_native_hu_huHU_enUS_css_layout",
         "run_id": 40937941448,
@@ -1727,6 +1729,24 @@
         "missing_hungarian_pattern_css_fallback_verified": false,
         "optin_hungarian_pattern_omission_built": false,
         "compressed_savings_bytes": null
+      },
+      "native_css_evidence": {
+        "status": "accepted_hungarian_rendering_observed_full_normal_package",
+        "run_id": 40938478049,
+        "evidence_artifact_id": 12925058497,
+        "historical_compiled_source_sha": "1683ca67b69389a879717bcd537772c3b40624b6",
+        "critical_hyphen_source_blobs_equal_current": true,
+        "whole_browser_source_equal_current": false,
+        "package_hu_pattern_present": true,
+        "hu_auto_wraps_more_than_none": true,
+        "hu_auto_wraps_more_than_unknown_locale": true,
+        "hu_HU_auto_wraps_more_than_none": true,
+        "en_US_auto_wraps_more_than_none": true,
+        "hu_pattern_omission_runtime_verified": false,
+        "normal_browser_changed": false,
+        "source_removal_authorized": false,
+        "compressed_package_savings": null,
+        "documentation": "docs/vulpra/M3-HUNGARIAN-NATIVE-CSS-RUNTIME.md"
       }
     }
   ],
@@ -1839,16 +1859,16 @@
     "next": "Obtain exact-source native linker map/symbol/section allocation and generated build/config values before crediting any compile-time removal; no disassembly or link graph completed by archive-level member census."
   },
   "m3_decision_classification": {
-    "state": "twenty_scoped_candidates_classified; AIWindow default seed now native-offline protected; other caller/fallback gates still open",
+    "state": "twenty_scoped_candidates_classified; AIWindow offline seed and Hungarian CSS language patterns protected by real packaged browser behavior, three review scopes remain",
     "as_of": "2026-10-29",
     "total_candidates": 20,
     "complete_feature_dependency_inventory": false,
     "complete_candidate_fallback_validation": false,
     "whole_m3_gate_passed": false,
     "categories": {
-      "keep": 9,
+      "keep": 10,
       "remove_source": 4,
-      "review": 4,
+      "review": 3,
       "conditional_compile": 3
     },
     "method": "Per-candidate scoped safety class, preserve prior immutable evidence; remove_source means bounded historical source deletions already accepted, conditional_compile means guarded opt-in native/bundle omission only, keep protects functional/security/privacy dependencies, review means insufficient caller graph.",
@@ -2115,5 +2135,23 @@
     "source_removal_authorized": false,
     "compressed_savings_bytes": null,
     "documentation": "docs/vulpra/M3-AIWINDOW-OFFLINE-RUNTIME.md"
+  },
+  "hungarian_hyphenation_native_css": {
+    "status": "accepted_hungarian_rendering_observed_full_normal_package",
+    "run_id": 40938478049,
+    "evidence_artifact_id": 12925058497,
+    "historical_compiled_source_sha": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "critical_hyphen_source_blobs_equal_current": true,
+    "whole_browser_source_equal_current": false,
+    "package_hu_pattern_present": true,
+    "hu_auto_wraps_more_than_none": true,
+    "hu_auto_wraps_more_than_unknown_locale": true,
+    "hu_HU_auto_wraps_more_than_none": true,
+    "en_US_auto_wraps_more_than_none": true,
+    "hu_pattern_omission_runtime_verified": false,
+    "normal_browser_changed": false,
+    "source_removal_authorized": false,
+    "compressed_package_savings": null,
+    "documentation": "docs/vulpra/M3-HUNGARIAN-NATIVE-CSS-RUNTIME.md"
   }
 }
