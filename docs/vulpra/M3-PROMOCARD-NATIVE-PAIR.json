@@ -58,5 +58,19 @@
     "normal": "https://github.com/sguzman/vulpra/actions/runs/40787699203",
     "optin": "https://github.com/sguzman/vulpra/actions/runs/40787698972",
     "verifier_fix": "https://github.com/sguzman/vulpra/commit/befb257961e776311751e09aec8158601a54dd79"
+  },
+  "comparison": {
+    "status": "passed",
+    "replay_workflow_run": 40797808197,
+    "artifact_id": 12864835886,
+    "failed_original_workflow_run": 40795895867,
+    "original_failure": "Artifact download succeeded, but strict ZIP-root evidence JSON path assumption failed before comparator executed.",
+    "replay_fix_commit": "60315d9969224305fc484f0547cdd36b7d9783b3",
+    "compared_source_sha": "befb257961e776311751e09aec8158601a54dd79",
+    "comparator_passed": true,
+    "signed_byte_delta": 5744,
+    "comparison_percent": 0.00659056,
+    "provenance": "Both immutable native run IDs and exact matching source SHA verified via GitHub Actions API; original bounded JSON files downloaded from completed build artifacts; ci/m3-promocard-match-evidence.py succeeded with expected signed delta.",
+    "limitations": "One completed independent build pair; comparator validates consistency, not component-isolated or reproducible package-byte saving."
   }
 }
