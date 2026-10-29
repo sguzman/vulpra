@@ -8,7 +8,7 @@
 | --- | ---: | --- |
 | Root PDF.js `pdf.worker.mjs` | **2,235,560** | **Keep** — built-in PDF capability; no replacement/consent |
 | Browser DevTools `css-properties.json` | **1,702,863** | **Keep** — debugging/compatibility data |
-| Browser `defaults/settings/main/ai-window-prompts.json` | **1,577,264** | **Review** — large, browser-specific AI Window seed; offline fallback unverified |
+| Browser `defaults/settings/main/ai-window-prompts.json` | **1,577,264** | **Keep** — real offline packaged browser proved seeded records; missing core manifests fail closed |
 | Browser DevTools `parser-worker.js` | **1,531,151** | **Keep** — debugging and JS tooling |
 | Browser `security-state/intermediates.json` | **1,467,806** | **Protect** — certificate/security state |
 | Browser New Tab `activity-stream.bundle.js` | **1,335,252** | Narrow guarded JS substitutions already tried, core feed kept |
@@ -31,12 +31,12 @@ The exact build and consumer path is:
 
 `browser/components/moz.build` → `aiwindow/` → `models/PromptLoader.sys.mjs`; separately `services/settings/dumps/main/moz.build` packages the named `ai-window-prompts.json` Remote Settings seed for browser applications. `Utils.sys.mjs` obtains `RemoteSettings("ai-window-prompts", { bucketName: "main" })`; `PromptLoader.sys.mjs` requires a published chat module manifest and explicitly throws `promptLoadFailure` when it is missing.
 
-**Safety finding:** deleting the seed without proving an alternate local first-run source and core manifest fallback may break AI Window in a fresh, offline or failed-Remote-Settings state. Remote synchronization and optional custom-prompt preferences do not establish reliable fallback. This is a **new review-only candidate**, `aiwindow_prompt_seed`, separate from GenAI engine/UI removal, **not** an approved default-variant change.
+**Safety finding:** deleting the seed without proving an alternate local first-run source and core manifest fallback may break AI Window in a fresh, offline or failed-Remote-Settings state. Remote synchronization and optional custom-prompt preferences do not establish reliable fallback. After that source audit, [actual offline native runtime CI 40937489359](https://github.com/sguzman/vulpra/actions/runs/40937489359) passed: a disposable isolated Vulpra profile with nonlocal connections blocked loaded **214 packaged seed records** (21 chat params, 1 identity and 5 response-rules records). Synthetic empty/missing-core manifests failed closed with `promptLoadFailure`; a complete synthetic manifest assembled. The four relevant source blobs were identical between the old compiled package and current source. This changes `aiwindow_prompt_seed` to **keep/protect default**, not a deletion experiment. [Runtime evidence](M3-AIWINDOW-OFFLINE-RUNTIME.md).
 
 The next safe step is source-matched, opt-in fallback implementation with explicit online/offline initialization cases, native browser/WebExtension/Wayland/profile tests, and *paired* physical package comparisons. Until those pass, retain this seed. Do not prune certificate/revocation/blocklist resources for small gains.
 
 ## Classification / acceptance
 
-The candidate register now has **19 bounded scopes**: **8 keep, 4 already accepted source-only prunes, 3 opt-in conditional compilation/bundle omissions, 4 requiring more review**. Source-only prunes are historical accepted work, not new deletions in this round. An opt-in variant does not alter normal Vulpra. This inventory does not complete the entire dynamic dependency graph, all fallbacks, or an additional M3 acceptance gate.
+The candidate register now has **20 bounded scopes**: **9 keep, 4 already accepted source-only prunes, 3 opt-in conditional compilation/bundle omissions, 4 requiring more review**. Hungarian hyphenation is also a distinct **review-only** localization subcandidate. Source-only prunes are historical accepted work, not new deletions in this round. An opt-in variant does not alter normal Vulpra. This inventory does not complete the entire dynamic dependency graph, all fallbacks, or an additional M3 acceptance gate.
 
 **M3 remains 2/6 (33%), overall product 44%, Δ 0 pp.**
