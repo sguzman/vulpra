@@ -452,7 +452,7 @@
         "toolkit/components/telemetry/moz.build: FINAL_LIBRARY=xul, native sources, generated interfaces",
         "https://github.com/sguzman/vulpra/actions/runs/40785850376"
       ],
-      "next": "Focused literal grep 40721612576 and targeted startup/shutdown policy source-boundary CI 40785850376 both PASSED. Preserve core xul metrics, Glean, PingSender and crash reporter, including deletion-request exception. Before an isolated optional upload-transport change, measure real normal/opt-in config, privacy-data lifecycle and actual localhost-captured HTTP upload with consent/opt-out state, followed by native browser acceptance and matched packages. No source deletion or broad gate credit.",
+      "next": "Telemetry lifecycle audit 40785850376 and deeper user-upload opt-out/deletion path 40801317928 PASS: FHR upload toggle triggers queue purge, client identifier rotation, special deletion-request with transport exception; dataSubmissionEnabled is a distinct master policy. Preserve both and do not blanket-disable transport/policy. Submission eligibility/persistence is not delivery proof. Require opt-out, deletion-request, policy and actual captured network behavior plus protected Glean/crash functionality before any isolated experiment; no removal or gate credit.",
       "observed_actual_config": "MOZ_TELEMETRY_REPORTING missing; MOZ_SERVICES_HEALTHREPORT=\"1\"; MOZ_CRASHREPORTER=\"1\"",
       "audit_result": {
         "source_audit_run": 40544803899,
@@ -533,6 +533,35 @@
           "Actual compiled MOZ_TELEMETRY_REPORTING remains unverified in target personal binary.",
           "Delete-request ping exception means simplistic no-upload module omission could violate privacy lifecycle.",
           "No native compile, packet capture, upload-policy behavior test, code deletion, package-size credit or completed M3 gate."
+        ]
+      },
+      "telemetry_deletion_boundary_audit": {
+        "source_commit": "2a9bc656993e64954ae1342a64b2770698d9605d",
+        "run_id": 40801317928,
+        "artifact_id": 12866286545,
+        "status": "passed_read_only_source_pinned",
+        "source_boundaries": 6,
+        "mutation_failures_rejected": 12,
+        "files": [
+          "toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs",
+          "toolkit/components/telemetry/app/TelemetrySend.sys.mjs",
+          "toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs",
+          "toolkit/components/telemetry/app/TelemetryUtils.sys.mjs"
+        ],
+        "protected_relations": [
+          "FhrUploadEnabled and DataSubmissionEnabled use distinct prefs",
+          "FHR upload pref observer triggers cleanup, identifier rotation, and deletion-request ping",
+          "Nimbus disabled-ping list explicitly excludes deletion-request from suppression",
+          "Only validated v4 deletion-request ping gets FHR upload-disabled bypass; official-build restriction remains",
+          "canSendNow depends on data-reporting policy and can persist pings",
+          "scheduler clears pending list and filters current to deletion-request when ordinary upload disabled"
+        ],
+        "decision": "retain deletion request/queue/ID handling and sender/policy; no blanket data-submission pref change and no static removal authorization",
+        "limitations": [
+          "Exact source relation and 12 deliberately broken anchors only; not evidence of actual delivery or opt-out behavior in packaged browser",
+          "Source may persist pings because canSendNow follows policy, so real network/proxy proof is necessary",
+          "Does not test Firefox/Vulpra branding-specific usage reporting gates",
+          "No binary size, native runtime, default browser changes, or new M3 gate"
         ]
       }
     },
