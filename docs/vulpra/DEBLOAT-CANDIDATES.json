@@ -40,7 +40,17 @@
         "toolkit/moz.build: unconditional mozapps/extensions",
         "real workstation Wayland + WebExtension smoke PASS"
       ],
-      "next": "Retain"
+      "next": "Retain",
+      "m3_strategy": {
+        "strategy": "keep",
+        "scope": "Linux GTK/Wayland, browser rendering and WebExtensions",
+        "safety_and_fallback": "M2 verified mandatory native/runtime protections; no fallback from removal.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+      }
     },
     {
       "id": "windows_widget_installer",
@@ -85,7 +95,17 @@
         "linux_binary_size_saving_bytes": null,
         "other_platform_source_removals": "not yet audited"
       },
-      "removal_accepted": true
+      "removal_accepted": true,
+      "m3_strategy": {
+        "strategy": "remove_source",
+        "scope": "Unsupported Windows widget and installer source already pruned",
+        "safety_and_fallback": "Do not infer Linux package byte savings; non-Linux builds unsupported.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": true,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+      }
     },
     {
       "id": "macos_cocoa_widget",
@@ -103,7 +123,17 @@
       ],
       "next": "Accepted first bounded GTK Linux-only source prune; continue other out-of-scope non-Linux platform components separately. Never claim binary byte improvement for already uncompiled paths.",
       "platform_prune_trial_ref": "windows_widget_installer.platform_prune_trial",
-      "removal_accepted": true
+      "removal_accepted": true,
+      "m3_strategy": {
+        "strategy": "remove_source",
+        "scope": "Unsupported Cocoa widget source already pruned",
+        "safety_and_fallback": "No macOS acceptance implied; leave Linux GTK and native modules intact.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": true,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+      }
     },
     {
       "id": "android_mobile",
@@ -182,6 +212,16 @@
         "accepted_ci_run": 40585240593,
         "android_only_workflows": "intentionally unsupported: Android Gradle modules, related Taskcluster Android pipelines and Android app-specific lint/test targets still reference omitted roots",
         "remaining_open": "Unpruned widget/android, mobile/shared, GeckoView, other mobile directory trees; test infrastructure and localization audit incomplete"
+      },
+      "m3_strategy": {
+        "strategy": "remove_source",
+        "scope": "Bounded unsupported Android application roots accepted as source-only pruning",
+        "safety_and_fallback": "GeckoView/mobile-shared/widget/android and Android build assumptions remain separately audited.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": true,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -279,6 +319,16 @@
         "decision": "retain manifest/mozbase/mozharness, WebDriver/Marionette, browser/toolkit localization; audit tests gated by ENABLE_TESTS as separate candidates; no removal authorized",
         "native_verified": false,
         "compiled_bytes_saved": null
+      },
+      "m3_strategy": {
+        "strategy": "review",
+        "scope": "Mixed test root: retain manifest, mozbase, mozharness, WPT and performance corpora; peripheral fixtures need graph",
+        "safety_and_fallback": "Deleting tests also removes critical QA/build capabilities; no blanket omit.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": true,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -364,6 +414,16 @@
         "removal_authorized": false,
         "native_runtime_verified": false,
         "package_bytes_measured": false
+      },
+      "m3_strategy": {
+        "strategy": "keep",
+        "scope": "Desktop Sync service and browser/extension/UI consumers",
+        "safety_and_fallback": "Missing Sync or extension fallback can break bookmarks, tabs or storage.sync.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -446,6 +506,16 @@
         "removal_authorized": false,
         "native_runtime_verified": false,
         "package_bytes_measured": false
+      },
+      "m3_strategy": {
+        "strategy": "keep",
+        "scope": "Desktop FxAccounts and independent identity UI/authentication",
+        "safety_and_fallback": "Disabling Sync does not remove FxAccounts or its consumers.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -648,6 +718,16 @@
         "expected_early_sender_inactive": true,
         "initial_missing_post_diagnostic": "Original early synthetic test ran before normal sender delay; not a demonstrated privacy bug.",
         "test_mode_deletion_post_after_natural_probe": true
+      },
+      "m3_strategy": {
+        "strategy": "keep",
+        "scope": "Telemetry native/transport, Glean, policy, crash reporting and deletion-request lifecycle",
+        "safety_and_fallback": "Disabling transmission indiscriminately can break privacy deletion requests.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -750,6 +830,16 @@
           "delta_bytes": 27620,
           "delta_percent": 0.032
         }
+      },
+      "m3_strategy": {
+        "strategy": "conditional_compile",
+        "scope": "Only isolated Normandy recipe runner opt-in omission; HealthReport and Nimbus helpers retained",
+        "safety_and_fallback": "The whole umbrella candidate is not disposable; preserve Nimbus/legacy shared utilities.",
+        "normal_browser_omit_accepted": true,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": true,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -768,7 +858,17 @@
         "devtools/moz.build: client conditional; platform/server/shared/startup unconditional"
       ],
       "next": "Full DevTools client enabled. Given debugging value, retain unless packaged footprint and explicit alternative justify exclusion.",
-      "observed_actual_config": "MOZ_DEVTOOLS=\"all\" (full client compiled)"
+      "observed_actual_config": "MOZ_DEVTOOLS=\"all\" (full client compiled)",
+      "m3_strategy": {
+        "strategy": "keep",
+        "scope": "Full DevTools client, server and debugging services on current baseline",
+        "safety_and_fallback": "Preserve user debugging and QA/remote test paths.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+      }
     },
     {
       "id": "browser_genai",
@@ -809,6 +909,16 @@
           "toolkit/components/nimbus/FeatureManifest.yaml"
         ],
         "interpretation": "Literal reference scan only. Unconditional startup registration plus external actor/sidebar/preference callers block whole-directory deletion; no packaged size benefit or native removal has been demonstrated."
+      },
+      "m3_strategy": {
+        "strategy": "review",
+        "scope": "GenAI source modules and cross-feature consumers pending complete caller audit",
+        "safety_and_fallback": "Cannot remove whole GenAI root before external consumers and fallback tests.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": true,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -962,6 +1072,16 @@
         "comparison_passed": true,
         "initial_comparison_failed_run_id": 40795895867,
         "comparison_failure_context": "Original comparator assumed candidate artifact JSON at ZIP root; nested upload paths caused early test -f failure, not mismatched browser packages. Fixed nested locator; replay passed 40797808197."
+      },
+      "m3_strategy": {
+        "strategy": "keep",
+        "scope": "Legacy TopStories and modern DiscoveryStream Pocket feeds plus protected sponsor components",
+        "safety_and_fallback": "Retain core New Tab and feed fallbacks, opt-in promos have separate candidates.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -1031,7 +1151,17 @@
         "compressed_reduction_percent": 0.00366
       },
       "runtime_guard_followup": "The prior false-valued VULPRA_NO_ASROUTER_PROMOS global macro was accidentally present under #ifdef in the ordinary build despite CONFIG false. Enabled-only set_define fix 16d8753 restores expected default routing; config-only three-variant CI 40708134402 and native conditional recompilation required before claiming this correction fully verified. Prior matched full/lean promotion resource-byte evidence remains historical evidence, not updated post-fix package sizing.",
-      "pocket_boundary_dependency": "Pocket source-pinned audit 40773515182 retains both story-feed registrations and generated bundles, and leaves promoCard/pocketCta only as unproven narrow preference candidates. No ASRouter or Pocket resource pruning authorized by this audit. Follow-up CI 40773988580 proves PromoCard static AdBanner import and billboard/two-pref render gating; opt-in omission requires JS bundle compile+fallback and is NOT authorized by a default false preference."
+      "pocket_boundary_dependency": "Pocket source-pinned audit 40773515182 retains both story-feed registrations and generated bundles, and leaves promoCard/pocketCta only as unproven narrow preference candidates. No ASRouter or Pocket resource pruning authorized by this audit. Follow-up CI 40773988580 proves PromoCard static AdBanner import and billboard/two-pref render gating; opt-in omission requires JS bundle compile+fallback and is NOT authorized by a default false preference.",
+      "m3_strategy": {
+        "strategy": "review",
+        "scope": "Shared New Tab/ASRouter messaging and Nimbus surfaces; narrow promotions separately trialed",
+        "safety_and_fallback": "No safe blanket New Tab or messaging removal, dynamic source needs mapping.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": true,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+      }
     },
     {
       "id": "core_web_security",
@@ -1057,6 +1187,16 @@
         "source_compiled_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
         "libxul_so_logical_bytes": 189486920,
         "linker_feature_attribution_unverified": true
+      },
+      "m3_strategy": {
+        "strategy": "keep",
+        "scope": "Browser security, sandbox, updater safeguards, places and extension infrastructure",
+        "safety_and_fallback": "Risk of functional/privacy/security regressions makes blanket debloat unacceptable.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -1136,6 +1276,16 @@
         "total_permanent_original_git_blob_bytes": 129967585,
         "linux_binary_size_saving_bytes": null,
         "m3_gate_credit": "no new gate; mobile/test/localization audit remains open"
+      },
+      "m3_strategy": {
+        "strategy": "remove_source",
+        "scope": "Eight bounded Android/iOS/UIKit-only leaf roots already pruned after native check",
+        "safety_and_fallback": "Shared mobile helpers and unsupported manifest references require further review.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": true,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -1264,6 +1414,16 @@
         "guarded_delta_bytes": 7120,
         "observed_delta_spread_bytes": 212240,
         "interpretation": "Different source commits and independent builds: both positive deltas are measured, neither demonstrates reproducible or isolated AdsFeed-size saving. Source and packaging differences are unresolved."
+      },
+      "m3_strategy": {
+        "strategy": "conditional_compile",
+        "scope": "Guarded opt-in packaged AdsFeed module omission only",
+        "safety_and_fallback": "Sponsor pathways outside AdsFeed remain; observed archive delta is not reproducible.",
+        "normal_browser_omit_accepted": true,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": true,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -1371,6 +1531,16 @@
         },
         "finding": "Masccot SVG is referenced outside the PromoCard component, and localization identifiers appear across component/localization definitions; no asset or localization removal is justified by JSX omission.",
         "asset_or_locale_removal_authorized": false
+      },
+      "m3_strategy": {
+        "strategy": "conditional_compile",
+        "scope": "Guarded opt-in PromoCard replacement in shipped New Tab bundle only",
+        "safety_and_fallback": "Keep default JSX, AdBanner and reused mascot/locale resources; compressed delta not causal.",
+        "normal_browser_omit_accepted": true,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": true,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
       }
     },
     {
@@ -1414,7 +1584,17 @@
         "native_runtime_tested": false,
         "removal_authorized": false
       },
-      "next": "Retain physically packaged default locale, generated locale metadata, dictionaries, hyphenation and browser/toolkit registries. Independently inspect translation consumers and real language-pack contents before any reversible guarded trial, then require exact-source native and locale fallback tests plus physical package-member and paired tar.xz comparison. Never equate 6,300,493 logical JAR bytes with extractable savings."
+      "next": "Retain physically packaged default locale, generated locale metadata, dictionaries, hyphenation and browser/toolkit registries. Independently inspect translation consumers and real language-pack contents before any reversible guarded trial, then require exact-source native and locale fallback tests plus physical package-member and paired tar.xz comparison. Never equate 6,300,493 logical JAR bytes with extractable savings.",
+      "m3_strategy": {
+        "strategy": "keep",
+        "scope": "Default browser/toolkit Fluent registries, dictionaries, hyphenation and langpack tooling",
+        "safety_and_fallback": "Physical ZIP contents and locale fallback need separate gated trials.",
+        "normal_browser_omit_accepted": false,
+        "permanent_removal_accepted": false,
+        "broad_feature_removal_authorized": false,
+        "requires_further_source_or_runtime_verification": false,
+        "provenance": "source and native evidence links in candidate.evidence; not generated linker graph"
+      }
     }
   ],
   "observed_native_config": {
@@ -1524,5 +1704,23 @@
     "removal_authorized": false,
     "docs": "docs/vulpra/M3-NATIVE-PACKAGE-FOOTPRINT.md",
     "next": "Obtain exact-source native linker map/symbol/section allocation and generated build/config values before crediting any compile-time removal; no disassembly or link graph completed by archive-level member census."
+  },
+  "m3_decision_classification": {
+    "state": "bounded_candidate_scope_classified; unresolved_review_and_dynamic_consumer_gates_remain",
+    "as_of": "2026-10-29",
+    "total_candidates": 18,
+    "complete_feature_dependency_inventory": false,
+    "complete_candidate_fallback_validation": false,
+    "whole_m3_gate_passed": false,
+    "categories": {
+      "keep": 8,
+      "remove_source": 4,
+      "review": 3,
+      "conditional_compile": 3
+    },
+    "method": "Per-candidate scoped safety class, preserve prior immutable evidence; remove_source means bounded historical source deletions already accepted, conditional_compile means guarded opt-in native/bundle omission only, keep protects functional/security/privacy dependencies, review means insufficient caller graph.",
+    "no_new_source_deletion": true,
+    "no_normal_browser_feature_changed": true,
+    "new_compiled_savings_bytes": null
   }
 }
