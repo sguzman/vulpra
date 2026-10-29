@@ -190,6 +190,29 @@ def validate(reg,paired,progress):
             accepted["external_direct_needs_names"])==(28,268,36)
     assert accepted["packaging_method"]=="mozpack.files.ExecutableFile.copy"
 
+    drift=reg["accepted_current_source_elf_import_stability"]
+    assert drift["status"]=="verified_two_sha256_pinned_native_ELF_direct_import_graphs"
+    assert drift["run_id"]==40973033976 and drift["evidence_artifact_id"]==12939844976
+    assert drift["historical_archive_sha256"]=="e8717fd10a1ffc330ef96f802a4112da335aaf57c6e68d70e639b3e137c9e97f"
+    assert drift["current_archive_sha256"]==accepted["package_sha256"]
+    assert drift["historical_compiler_commit_declared_in_elf_graph"] is None
+    assert drift["current_source_commit"]==accepted["source_commit"]
+    assert (drift["historical_archive_compressed_bytes"],drift["current_archive_compressed_bytes"])==(86930792,87154700)
+    assert (drift["historical_ELF_member_count"],drift["current_ELF_member_count"])==(28,28)
+    assert (drift["historical_direct_needed_edges"],drift["current_direct_needed_edges"])==(268,268)
+    assert (drift["missing_or_added_packaged_ELF_member_paths"],
+            drift["changed_per_file_sonames_or_dt_needed"])==(0,0)
+    assert drift["differing_ELF_payload_sha256_count"]==6
+    assert drift["byte_identical_ELF_payload_sha256_count"]==22
+    assert len(drift["different_payload_members"])==6
+    assert drift["source_checksum_proven_for_both_archives"] is True
+    assert drift["original_native_runtime_independently_accepted"] is True
+    for flag in ("host_loader_searchpaths_or_symbol_versions_proven",
+                 "binary_semantics_equal_proven",
+                 "different_source_archive_size_difference_is_feature_savings",
+                 "new_source_pruning_authorized","whole_m3_gate_advanced"):
+        assert drift[flag] is False,flag
+
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -382,6 +405,13 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(package_sha256="f"*64),
         lambda a,b,c:a["accepted_current_source_native_link_runtime_evidence"].update(original_full_native_run_id=40944392090),
         lambda a,b,c:a["pending_current_source_link_input_acceptance"].update(historical_scope_only=False),
+        lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(changed_per_file_sonames_or_dt_needed=1),
+        lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(missing_or_added_packaged_ELF_member_paths=1),
+        lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(binary_semantics_equal_proven=True),
+        lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(host_loader_searchpaths_or_symbol_versions_proven=True),
+        lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(different_source_archive_size_difference_is_feature_savings=True),
+        lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(historical_compiler_commit_declared_in_elf_graph="a"*40),
+        lambda a,b,c:a["accepted_current_source_elf_import_stability"].update(differing_ELF_payload_sha256_count=0),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
