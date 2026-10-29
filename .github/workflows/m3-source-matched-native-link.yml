@@ -41,6 +41,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           python3 ci/m3-native-build-link-inputs.py --self-test
           python3 -m py_compile ci/m3-native-replay-packager.py
+          python3 ci/m3-native-replay-packager.py --self-test
           python3 ci/m3-configure-only-substs.py --self-test
           python3 ci/tests/m3-promocard-bundle-contract.py
           python3 -m py_compile ci/m3-native-elf-package-graph.py
@@ -138,6 +139,12 @@ jobs:
           # Gecko's executable packager may STRIP/elfhack the output of
           # dist/bin, so independently reproduce the actual transformation.
           # Never overwrite the linked library, staged package or source.
+          objdir="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline"
+          for lib in "$objdir/dist/bin/libxul.so" "$objdir/dist/vulpra/libxul.so"; do
+            test -f "$lib"
+            stat -c 'Native packaging replay input: %n (%s bytes)' "$lib"
+            file "$lib"
+          done
           ./mach python ci/m3-native-replay-packager.py \
             --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
             --source-sha "$GITHUB_SHA" \
