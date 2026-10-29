@@ -129,6 +129,11 @@ jobs:
       - name: Validate native PromoCard paired evidence and reject inflation
         run: python3 ci/tests/m3-promocard-native-ledger-test.py
 
+      - name: Validate 18 M3 scoped strategies and their accepted evidence
+        run: |
+          python3 -m py_compile ci/tests/m3-candidate-strategy-test.py
+          python3 ci/tests/m3-candidate-strategy-test.py
+
       - name: Validate classified M3 candidate register
         run: |
           jq -e '
