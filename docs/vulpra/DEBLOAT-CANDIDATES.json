@@ -1268,7 +1268,7 @@
     },
     {
       "id": "newtab_promocard_optout",
-      "decision": "isolated_native_trial_running_not_accepted",
+      "decision": "accepted_guarded_selective_opt_in_promocard_bundle_omission",
       "surface": "optional_generated_newtab_js_bundle",
       "paths": [
         "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCard.jsx",
@@ -1291,7 +1291,10 @@
         "Initial opt-in configure false-negative: https://github.com/sguzman/vulpra/actions/runs/40777472270",
         "Corrected native opt-in source: https://github.com/sguzman/vulpra/actions/runs/40778245764",
         "Fresh same-source normal baseline: https://github.com/sguzman/vulpra/actions/runs/40778245670",
-        "Read-only asset/l10n audit: https://github.com/sguzman/vulpra/actions/runs/40778037014"
+        "Read-only asset/l10n audit: https://github.com/sguzman/vulpra/actions/runs/40778037014",
+        "Complete source-matched native normal CI 40787699203 and lean CI 40787698972 passed at befb257961e776311751e09aec8158601a54dd79.",
+        "Immutable evidence replay 40797808197 PASS; machine ledger docs/vulpra/M3-PROMOCARD-NATIVE-PAIR.json.",
+        "Observed archive compressed delta 5744 B; repeatability/causality unproven."
       ],
       "preflight": {
         "source_commit": "2635afea3c2d263efacd2f81c676c7602ebe9a33",
@@ -1306,16 +1309,45 @@
         "warning": "This is generated JS bytes only; not package tar.xz savings or native acceptance."
       },
       "native_trial": {
-        "source_commit": "977c7ae262a76fb0ca0327857917928810e9108e",
-        "lean_run": 40778245764,
-        "normal_run": 40778245670,
-        "comparator_workflow": ".github/workflows/m3-promocard-size-compare.yml",
-        "status": "Fresh exact-source normal and lean native builds running; corrected string-valued config assertion; no package/runtime/byte evidence accepted.",
-        "previous_failed_run": {
-          "source_commit": "c9e520f5d844990d6eb19c1611dc7f62adf5a811",
-          "lean_run": 40777472270,
-          "reason": "Native configure succeeded, custom CI assertion falsely rejected Mozilla config.statusd/substs enabled flag returned as string '1'; stopped before C++/Rust compilation. Same-source baseline run 40777472244 compiled but cannot be source-matched with next commit; original SHA evidence cannot be combined.",
-          "accepted": false
+        "status": "accepted_opt_in_only_native_full_and_lean_pair; one_archive_delta_observed_not_causal",
+        "source_commit": "befb257961e776311751e09aec8158601a54dd79",
+        "normal_run": 40787699203,
+        "normal_artifact_id": 12862697117,
+        "lean_run": 40787698972,
+        "lean_artifact_id": 12862948830,
+        "comparison_run": 40797808197,
+        "comparison_artifact_id": 12864835886,
+        "normal_compressed_package_bytes": 87154984,
+        "lean_compressed_package_bytes": 87149240,
+        "signed_full_minus_optin_archive_bytes": 5744,
+        "normal_newtab_uncompressed_js_bytes": 1335463,
+        "lean_newtab_uncompressed_js_bytes": 1332731,
+        "signed_uncompressed_newtab_js_bytes": 2732,
+        "original_promocard_absent_in_optin": true,
+        "runtime_checks": [
+          "private Weston Wayland buffer attachment/commit",
+          "packaged localhost screenshot and isolated Firefox profile",
+          "WebDriver JavaScript redirect, HTTP 302, final DOM",
+          "temporary WebExtension installation, background/content messaging, storage.local, uninstall",
+          "Nimbus ExperimentStore and API initialized"
+        ],
+        "same_source_verified": true,
+        "repeatability_established": false,
+        "component_specific_compressed_saving_established": false,
+        "default_browser_changed": false,
+        "source_files_deleted": 0,
+        "previous_trial": {
+          "source_commit": "977c7ae262a76fb0ca0327857917928810e9108e",
+          "lean_run": 40778245764,
+          "normal_run": 40778245670,
+          "comparator_workflow": ".github/workflows/m3-promocard-size-compare.yml",
+          "status": "Fresh exact-source normal and lean native builds running; corrected string-valued config assertion; no package/runtime/byte evidence accepted.",
+          "previous_failed_run": {
+            "source_commit": "c9e520f5d844990d6eb19c1611dc7f62adf5a811",
+            "lean_run": 40777472270,
+            "reason": "Native configure succeeded, custom CI assertion falsely rejected Mozilla config.statusd/substs enabled flag returned as string '1'; stopped before C++/Rust compilation. Same-source baseline run 40777472244 compiled but cannot be source-matched with next commit; original SHA evidence cannot be combined.",
+            "accepted": false
+          }
         }
       },
       "protected": [
@@ -1324,7 +1356,7 @@
         "Top Sites, AdsClient, AdsFeed, Nimbus, Sync, DevTools, Linux Wayland, WebExtensions and Firefox profile",
         "ordinary default PromoCard JSX and click/dismiss/impression handlers"
       ],
-      "next": "Await corrected source SHA 977c7ae source-matched lean 40778245764 and normal 40778245670 native compile/package checks and real browser Wayland/JS/about:newtab/WebExtension/Nimbus/profile acceptance, then event-driven signed compressed archive measurement. Shared mascot SVG has 2 other source references; retain all locale/style assets pending dynamic reachability proof.",
+      "next": "Accepted guarded Linux-only PromoCard null-JSX substitution in one matched native full/lean pair, not permanent removal or reproducible compression saving. Keep default PromoCard, AdBanner sponsored paths, all Pocket feeds, Nimbus, localization and mascot. Do not add 5,744 observed compressed bytes to other independent experiments. Audit remaining dynamic consumers/localization references before another candidate.",
       "asset_audit": {
         "source_commit": "b3a90e8548bb108bfba45f10ca90f474598f951d",
         "workflow_run": 40778037014,
