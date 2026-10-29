@@ -267,7 +267,7 @@ jobs:
           set -euo pipefail
           {
             printf '## M3 Normandy native variant CI\n\n'
-            printf 'Commit: `%s`\n' "$GITHUB_SHA"
+            printf 'Commit: %s\n' "$GITHUB_SHA"
             printf 'Run: https://github.com/sguzman/vulpra/actions/runs/%s\n' "$GITHUB_RUN_ID"
             printf 'Result: **%s**\n\n' "$VULPRA_JOB_STATUS"
             if [[ -s "$RUNNER_TEMP/m3-normandy-package.json" ]]; then
