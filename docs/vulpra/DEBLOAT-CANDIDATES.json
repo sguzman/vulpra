@@ -2280,5 +2280,41 @@
     "additional_source_removal_authorized": false,
     "whole_m3_gate_advanced": false,
     "documentation": "docs/vulpra/M3-ACCEPTED-NATIVE-LINK-EVIDENCE.md"
+  },
+  "accepted_current_source_elf_import_stability": {
+    "status": "verified_two_sha256_pinned_native_ELF_direct_import_graphs",
+    "run_id": 40973033976,
+    "evidence_artifact_id": 12939844976,
+    "historical_archive_sha256": "e8717fd10a1ffc330ef96f802a4112da335aaf57c6e68d70e639b3e137c9e97f",
+    "historical_archive_compressed_bytes": 86930792,
+    "historical_compiler_commit_declared_in_elf_graph": null,
+    "current_source_native_run_id": 40963098075,
+    "current_source_commit": "cde4d83043f8c476173c8dbc78b66b078c3f6b5b",
+    "current_archive_sha256": "18798900c5307fd136f7d93db6681741616981b609741a4b2209a1810273eb51",
+    "current_archive_compressed_bytes": 87154700,
+    "historical_ELF_member_count": 28,
+    "current_ELF_member_count": 28,
+    "historical_direct_needed_edges": 268,
+    "current_direct_needed_edges": 268,
+    "missing_or_added_packaged_ELF_member_paths": 0,
+    "changed_per_file_sonames_or_dt_needed": 0,
+    "differing_ELF_payload_sha256_count": 6,
+    "byte_identical_ELF_payload_sha256_count": 22,
+    "different_payload_members": [
+      "./vulpra/crashhelper",
+      "./vulpra/crashreporter",
+      "./vulpra/libmozinference.so",
+      "./vulpra/libxul.so",
+      "./vulpra/vulpra",
+      "./vulpra/vulpra-bin"
+    ],
+    "source_checksum_proven_for_both_archives": true,
+    "original_native_runtime_independently_accepted": true,
+    "host_loader_searchpaths_or_symbol_versions_proven": false,
+    "binary_semantics_equal_proven": false,
+    "different_source_archive_size_difference_is_feature_savings": false,
+    "new_source_pruning_authorized": false,
+    "whole_m3_gate_advanced": false,
+    "documentation": "docs/vulpra/M3-ACCEPTED-NATIVE-LINK-EVIDENCE.md"
   }
 }
