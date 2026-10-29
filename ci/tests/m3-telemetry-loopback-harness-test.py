@@ -55,7 +55,19 @@ def main():
                 str(probe.LIMIT + 1) + "\r\n\r\n").encode())
             assert b" 413 " in sock.recv(1024)
         assert probe.counts(server)["vulpra-probe"] == 1
-    print("PASS: localhost-only request types; no payload, URL, ping ID or oversized body retained")
+        with socket.create_connection(("127.0.0.1", server.server_port), timeout=5) as sock:
+            sock.sendall(
+                b"POST /submit/telemetry/throwaway/vulpra-probe/app HTTP/1.1\r\n"
+                b"Host: 127.0.0.1\r\n"
+                b"Transfer-Encoding: chunked\r\n"
+                b"Connection: close\r\n\r\n"
+                b"3\r\nabc\r\n0\r\n\r\n"
+            )
+            assert b" 200 " in sock.recv(1024)
+        assert probe.counts(server)["vulpra-probe"] == 2
+        assert probe.rejected_counts(server) == {
+            "oversize":1, "bad_framing":0, "truncated":0}
+    print("PASS: localhost-only request types, bounded fixed/chunked bodies and redaction")
 
     record = {"status":"observed", "observer_seen":True, "test_override":True,
         "before":{"ordinary":True, "deletion":True, "policy":True,
