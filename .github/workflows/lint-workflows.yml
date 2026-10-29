@@ -57,3 +57,4 @@ jobs:
             .github/workflows/m3-testing-localization-boundaries.yml
             .github/workflows/m3-native-build-feature-boundaries.yml
             .github/workflows/m3-package-localization-census.yml
+            .github/workflows/m3-native-elf-census.yml
