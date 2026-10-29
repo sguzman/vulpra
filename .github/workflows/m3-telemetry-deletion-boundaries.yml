@@ -1,0 +1,52 @@
+# Bound the deletion-request and FHR opt-out privacy lifecycle before debloating.
+# Sparse checkout, exact source commit, no compiled browser or package changes.
+name: M3 Telemetry Upload Opt-out Deletion Boundary Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-telemetry-deletion-boundaries.py
+      - .github/workflows/m3-telemetry-deletion-boundaries.yml
+      - toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs
+      - toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+      - toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs
+      - toolkit/components/telemetry/app/TelemetryUtils.sys.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-deletion-boundary:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Sparse checkout source contract without native browser compilation
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Validate FHR opt-out cleanup, identity rotation, and deletion exception
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test ! -e toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          git cat-file -e HEAD:toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          python3 ci/m3-telemetry-deletion-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/m3-telemetry-deletion-boundaries.json"
+          jq -e '.removal_authorized == false and
+                 (.source_boundaries | length == 6) and
+                 (.source_commit == env.GITHUB_SHA)' \
+            "$RUNNER_TEMP/m3-telemetry-deletion-boundaries.json" >/dev/null
+      - name: Preserve bounded source evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-telemetry-deletion-boundaries
+          path: ${{ runner.temp }}/m3-telemetry-deletion-boundaries.json
+          if-no-files-found: error
+          retention-days: 14
