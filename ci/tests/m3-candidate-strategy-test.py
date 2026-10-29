@@ -29,12 +29,13 @@ EXPECTED={
  "newtab_adsfeed_optout":"conditional_compile",
  "newtab_promocard_optout":"conditional_compile",
  "localization_default_and_repack":"keep",
- "aiwindow_prompt_seed":"review"
+ "aiwindow_prompt_seed":"review",
+ "hungarian_hyphenation_patterns":"review"
 }
 
 def validate(reg,paired,progress):
     names=[c["id"] for c in reg["candidates"]]
-    assert len(names)==19 and len(set(names))==19
+    assert len(names)==20 and len(set(names))==20
     assert set(names)==set(EXPECTED)
     counts={}
     for c in reg["candidates"]:
@@ -57,9 +58,9 @@ def validate(reg,paired,progress):
             assert c["decision"].startswith("accepted_")
             assert strategy!="remove_source"
     control=reg["m3_decision_classification"]
-    assert control["total_candidates"]==19
+    assert control["total_candidates"]==20
     assert counts==control["categories"]
-    assert counts=={"keep":8,"remove_source":4,"review":4,"conditional_compile":3}
+    assert counts=={"keep":8,"remove_source":4,"review":5,"conditional_compile":3}
     assert control["complete_feature_dependency_inventory"] is False
     assert control["complete_candidate_fallback_validation"] is False
     assert control["whole_m3_gate_passed"] is False
@@ -91,6 +92,20 @@ def validate(reg,paired,progress):
     assert ai["normal_browser_changed"] is False
     assert ai["removal_authorized"] is False
     assert ai["decision"]=="review_missing_offline_bootstrap_fallback"
+
+    hu,=(x for x in reg["candidates"] if x["id"]=="hungarian_hyphenation_patterns")
+    assert hu["package_logical_bytes"]==1048764
+    assert hu["source_files_removed"]==0
+    assert hu["normal_browser_changed"] is False
+    assert hu["removal_authorized"] is False
+    assert hu["decision"]=="review_only_localized_css_fallback_unverified"
+    hyph=reg["hungarian_hyphenation_boundary_audit"]
+    assert hyph["source_only_passed"] is True and hyph["source_boundaries"]==6
+    assert hyph["source_mutation_negatives"]==12
+    assert hyph["hu_pattern_historical_logical_zip_bytes"]==1048764
+    assert hyph["locale_layout_omission_runtime_checked"] is False
+    assert hyph["compressed_savings_bytes"] is None
+    assert hyph["normal_source_changed"] is False
 
     promo,=(x for x in reg["candidates"] if x["id"]=="newtab_promocard_optout")
     trial=promo["native_trial"]
@@ -142,6 +157,9 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_source_pruning_cohort_totals"].update(aggregate_removed_git_paths=16182),
         lambda a,b,c:a["accepted_source_pruning_cohort_totals"]["cohorts"][1].update(removed_git_paths=15441),
         lambda a,b,c:a["accepted_source_pruning_cohort_totals"].update(candidate_fields_source_files_not_additive_as_pruned_totals=False),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns").update(removal_authorized=True),
+        lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="hungarian_hyphenation_patterns").update(package_logical_bytes=0),
+        lambda a,b,c:a["hungarian_hyphenation_boundary_audit"].update(locale_layout_omission_runtime_checked=True),
     ]
     for mutate in mutations:
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
@@ -159,7 +177,7 @@ def main():
     prog=json.loads((docs/"PROGRESS.json").read_text())
     counts=validate(reg,paired,prog)
     negative=negative_fixtures(reg,paired,prog)
-    print("PASS: 19 bounded M3 strategies reconciled:",counts)
+    print("PASS: 20 bounded M3 strategies reconciled:",counts)
     print(f"PASS: {negative} contradictory classifications/evidence mutants rejected")
     print("READ-ONLY LEDGER: no new source removal, runtime, linker or size claim")
 
