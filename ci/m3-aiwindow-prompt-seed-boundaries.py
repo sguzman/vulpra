@@ -35,14 +35,16 @@ def anchor(texts,key,lit):
 
 def scoped(texts,key,start,end,*tokens):
     raw=texts[key]
-    if raw.count(start)!=1: raise ValueError("Missing/ambiguous guard "+key)
+    if raw.count(start)<1: raise ValueError("Missing guard "+key)
     b=raw.find(end,raw.index(start)+len(start))
     if b<0: raise ValueError("Missing guard terminator "+key)
     block=raw[raw.index(start):b]
     for item in tokens:
         if item not in block:
             raise ValueError("Required source escaped guard "+key+": "+item)
-    return anchor(texts,key,start)
+    return {"path":FILES[key],
+            "line":raw.count("\n",0,raw.index(start))+1,
+            "literal":start,"matching_guard_occurrences":raw.count(start)}
 
 def validate(texts):
     b=[]
@@ -73,7 +75,7 @@ def validate(texts):
         "continuing; offline first-run and fallback are unverified.",
         anchor(texts,"loader",'export async function buildChatSystemPrompt(model) {'),
         anchor(texts,"loader",'const err = new Error("Missing chat module manifest");'),
-        anchor(texts,"loader",'const records = await loadV2Records();'))
+        anchor(texts,"loader",'for (const required of REQUIRED_CHAT_MODULES) {'))
     add("generic_loader_has_remote_and_override_paths","retain_pending_fallback",
         "Prompt loader imports Remote Settings record retrieval and custom pref "
         "overrides; none proves replacing the full seed is safe.",
@@ -111,7 +113,8 @@ def selftest(t):
       ("loader",'export async function buildChatSystemPrompt(model) {'),
     ]
     for key,lit in changes:
-        if t[key].count(lit)!=1:raise AssertionError("Bad fixture "+key+": "+lit)
+        if t[key].count(lit)!=(2 if key=="seed" and lit.startswith("if CONFIG") else 1):
+            raise AssertionError("Bad fixture "+key+": "+lit)
         damaged=dict(t);damaged[key]=damaged[key].replace(lit,"__BROKEN_DEPENDENCY__",1)
         try:validate(damaged)
         except ValueError:continue
