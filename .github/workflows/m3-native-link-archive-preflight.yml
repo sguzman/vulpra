@@ -60,7 +60,7 @@ jobs:
           record=mod.inside_package(path)
           order=record["packaged_native_loader_order"]
           assert order["mozgtk_before_mozwayland"] is True
-          assert record["libxul_member"]["logical_bytes"]==189486920
+          assert record["libxul_member"]["bytes"]==189486920
           assert record["package_compressed_bytes"]==86930792
           report={"schema_version":1,
                   "archive_original_build_run_id":40567473401,
