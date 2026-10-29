@@ -1,0 +1,67 @@
+# Only source manifests and the pinned prompt loader are inspected.
+# The large AI prompt JSON is never parsed or copied into the evidence artifact.
+name: M3 AI Window Prompt Seed and Fallback Boundary Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-aiwindow-prompt-seed-boundaries.yml
+      - ci/m3-aiwindow-prompt-seed-boundaries.py
+      - services/settings/dumps/main/moz.build
+      - services/settings/dumps/moz.build
+      - browser/components/moz.build
+      - browser/components/aiwindow/moz.build
+      - browser/components/aiwindow/models/moz.build
+      - browser/components/aiwindow/models/Utils.sys.mjs
+      - browser/components/aiwindow/models/PromptLoader.sys.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-ai-seed-audit:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Sparse checkout only source contract script
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Check build and fallback contracts, reject broken source mutants
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-aiwindow-prompt-seed-boundaries.py
+          python3 ci/m3-aiwindow-prompt-seed-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/m3-aiwindow-prompt-seed-boundaries.json"
+          jq -e '
+            .source_commit == env.GITHUB_SHA and
+            .source_only == true and
+            .prompt_json_body_not_read == true and
+            .source_removal_authorized == false and
+            .offline_fallback_verified == false and
+            .compiled_package_bytes_saved == null and
+            (.boundaries | length) == 6 and
+            .negative_mutations_rejected == 12
+          ' "$RUNNER_TEMP/m3-aiwindow-prompt-seed-boundaries.json" >/dev/null
+          # Only object size, never content. The seed is sizable but its
+          # physical package cost was measured in a separate accepted archive.
+          BLOB_BYTES="$(git cat-file -s HEAD:services/settings/dumps/main/ai-window-prompts.json)"
+          test "$BLOB_BYTES" -gt 1000000
+          echo "Observed pinned AIWindow prompt seed Git blob bytes: $BLOB_BYTES"
+
+      - name: Upload bounded source-only evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-aiwindow-prompt-seed-boundaries
+          path: ${{ runner.temp }}/m3-aiwindow-prompt-seed-boundaries.json
+          if-no-files-found: error
+          retention-days: 14
