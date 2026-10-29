@@ -66,6 +66,23 @@ def validate(reg,paired,progress):
     assert control["no_new_source_deletion"] is True
     assert control["no_normal_browser_feature_changed"] is True
     assert control["new_compiled_savings_bytes"] is None
+    source=reg["accepted_source_pruning_cohort_totals"]
+    cohorts=source["cohorts"]
+    assert len(cohorts)==3
+    assert [x["removed_git_paths"] for x in cohorts]==[453,14134,280]
+    assert [x["original_git_blob_bytes"] for x in cohorts]==[6266676,115996869,7704040]
+    assert sum(x["removed_git_paths"] for x in cohorts)==source["aggregate_removed_git_paths"]==14867
+    assert sum(x["original_git_blob_bytes"] for x in cohorts)==source["aggregate_original_git_blob_bytes"]==129967585
+    assert source["candidate_fields_source_files_not_additive_as_pruned_totals"] is True
+    assert source["compiled_package_bytes_saved"] is None
+    assert source["new_pruning_authorized"] is False
+    assert source["broader_m3_gate_advanced_by_this_accounting"] is False
+    assert cohorts[0]["individually_allocatable_to_candidate_ids"] is False
+    accepted={x["id"]:x for x in progress["milestones"][2]["verified_removals"]}
+    assert accepted["linux-excluded-widget-installer-source"]["removed_paths"]==cohorts[0]["removed_git_paths"]
+    assert accepted["linux-excluded-widget-installer-source"]["removed_git_blob_bytes"]==cohorts[0]["original_git_blob_bytes"]
+    assert accepted["android-app-source-tree"]["removed_paths"]==cohorts[1]["removed_git_paths"]
+    assert accepted["android-app-source-tree"]["removed_git_blob_bytes"]==cohorts[1]["original_git_blob_bytes"]
 
     ai,=(x for x in reg["candidates"] if x["id"]=="aiwindow_prompt_seed")
     assert ai["source_files"]==1 and ai["source_bytes"]==1577264
@@ -122,6 +139,9 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:c["milestones"][2]["acceptance_gates"].update(passed=3),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed").update(removal_authorized=True),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed").update(package_logical_bytes=0),
+        lambda a,b,c:a["accepted_source_pruning_cohort_totals"].update(aggregate_removed_git_paths=16182),
+        lambda a,b,c:a["accepted_source_pruning_cohort_totals"]["cohorts"][1].update(removed_git_paths=15441),
+        lambda a,b,c:a["accepted_source_pruning_cohort_totals"].update(candidate_fields_source_files_not_additive_as_pruned_totals=False),
     ]
     for mutate in mutations:
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
