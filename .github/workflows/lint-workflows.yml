@@ -63,3 +63,4 @@ jobs:
             .github/workflows/m3-native-elf-package-graph.yml
             .github/workflows/m3-configure-only-snapshot.yml
             .github/workflows/m3-source-matched-native-link.yml
+            .github/workflows/m3-hungarian-hyphenation-boundaries.yml
