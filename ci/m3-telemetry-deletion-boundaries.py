@@ -60,10 +60,7 @@ def validate(src: dict[str, str]) -> dict:
         'FhrUploadEnabled: "datareporting.healthreport.uploadEnabled"')
     require(policy, "get dataSubmissionEnabled() {",
             "TelemetryUtils.Preferences.DataSubmissionEnabled,")
-    policy_guard = span(policy,
-        '  canUpload() {',
-        '  isFirstRun() {')
-    # First canUpload() wrapper is an earlier export; use the implementation
+    # The first canUpload() is an earlier public wrapper; use the implementation
     # after the actual Impl method instead of matching its public facade.
     policy_guard = span(policy[policy.index("var TelemetryReportingPolicyImpl = {"):],
         '  canUpload() {', '  isFirstRun() {')
@@ -88,7 +85,8 @@ def validate(src: dict[str, str]) -> dict:
     optout = span(controller, '  _onUploadPrefChange() {',
                   '  QueryInterface: ChromeUtils.generateQI(')
     require(optout, 'if (uploadEnabled) {', 'return;', 'Glean.telemetry.dataUploadOptin.set(true);')
-    ordered(optout,
+    disabled_branch = optout[optout.index('    let p = (async () => {', optout.index('    return;')):]
+    ordered(disabled_branch,
         'await lazy.TelemetrySend.clearCurrentPings();',
         'await lazy.TelemetryStorage.removeAppDataPings();',
         'await lazy.TelemetryStorage.runRemovePendingPingsTask();',
