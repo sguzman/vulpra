@@ -2140,7 +2140,15 @@
     "next_evidence_replay_workflow_result": "in_progress_not_accepted_at_last_observation",
     "next_evidence_replay_hard_bounded_unstripped_limit": 2147483648,
     "next_evidence_replay_checks_input_path_sizes": true,
-    "next_evidence_replay_verification_accepted": false
+    "next_evidence_replay_verification_accepted": false,
+    "schema_compatibility_probe_run_id": 40953419796,
+    "schema_compatibility_probe_status": "passed_test_only_real_evidence_schema_with_unverified_in_memory_packager_record",
+    "schema_compatibility_source_native_run_id": 40935344279,
+    "schema_compatibility_used_synthetic_transform_only": true,
+    "schema_compatibility_synthetic_report_persisted": false,
+    "schema_compatibility_proves_real_packager_transform": false,
+    "schema_compatibility_accepted_as_native_runtime_evidence": false,
+    "schema_compatibility_new_gate_credit": false
   },
   "aiwindow_offline_seed_runtime": {
     "status": "accepted_real_archived_native_browser_protected_default_seed",
