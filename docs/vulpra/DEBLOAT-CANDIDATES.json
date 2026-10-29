@@ -1052,7 +1052,12 @@
         "M2 actual Javascript/WebExtension/browser startup smoke"
       ],
       "next": "Keep native Gecko/GTK/Wayland, sandbox, libxul and WebExtension capabilities. Native/Rust feature boundary source audit 40922965533 verifies xul and gkrust FFI linkage and guarded sandbox, not link-time size or approved deletion. Keep native telemetry/Glean, DevTools/remote, security and updater protections; configured updater is not a proven remote update service.",
-      "observed_actual_config": "MOZ_SANDBOX=\"1\", MOZ_WAYLAND=\"1\", MOZ_UPDATER=\"1\", MOZ_CRASHREPORTER=\"1\", ENABLE_WEBDRIVER=\"1\""
+      "observed_actual_config": "MOZ_SANDBOX=\"1\", MOZ_WAYLAND=\"1\", MOZ_UPDATER=\"1\", MOZ_CRASHREPORTER=\"1\", ENABLE_WEBDRIVER=\"1\"",
+      "historical_native_library_evidence": {
+        "source_compiled_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+        "libxul_so_logical_bytes": 189486920,
+        "linker_feature_attribution_unverified": true
+      }
     },
     {
       "id": "remaining_mobile_platform_leaves",
@@ -1466,5 +1471,26 @@
     "categorized_localized_jar_logical_bytes": 6300493,
     "claimed_compressed_saving": null,
     "default_locale_and_registry_remove_authorized": false
+  },
+  "historical_native_package_footprint": {
+    "status": "sha256_verified_normal_archived_package_measured",
+    "source_archive_workflow_run_id": 40567473401,
+    "source_compiled_commit": "1683ca67b69389a879717bcd537772c3b40624b6",
+    "census_workflow_run_id": 40924515578,
+    "json_evidence_artifact_id": 12918979037,
+    "current_main_whole_source_matched": false,
+    "archive_compressed_tar_xz_bytes": 86930792,
+    "tar_regular_members": 47,
+    "tar_regular_member_logical_bytes": 339565212,
+    "libxul_so_logical_bytes": 189486920,
+    "browser_omni_ja_logical_bytes": 54911514,
+    "root_omni_ja_logical_bytes": 48049596,
+    "zip_l10n_entries_included_within_omni_file_sizes": true,
+    "independent_member_marginal_tar_xz_savings_measured": false,
+    "real_compiled_feature_omission_measured": false,
+    "normal_browser_changed": false,
+    "removal_authorized": false,
+    "docs": "docs/vulpra/M3-NATIVE-PACKAGE-FOOTPRINT.md",
+    "next": "Obtain exact-source native linker map/symbol/section allocation and generated build/config values before crediting any compile-time removal; no disassembly or link graph completed by archive-level member census."
   }
 }
