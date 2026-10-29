@@ -1,0 +1,95 @@
+# Verify only the presence of external direct ELF dependencies on a standard Ubuntu CI runner.
+# Never invoke ldd, dlopen, the packaged executable, or a native full compile.
+name: M3 Native ELF Host Cache Preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-host-dependency-preflight.py
+      - .github/workflows/m3-native-host-cache-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect-host-elf-cache:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Sparse checkout bounded ELF inspectors
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+
+      - name: Reject false host and ELF package claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-native-host-dependency-preflight.py ci/m3-native-elf-package-graph.py
+          python3 ci/m3-native-host-dependency-preflight.py --self-test
+          python3 ci/m3-native-elf-package-graph.py --self-test
+
+      - name: Prepare direct library metadata inspection tools only
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends binutils libgtk-3-0t64 libdbus-glib-1-2 \
+              libasound2t64 libnss3 libgbm1
+          test -x /sbin/ldconfig
+          command -v readelf
+
+      - name: Fetch immutable historical full native Vulpra archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40567473401 --repo "$GITHUB_REPOSITORY" \
+            --name m3-asrouter-promo-matched-baseline --dir "$RUNNER_TEMP/archived"
+          (
+            cd "$RUNNER_TEMP/archived"
+            sha256sum -c vulpra-promo-full-baseline.tar.xz.sha256
+            jq -e '.source_commit == "1683ca67b69389a879717bcd537772c3b40624b6" and .full_promo_resources_present == true' m3-promo-matched-size.json >/dev/null
+          )
+
+      - name: Enumerate real packaged direct ELF names and Ubuntu cache file candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-elf-package-graph.py \
+            "$RUNNER_TEMP/archived/vulpra-promo-full-baseline.tar.xz" \
+            --output "$RUNNER_TEMP/m3-host-elf-source-graph.json"
+          python3 ci/m3-native-host-dependency-preflight.py \
+            --graph "$RUNNER_TEMP/m3-host-elf-source-graph.json" \
+            --output "$RUNNER_TEMP/m3-native-host-cache-preflight.json"
+          jq -e \
+            '.direct_unbundled_names_checked == 36 and
+             (.names_with_host_elf64_cache_candidates + .names_with_no_compatible_host_cache_candidate) == 36 and
+             .native_package_binary_executed == false and
+             .ldd_or_dlopen_called == false and
+             .host_transitive_and_searchpath_closure_proven == false and
+             .target_workstation_library_resolution_proven == false and
+             .compiled_feature_savings_claimed == null and
+             .source_removal_authorized == false' \
+            "$RUNNER_TEMP/m3-native-host-cache-preflight.json" >/dev/null
+          echo "PASS: declared external package SONAMEs classified against this CI host only"
+
+      - name: Preserve bounded archive identity and CI host cache crosswalk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-host-cache-preflight
+          path: |
+            ${{ runner.temp }}/m3-host-elf-source-graph.json
+            ${{ runner.temp }}/m3-native-host-cache-preflight.json
+          if-no-files-found: warn
+          retention-days: 14
