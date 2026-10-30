@@ -1,0 +1,82 @@
+# Read-only source-candidate crosswalk against EXACT original native browser
+# source and authenticated original-package dynamic loader request evidence.
+name: M3 Native Dynamic Requests To Original Source Candidates
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-dynamic-source-candidates.yml
+      - ci/m3-dynamic-request-source-map.sh
+      - ci/tests/m3-dynamic-request-source-map-test.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-source-dynamic-request-candidate-mapping:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      HISTORICAL_SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      OBSERVATION_RUN: '41138174618'
+      OBSERVATION_ARTIFACT: m3-native-headless-wayland-loader-request-edge-contrast
+    steps:
+      - name: Checkout current guarded source crosswalk only
+        uses: actions/checkout@v4
+        with:
+          path: current
+          sparse-checkout: |
+            ci
+      - name: Checkout original compiled Firefox source for three features
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: original
+          sparse-checkout: |
+            dom/media/platforms/ffmpeg
+            widget/gtk
+            media/libcubeb/src
+            toolkit/library/rust/shared
+            toolkit/library/rust/gkrust-features.mozbuild
+          sparse-checkout-cone-mode: false
+      - name: Authenticate historical source and test adversarial source relations
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C current rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original rev-parse HEAD)" = "$HISTORICAL_SOURCE"
+          bash -n current/ci/m3-dynamic-request-source-map.sh
+          bash -n current/ci/tests/m3-dynamic-request-source-map-test.sh
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$OBSERVATION_RUN" |
+            jq -e '
+              .status=="completed" and .conclusion=="success" and
+              .name=="M3 Actual Headless Graphical Native Loader Request Edge Graph"' >/dev/null
+          bash current/ci/tests/m3-dynamic-request-source-map-test.sh original
+          mkdir -p "$RUNNER_TEMP/observed"
+          gh run download "$OBSERVATION_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name "$OBSERVATION_ARTIFACT" --dir "$RUNNER_TEMP/observed"
+          test -s "$RUNNER_TEMP/observed/m3-native-loader-actual-request-edge-contrast.json"
+      - name: Bind real observed dynamic requests to exact compiled-source candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash current/ci/m3-dynamic-request-source-map.sh \
+            "$RUNNER_TEMP/observed/m3-native-loader-actual-request-edge-contrast.json" \
+            original "$RUNNER_TEMP/m3-source-dynamic-requests-crosswalk.json"
+          jq -e '
+            .source_candidates_confirmed_with_exact_original_tree==true and
+            .actual_call_stacks_captured==false and
+            .linked_pinned_external_crate_bytes_audited!=true and
+            .full_dynamic_load_graph_covered==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-source-dynamic-requests-crosswalk.json" >/dev/null
+      - name: Archive only small sanitized source candidate map
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-source-three-dynamic-request-candidates
+          path: ${{ runner.temp }}/m3-source-dynamic-requests-crosswalk.json
+          if-no-files-found: error
+          retention-days: 14
