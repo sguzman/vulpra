@@ -85,10 +85,37 @@ jobs:
         timeout-minutes: 3
         run: |
           set -euo pipefail
-          env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+          # Acceptance remains the original uninstrumented ten-second run.
+          # A failure may be followed by diagnostic runs, but never converted
+          # into a pass by a shorter surviving process or altered environment.
+          if env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             VULPRA_WAYLAND_TEST_SECONDS=10 \
-            bash packaging/test-wayland.sh "$RUNNER_TEMP/extracted/vulpra"
-          echo 'PASS: original normal browser Wayland baseline survives 10 seconds'
+            bash packaging/test-wayland.sh "$RUNNER_TEMP/extracted/vulpra"; then
+            echo 'PASS: original normal browser Wayland baseline survives 10 seconds'
+          else
+            echo 'FAIL: required original ten-second Wayland baseline'
+            echo 'DIAGNOSTIC ONLY: separate clean profiles at shorter intervals'
+            for seconds in 2 5 8; do
+              if env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+                VULPRA_WAYLAND_TEST_SECONDS="$seconds" \
+                bash packaging/test-wayland.sh "$RUNNER_TEMP/extracted/vulpra"; then
+                echo "DIAGNOSTIC PASS: rendered frame and process survived ${seconds}s"
+              else
+                echo "DIAGNOSTIC FAIL: ${seconds}s probe did not meet all conditions"
+              fi
+            done
+            echo 'DIAGNOSTIC ONLY: crash reporter disabled, full ten-second contract'
+            if env MOZ_CRASHREPORTER_DISABLE=1 \
+              MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+              VULPRA_WAYLAND_TEST_SECONDS=10 \
+              bash packaging/test-wayland.sh "$RUNNER_TEMP/extracted/vulpra"; then
+              echo 'DIAGNOSTIC PASS: no-crash-reporter ten-second probe'
+            else
+              echo 'DIAGNOSTIC FAIL: no-crash-reporter ten-second probe'
+            fi
+            echo 'FAIL: the original native Wayland acceptance was not satisfied'
+            exit 1
+          fi
       - name: Render and commit an actual Wayland frame while tracing native loader
         shell: bash
         timeout-minutes: 8
