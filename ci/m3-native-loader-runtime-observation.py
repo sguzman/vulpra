@@ -72,6 +72,7 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
                         trace_pre_libxul.add(n)
                     else:
                         trace_after_libxul.add(n)
+            m=OPEN.search(line)
             if m:
                 n=basename(m.group(1))
                 if n:opened.add(n)
