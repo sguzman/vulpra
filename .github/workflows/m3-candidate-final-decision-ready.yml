@@ -108,8 +108,8 @@ jobs:
             $c[0].m3_decision_classification as $d |
             if $d.whole_m3_gate_passed then
               if $d.complete_candidate_fallback_validation!=true or
-                 $m.acceptance_gates.passed!=3 or $m.percent!=50 or
-                 $p[0].overall.percent!=50 then error("Incomplete M3 decision gate advancement") else . end
+                 $m.acceptance_gates.passed!=4 or $m.percent!=66 or
+                 $p[0].overall.percent!=55 then error("Incomplete M3 decision gate advancement") else . end
             else
               if $d.complete_candidate_fallback_validation!=false or
                  $m.acceptance_gates.passed!=2 or $m.percent!=33 or

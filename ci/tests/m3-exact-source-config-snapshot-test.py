@@ -43,9 +43,9 @@ def check(d,progress,roadmap):
     assert "M3-EXACT-SOURCE-CONFIG-SNAPSHOT.json" in roadmap
     assert "M3-EXACT-SOURCE-CONFIG-SNAPSHOT.md" in roadmap
     m3=next(m for m in progress["milestones"] if m["id"]=="M3")
-    assert m3["acceptance_gates"]["passed"]==3
+    assert m3["acceptance_gates"]["passed"]==4
     assert m3["acceptance_gates"]["total"]==6
-    assert m3["percent"]==50 and progress["overall"]["percent"]==50
+    assert m3["percent"]==66 and progress["overall"]["percent"]==55
 def test_mutants(d,p,r):
     changes=[
       lambda a,b,c:a.update(observed_source_commit="1683ca67b69389a879717bcd537772c3b40624b6"),
