@@ -88,6 +88,11 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
                         candidate_dynamic.add(edge)
         if "libxul.so" not in opened and "libxul.so" not in init:
             continue
+        # A loader *request* for libxul without its real glibc initializer
+        # is not a verified running browser, even if Bash already initialized
+        # three unrelated libraries before exec.
+        if "libxul.so" not in init:
+            raise ValueError("Browser loader trace lacks native libxul initializer")
         if len(init)<3:
             raise ValueError("Browser process had too few real loader init events")
         seen.update(init)
@@ -108,7 +113,7 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
     if not browsers:
         raise ValueError("No actual Vulpra native browser process with libxul")
     for required in ("libxul.so","libc.so.6"):
-        if required not in seen and required!="libxul.so":
+        if required not in seen:
             raise ValueError("No observed core glibc initialization: "+required)
     # No path, user state, PID or raw message is ever emitted.
     if len(recorded_needed_by)+len(recorded_dynamic_requests)>MAX_REQUEST_EDGES:
