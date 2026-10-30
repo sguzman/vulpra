@@ -221,11 +221,17 @@ jobs:
           set -e
           echo "DIAGNOSTIC GDB process exit status: $probe_status (not browser acceptance)"
           awk '
-            /Program received signal/ {
+            /received signal/ {
               if (/SIGSEGV/) print "DIAGNOSTIC signal: SIGSEGV";
               else print "DIAGNOSTIC signal: other";
             }
             /^#[0-9]+[[:space:]]/ {
+              module="unknown"
+              if (match($0, / from [^[:space:]]+/)) {
+                path=substr($0, RSTART+6, RLENGTH-6)
+                parts_count=split(path, parts, "/")
+                module=parts[parts_count]
+              }
               frame=$0
               sub(/^#[0-9]+[[:space:]]+/, "", frame)
               sub(/^0x[0-9a-fA-F]+[[:space:]]+in[[:space:]]+/, "", frame)
@@ -233,7 +239,7 @@ jobs:
               sub(/[(].*/, "", frame)
               sub(/[[:space:]]+(at|from)[[:space:]].*/, "", frame)
               gsub(/[^A-Za-z0-9_:~<>., +*-]/, "?", frame)
-              print "DIAGNOSTIC symbolic frame " ++n ": " substr(frame,1,120)
+              print "DIAGNOSTIC symbolic frame " ++n ": " substr(frame,1,120) " [module=" module "]"
               if (n >= 15) exit
             }
           ' "$work/gdb.log"
