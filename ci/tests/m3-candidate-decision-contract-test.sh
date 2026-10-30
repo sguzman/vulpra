@@ -15,7 +15,7 @@ jq -e '
   .schema_version==1 and
   .status=="scoped_candidate_policy_guard_passed" and
   .candidates_checked==20 and
-  .classes=={"keep":12,"remove_source":4,"review":1,"conditional_compile":3} and
+  .classes=={"keep":13,"remove_source":4,"review":0,"conditional_compile":3} and
   .verified_distinct_pruned_source_paths==14867 and
   .verified_distinct_pruned_git_blob_bytes==129967585 and
   .incomplete_dependencies_preserved==true and
@@ -51,6 +51,8 @@ reject 'do not permanently prune guarded AdsFeed' '(.candidates[]|select(.id=="n
 reject 'do not permanently prune guarded PromoCard' '(.candidates[]|select(.id=="newtab_promocard_optout")|.m3_strategy.guarded_opt_in_omission_accepted)=false'
 reject 'do not permanently remove protected GenAI root' '(.candidates[]|select(.id=="browser_genai")|.m3_strategy.strategy)="remove_source"'
 reject 'protect broad New Tab and ASRouter' '(.candidates[]|select(.id=="newtab_and_messaging")|.m3_strategy.strategy)="remove_source"'
+reject 'protect current shared testing root classification' '(.candidates[]|select(.id=="source_testing")|.m3_strategy.strategy)="review"'
+reject 'reject conditional testing root omission' '(.candidates[]|select(.id=="source_testing")|.m3_strategy.guarded_opt_in_omission_accepted)=true'
 reject 'do not approve full testing tree deletion' '(.candidates[]|select(.id=="source_testing")|.m3_strategy.permanent_removal_accepted)=true'
 reject 'reject missing failure-safe fallback' '(.candidates[]|select(.id=="source_testing")|.m3_strategy.safety_and_fallback)=""'
 reject 'reject missing runtime/source evidence' '(.candidates[]|select(.id=="newtab_and_messaging")|.evidence)=[]'
@@ -59,7 +61,7 @@ reject 'reject invalid flag type' '(.candidates[]|select(.id=="pocket_integratio
 reject 'reject fake complete candidate map' '.m3_decision_classification.complete_feature_dependency_inventory=true'
 reject 'reject fake fallback closure' '.m3_decision_classification.complete_candidate_fallback_validation=true'
 reject 'reject unearned gate' '.m3_decision_classification.whole_m3_gate_passed=true'
-reject 'reject inflated summary count' '.m3_decision_classification.categories.keep=13'
+reject 'reject inflated summary count' '.m3_decision_classification.categories.keep=14'
 reject 'reject claimed new normal browser change' '.m3_decision_classification.no_normal_browser_feature_changed=false'
 reject 'reject compiled saving without build' '.m3_decision_classification.new_compiled_savings_bytes=500000'
 reject 'reject inflated pruned Git file count' '.accepted_source_pruning_cohort_totals.aggregate_removed_git_paths+=1'
@@ -69,8 +71,8 @@ reject 'reject source-only claims of binary savings' '.accepted_source_pruning_c
 reject 'reject source-only claims of native library removal' '.accepted_source_pruning_cohort_totals.native_library_removed=true'
 reject 'reject add old overlapping candidate inventories' '.accepted_source_pruning_cohort_totals.candidate_fields_source_files_not_additive_as_pruned_totals=false'
 reject 'reject incorrectly declared milestone progress' '.accepted_source_pruning_cohort_totals.broader_m3_gate_advanced_by_this_accounting=true'
-if [[ "$rejected" -ne 33 ]]; then
-  echo "FAIL: expected 33 unsafe mutation rejections, saw $rejected" >&2
+if [[ "$rejected" -ne 35 ]]; then
+  echo "FAIL: expected 35 unsafe mutation rejections, saw $rejected" >&2
   exit 1
 fi
 echo "PASS: real 20-candidate scoped policy; $rejected deliberately unsafe mutations rejected"

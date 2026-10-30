@@ -236,7 +236,7 @@
     },
     {
       "id": "source_testing",
-      "decision": "protect_core_test_build_and_performance_corpora; audit peripheral fixtures",
+      "decision": "retain_complete_shared_testing_and_QA_source_root_with_no_peripheral_omissions",
       "surface": "source_only",
       "paths": [
         "testing/"
@@ -246,10 +246,13 @@
       "why": "Root moz.build always includes testing; toolkit/toolkit.mozbuild includes testing/gtest even when optional suites are disabled",
       "evidence": [
         "root moz.build: DIRS includes testing",
+        "2026-10-30 current testing source guard 41107821628 PASS: 25/25 source dependencies and 25 negative mutations, https://github.com/sguzman/vulpra/actions/runs/41107821628",
+        "2026-10-30 cross-reconciled current build and QA sources with real packaged browser via 41109168322 PASS, https://github.com/sguzman/vulpra/actions/runs/41109168322",
+        "2026-10-30 original full normal packaged browser independently passed geckodriver WebDriver New Tab and ASRouter native acceptance via 41106584931 PASS, https://github.com/sguzman/vulpra/actions/runs/41106584931",
         "toolkit/toolkit.mozbuild: unconditional /testing/gtest; optional harnesses guarded by ENABLE_TESTS",
         "actual M2 build needed disabled-test manifest workaround"
       ],
-      "next": "Retain always-wired manifest/mozbase/mozharness and remote/Marionette WebDriver paths. Source audit 40922064826 maps 14 test/localization conditional boundaries and rejects 17 mutations. Need actual generated build graph, optional data size and native acceptance before omitting any ENABLE_TESTS fixtures; app may build standalone tools regardless of suite state.",
+      "next": "KEEP all testing/ source and tooling for current Linux browser development, including unmeasured peripheral fixtures. Do not delete an ENABLE_TESTS fixture or treat --disable-tests as a source reachability proof. Future narrower removal requires separate generated graph, acceptance baseline, isolated compiled browser, original QA tests and source-matched savings.",
       "manifest_grounded_boundaries": {
         "source_revision": "2450fb9f86f49ada663cb5cc1a48544265e8bc26",
         "status": "read_only_source_graph_classification; no deletion authorized",
@@ -331,12 +334,12 @@
         "compiled_bytes_saved": null
       },
       "m3_strategy": {
-        "strategy": "review",
-        "scope": "Mixed test root: retain manifest, mozbase, mozharness, WPT and performance corpora; peripheral fixtures need graph",
-        "safety_and_fallback": "Deleting tests also removes critical QA/build capabilities; no blanket omit.",
+        "strategy": "keep",
+        "scope": "Keep entire shared testing/ tree: build manifests, mozbase/mozharness, Marionette/WebDriver, WPT, Talos/Raptor and unmeasured peripheral fixtures, with NO test-root omission",
+        "safety_and_fallback": "Keep all existing test root content as the safest fallback; root build traverses testing and third_party/python, toolkit WebDriver and GeckoDriver still need QA sources, and WPT/Talos/Raptor are needed for future Gecko/Rust migration regression. No peripheral fixture deletion or package-size saving is authorized. Any future narrow optional fixture would be a new independent candidate with generated build graph/native acceptance.",
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
-        "requires_further_source_or_runtime_verification": true,
+        "requires_further_source_or_runtime_verification": false,
         "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
         "guarded_opt_in_omission_accepted": false
       }
@@ -1862,16 +1865,16 @@
     "next": "Obtain exact-source native linker map/symbol/section allocation and generated build/config values before crediting any compile-time removal; no disassembly or link graph completed by archive-level member census."
   },
   "m3_decision_classification": {
-    "state": "twenty_scoped_candidates_classified; GenAI and NewTab/ASRouter shared roots retained after source/native evidence; source_testing remains the only review scope",
+    "state": "twenty_scoped_candidates_assigned_conservative_strategies; all shared GenAI, NewTab/ASRouter and testing roots retained; candidate gate awaits separate cross-evidence acceptance",
     "as_of": "2026-10-29",
     "total_candidates": 20,
     "complete_feature_dependency_inventory": false,
     "complete_candidate_fallback_validation": false,
     "whole_m3_gate_passed": false,
     "categories": {
-      "keep": 12,
+      "keep": 13,
       "remove_source": 4,
-      "review": 1,
+      "review": 0,
       "conditional_compile": 3
     },
     "method": "Per-candidate scoped safety class, preserve prior immutable evidence; remove_source means bounded historical source deletions already accepted, conditional_compile means guarded opt-in native/bundle omission only, keep protects functional/security/privacy dependencies, review means insufficient caller graph.",
@@ -2675,6 +2678,21 @@
     "accepted_new_genai_keep_source_safety_ci_run_id": 41082489351,
     "genai_shared_root_decision": "keep",
     "newtab_asrouter_shared_root_decision": "keep",
+    "shared_testing_root_decision": "keep",
+    "shared_testing_source_guard_run_id": 41107821628,
+    "shared_testing_source_guard_artifact_id": 13001821774,
+    "shared_testing_current_source_boundaries": 25,
+    "shared_testing_negative_boundaries_rejected": 25,
+    "shared_testing_qa_crosswalk_run_id": 41109168322,
+    "shared_testing_qa_crosswalk_artifact_id": 13002321956,
+    "shared_testing_locale_boundary_run_id": 40922064826,
+    "shared_testing_locale_boundary_count": 14,
+    "shared_testing_locale_mutations_rejected": 17,
+    "shared_testing_native_qa_run_id": 41106584931,
+    "shared_testing_native_full_build_run_id": 40997075527,
+    "shared_testing_all_peripheral_fixtures_kept": true,
+    "shared_testing_peripheral_omission_authorized": false,
+    "shared_testing_generated_build_graph_proven": false,
     "newtab_asrouter_source_ci_run_id": 41105957207,
     "newtab_asrouter_source_ci_artifact_id": 13000952309,
     "newtab_asrouter_source_relationships": 34,
@@ -2691,14 +2709,14 @@
     "newtab_asrouter_actual_cloud_messages_tested": false,
     "newtab_asrouter_actor_lifecycle_tested": false,
     "full_newtab_dependency_graph_complete": false,
-    "remaining_review_candidate_ids": ["source_testing"],
+    "remaining_review_candidate_ids": [],
     "policy_artifact_id": 12989500427,
     "policy_workflow_lint_ci_run_id": 41080217307,
     "classified_candidate_count": 20,
     "candidate_strategy_counts": {
-      "keep": 12,
+      "keep": 13,
       "remove_source": 4,
-      "review": 1,
+      "review": 0,
       "conditional_compile": 3
     },
     "unsafe_candidate_policy_mutations_rejected": 32,

@@ -15,7 +15,7 @@ EXPECTED={
  "windows_widget_installer":"remove_source",
  "macos_cocoa_widget":"remove_source",
  "android_mobile":"remove_source",
- "source_testing":"review",
+ "source_testing":"keep",
  "sync_services":"keep",
  "firefox_accounts":"keep",
  "telemetry_internals":"keep",
@@ -60,7 +60,7 @@ def validate(reg,paired,progress):
     control=reg["m3_decision_classification"]
     assert control["total_candidates"]==20
     assert counts==control["categories"]
-    assert counts=={"keep":12,"remove_source":4,"review":1,"conditional_compile":3}
+    assert counts=={"keep":13,"remove_source":4,"review":0,"conditional_compile":3}
     assert control["complete_feature_dependency_inventory"] is False
     assert control["complete_candidate_fallback_validation"] is False
     assert control["whole_m3_gate_passed"] is False

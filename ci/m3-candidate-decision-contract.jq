@@ -18,6 +18,7 @@ def expected:
       "devtools_client",
       "pocket_integration",
       "newtab_and_messaging",
+      "source_testing",
       "browser_genai",
       "core_web_security",
       "localization_default_and_repack",
@@ -30,7 +31,7 @@ def expected:
       "android_mobile",
       "remaining_mobile_platform_leaves"
     ],
-    "review": ["source_testing"],
+    "review": [],
     "conditional_compile": [
       "normandy_and_healthreport",
       "newtab_adsfeed_optout",
@@ -101,7 +102,7 @@ def valid_candidate:
     and $summary.complete_candidate_fallback_validation==false;
     "false broad M3 classification gate")
 | require($summary.categories=={
-    "keep":12,"remove_source":4,"review":1,"conditional_compile":3
+    "keep":13,"remove_source":4,"review":0,"conditional_compile":3
   }; "classification summary contradicts scoped inventory")
 | require($summary.no_new_source_deletion==true and
     $summary.no_normal_browser_feature_changed==true and
