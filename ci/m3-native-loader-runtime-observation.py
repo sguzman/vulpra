@@ -149,7 +149,7 @@ def main() -> int:
           "actual browser loader process trace(s),",
           result["observed_loader_init_library_basename_count"],
           "libc/glibc init library basenames")
-    print("LIMIT: one headless workload on Ubuntu, not complete dlopen, Arch, ABI or feature map")
+    print("LIMIT: one", a.workload, "workload on Ubuntu, not complete dlopen, Arch, ABI or feature map")
     return 0
 
 if __name__=="__main__":

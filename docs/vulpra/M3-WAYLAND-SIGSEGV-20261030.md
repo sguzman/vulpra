@@ -70,6 +70,10 @@ These controls rule out *simple* loopback-up state, disconnected dummy-interface
 
 The regular original Ubuntu runner still crashes; no workaround has been merged into normal browser packaging or the workstation. M3 **83% (5/6)**, overall **61%**, session **Δ0 pp**.
 
+### Measured graphical loader library coverage
+
+[Actual no-egress private-Weston loader 41137086850](https://github.com/sguzman/vulpra/actions/runs/41137086850) **PASS**, three original-native browser loader traces and **152** safe initialized library basenames, versus **94** in the earlier authenticated headless New Tab loader. [Independent source-pinned reconciliation 41137467860](https://github.com/sguzman/vulpra/actions/runs/41137467860) **PASS**, **94 overlapping**, **0 headless-only** and **58 graphical-only** names. Artifact and precise inference limits are recorded in [M3-WAYLAND-HEADLESS-LOADER-CROSSWALK-20261030.md](M3-WAYLAND-HEADLESS-LOADER-CROSSWALK-20261030.md). This is a real successful network-namespace graphical workload, **not** acceptance of the ordinary-host SIGSEGV, Arch/Hyprland, complete dynamic ABI/`dlopen` graph or source deletion. M3 **83% (5/6)**, overall **61%**, Δ0 pp.
+
 ## Next acceptance work
 
 1. Recover source-matched native debug symbols or a dedicated symbolized diagnostic build, then identify the crashing libxul function and validate a real fix; retain sandboxing and profile protection.
