@@ -8,6 +8,14 @@ on:
     paths:
       - .github/workflows/m3-genai-external-consumer-contract.yml
       - ci/m3-genai-external-consumer-contract.sh
+      - browser/components/genai/**
+      - browser/components/moz.build
+      - browser/components/BrowserComponents.manifest
+      - browser/components/DesktopActorRegistry.sys.mjs
+      - browser/components/preferences/config/tabs-browsing.mjs
+      - browser/components/sidebar/browser-sidebar.js
+      - browser/components/enterprisepolicies/Policies.sys.mjs
+      - toolkit/components/nimbus/FeatureManifest.yaml
   workflow_dispatch:
 permissions:
   contents: read
