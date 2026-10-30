@@ -2377,5 +2377,31 @@
     "additional_source_deletion_authorized": false,
     "new_m3_gate_credit": false,
     "documentation": "docs/vulpra/M3-NORMANDY-NATIVE-RECHECK-20261030.md"
+  },
+  "accepted_m3_protected_source_crosscheck": {
+    "status": "passed_source_pinned_four_subsystem_protected_boundary_crosscheck",
+    "run_id": 40982290720,
+    "source_commit": "010d4b7e847f3a0cd0bb69d20b17db59108120ae",
+    "evidence_artifact_id": 12945352163,
+    "independent_audit_boundary_counts": {
+      "pocket": 5,
+      "sync": 7,
+      "telemetry": 6,
+      "deletion": 6
+    },
+    "protected_source_boundaries_total": 24,
+    "explicitly_joined_high_impact_risks": 5,
+    "synthetic_false_claim_rejection_cases": 13,
+    "all_source_audits_same_commit": true,
+    "script_does_not_execute_browser": true,
+    "normal_browser_source_modified": false,
+    "protected_pocket_and_sync_interfaces_preserved": true,
+    "user_upload_deletion_path_source_anchors_preserved": true,
+    "actual_runtime_callgraph_complete": false,
+    "actual_network_submission_privacy_proven": false,
+    "source_deletion_authorized": false,
+    "new_compiled_savings_bytes": null,
+    "new_m3_roadmap_gate_passed": false,
+    "documentation": "docs/vulpra/M3-PROTECTED-SOURCE-CROSSCHECK-20261030.md"
   }
 }
