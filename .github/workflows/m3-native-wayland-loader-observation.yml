@@ -229,7 +229,7 @@ jobs:
               sub(/^#[0-9]+[[:space:]]+/, "", frame)
               sub(/^0x[0-9a-fA-F]+[[:space:]]+in[[:space:]]+/, "", frame)
               sub(/^in[[:space:]]+/, "", frame)
-              sub(/\\(.*/, "", frame)
+              sub(/[(].*/, "", frame)
               sub(/[[:space:]]+(at|from)[[:space:]].*/, "", frame)
               gsub(/[^A-Za-z0-9_:~<>., +*-]/, "?", frame)
               print "DIAGNOSTIC symbolic frame " ++n ": " substr(frame,1,120)
