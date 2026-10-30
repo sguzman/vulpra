@@ -1,0 +1,147 @@
+# Current compiled full-normal Linux Vulpra telemetry policy checks, localhost only.
+# Reuses authenticated source-pinned native build. No compilation/user profile.
+name: M3 Newer Full-Normal Native Telemetry Policy Runtime
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-newer-full-telemetry-native.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-source-pinned-normal-localhost-privacy-policy:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPILED_SOURCE: 'b1482404dfb8b01342990ee99ea3df0f9756b5f7'
+      ORIGINAL_BUILD_RUN: '40997075527'
+      ARCHIVE_SHA256: '7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a'
+      MOZ_HEADLESS: '1'
+    steps:
+      - name: Checkout exact native compiler source and CI harness
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Verify protected telemetry source modules and reject fake local reports
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$COMPILED_SOURCE"
+          python3 -m py_compile ci/smoke-telemetry-loopback-package.py
+          python3 ci/tests/m3-telemetry-loopback-harness-test.py
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_BUILD_RUN" |
+            jq -e --arg sha "$COMPILED_SOURCE"               '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          python3 - <<'PY'
+          import subprocess
+          expected={
+            "toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs":
+              "54727bf2024cedb83f39037aed930ac926cc584f",
+            "toolkit/components/telemetry/app/TelemetrySend.sys.mjs":
+              "2ebae13763c51cad5e8652e9ab4a66907197099f",
+            "toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs":
+              "6f0982dbae00342fdd38d537bf2dc18333184787",
+            "toolkit/components/telemetry/app/TelemetryUtils.sys.mjs":
+              "51525bc8f94da207c186ee743a5e23001e0bbd66",
+            "toolkit/components/telemetry/app/TelemetryControllerBase.sys.mjs":
+              "fdd0a947e908a5376c2883d544a67c24a81d3c4d",
+            "toolkit/modules/ServiceRequest.sys.mjs":
+              "74241892821532785a468ffc01ac68cb83e5ba04",
+          }
+          for path,sha in expected.items():
+              assert subprocess.check_output(["git","rev-parse","HEAD:"+path],text=True).strip()==sha,path
+          print("PASS: exact compiled source and six protected telemetry/transport module identities")
+          PY
+      - name: Retrieve and authenticate actual newly compiled normal native package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/normal"
+          gh run download "$ORIGINAL_BUILD_RUN" --repo "$GITHUB_REPOSITORY"             --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/normal"
+          (cd "$RUNNER_TEMP/normal" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"normal"
+          pkg=root/"full-normandy-baseline.tar.xz"
+          manifest=json.loads((root/"m3-full-normandy-baseline.json").read_text())
+          assert manifest["schema_version"]==1
+          assert manifest["source_commit"]==os.environ["COMPILED_SOURCE"]
+          assert manifest["sha256"]==os.environ["ARCHIVE_SHA256"]==hashlib.sha256(pkg.read_bytes()).hexdigest()
+          assert manifest["compressed_bytes"]==pkg.stat().st_size==87154544
+          assert manifest["variant"]=="full-normandy"
+          assert manifest["normandy_runner_present"] is True
+          assert manifest["required_newtab_modules_present"] is True
+          print("PASS: exact normal source/package and protected full browser feature identity")
+          PY
+          mkdir -p .git/vulpra-native-build/packages
+          cp "$RUNNER_TEMP/normal/full-normandy-baseline.tar.xz"             .git/vulpra-native-build/packages/vulpra-local-telemetry-current-ci.tar.xz
+          (cd .git/vulpra-native-build/packages &&             sha256sum vulpra-local-telemetry-current-ci.tar.xz >                       vulpra-local-telemetry-current-ci.tar.xz.sha256)
+      - name: Install only headless Vulpra runtime and pinned geckodriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y             --no-install-recommends libgtk-3-0t64 libdbus-glib-1-2             libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz"             https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+      - name: Observe normal sender initialization without test-mode setup
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-telemetry-loopback-package.py             "$GITHUB_WORKSPACE" --observe-natural-startup
+          jq -e             '.schema_version==1 and
+             .status=="natural_startup_observed_without_test_init" and
+             .verified_package_sha256==true and .isolated_profile==true and
+             .no_explicit_test_controller_setup==true and
+             .no_sender_test_override==true and
+             (.natural_startup.samples | map(.seconds))==[0,30,75] and
+             (.natural_startup.samples[0].sender_ready)==false and
+             (.natural_startup.samples[1].sender_ready)==false and
+             (.natural_startup.samples[2].sender_ready)==true'             .git/vulpra-native-build/m3-telemetry-natural-startup.json >/dev/null
+      - name: Exercise actual packaged telemetry test-mode opt-out and deletion exception
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-telemetry-loopback-package.py             "$GITHUB_WORKSPACE"
+          jq -e             '.schema_version==2 and
+             .status=="native_privileged_telemetry_runtime_observed" and
+             .verified_package_sha256==true and .isolated_profile==true and
+             .nonlocal_connections_blocked_by_gecko_environment==true and
+             .loopback_receiver=="127.0.0.1" and
+             .runtime.test_setup_used==true and
+             .runtime.observer_seen==true and
+             .runtime.disabled.ordinary==false and
+             .runtime.disabled.deletion==true and
+             .runtime.master_off.policy==false and
+             .before_optout_requests["vulpra-probe"]==1 and
+             .after_optout_requests["vulpra-probe"]==1 and
+             .before_optout_requests["deletion-request"]==0 and
+             .after_optout_requests["deletion-request"]==1 and
+             (.receiver_rejections | all(.==0))'             .git/vulpra-native-build/m3-telemetry-loopback.json >/dev/null
+          echo 'PASS: newer full normal browser protected upload opt-out, deletion exception, master policy'
+      - name: Preserve only bounded local test counts and no payloads
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-newer-full-normal-native-telemetry-policy
+          path: |
+            .git/vulpra-native-build/m3-telemetry-natural-startup.json
+            .git/vulpra-native-build/m3-telemetry-loopback.json
+            .git/vulpra-native-build/packages/vulpra-local-telemetry-current-ci.tar.xz.sha256
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
