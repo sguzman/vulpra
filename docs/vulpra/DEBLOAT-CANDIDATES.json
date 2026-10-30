@@ -2484,5 +2484,39 @@
     "new_m3_roadmap_gate_passed": false,
     "documentation": "docs/vulpra/M3-NORMANDY-PHYSICAL-PAYLOAD-20261030.md",
     "strict_followup_artifact_id": 12946415710
+  },
+  "accepted_historical_normal_sync_fxa_module_runtime": {
+    "status": "passed_real_isolated_normal_native_browser_sync_fxa_module_imports_no_credentials",
+    "runtime_run_id": 40984957431,
+    "evidence_artifact_id": 12946740842,
+    "current_harness_commit": "4389f7d4075f0f40b68e0a6818c4d5f278767304",
+    "original_normal_native_run_id": 40431769117,
+    "original_normal_native_source_commit": "674db8e385c36aec23e78bbe059b2a1fec194fae",
+    "original_normal_native_package_sha256": "47c8ac5ce90747c051eac8daf24544d88767fdeb989293c0b50c5e8ac9e53c30",
+    "original_normal_native_archive_bytes": 86937548,
+    "original_candidate_runtime_passed_run_id": 40439671494,
+    "protected_unchanged_source_blobs_count": 7,
+    "full_current_browser_source_and_config_match": false,
+    "actual_packaged_native_executable_tested": true,
+    "isolated_home_and_profile_verified": true,
+    "gecko_nonlocal_connection_guard_enabled": true,
+    "account_credentials_provided": false,
+    "independent_runtime_checks": {
+      "sync_ui_module": true,
+      "sync_ui_default_not_configured": true,
+      "weave_lazy_module": true,
+      "fxa_singleton": true,
+      "fxa_no_signed_in_account": true,
+      "extension_storage_sync_loaded": true,
+      "accounts_glue_module": true,
+      "firefox_view_controller": true
+    },
+    "actually_authenticated_or_performed_remote_sync": false,
+    "webextension_storage_sync_read_write_tested": false,
+    "sync_service_network_tested": false,
+    "complete_current_head_binary_proven": false,
+    "source_removal_authorized": false,
+    "new_m3_roadmap_gate_passed": false,
+    "documentation": "docs/vulpra/M3-ARCHIVED-NATIVE-SYNC-FXA-BOUNDARIES-20261030.md"
   }
 }
