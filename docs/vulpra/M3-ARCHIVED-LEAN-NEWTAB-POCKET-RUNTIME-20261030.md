@@ -240,3 +240,42 @@ preserving its existing behavior; it does not prove live feeds, current
 full-normal compilation or whole milestone completion.
 
 **M3 2/6 (33%), overall 44%, Δ0 pp.**
+
+## Newer full-normal exact-compiled-source packaged New Tab runtime ACCEPTED (2026-10-30 UTC)
+
+The [normal full-Normandy native build 40997075527](https://github.com/sguzman/vulpra/actions/runs/40997075527)
+**PASSED** after compiling, packaging and checksum-preserving the actual
+native browser on GitHub Actions. The compiled source was
+`b1482404dfb8b01342990ee99ea3df0f9756b5f7`. The original
+`vulpra-m3-normandy-matched-full-baseline` artifact is **12954387251**;
+its manifest asserts physical inclusion of the full Normandy runner and
+the retained ActivityStream, TopStoriesFeed and DiscoveryStreamFeed
+packaged resources.
+
+The automatically triggered independent
+[source-pinned normal-native browser runtime 41004025705](https://github.com/sguzman/vulpra/actions/runs/41004025705)
+**PASSED** with evidence artifact **12954189626**. It checked out the
+*exact compiled source SHA*, not the later workflow's own `main` HEAD,
+verified all six New Tab source guard blob hashes, checked the actual
+archive SHA-256 sidecar/source manifest and physical `omni.ja` resource
+presence, then opened `about:newtab` in a fresh real headless native
+Vulpra browser under a disposable profile and disabled nonlocal Gecko
+connections. It required **all 26/26 real shipped protected feed factory,
+legacy fallback and modern preference behavior assertions** to pass,
+with no real story fetch, production feed initialization or account login.
+The full-normal runtime status, report variant and package feature flags
+were additionally checked by the workflow; the headless test harness
+also directly verified the physical package itself.
+
+Workflow lint [40997075529](https://github.com/sguzman/vulpra/actions/runs/40997075529)
+**PASSED**.
+
+This closes the formerly pending **newer-source full-normal New Tab
+runtime** test dependency. It is stronger than the original historical
+same-source pair for more recent full-normal compilation, but it is
+**not a matched full-versus-lean comparison at `b148240`** and does not
+prove real remote Pocket recommendations, production network use,
+per-component binary saving or future current-HEAD behavior. The user
+workstation and browser profiles were not involved.
+
+**M3 remains 2/6 (33%), overall 44%, Δ0 percentage points.**
