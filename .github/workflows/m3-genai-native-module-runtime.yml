@@ -8,6 +8,10 @@ on:
     paths:
       - .github/workflows/m3-genai-native-module-runtime.yml
       - ci/smoke-genai-native-protected-modules.py
+      - ci/smoke-webextension-package-local.py
+      - browser/components/genai/**
+      - browser/components/BrowserComponents.manifest
+      - browser/components/DesktopActorRegistry.sys.mjs
   workflow_dispatch:
 permissions:
   contents: read
