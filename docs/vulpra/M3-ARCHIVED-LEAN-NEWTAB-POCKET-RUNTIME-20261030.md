@@ -114,3 +114,35 @@ a successful signed-in user path, live Pocket recommendation network
 load, *production-context* story-fetch fallback, real ad delivery, complete runtime
 dependency map or newly measured feature saving. No source code was
 removed. **M3 2/6 (33%), overall 44%.**
+
+## Additional real packaged selection and opt-out checks
+
+[Native browser CI 40993562424](https://github.com/sguzman/vulpra/actions/runs/40993562424)
+**PASSED**, artifact **12949863723**, and [workflow lint
+40993562212](https://github.com/sguzman/vulpra/actions/runs/40993562212)
+**PASSED**. [Test/workflow commit
+`cd12bfa`](https://github.com/sguzman/vulpra/commit/cd12bfad77357ecbd63e08cbe2dbdd625e01cfc1)
+raised the required actual packaged native assertions from **22 to 26**.
+All prior assertions remain required. The four new shipped-method checks
+verify:
+
+- Modern Discovery Stream JSON with its system preference enabled
+  selects modern mode without initializing legacy Top Stories properties.
+- With modern JSON enabled but its system preference disabled, the
+  shipped TopStories method selects legacy initialization instead.
+- Repeated legacy fallback initializes legacy properties only once,
+  with inert initialization hooks called twice.
+- The shipped DiscoveryStream `showStories` getter respects the user's
+  Top Stories opt-out without an assigned-space override, even when the
+  system stories preference remains enabled.
+
+No new browser build was made. The original checksum-verified
+Normandy-free archive was reused, the six pinned New Tab source blobs
+still match current main, and the real `about:newtab` page was loaded
+in an isolated private browser session. All feed-init side effects were
+replaced by inert test hooks: no live recommendations or sponsored data
+fetches, user login, profile changes or production-context feed setup
+were tested. A suitable downloadable full-Normandy normal browser
+artifact has not been verified for this specific cross-check.
+No source deletion, compressed-size saving, privacy guarantee or broad
+M3 gate credit follows. **M3 2/6 (33%), overall 44%, Δ0 pp.**
