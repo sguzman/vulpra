@@ -132,7 +132,14 @@ jobs:
           inv="$RUNNER_TEMP/physical/m3-newer-full-elf-locale-inventory.json"
           f="$RUNNER_TEMP/physical/m3-newer-full-feature-resource-crosswalk.json"
           qa="$RUNNER_TEMP/qa/m3-testing-qa-source-native-crosswalk.json"
-          test -s "$l" && test -s "$inv" && test -s "$f" && test -s "$qa"
+          for item in "$l" "$inv" "$f" "$qa"; do
+            if [[ ! -s "$item" ]]; then
+              echo "FAIL: required original physical evidence unavailable: $(basename "$item")" >&2
+              exit 1
+            fi
+          done
+          echo "PASS: original physical files present and nonempty"
+          echo "CHECK: native locale resource JSON"
           jq -e '
             .schema_version==1 and
             .sha256=="7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a" and
@@ -147,6 +154,8 @@ jobs:
             (.nested_omni_ja_members.legacy_chrome_locale.files)==93 and
             .source_removal_authorized==false and
             .compiled_bytes_saved==null' "$l" >/dev/null
+          echo "PASS: native locale resource JSON"
+          echo "CHECK: normal native inventory JSON"
           jq -e '
             .compiled_source_sha=="b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
             .native_build_run_id==40997075527 and
@@ -156,6 +165,8 @@ jobs:
             .elf_regular_members==28 and
             .same_physical_package_for_both_scans==true and
             .candidate_source_removal_authorized==false' "$inv" >/dev/null
+          echo "PASS: normal native inventory JSON"
+          echo "CHECK: physical feature root JSON"
           jq -e '
             .compiled_source_sha=="b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
             .archive_sha256=="7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a" and
@@ -167,12 +178,15 @@ jobs:
             .runtime_reachability_proven==false and
             .removal_authorized==false and
             .compressed_byte_savings==null' "$f" >/dev/null
+          echo "PASS: physical feature root JSON"
+          echo "CHECK: original testing QA native crosswalk"
           jq -e '
             .current_testing_qa_source_guards==25 and
             .current_testing_locale_manifests_checked==14 and
             .independent_real_native_browser_qa_passed==true and
             .peripheral_fixture_omissions_proven==false and
             .new_source_deletion_authorized==false' "$qa" >/dev/null
+          echo "PASS: original testing QA native crosswalk"
           jq -n --arg sha "$GITHUB_SHA" '{
             schema_version:1,
             checkout_source:$sha,
