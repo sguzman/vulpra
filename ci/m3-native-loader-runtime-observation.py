@@ -190,12 +190,14 @@ def selftest() -> None:
         assert "libtinfo.so.6" in v["observed_loader_init_library_basenames"]
         assert v["post_first_libxul_request_stage_is_proven_exclusive_browser_code"] is False
         assert v["loader_reported_needed_by_initialized_edges"]==[
+            {"requester_basename":"bash",
+             "requested_library_basename":"libtinfo.so.6"},
             {"requester_basename":"vulpra-bin",
              "requested_library_basename":"libxul.so"}]
         assert v["loader_reported_dynamic_initialized_edges"]==[
             {"requester_basename":"libxul.so",
              "requested_library_basename":"libnss3.so"}]
-        assert v["loader_reported_needed_by_initialized_edge_count"]==1
+        assert v["loader_reported_needed_by_initialized_edge_count"]==2
         assert v["loader_reported_dynamic_initialized_edge_count"]==1
         assert not v["loader_request_edges_complete"]
         assert all("/" not in str(pair) for pair in
