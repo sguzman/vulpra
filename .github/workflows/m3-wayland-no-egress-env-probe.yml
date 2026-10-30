@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/m3-wayland-no-egress-env-probe.yml
+      - ci/m3-wayland-netns-launch.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,6 +27,7 @@ jobs:
         with:
           sparse-checkout: |
             packaging
+            ci
       - name: Validate original compiled package provenance
         shell: bash
         env:
@@ -34,6 +36,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash -n packaging/test-wayland.sh
+          bash -n ci/m3-wayland-netns-launch.sh
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
             jq -e --arg sha "$SOURCE_SHA" \
               '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
@@ -73,25 +76,8 @@ jobs:
             local label="$1"
             local env_mode="$2"
             local status=0
-            if netns_unshare --net -- bash -c '
-              set -euo pipefail
-              if ip -4 route show default | grep -q . ||
-                 ip -6 route show default | grep -q .; then
-                echo "FAIL: isolated network unexpectedly has default routes" >&2
-                exit 4
-              fi
-              user="$1"
-              harness="$2"
-              app="$3"
-              flag="$4"
-              if [[ "$flag" = enabled ]]; then
-                exec runuser -u "$user" -- env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
-                  VULPRA_WAYLAND_TEST_SECONDS=10 bash "$harness" "$app"
-              else
-                exec runuser -u "$user" -- env -u MOZ_DISABLE_NONLOCAL_CONNECTIONS \
-                  VULPRA_WAYLAND_TEST_SECONDS=10 bash "$harness" "$app"
-              fi
-            ' _ "$runner_user" "$harness" "$app" "$env_mode" \
+            if netns_unshare --net -- bash ci/m3-wayland-netns-launch.sh \
+              "$runner_user" "$harness" "$app" "$env_mode" \
               >"$RUNNER_TEMP/$label-private.log" 2>&1; then
               echo "DIAGNOSTIC $label: native 10-second private Weston PASS in no-egress namespace"
             else

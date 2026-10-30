@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/m3-wayland-launch-context-matrix.yml
+      - ci/m3-wayland-netns-launch.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,6 +26,7 @@ jobs:
         with:
           sparse-checkout: |
             packaging
+            ci
       - name: Authenticate immutable compiled original archive
         shell: bash
         env:
@@ -33,6 +35,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash -n packaging/test-wayland.sh
+          bash -n ci/m3-wayland-netns-launch.sh
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
             jq -e --arg sha "$SOURCE_SHA" \
               '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
@@ -92,15 +95,6 @@ jobs:
             env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_WAYLAND_TEST_SECONDS=10 \
             bash "$harness" "$app"
           # Change only external network route availability from above.
-          probe runuser_netns sudo unshare --net -- bash -c '
-            set -euo pipefail
-            if ip -4 route show default | grep -q . ||
-               ip -6 route show default | grep -q .; then
-              echo "FAIL: isolated network has an unexpected default route" >&2
-              exit 4
-            fi
-            exec runuser -u "$1" -- \
-              env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_WAYLAND_TEST_SECONDS=10 \
-              bash "$2" "$3"
-          ' _ "$runner_user" "$harness" "$app"
+          probe runuser_netns sudo unshare --net -- bash ci/m3-wayland-netns-launch.sh \
+            "$runner_user" "$harness" "$app" enabled
           echo 'DIAGNOSTIC MATRIX COMPLETE: results above are not M3 feature-map acceptance'
