@@ -26,6 +26,12 @@ The separate GDB probe uses the native executable directly with the same private
 
 In [CI 41133073378](https://github.com/sguzman/vulpra/actions/runs/41133073378), corrected position-aware GDB diagnostics showed **SIGSEGV**, memory address **exactly null (0x0)** and fault code **SEGV_MAPERR**, with the first 15 frames in stripped `libxul.so`. The original ten-second graphical acceptance **still failed**. A prior diagnostic incorrectly interpreted three numeric GDB booleans/code values as three independent signal codes; the replacement parser reads the first two boolean checks and third `si_code` in order. `ci/m3-wayland-gdb-sanitize.awk` plus `ci/tests/m3-wayland-gdb-sanitize-test.sh` now verify numeric and textual GDB output, two fault classes, sanitization of paths/addresses/arguments, and incomplete traces. This is fault classification, **not** a resolved source function or accepted graphical run.
 
+### Final CI replay of diagnostic parser and original crash
+
+[Live native test 41133467657](https://github.com/sguzman/vulpra/actions/runs/41133467657) **PASSED** the new synthetic fault-classification/privacy fixtures in the initial preflight, then reproduced the actual original 10-second Wayland exit **11**, the separate crash-reporter-disabled exit **139**, and GDB **SIGSEGV** at unmapped address **0x0** in `libxul.so`. The workflow's overall **FAILURE** is intentional under the preserved acceptance policy: a crash cannot be reclassified as a passing graphical browser.
+
+Independent checks passed on the committed fixture revision: [workflow lint 41133467638](https://github.com/sguzman/vulpra/actions/runs/41133467638), [candidate boundaries 41133467616](https://github.com/sguzman/vulpra/actions/runs/41133467616), [source/build safety 41133467607](https://github.com/sguzman/vulpra/actions/runs/41133467607). M3 **5/6 (83%)**, overall **61%**, delta **+0 percentage points**.
+
 ## Next acceptance work
 
 1. Recover source-matched native debug symbols or a dedicated symbolized diagnostic build, then identify the crashing libxul function and validate a real fix; retain sandboxing and profile protection.
