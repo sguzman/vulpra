@@ -1,0 +1,101 @@
+# Source-only integration of existing Pocket, Sync and Telemetry safety audits.
+# No native recompilation, package/loader activity, network upload or source prune.
+name: M3 Crosscheck Protected Pocket Sync Telemetry Boundaries
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-protected-boundary-crosscheck.py
+      - .github/workflows/m3-protected-feature-boundary-crosscheck.yml
+      - ci/m3-pocket-live-boundaries.py
+      - ci/m3-sync-live-boundaries.py
+      - ci/m3-telemetry-lifecycle-boundaries.py
+      - ci/m3-telemetry-deletion-boundaries.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-matched-crosscheck:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Sparse checkout only four source audits and crosscheck code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject bad audit and crosscheck source inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test ! -e browser/extensions/newtab/lib/ActivityStream.sys.mjs
+          python3 -m py_compile \
+            ci/m3-protected-boundary-crosscheck.py \
+            ci/m3-pocket-live-boundaries.py \
+            ci/m3-sync-live-boundaries.py \
+            ci/m3-telemetry-lifecycle-boundaries.py \
+            ci/m3-telemetry-deletion-boundaries.py
+          python3 ci/m3-protected-boundary-crosscheck.py --self-test
+      - name: Inspect four actual pinned Git-source dependency contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-pocket-live-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/pocket.json"
+          python3 ci/m3-sync-live-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/sync.json"
+          python3 ci/m3-telemetry-lifecycle-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/telemetry.json"
+          python3 ci/m3-telemetry-deletion-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/deletion.json"
+          for file in pocket sync telemetry deletion; do
+            jq -e --arg sha "$GITHUB_SHA" '.source_commit == $sha and
+              .schema_version == 1 and .removal_authorized == false' \
+              "$RUNNER_TEMP/$file.json" >/dev/null
+          done
+      - name: Emit joined source-pinned safe-disposition and false-claim guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-protected-boundary-crosscheck.py \
+            --pocket "$RUNNER_TEMP/pocket.json" \
+            --sync "$RUNNER_TEMP/sync.json" \
+            --telemetry "$RUNNER_TEMP/telemetry.json" \
+            --deletion "$RUNNER_TEMP/deletion.json" \
+            --output "$RUNNER_TEMP/m3-protected-boundary-crosscheck.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            '.source_commit == $sha and
+             .mode == "joined_pinned_source_contract_not_dynamic_dependency_graph" and
+             .total_protected_source_boundaries == 24 and
+             .independent_source_audit_counts == {"pocket":5,"sync":7,"telemetry":6,"deletion":6} and
+             (.high_impact_crosscheck_risks | length) == 5 and
+             .all_four_source_audits_same_git_commit == true and
+             .normal_browser_source_modified == false and
+             .native_browser_compiled_or_executed_by_crosscheck == false and
+             .generated_runtime_caller_graph_proven == false and
+             .actual_network_upload_privacy_proven == false and
+             .source_removal_authorized == false and
+             .new_package_savings_bytes == null and
+             .new_M3_whole_gate_passed == false' \
+             "$RUNNER_TEMP/m3-protected-boundary-crosscheck.json" >/dev/null
+          echo "PASS: 24 source-only feature boundaries crosschecked at exact HEAD"
+      - name: Preserve short current-source safety evidence reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-protected-boundary-source-crosscheck
+          path: |
+            ${{ runner.temp }}/pocket.json
+            ${{ runner.temp }}/sync.json
+            ${{ runner.temp }}/telemetry.json
+            ${{ runner.temp }}/deletion.json
+            ${{ runner.temp }}/m3-protected-boundary-crosscheck.json
+          if-no-files-found: warn
+          retention-days: 14
