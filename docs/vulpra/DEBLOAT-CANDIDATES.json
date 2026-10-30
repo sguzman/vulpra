@@ -2827,5 +2827,48 @@
     "m3_percent": 66,
     "overall_percent": 55,
     "documentation": "docs/vulpra/M3-MOBILE-TEST-LOCALE-SAFE-AUDIT-20261030.md"
+  },
+  "accepted_m3_pocket_sync_telemetry_safety_audit_gate": {
+    "status": "conservative_service_safety_audit_accepted",
+    "run_id": 41113199778,
+    "artifact_id": 13004751589,
+    "lint_run_id": 41113199721,
+    "source_audit_run_id": 40982290720,
+    "source_risk_boundaries": {
+      "pocket": 5,
+      "sync": 7,
+      "telemetry": 6,
+      "deletion": 6
+    },
+    "native_full_browser_run": 40997075527,
+    "native_pocket_runtime_run": 41004025705,
+    "pocket_assertions": 26,
+    "native_sync_fxa_run": 41078779642,
+    "sync_fxa_assertions": 8,
+    "native_telemetry_run": 41078909794,
+    "ordinary_local_test_before_after_optout": [
+      1,
+      1
+    ],
+    "local_deletion_exception_before_after": [
+      0,
+      1
+    ],
+    "guarded_promotions_runs": [
+      40547968387,
+      40617558714,
+      40787698972
+    ],
+    "sensitive_default_modules_all_retained": true,
+    "live_account_or_remote_pocket_or_production_data_erasure_tested": false,
+    "new_source_removal_authorized": false,
+    "new_binary_savings_bytes": null,
+    "complete_dynamic_feature_graph_proven": false,
+    "privacy_audit_roadmap_gate_passed": true,
+    "other_unfinished_m3_gate": "complete_feature_build_binary_and_dynamic_dependency_map",
+    "m3_passed_gates": 5,
+    "m3_percent": 83,
+    "overall_percent": 61,
+    "documentation": "docs/vulpra/M3-POCKET-SYNC-TELEMETRY-SAFE-AUDIT-20261030.md"
   }
 }
