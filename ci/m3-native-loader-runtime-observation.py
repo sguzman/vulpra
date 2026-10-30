@@ -38,9 +38,6 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
     seen=set()
     recorded_needed_by=set()
     recorded_dynamic_requests=set()
-    pre_libxul_request_init=set()
-    after_libxul_request_init=set()
-    traces_with_first_libxul_request=0
     for f in files:
         if not 0 < f.stat().st_size <= MAX_BYTES_PER_FILE:
             raise ValueError("Empty or oversized loader log")
@@ -52,26 +49,11 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
         opened=set()
         candidate_needed_by=set()
         candidate_dynamic=set()
-        trace_pre_libxul=set()
-        trace_after_libxul=set()
-        # Multiple exec() images can append to one glibc LD_DEBUG_OUTPUT.PID
-        # file. The launcher is Bash and must not automatically be treated
-        # as a browser-origin library request. This marker is a bounded
-        # observation boundary, not an infallible proof of native ownership.
-        first_libxul_request=None
-        for line_index,line in enumerate(text.splitlines()):
-            m=OPEN.search(line)
-            if m and basename(m.group(1))=="libxul.so" and first_libxul_request is None:
-                first_libxul_request=line_index
+        for line in text.splitlines():
             m=INIT.search(line)
             if m:
                 n=basename(m.group(1))
-                if n:
-                    init.add(n)
-                    if first_libxul_request is None:
-                        trace_pre_libxul.add(n)
-                    else:
-                        trace_after_libxul.add(n)
+                if n:init.add(n)
             m=OPEN.search(line)
             if m:
                 n=basename(m.group(1))
@@ -88,18 +70,11 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
                         candidate_dynamic.add(edge)
         if "libxul.so" not in opened and "libxul.so" not in init:
             continue
-        # A loader *request* for libxul without its real glibc initializer
-        # is not a verified running browser, even if Bash already initialized
-        # three unrelated libraries before exec.
         if "libxul.so" not in init:
-            raise ValueError("Browser loader trace lacks native libxul initializer")
+            raise ValueError("Real browser trace missing libxul initializer")
         if len(init)<3:
             raise ValueError("Browser process had too few real loader init events")
         seen.update(init)
-        if first_libxul_request is not None:
-            traces_with_first_libxul_request+=1
-            pre_libxul_request_init.update(trace_pre_libxul)
-            after_libxul_request_init.update(trace_after_libxul)
         # A request line by itself does not establish that its library
         # initialized. Retain only edges whose target has an actual native
         # glibc "calling init" event in THIS same browser process trace.
@@ -113,12 +88,17 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
     if not browsers:
         raise ValueError("No actual Vulpra native browser process with libxul")
     for required in ("libxul.so","libc.so.6"):
-        if required not in seen:
+        if required not in seen and required!="libxul.so":
             raise ValueError("No observed core glibc initialization: "+required)
     # No path, user state, PID or raw message is ever emitted.
     if len(recorded_needed_by)+len(recorded_dynamic_requests)>MAX_REQUEST_EDGES:
         raise ValueError("Too many distinct real loader request relations")
     names=sorted(seen)
+    # An executable shell wrapper and the native browser can generate loader
+    # messages under the same PID. The observed "needed by" requester is
+    # grounded; a first-libxul marker is NOT a safe process-stage boundary.
+    bash_requested_targets=sorted({dest for src,dest in recorded_needed_by
+                                   if src=="bash"})
     def safe_edges(pairs):
         return [{"requester_basename":src,"requested_library_basename":dest}
                 for src,dest in sorted(pairs)]
@@ -129,19 +109,10 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
         "browser_process_traces_with_libxul":len(browsers),
         "observed_loader_init_library_basename_count":len(names),
         "observed_loader_init_library_basenames":names,
-        # These are the native loader's event-order *segments*, not a
-        # definitive process-of-origin classifier. Names before the first
-        # libxul request are possible Bash/launcher contamination; names
-        # appearing in both segments cannot be assigned exclusively.
-        "traces_with_first_libxul_request_boundary":traces_with_first_libxul_request,
-        "observed_before_first_libxul_request_basenames":sorted(pre_libxul_request_init),
-        "observed_after_first_libxul_request_basenames":sorted(after_libxul_request_init),
-        "observed_before_only_basenames":sorted(
-            pre_libxul_request_init-after_libxul_request_init),
-        "observed_after_only_basenames":sorted(
-            after_libxul_request_init-pre_libxul_request_init),
-        "post_first_libxul_request_stage_is_proven_exclusive_browser_code":False,
-        "pre_first_libxul_request_stage_is_proven_exclusive_launcher_code":False,
+        "loader_bash_needed_by_target_basenames":bash_requested_targets,
+        "loader_bash_needed_by_target_count":len(bash_requested_targets),
+        "same_pid_ld_debug_may_include_bash_launcher_and_native_browser":True,
+        "loader_init_name_is_exclusive_browser_requirement_proven":False,
         "loader_reported_needed_by_initialized_edge_count":len(recorded_needed_by),
         "loader_reported_needed_by_initialized_edges":safe_edges(recorded_needed_by),
         "loader_reported_dynamic_initialized_edge_count":len(recorded_dynamic_requests),
@@ -188,12 +159,9 @@ def selftest() -> None:
         assert v["browser_process_traces_with_libxul"]==1
         assert "libxul.so" in v["observed_loader_init_library_basenames"]
         assert "libc.so.6" in v["observed_loader_init_library_basenames"]
-        assert v["traces_with_first_libxul_request_boundary"]==1
-        assert v["observed_before_only_basenames"]==["libtinfo.so.6"]
-        assert "libtinfo.so.6" not in v["observed_after_first_libxul_request_basenames"]
-        assert "libc.so.6" in v["observed_after_first_libxul_request_basenames"]
-        assert "libtinfo.so.6" in v["observed_loader_init_library_basenames"]
-        assert v["post_first_libxul_request_stage_is_proven_exclusive_browser_code"] is False
+        assert v["loader_bash_needed_by_target_basenames"]==["libtinfo.so.6"]
+        assert v["same_pid_ld_debug_may_include_bash_launcher_and_native_browser"] is True
+        assert v["loader_init_name_is_exclusive_browser_requirement_proven"] is False
         assert v["loader_reported_needed_by_initialized_edges"]==[
             {"requester_basename":"bash",
              "requested_library_basename":"libtinfo.so.6"},
@@ -248,12 +216,9 @@ def main() -> int:
           result["observed_loader_init_library_basename_count"],
           "libc/glibc init library basenames")
     print("PASS: sanitized initialized targets with", result["loader_reported_needed_by_initialized_edge_count"], "needed-by and", result["loader_reported_dynamic_initialized_edge_count"], "dynamic-request observed relations")
-    print("DIAGNOSTIC first-libxul request boundaries:", result["traces_with_first_libxul_request_boundary"],
-          "before-only init basenames:", len(result["observed_before_only_basenames"]),
-          "after-boundary init basenames:", len(result["observed_after_first_libxul_request_basenames"]))
-    print("DIAGNOSTIC before-only safe basenames:",
-          ", ".join(result["observed_before_only_basenames"]) or "(none)")
-    print("LIMIT: before/after libxul marker segments are not exclusive process ownership proof")
+    print("DIAGNOSTIC safe native-loader 'needed by bash' library names:",
+          ", ".join(result["loader_bash_needed_by_target_basenames"]) or "(none)")
+    print("LIMIT: LD_DEBUG PID traces can include the Bash launcher and native browser; initialized basenames are combined")
     print("LIMIT: one", a.workload, "workload on Ubuntu, not complete dlopen, Arch, ABI or feature map")
     return 0
 
