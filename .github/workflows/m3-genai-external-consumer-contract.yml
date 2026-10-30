@@ -1,0 +1,57 @@
+# Bounded source-pinned external GenAI caller/registration regression.
+# Old full-tree literal scan was 845 matches / 129 external; this guards
+# selected high-impact caller relationships, NOT whole source reachability.
+name: M3 Protect GenAI External Registration and Consumers
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-genai-external-consumer-contract.yml
+      - ci/m3-genai-external-consumer-contract.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-pinned-cross-component-guard:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Sparse checkout script and source-root identity without full Mozilla tree
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+            mach
+      - name: Source audit syntax, provenance, and fail-closed mutation contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-genai-external-consumer-contract.sh
+          bash ci/m3-genai-external-consumer-contract.sh \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/m3-genai-external-consumers.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            '.schema_version==1 and .source_commit==$sha and
+             .candidate=="browser_genai" and
+             .verified_relationship_count==33 and
+             .deliberately_removed_anchor_mutations_rejected==33 and
+             .external_startup_and_actor_callers_remain==true and
+             .dependency_decision=="review_and_retain_genai_root" and
+             .source_removal_authorized==false and
+             .native_runtime_verified_by_this_test==false and
+             .complete_dynamic_import_or_caller_graph_proven==false and
+             .normal_browser_feature_changed==false and
+             .new_compiled_savings_bytes==null and
+             .full_m3_gate_passed==false' \
+             "$RUNNER_TEMP/m3-genai-external-consumers.json" >/dev/null
+      - name: Preserve bounded source-boundary evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-genai-external-source-consumer-contract
+          path: ${{ runner.temp }}/m3-genai-external-consumers.json
+          if-no-files-found: warn
+          retention-days: 14
