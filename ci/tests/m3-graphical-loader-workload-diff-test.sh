@@ -28,6 +28,14 @@ jq '
 ' "$work/headless.json" > "$work/wayland.json"
 bash "$root/ci/m3-graphical-loader-workload-diff.sh" "$work/headless.json" \
   "$work/wayland.json" "$work/output.json"
+# Historical authenticated headless schema predated explicit mode/Wayland
+# fields. The fallback must apply only to the old headless record.
+jq 'del(.observed_workload_mode, .real_native_wayland_surface_commit_passed)' \
+  "$work/headless.json" > "$work/old-headless.json"
+bash "$root/ci/m3-graphical-loader-workload-diff.sh" \
+  "$work/old-headless.json" "$work/wayland.json" "$work/legacy.json"
+jq -e '.observed_both_count==2 and .m3_sixth_gate_closed==false' \
+  "$work/legacy.json" >/dev/null
 jq -e '
   .observed_both_count==2 and
   .observed_headless_only_count==1 and

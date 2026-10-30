@@ -25,7 +25,10 @@ check() {
     .status=="actual_native_full_normal_loader_observation" and
     .old_normal_native_archive_source==$source and
     .old_normal_native_archive_sha256==$sha and
-    .observed_workload_mode==$mode and
+    # Historical headless report predates explicit workload fields. Accept
+    # only their absence in headless mode, never spoof the new graphical flag.
+    ((.observed_workload_mode==$mode) or
+      ($mode=="headless_webdriver" and (has("observed_workload_mode")|not))) and
     .browser_process_traces_with_libxul>=1 and
     .libxul_requested_in_real_browser_process==true and
     .libc_loader_init_observed==true and
@@ -38,9 +41,11 @@ check() {
     .unexecuted_feature_routes_proven==false and
     (if $mode=="headless_webdriver"
      then (.real_native_webdriver_workload_passed==true and
-           .real_native_wayland_surface_commit_passed==false)
+           ((.real_native_wayland_surface_commit_passed==false) or
+            (has("real_native_wayland_surface_commit_passed")|not)))
      else (.real_native_webdriver_workload_passed==false and
-           .real_native_wayland_surface_commit_passed==true)
+           .real_native_wayland_surface_commit_passed==true and
+           .observed_workload_mode=="private_weston_wayland")
      end) and
     (.observed_loader_init_library_basenames|type=="array") and
     (.observed_loader_init_library_basenames|length)==
