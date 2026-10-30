@@ -43,9 +43,9 @@ def check(d,progress,roadmap):
     assert "M3-EXACT-SOURCE-CONFIG-SNAPSHOT.json" in roadmap
     assert "M3-EXACT-SOURCE-CONFIG-SNAPSHOT.md" in roadmap
     m3=next(m for m in progress["milestones"] if m["id"]=="M3")
-    assert m3["acceptance_gates"]["passed"]==2
+    assert m3["acceptance_gates"]["passed"]==3
     assert m3["acceptance_gates"]["total"]==6
-    assert m3["percent"]==33 and progress["overall"]["percent"]==44
+    assert m3["percent"]==50 and progress["overall"]["percent"]==50
 def test_mutants(d,p,r):
     changes=[
       lambda a,b,c:a.update(observed_source_commit="1683ca67b69389a879717bcd537772c3b40624b6"),
@@ -58,8 +58,8 @@ def test_mutants(d,p,r):
       lambda a,b,c:a.update(source_binary_compiled=True),
       lambda a,b,c:a.update(absent_subst_is_not_disabled_feature=False),
       lambda a,b,c:a.update(compiled_savings_bytes=1577264),
-      lambda a,b,c:b["overall"].update(percent=45),
-      lambda a,b,c:b["milestones"][2]["acceptance_gates"].update(passed=3),
+      lambda a,b,c:b["overall"].update(percent=49),
+      lambda a,b,c:b["milestones"][2]["acceptance_gates"].update(passed=2),
     ]
     for mutate in changes:
         a,b,c=deepcopy(d),deepcopy(p),r
