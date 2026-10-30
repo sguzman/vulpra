@@ -2521,8 +2521,8 @@
   },
   "accepted_historical_lean_newtab_pocket_factory_runtime": {
     "status": "passed_source_pinned_historical_normandy_free_native_newtab_dual_feed_factory_smoke",
-    "runtime_run_id": 40985864152,
-    "evidence_artifact_id": 12947495420,
+    "runtime_run_id": 40986240766,
+    "evidence_artifact_id": 12947750031,
     "original_native_lean_compile_run_id": 40954193793,
     "prior_native_candidate_runtime_run_id": 40968542013,
     "source_commit": "034ddd665a080f173ce45094ae3afb8868b45e1a",
@@ -2542,7 +2542,11 @@
       "modern_factory_export": true,
       "newtab_adsfeed_omission_disabled": true,
       "testing_minimal_feed_map": true,
-      "no_feed_initialized_or_fetched_by_probe": true
+      "no_feed_initialized_or_fetched_by_probe": true,
+      "legacy_malformed_config_stubbed_init": true,
+      "legacy_disabled_config_stubbed_init": true,
+      "legacy_stories_already_loaded_skip": true,
+      "legacy_user_pref_disabled_skip": true
     },
     "actual_about_newtab_document_loaded": true,
     "feed_factory_discovery_gate_tested_in_temporary_profile": true,
@@ -2553,6 +2557,15 @@
     "safe_full_newtab_source_removal_proven": false,
     "new_m3_gate_passed": false,
     "new_source_removal_authorized": false,
-    "documentation": "docs/vulpra/M3-ARCHIVED-LEAN-NEWTAB-POCKET-RUNTIME-20261030.md"
+    "documentation": "docs/vulpra/M3-ARCHIVED-LEAN-NEWTAB-POCKET-RUNTIME-20261030.md",
+    "first_factory_only_run_id": 40985864152,
+    "first_factory_only_evidence_artifact_id": 12947495420,
+    "real_shipped_legacy_method_exercised_with_inert_side_effect_hooks": true,
+    "legacy_real_method_malformed_config_stubbed_initialization": true,
+    "legacy_real_method_explicit_discovery_disabled_stubbed_initialization": true,
+    "legacy_real_method_already_loaded_skips_initialization": true,
+    "legacy_real_method_user_preference_off_skips_initialization": true,
+    "source_legacy_method_test_is_production_context_end_to_end": false,
+    "synthetic_fake_boundary_rejections": 16
   }
 }
