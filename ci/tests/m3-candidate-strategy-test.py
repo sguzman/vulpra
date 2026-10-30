@@ -338,6 +338,32 @@ def validate(reg,paired,progress):
                  "new_m3_roadmap_gate_passed"):
         assert variance[flag] is False,flag
 
+    preserved=reg["accepted_historical_normal_sync_fxa_module_runtime"]
+    assert preserved["status"]=="passed_real_isolated_normal_native_browser_sync_fxa_module_imports_no_credentials"
+    assert preserved["runtime_run_id"]==40984957431
+    assert preserved["evidence_artifact_id"]==12946740842
+    assert preserved["current_harness_commit"]=="4389f7d4075f0f40b68e0a6818c4d5f278767304"
+    assert preserved["original_normal_native_run_id"]==40431769117
+    assert preserved["original_normal_native_source_commit"]=="674db8e385c36aec23e78bbe059b2a1fec194fae"
+    assert preserved["original_normal_native_package_sha256"]=="47c8ac5ce90747c051eac8daf24544d88767fdeb989293c0b50c5e8ac9e53c30"
+    assert preserved["original_normal_native_archive_bytes"]==86937548
+    assert preserved["original_candidate_runtime_passed_run_id"]==40439671494
+    assert preserved["protected_unchanged_source_blobs_count"]==7
+    assert len(preserved["independent_runtime_checks"])==8
+    assert all(val is True for val in preserved["independent_runtime_checks"].values())
+    for flag in ("actual_packaged_native_executable_tested",
+                 "isolated_home_and_profile_verified",
+                 "gecko_nonlocal_connection_guard_enabled"):
+        assert preserved[flag] is True,flag
+    for flag in ("full_current_browser_source_and_config_match",
+                 "account_credentials_provided",
+                 "actually_authenticated_or_performed_remote_sync",
+                 "webextension_storage_sync_read_write_tested","sync_service_network_tested",
+                 "complete_current_head_binary_proven","source_removal_authorized",
+                 "new_m3_roadmap_gate_passed"):
+        assert preserved[flag] is False,flag
+    assert preserved["documentation"]=="docs/vulpra/M3-ARCHIVED-NATIVE-SYNC-FXA-BOUNDARIES-20261030.md"
+
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -568,6 +594,13 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(causal_component_bytes_proven=True),
         lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(new_m3_roadmap_gate_passed=True),
         lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(strict_schema_followup_run_id=None),
+        lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"].update(full_current_browser_source_and_config_match=True),
+        lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"].update(actually_authenticated_or_performed_remote_sync=True),
+        lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"].update(webextension_storage_sync_read_write_tested=True),
+        lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"].update(new_m3_roadmap_gate_passed=True),
+        lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"].update(protected_unchanged_source_blobs_count=8),
+        lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"]["independent_runtime_checks"].update(fxa_no_signed_in_account=False),
+        lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"].update(runtime_run_id=40984871838),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
