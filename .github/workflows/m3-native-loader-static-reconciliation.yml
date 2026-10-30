@@ -1,0 +1,98 @@
+# Match real glibc dynamic loader init names with exact same compiled
+# archive's static direct DT_NEEDED imports. Bounded read-only proof.
+name: M3 Reconcile Native Loader with Exact ELF Direct Dependencies
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-loader-static-reconciliation.yml
+      - ci/m3-native-loader-static-reconciliation.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-compiled-archive-loader-crosswalk:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout verifier (no browser source or raw traces)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject forged ELF/native data and authenticate original successful runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-native-loader-static-reconciliation.py
+          python3 ci/m3-native-loader-static-reconciliation.py --self-test
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41077783489" |
+            jq -e '.status=="completed" and .conclusion=="success"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41116477542" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="ecfa4e7f09a517eb12c2105d6160165dc85bd272"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40997075527" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="b1482404dfb8b01342990ee99ea3df0f9756b5f7"' >/dev/null
+      - name: Download exact source-pinned immutable source and runtime evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/static" "$RUNNER_TEMP/live"
+          gh run download 41077783489 --repo "$GITHUB_REPOSITORY" \
+            --name m3-newer-source-full-elf-locale-inventory \
+            --dir "$RUNNER_TEMP/static"
+          gh run download 41116477542 --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-loader-startup-sanitized \
+            --dir "$RUNNER_TEMP/live"
+      - name: Prove real startup covered declared direct library names without faking closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-loader-static-reconciliation.py \
+            --elf "$RUNNER_TEMP/static/newer-full-elf-direct-graph.json" \
+            --loader "$RUNNER_TEMP/live/m3-runtime-loader-observation.json" \
+            --output "$RUNNER_TEMP/m3-native-loader-static-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="immutable_static_and_real_loader_basename_reconciliation_passed" and
+            .native_elf_members==28 and
+            .direct_dt_needed_edges==268 and
+            .distinct_direct_needed_soname_names==50 and
+            .direct_names_seen_in_some_observed_native_loader_process==50 and
+            .packaged_direct_needed_name_total==14 and
+            .all_packaged_direct_needed_names_seen_during_workload==14 and
+            .host_external_direct_needed_name_total==36 and
+            .observed_native_loader_initialized_library_names==94 and
+            .observed_extra_library_name_count==44 and
+            .libxul_dynamically_loaded_in_real_browser==true and
+            .headless_about_newtab_and_asrouter_workload_passed==true and
+            .source_inventory_scans_ever_executed_browser==false and
+            .native_runtime_observation_did_execute_browser==true and
+            .each_declared_edge_loader_resolution_proven==false and
+            .extra_names_attributed_to_dlopen_not_proven==true and
+            .complete_conditional_dynamic_dependency_closure==false and
+            .full_abi_version_or_symbol_resolution_map==false and
+            .ubuntu_ci_is_user_arch_host==false and
+            .default_browser_or_user_profile_modified==false and
+            .new_source_pruning_authorized==false and
+            .new_compressed_savings_bytes==null and
+            .sixth_m3_feature_map_gate_closed==false' \
+            "$RUNNER_TEMP/m3-native-loader-static-crosswalk.json" >/dev/null
+      - name: Archive only bounded aggregate and basename classifications
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-loader-elf-reconciliation
+          path: ${{ runner.temp }}/m3-native-loader-static-crosswalk.json
+          if-no-files-found: warn
+          retention-days: 14
