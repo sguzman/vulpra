@@ -364,6 +364,32 @@ def validate(reg,paired,progress):
         assert preserved[flag] is False,flag
     assert preserved["documentation"]=="docs/vulpra/M3-ARCHIVED-NATIVE-SYNC-FXA-BOUNDARIES-20261030.md"
 
+    pocket_native=reg["accepted_historical_lean_newtab_pocket_factory_runtime"]
+    assert pocket_native["status"]=="passed_source_pinned_historical_normandy_free_native_newtab_dual_feed_factory_smoke"
+    assert pocket_native["runtime_run_id"]==40985864152
+    assert pocket_native["evidence_artifact_id"]==12947495420
+    assert pocket_native["original_native_lean_compile_run_id"]==40954193793
+    assert pocket_native["prior_native_candidate_runtime_run_id"]==40968542013
+    assert pocket_native["source_commit"]=="034ddd665a080f173ce45094ae3afb8868b45e1a"
+    assert pocket_native["original_optin_archive_sha256"]=="7095a57083a6211177fd182a2c5275d0ef8c8b2398f4eb1b3298ae951861adac"
+    assert pocket_native["original_optin_compressed_archive_bytes"]==87138100
+    assert pocket_native["unchanged_critical_newtab_source_blobs"]==6
+    assert pocket_native["archived_variant"]=="optin_normandy_recipe_runner_absent_but_normal_newtab_feeds_preserved"
+    assert len(pocket_native["protected_feed_factories_and_registrations"])==10
+    assert all(v is True for v in pocket_native["protected_feed_factories_and_registrations"].values())
+    for flag in ("real_packaged_browser_executed","isolated_home_and_profile_verified",
+                 "actual_about_newtab_document_loaded",
+                 "feed_factory_discovery_gate_tested_in_temporary_profile"):
+        assert pocket_native[flag] is True,flag
+    for flag in ("real_legacy_recommendation_failure_fallback_invoked",
+                 "actual_remote_pocket_data_fetched",
+                 "server_sponsored_content_delivery_proven",
+                 "current_main_entire_native_build_proven",
+                 "safe_full_newtab_source_removal_proven",
+                 "new_m3_gate_passed","new_source_removal_authorized"):
+        assert pocket_native[flag] is False,flag
+    assert pocket_native["documentation"]=="docs/vulpra/M3-ARCHIVED-LEAN-NEWTAB-POCKET-RUNTIME-20261030.md"
+
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -601,6 +627,13 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"].update(protected_unchanged_source_blobs_count=8),
         lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"]["independent_runtime_checks"].update(fxa_no_signed_in_account=False),
         lambda a,b,c:a["accepted_historical_normal_sync_fxa_module_runtime"].update(runtime_run_id=40984871838),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(new_m3_gate_passed=True),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(safe_full_newtab_source_removal_proven=True),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(current_main_entire_native_build_proven=True),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(real_legacy_recommendation_failure_fallback_invoked=True),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(actual_remote_pocket_data_fetched=True),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(unchanged_critical_newtab_source_blobs=7),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"]["protected_feed_factories_and_registrations"].update(legacy_registered=False),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
