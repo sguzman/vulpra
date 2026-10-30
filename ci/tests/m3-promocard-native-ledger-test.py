@@ -119,9 +119,9 @@ def validate(e: dict, register: dict, progress: dict, roadmap: str) -> None:
 
     milestones = {m["id"]: m for m in progress["milestones"]}
     m3 = milestones["M3"]
-    assert m3["acceptance_gates"]["passed"] == 4
+    assert m3["acceptance_gates"]["passed"] == 5
     assert m3["acceptance_gates"]["total"] == 6
-    assert m3["percent"] == 66
+    assert m3["percent"] == 83
     assert progress["overall"]["percent"] == floor(
         (milestones["M2"]["percent"] + m3["percent"] + milestones["M4"]["percent"]) / 3)
     records = [r for r in m3["verified_removals"] if r["id"] == "opt-in-newtab-promocard-jsx"]
@@ -138,7 +138,7 @@ def validate(e: dict, register: dict, progress: dict, roadmap: str) -> None:
     assert record["lean_compressed_bytes"] == lean["compressed_package_bytes"]
     assert record["observed_signed_archive_delta_bytes"] == diff["signed_full_minus_optin_compressed_archive_bytes"]
     assert record["observed_uncompressed_js_delta_bytes"] == diff["signed_full_minus_optin_uncompressed_newtab_js_bytes"]
-    assert "4/6 acceptance gates (66%)" in roadmap and "overall 55%" in roadmap
+    assert "5/6 acceptance gates (83%)" in roadmap and "overall 61%" in roadmap
     assert "M3-PROMOCARD-NATIVE-PAIR.json" in roadmap
 
 
