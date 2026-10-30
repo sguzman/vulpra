@@ -23,7 +23,7 @@ EXPECTED={
  "devtools_client":"keep",
  "browser_genai":"keep",
  "pocket_integration":"keep",
- "newtab_and_messaging":"review",
+ "newtab_and_messaging":"keep",
  "core_web_security":"keep",
  "remaining_mobile_platform_leaves":"remove_source",
  "newtab_adsfeed_optout":"conditional_compile",
@@ -60,7 +60,7 @@ def validate(reg,paired,progress):
     control=reg["m3_decision_classification"]
     assert control["total_candidates"]==20
     assert counts==control["categories"]
-    assert counts=={"keep":11,"remove_source":4,"review":2,"conditional_compile":3}
+    assert counts=={"keep":12,"remove_source":4,"review":1,"conditional_compile":3}
     assert control["complete_feature_dependency_inventory"] is False
     assert control["complete_candidate_fallback_validation"] is False
     assert control["whole_m3_gate_passed"] is False

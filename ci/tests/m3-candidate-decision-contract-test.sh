@@ -15,7 +15,7 @@ jq -e '
   .schema_version==1 and
   .status=="scoped_candidate_policy_guard_passed" and
   .candidates_checked==20 and
-  .classes=={"keep":11,"remove_source":4,"review":2,"conditional_compile":3} and
+  .classes=={"keep":12,"remove_source":4,"review":1,"conditional_compile":3} and
   .verified_distinct_pruned_source_paths==14867 and
   .verified_distinct_pruned_git_blob_bytes==129967585 and
   .incomplete_dependencies_preserved==true and
@@ -50,6 +50,7 @@ reject 'do not permanently prune guarded Normandy experiment' '(.candidates[]|se
 reject 'do not permanently prune guarded AdsFeed' '(.candidates[]|select(.id=="newtab_adsfeed_optout")|.m3_strategy.permanent_removal_accepted)=true'
 reject 'do not permanently prune guarded PromoCard' '(.candidates[]|select(.id=="newtab_promocard_optout")|.m3_strategy.guarded_opt_in_omission_accepted)=false'
 reject 'do not permanently remove protected GenAI root' '(.candidates[]|select(.id=="browser_genai")|.m3_strategy.strategy)="remove_source"'
+reject 'protect broad New Tab and ASRouter' '(.candidates[]|select(.id=="newtab_and_messaging")|.m3_strategy.strategy)="remove_source"'
 reject 'do not approve full testing tree deletion' '(.candidates[]|select(.id=="source_testing")|.m3_strategy.permanent_removal_accepted)=true'
 reject 'reject missing failure-safe fallback' '(.candidates[]|select(.id=="source_testing")|.m3_strategy.safety_and_fallback)=""'
 reject 'reject missing runtime/source evidence' '(.candidates[]|select(.id=="newtab_and_messaging")|.evidence)=[]'
@@ -68,8 +69,8 @@ reject 'reject source-only claims of binary savings' '.accepted_source_pruning_c
 reject 'reject source-only claims of native library removal' '.accepted_source_pruning_cohort_totals.native_library_removed=true'
 reject 'reject add old overlapping candidate inventories' '.accepted_source_pruning_cohort_totals.candidate_fields_source_files_not_additive_as_pruned_totals=false'
 reject 'reject incorrectly declared milestone progress' '.accepted_source_pruning_cohort_totals.broader_m3_gate_advanced_by_this_accounting=true'
-if [[ "$rejected" -ne 32 ]]; then
-  echo "FAIL: expected 32 unsafe mutation rejections, saw $rejected" >&2
+if [[ "$rejected" -ne 33 ]]; then
+  echo "FAIL: expected 33 unsafe mutation rejections, saw $rejected" >&2
   exit 1
 fi
 echo "PASS: real 20-candidate scoped policy; $rejected deliberately unsafe mutations rejected"

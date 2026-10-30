@@ -35,7 +35,7 @@ jobs:
           command -v jq
           bash -n ci/tests/m3-candidate-decision-contract-test.sh
           jq -e -f ci/m3-candidate-decision-contract.jq             docs/vulpra/DEBLOAT-CANDIDATES.json             > "$RUNNER_TEMP/m3-candidate-policy-guard.json"
-      - name: Reject 32 unsafe candidate and source-prune ledger mutations
+      - name: Reject 33 unsafe candidate and source-prune ledger mutations
         shell: bash
         run: |
           set -euo pipefail
@@ -43,7 +43,7 @@ jobs:
           jq -e '.candidates_checked==20 and
                  .classes.remove_source==4 and
                  .classes.conditional_compile==3 and
-                 .classes.keep==11 and .classes.review==2 and
+                 .classes.keep==12 and .classes.review==1 and
                  .verified_distinct_pruned_source_paths==14867 and
                  .verified_distinct_pruned_git_blob_bytes==129967585 and
                  .new_source_deletion_authorized==false and
