@@ -1,7 +1,9 @@
 # M3: real archived lean-browser New Tab dual-feed runtime boundary
 
-**2026-10-30 UTC:** [GitHub Actions 40985864152](https://github.com/sguzman/vulpra/actions/runs/40985864152)
-**PASSED**, artifact **12947495420**.
+**2026-10-30 UTC:** initial [native factory run 40985864152](https://github.com/sguzman/vulpra/actions/runs/40985864152)
+**PASSED** its 10 source-registration checks (artifact **12947495420**).
+Expanded [real native 14-check run 40986240766](https://github.com/sguzman/vulpra/actions/runs/40986240766)
+**PASSED** both factory maps **and actual TopStoriesFeed method-level legacy branches**, artifact **12947750031**.
 This executed the actual native Linux Vulpra browser from the independently
 successful [Normandy runner-free source-matched build
 40954193793](https://github.com/sguzman/vulpra/actions/runs/40954193793),
@@ -37,15 +39,22 @@ In a privileged *test-only* browser context it imported the packaged
 | New Tab AdsFeed omission guard | Off, protecting normal New Tab inventory |
 | Test `shouldInitializeFeeds=false` on fresh *uninitialized* stream | Exactly Top Sites + preferences remain in the restricted map |
 | No feed factories explicitly called by probe | Verified test method boundary |
+| Malformed Discovery Stream JSON passed to shipped `TopStoriesFeed.lazyLoadTopStories` | Legacy `initializeProperties` and `init` *inert test hooks* each invoked once |
+| Explicit `{"enabled":false}` discovery configuration | Same inert legacy initialization path invoked |
+| `storiesLoaded=true` | Guard returned without calling either inert hook |
+| User Top Stories preference disabled | Guard returned without calling either inert hook |
 
 The test toggled
 `browser.newtabpage.activity-stream.testing.shouldInitializeFeeds`
 **only in a disposable headless session** on freshly constructed
 ActivityStream objects. It restores the previous preference after both
-branches; it does not call `TopStoriesFeed.lazyLoadTopStories`,
-fetch live recommendations, construct remote/sponsored feeds or test
-server-side fallback. A source-level audit separately confirms the
-legacy Discovery Stream-disabled branch.
+branches. The follow-up then calls the *actual packaged*
+`TopStoriesFeed.lazyLoadTopStories` method on controlled inert objects
+whose `initializeProperties` and `init` hooks only increment counters.
+This checks malformed-JSON, Discovery Stream disabled, stories-already-loaded
+and user-opt-out branches without creating a real feed, performing
+recommendation requests or proving live fallback delivery.
+A source-level audit independently traces the matching method and registration.
 
 **Source continuity:** Six protected Git blobs are byte-identical
 between the archive's original source and current main: activity-stream
@@ -53,8 +62,8 @@ registration, Discovery Stream feed, TopStories feed, newtab `moz.build`,
 newtab `addon-jar.mn`, and sponsored AdBanner component.
 The six-source check is not proof the entire current browser source,
 build configuration or platform ABI matches the archived package.
-The test suite rejected **11** deliberately fabricated registration,
-restricted-map and page-document results.
+The extended test suite rejected **16** deliberately fabricated
+registration, legacy-branch, restricted-map and page-document results.
 
 An earlier attempt [40985644967](https://github.com/sguzman/vulpra/actions/runs/40985644967)
 failed an overly literal test-harness metadata suffix assertion; a
@@ -68,6 +77,6 @@ accepted as native runtime evidence.
 **Limits:** This is proof of retained native packaged module imports
 and registration/factory maps in a Normandy-free opt-in build, **not**
 a successful signed-in user path, live Pocket recommendation network
-load, legacy story-fetch fallback, real ad delivery, complete runtime
+load, *production-context* story-fetch fallback, real ad delivery, complete runtime
 dependency map or newly measured feature saving. No source code was
 removed. **M3 2/6 (33%), overall 44%.**
