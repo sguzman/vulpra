@@ -261,6 +261,32 @@ def validate(reg,paired,progress):
         assert third[flag] is False,flag
     assert third["documentation"]=="docs/vulpra/M3-NORMANDY-NATIVE-RECHECK-20261030.md"
 
+    cross=reg["accepted_m3_protected_source_crosscheck"]
+    assert cross["status"]=="passed_source_pinned_four_subsystem_protected_boundary_crosscheck"
+    assert cross["run_id"]==40982290720
+    assert cross["source_commit"]=="010d4b7e847f3a0cd0bb69d20b17db59108120ae"
+    assert cross["evidence_artifact_id"]==12945352163
+    assert cross["independent_audit_boundary_counts"]=={
+        "pocket":5,"sync":7,"telemetry":6,"deletion":6
+    }
+    assert cross["protected_source_boundaries_total"]==sum(
+        cross["independent_audit_boundary_counts"].values())==24
+    assert cross["explicitly_joined_high_impact_risks"]==5
+    assert cross["synthetic_false_claim_rejection_cases"]==13
+    for flag in ("all_source_audits_same_commit",
+                 "script_does_not_execute_browser",
+                 "protected_pocket_and_sync_interfaces_preserved",
+                 "user_upload_deletion_path_source_anchors_preserved"):
+        assert cross[flag] is True,flag
+    for flag in ("normal_browser_source_modified",
+                 "actual_runtime_callgraph_complete",
+                 "actual_network_submission_privacy_proven",
+                 "source_deletion_authorized",
+                 "new_m3_roadmap_gate_passed"):
+        assert cross[flag] is False,flag
+    assert cross["new_compiled_savings_bytes"] is None
+    assert cross["documentation"]=="docs/vulpra/M3-PROTECTED-SOURCE-CROSSCHECK-20261030.md"
+
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -473,6 +499,14 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(independent_real_browser_runtime_passed=False),
         lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(general_feature_dependency_coverage_complete=True),
         lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(can_add_independent_trial_savings=True),
+        lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(new_m3_roadmap_gate_passed=True),
+        lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(actual_runtime_callgraph_complete=True),
+        lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(actual_network_submission_privacy_proven=True),
+        lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(source_deletion_authorized=True),
+        lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(protected_source_boundaries_total=23),
+        lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(all_source_audits_same_commit=False),
+        lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(new_compiled_savings_bytes=1),
+        lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(source_commit="0"*40),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
