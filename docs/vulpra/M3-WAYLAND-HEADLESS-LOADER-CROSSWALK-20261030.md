@@ -29,3 +29,7 @@ Independent physical ELF / headless-loader crosswalk [41116837335](https://githu
 - Preserve source/module keep boundaries and no deletion without mapped route coverage, native acceptance and a source-matched measurement. **No new omitted feature or byte saving in this round.**
 
 **Accepted gate status remains M3 5/6 (83%), overall product roadmap 61%, this round Δ0 percentage points.** This is accepted **nested dependency-mapping evidence** within the still-open sixth M3 gate, not whole-gate closure.
+
+## Explicit three-request source-candidate mapping
+
+The three graphical-only loader dynamic requests were authenticated by [CI 41138174618](https://github.com/sguzman/vulpra/actions/runs/41138174618) and matched against the **exact original compiled source** in [CI 41138797948](https://github.com/sguzman/vulpra/actions/runs/41138797948), artifact 13018260526. Details: [source crosswalk](M3-DYNAMIC-REQUEST-SOURCE-MAP-20261030.md). GBM has a direct `dlopen` in GTK DMA-BUF; FFmpeg goes via NSPR library loading; Pulse is supported by cubeb Rust feature and external git dependency. None prove native stack ownership, that those are exclusively graphical dependencies, or ABI/feature-map closure. **M3 5/6 (83%), overall 61%, Δ0pp.**
