@@ -2,7 +2,7 @@
 
 **Vulpra** is a personal, Linux-first Firefox-derived browser project. It targets x86-64 Linux with native Wayland/Hyprland use. It is independent of Mozilla and is not an official Firefox product.
 
-> **Status (2026-10-27):** 🦊 **M2 working Linux browser 100% (5/5 gates); M3 debloating 33% (2/6 gates).** Vulpra 159.0b5 compiled and passed packaged Wayland, JavaScript/HTTP, temporary WebExtension and profile-isolation acceptance. M3 has two independently **measured opt-in Linux package reductions** (Normandy runner: 27,620 compressed bytes, 0.032%; ASRouter two AI promo modules: 3,184 compressed bytes, 0.00366%; both with native/runtime and source-matched comparison evidence; not additive without a combined build) and three **source-only pruning passes** (453 Windows/Cocoa files / 6,266,676 Git blob bytes; 14,134 Android-only app files / 115,996,869 Git blob bytes; and 280 mobile/iOS/UIKit leaf files / 7,704,040 Git blob bytes; total **14,867 files / 129,967,585 original Git blob bytes**, all with native/runtime CI verification). Shared GeckoView/Android widget and generator/Cargo dependencies remain; unsupported Android Gradle/app Taskcluster jobs still reference removed app roots. **The personal browser baseline works; these changes do not establish a finished public release, full telemetry removal, automatic updater, broader security audit or Rust-only browser.**
+> **Status (2026-10-30):** 🦊 **M2 working Linux browser: 100% (5/5 gates). M3 debloating: 83% (5/6 gates). Overall product roadmap: 61%.** The target-machine M2 baseline passed native Linux startup, graphical Wayland, localhost JavaScript and temporary WebExtension/profile-isolation acceptance. M3 has native-tested opt-in package omissions and independently verified non-Linux source pruning, with protected security, language, QA and account infrastructure retained. The remaining feature/build/binary/dynamic-dependency-map gate is open. A later checksum-pinned full-normal Ubuntu CI archive reproducibly crashes under private Weston: crash-reporter-disabled exit 139 and an isolated GDB SIGSEGV in stripped `libxul.so` (issue #2); the same archive passed its separate headless New Tab workload. Neither result proves a crash on the target Arch/Hyprland workstation or justifies more source deletion. This is not a finished public release, complete security/update program or Rust-only browser.
 
 ## Direction
 
@@ -18,10 +18,10 @@ Avoid deleting security foundations, extension support, essential web standards 
 
 - ✅ **M1 — Source foundation: 100%**
 - ✅ **M2 — Working Linux browser: 100%**, five actual acceptance gates complete on the target machine
-- ✂️ **M3 — Personal debloating: 33% (2/6 gates)**, opt-in Normandy and two-module ASRouter package reductions plus Windows/Cocoa, Android application, and additional mobile/iOS/UIKit source pruning verified; more feature/platform/privacy and test/localization work remains
+- ✂️ **M3 — Personal debloating: 83% (5/6 gates)**; remaining dependency map and native graphical crash investigation are open. See the roadmap and [Wayland investigation](docs/vulpra/M3-WAYLAND-SIGSEGV-20261030.md).
 - 🦀 **M4 — Defect fixes / Rust trajectory: 0%**, pending M3
 
-**Overall product roadmap: 44%** (equal-weight M2–M4; source scaffolding M1 excluded). Percentages are updated only for tested completion, not for roadmap or tooling preparation. Packaged size, source footprint, browser memory and startup measurements have separate provenance and must not be conflated. Upstream security maintenance and independent icon/trademark review remain necessary before distribution.
+**Overall product roadmap: 61%** (equal-weight M2–M4; source scaffolding M1 excluded). Percentages are updated only for tested completion, not for roadmap or tooling preparation. Packaged size, source footprint, browser memory and startup measurements have separate provenance and must not be conflated. Upstream security maintenance and independent icon/trademark review remain necessary before distribution.
 
 ## Pinned source
 

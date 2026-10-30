@@ -1,0 +1,31 @@
+# M3 — Private Weston native SIGSEGV investigation (2026-10-30)
+
+## Protected baseline and scope
+
+This investigates the **original full-Normandy, x86-64 native Vulpra** package compiled from source `b1482404dfb8b01342990ee99ea3df0f9756b5f7` (successful build [40997075527](https://github.com/sguzman/vulpra/actions/runs/40997075527)). The verified 87,154,544-byte tar.xz has SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`. The standard `packaging/test-wayland.sh` uses a disposable HOME/profile and private Weston headless compositor on Ubuntu 24.04; none of these probes touches the user's Arch/Hyprland browser or installed Firefox Developer Edition.
+
+The required acceptance remains **10 seconds of process survival plus a non-null Wayland buffer attach and commit on the same surface**. Shortened or instrumented runs are *diagnostics only*.
+
+## Reproduced observations
+
+| Evidence | Result |
+| --- | --- |
+| [41117899170](https://github.com/sguzman/vulpra/actions/runs/41117899170) | Uninstrumented native private Weston startup failed mandatory ten-second survival, process exit 11. Protocol log had repeated non-null wl_buffer attach/commit events, but the final acceptance assertion was not reached. |
+| [41131721765](https://github.com/sguzman/vulpra/actions/runs/41131721765) | Original ten-second test failed again at exit 11. Independent disposable profiles at 2, 5, and 8 seconds all failed at exit 11. An altered diagnostic with crash reporter disabled, otherwise retaining private Weston and MOZ_DISABLE_NONLOCAL_CONNECTIONS=1, exited **139** at ten seconds, consistent with POSIX SIGSEGV (11). These separate trials do not locate the exact elapsed crash time. |
+| [41132264823](https://github.com/sguzman/vulpra/actions/runs/41132264823) | Separate GDB probe, same checked original archive with private explicit profile, detected **SIGSEGV**; its first 15 frames are from **libxul.so**, with function names unavailable in the stripped distribution build. Workflow lint [41132264822](https://github.com/sguzman/vulpra/actions/runs/41132264822) passed. GDB's own process exit 0 is *not* a browser or graphical acceptance pass. |
+| [41116477542](https://github.com/sguzman/vulpra/actions/runs/41116477542) | The same exact package independently passed a **headless** about:newtab/ASRouter runtime check. This does not exercise native Weston graphics. |
+| [40963098075](https://github.com/sguzman/vulpra/actions/runs/40963098075) | An earlier full-native source `cde4d830` passed ten-second private Weston + browser runtime acceptance in its own compile job. |
+
+## Source comparison and limits
+
+The Git comparison `cde4d83043f8c476173c8dbc78b66b078c3f6b5b...b1482404dfb8b01342990ee99ea3df0f9756b5f7` has **88 commits and 28 changed files**, all under `.github/`, `ci/`, and `docs/`; there are no intervening browser-engine source modifications. This makes a direct browser source change an unlikely explanation, but the two accepted native packages were **not** rebuilt together with an identical toolchain, process environment and build artifacts. It does not prove that their executable bytes, compiler configuration, host libraries or runtime behavior are equivalent.
+
+The separate GDB probe uses the native executable directly with the same private-profile arguments, rather than the shell wrapper, and can change timing/sandbox interaction. The crash is localized only to the **stripped libxul library**, not a function or source line. Raw debugger output was retained only inside a disposable CI directory and deleted; only sanitized symbol/module summaries appear in CI logs.
+
+## Next acceptance work
+
+1. Recover source-matched native debug symbols or a dedicated symbolized diagnostic build, then identify the crashing libxul function and validate a real fix; retain sandboxing and profile protection.
+2. Compare two independently verified native builds under **one** controlled private Weston runtime/toolchain before attributing a source, build or environmental regression. The earlier run preserved only bounded link evidence, not its whole package archive for immediate reuse.
+3. Rerun the untouched ten-second same-surface graphical acceptance followed by protected New Tab, JavaScript navigation, WebExtension, and dependency checks. Do not count an instrumented or shortened run as a pass.
+
+**Gate result: M3 remains 5/6 (83%), overall 61%, delta 0 pp.** No new pruning, measured saving, user-machine regression claim, or whole dynamic feature-graph completion.
