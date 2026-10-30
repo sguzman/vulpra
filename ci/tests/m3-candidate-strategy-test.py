@@ -366,8 +366,10 @@ def validate(reg,paired,progress):
 
     pocket_native=reg["accepted_historical_lean_newtab_pocket_factory_runtime"]
     assert pocket_native["status"]=="passed_source_pinned_historical_normandy_free_native_newtab_dual_feed_factory_smoke"
-    assert pocket_native["runtime_run_id"]==40985864152
-    assert pocket_native["evidence_artifact_id"]==12947495420
+    assert pocket_native["runtime_run_id"]==40986240766
+    assert pocket_native["evidence_artifact_id"]==12947750031
+    assert pocket_native["first_factory_only_run_id"]==40985864152
+    assert pocket_native["first_factory_only_evidence_artifact_id"]==12947495420
     assert pocket_native["original_native_lean_compile_run_id"]==40954193793
     assert pocket_native["prior_native_candidate_runtime_run_id"]==40968542013
     assert pocket_native["source_commit"]=="034ddd665a080f173ce45094ae3afb8868b45e1a"
@@ -375,13 +377,20 @@ def validate(reg,paired,progress):
     assert pocket_native["original_optin_compressed_archive_bytes"]==87138100
     assert pocket_native["unchanged_critical_newtab_source_blobs"]==6
     assert pocket_native["archived_variant"]=="optin_normandy_recipe_runner_absent_but_normal_newtab_feeds_preserved"
-    assert len(pocket_native["protected_feed_factories_and_registrations"])==10
+    assert len(pocket_native["protected_feed_factories_and_registrations"])==14
+    assert pocket_native["synthetic_fake_boundary_rejections"]==16
     assert all(v is True for v in pocket_native["protected_feed_factories_and_registrations"].values())
     for flag in ("real_packaged_browser_executed","isolated_home_and_profile_verified",
                  "actual_about_newtab_document_loaded",
-                 "feed_factory_discovery_gate_tested_in_temporary_profile"):
+                 "feed_factory_discovery_gate_tested_in_temporary_profile",
+                 "real_shipped_legacy_method_exercised_with_inert_side_effect_hooks",
+                 "legacy_real_method_malformed_config_stubbed_initialization",
+                 "legacy_real_method_explicit_discovery_disabled_stubbed_initialization",
+                 "legacy_real_method_already_loaded_skips_initialization",
+                 "legacy_real_method_user_preference_off_skips_initialization"):
         assert pocket_native[flag] is True,flag
-    for flag in ("real_legacy_recommendation_failure_fallback_invoked",
+    for flag in ("source_legacy_method_test_is_production_context_end_to_end",
+                 "real_legacy_recommendation_failure_fallback_invoked",
                  "actual_remote_pocket_data_fetched",
                  "server_sponsored_content_delivery_proven",
                  "current_main_entire_native_build_proven",
@@ -634,6 +643,11 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(actual_remote_pocket_data_fetched=True),
         lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(unchanged_critical_newtab_source_blobs=7),
         lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"]["protected_feed_factories_and_registrations"].update(legacy_registered=False),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(source_legacy_method_test_is_production_context_end_to_end=True),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(real_shipped_legacy_method_exercised_with_inert_side_effect_hooks=False),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(legacy_real_method_user_preference_off_skips_initialization=False),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"]["protected_feed_factories_and_registrations"].update(legacy_disabled_config_stubbed_init=False),
+        lambda a,b,c:a["accepted_historical_lean_newtab_pocket_factory_runtime"].update(runtime_run_id=40985864152),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
