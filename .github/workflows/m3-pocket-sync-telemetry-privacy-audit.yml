@@ -1,0 +1,188 @@
+# Original-source-pinned Pocket/Sync/privacy safety reconciliation, no feature removal.
+name: M3 Preserve Pocket Sync And Telemetry Privacy Boundaries
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-pocket-sync-telemetry-privacy-audit.yml
+      - docs/vulpra/DEBLOAT-CANDIDATES.json
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile-real-normal-browser-private-boundaries:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source identities and protected decisions
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            docs/vulpra/DEBLOAT-CANDIDATES.json
+            ci
+      - name: Reject accidental source deletion and unsafe reclassification
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          jq -e -f ci/m3-candidate-decision-contract.jq \
+            docs/vulpra/DEBLOAT-CANDIDATES.json > "$RUNNER_TEMP/safe-candidates.json"
+          for path in \
+            browser/extensions/newtab/lib/TopStoriesFeed.sys.mjs \
+            browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs \
+            services/moz.build \
+            toolkit/components/extensions/ExtensionStorageSyncKinto.sys.mjs \
+            browser/components/aiwindow/ui/modules/AIWindowAccountAuth.sys.mjs \
+            toolkit/components/telemetry/app/TelemetrySend.sys.mjs \
+            toolkit/components/telemetry/app/TelemetryControllerParent.sys.mjs \
+            toolkit/components/telemetry/app/TelemetryReportingPolicy.sys.mjs \
+            toolkit/components/glean/moz.build \
+            toolkit/crashreporter/moz.build \
+            browser/app/profile/firefox.js \
+            browser/components/asrouter/moz.build; do
+            git cat-file -e "HEAD:$path" || {
+              echo "FAIL: protected default-browser/account/privacy module missing: $path" >&2
+              exit 1
+            }
+          done
+          jq -e '
+            ([.candidates[] | select(.id=="pocket_integration" or
+              .id=="sync_services" or .id=="firefox_accounts" or
+              .id=="telemetry_internals" or .id=="newtab_and_messaging" or
+              .id=="core_web_security") | select(.m3_strategy.strategy=="keep")]|length)==6 and
+            ([.candidates[] | select(.id=="normandy_and_healthreport" or
+               .id=="newtab_adsfeed_optout" or .id=="newtab_promocard_optout") |
+               select(.m3_strategy.strategy=="conditional_compile")]|length)==3 and
+            .m3_decision_classification.no_normal_browser_feature_changed==true and
+            .m3_decision_classification.new_compiled_savings_bytes==null and
+            .accepted_source_pruning_cohort_totals.new_pruning_authorized==false' \
+            docs/vulpra/DEBLOAT-CANDIDATES.json >/dev/null
+      - name: Authenticate source audit and four actual successful browser behaviors
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in \
+            40982290720 41078779642 41078909794 41004025705 \
+            41106584931 40997075527 41077783489 \
+            40547968387 40617558714 40787698972; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e '.status=="completed" and .conclusion=="success"' >/dev/null
+          done
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40997075527" |
+            jq -e '.head_sha=="b1482404dfb8b01342990ee99ea3df0f9756b5f7"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/source" "$RUNNER_TEMP/sync" \
+            "$RUNNER_TEMP/telemetry" "$RUNNER_TEMP/newtab"
+          gh run download 40982290720 --repo "$GITHUB_REPOSITORY" \
+            --name m3-protected-boundary-source-crosscheck --dir "$RUNNER_TEMP/source"
+          gh run download 41078779642 --repo "$GITHUB_REPOSITORY" \
+            --name m3-newer-normal-sync-fxa-native-runtime --dir "$RUNNER_TEMP/sync"
+          gh run download 41078909794 --repo "$GITHUB_REPOSITORY" \
+            --name m3-newer-full-normal-native-telemetry-policy --dir "$RUNNER_TEMP/telemetry"
+          gh run download 41004025705 --repo "$GITHUB_REPOSITORY" \
+            --name m3-full-normal-source-pinned-newtab-native-evidence --dir "$RUNNER_TEMP/newtab"
+      - name: Require exact source-risk and original packed-browser account/telemetry/Pocket evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          s="$RUNNER_TEMP/source/m3-protected-boundary-crosscheck.json"
+          f="$RUNNER_TEMP/sync/m3-sync-fxa-archive-runtime.json"
+          n="$RUNNER_TEMP/telemetry/m3-telemetry-natural-startup.json"
+          t="$RUNNER_TEMP/telemetry/m3-telemetry-loopback.json"
+          p="$RUNNER_TEMP/newtab/m3-newtab-pocket-preservation.json"
+          for file in "$s" "$f" "$n" "$t" "$p"; do
+            test -s "$file" || { echo "FAIL: missing source-pinned QA artifact: $(basename "$file")" >&2; exit 1; }
+          done
+          jq -e '
+            .schema_version==1 and .total_protected_source_boundaries==24 and
+            .independent_source_audit_counts=={"pocket":5,"sync":7,"telemetry":6,"deletion":6} and
+            .all_four_source_audits_same_git_commit==true and
+            .source_commit=="010d4b7e847f3a0cd0bb69d20b17db59108120ae" and
+            .source_removal_authorized==false and
+            .actual_network_upload_privacy_proven==false and
+            .generated_runtime_caller_graph_proven==false and
+            .new_package_savings_bytes==null' "$s" >/dev/null
+          jq -e '
+            .schema_version==1 and
+            .source_pinned_newer_full_normal_native_binary==true and
+            .native_compiled_source_commit=="b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
+            .original_full_native_build_run_id==40997075527 and
+            .archive_sha256_verified==true and .private_home_and_profile_verified==true and
+            .nonlocal_gecko_connections_blocked==true and
+            .account_credentials_or_user_profile_provided==false and
+            .actual_sync_upload_or_account_login_proven==false and
+            .any_login_or_remote_sync_attempted_by_probe==false and
+            (.modules_verified|length)==8 and (.modules_verified|all(.==true)) and
+            .source_removal_authorized==false' "$f" >/dev/null
+          jq -e '
+            .schema_version==1 and .status=="natural_startup_observed_without_test_init" and
+            .verified_package_sha256==true and .isolated_profile==true and
+            .no_explicit_test_controller_setup==true and
+            .no_sender_test_override==true and
+            (.natural_startup.samples|map(.seconds))==[0,30,75] and
+            (.natural_startup.samples|map(.sender_ready))==[false,false,true] and
+            .natural_startup.test_setup_used==false' "$n" >/dev/null
+          jq -e '
+            .schema_version==2 and .status=="native_privileged_telemetry_runtime_observed" and
+            .verified_package_sha256==true and .isolated_profile==true and
+            .nonlocal_connections_blocked_by_gecko_environment==true and
+            .loopback_receiver=="127.0.0.1" and
+            .before_optout_requests["vulpra-probe"]==1 and
+            .after_optout_requests["vulpra-probe"]==1 and
+            .before_optout_requests["deletion-request"]==0 and
+            .after_optout_requests["deletion-request"]==1 and
+            .runtime.disabled.ordinary==false and
+            .runtime.disabled.deletion==true and
+            .runtime.master_off.policy==false and
+            (.receiver_rejections|all(.==0))' "$t" >/dev/null
+          jq -e '
+            .schema_version==1 and
+            .status=="real_normal_full_normandy_native_newtab_factories_retained" and
+            .native_build_source_commit=="b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
+            .native_build_run_id==40997075527 and
+            .variant=="full-normandy" and
+            .verified_archive_sha256==true and
+            .gecko_nonlocal_connection_guard_enabled==true and
+            .newtab_document_loaded==true and
+            (.protected_newtab_factories_and_registry|length)==26 and
+            (.protected_newtab_factories_and_registry|all(.==true)) and
+            .actual_modern_content_fetch_invoked==false and
+            .pocket_recommendation_data_downloaded_by_probe==false and
+            .source_removal_authorized==false' "$p" >/dev/null
+          jq -n --arg sha "$GITHUB_SHA" '{
+            schema_version:1,checked_policy_source:$sha,
+            original_native_compiled_source:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+            original_native_build_run_id:40997075527,
+            source_pinned_pocket_sync_telemetry_deletion_boundaries:24,
+            independent_source_risk_domains:4,
+            normal_packaged_sync_fxa_and_extension_modules:8,
+            source_pinned_normal_newtab_feed_assertions:26,
+            native_telemetry_normal_sender_observed_by_75s:true,
+            native_local_ordinary_optout_kept_off:true,
+            native_local_deletion_request_retained:true,
+            separate_guarded_optin_promos_and_ads_candidates:3,
+            normal_browser_pocket_sync_fxa_telemetry_preserved:true,
+            user_profile_or_live_account_credentials_used:false,
+            remote_pocket_feed_fetch_verified:false,
+            actual_account_login_or_sync_upload_verified:false,
+            actual_production_telemetry_server_deletion_verified:false,
+            full_dynamic_dependency_graph_proven:false,
+            original_native_browser_recompiled_by_this_check:false,
+            no_new_source_deletion:true,
+            no_new_combined_compiled_binary_savings:true,
+            other_M3_gates_closed_by_this_check:false
+          }' > "$RUNNER_TEMP/m3-pocket-sync-telemetry-safe-audit.json"
+          echo 'PASS: independent real full-normal native Pocket/Sync/telemetry safety evidence'
+      - name: Preserve minimal source and runtime acceptance summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-pocket-sync-telemetry-privacy-crosscheck
+          path: ${{ runner.temp }}/m3-pocket-sync-telemetry-safe-audit.json
+          if-no-files-found: warn
+          retention-days: 14
