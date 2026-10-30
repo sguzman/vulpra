@@ -2518,5 +2518,41 @@
     "source_removal_authorized": false,
     "new_m3_roadmap_gate_passed": false,
     "documentation": "docs/vulpra/M3-ARCHIVED-NATIVE-SYNC-FXA-BOUNDARIES-20261030.md"
+  },
+  "accepted_historical_lean_newtab_pocket_factory_runtime": {
+    "status": "passed_source_pinned_historical_normandy_free_native_newtab_dual_feed_factory_smoke",
+    "runtime_run_id": 40985864152,
+    "evidence_artifact_id": 12947495420,
+    "original_native_lean_compile_run_id": 40954193793,
+    "prior_native_candidate_runtime_run_id": 40968542013,
+    "source_commit": "034ddd665a080f173ce45094ae3afb8868b45e1a",
+    "original_optin_archive_sha256": "7095a57083a6211177fd182a2c5275d0ef8c8b2398f4eb1b3298ae951861adac",
+    "original_optin_compressed_archive_bytes": 87138100,
+    "unchanged_critical_newtab_source_blobs": 6,
+    "archived_variant": "optin_normandy_recipe_runner_absent_but_normal_newtab_feeds_preserved",
+    "real_packaged_browser_executed": true,
+    "isolated_home_and_profile_verified": true,
+    "protected_feed_factories_and_registrations": {
+      "legacy_registered": true,
+      "modern_registered": true,
+      "top_sites_registered": true,
+      "preferences_registered": true,
+      "sponsored_adsfeed_retained": true,
+      "legacy_factory_export": true,
+      "modern_factory_export": true,
+      "newtab_adsfeed_omission_disabled": true,
+      "testing_minimal_feed_map": true,
+      "no_feed_initialized_or_fetched_by_probe": true
+    },
+    "actual_about_newtab_document_loaded": true,
+    "feed_factory_discovery_gate_tested_in_temporary_profile": true,
+    "real_legacy_recommendation_failure_fallback_invoked": false,
+    "actual_remote_pocket_data_fetched": false,
+    "server_sponsored_content_delivery_proven": false,
+    "current_main_entire_native_build_proven": false,
+    "safe_full_newtab_source_removal_proven": false,
+    "new_m3_gate_passed": false,
+    "new_source_removal_authorized": false,
+    "documentation": "docs/vulpra/M3-ARCHIVED-LEAN-NEWTAB-POCKET-RUNTIME-20261030.md"
   }
 }
