@@ -77,7 +77,17 @@ grep -Fq 'xdg_wm_base' "$work/compositor-info" || {
 
 # Private HOME and no X11 DISPLAY: a normal browser must use GTK Wayland
 # or fail to start; MOZ_HEADLESS is removed to exercise graphical startup.
-env -u MOZ_HEADLESS \
+# Optional CI loader observation applies ONLY to browser processes, never the
+# Weston compositor, wayland-info or Python QA helper. No default behavior change.
+loader_env=()
+if [[ -n "${VULPRA_M3_LOADER_TRACE_PREFIX:-}" ]]; then
+  [[ "$VULPRA_M3_LOADER_TRACE_PREFIX" == /* ]] || {
+    echo 'Native loader trace prefix must be an absolute disposable path' >&2
+    exit 2
+  }
+  loader_env=("LD_DEBUG=libs,files" "LD_DEBUG_OUTPUT=$VULPRA_M3_LOADER_TRACE_PREFIX")
+fi
+env -u MOZ_HEADLESS "${loader_env[@]}" \
   HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
   XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
   WAYLAND_DEBUG=client \
