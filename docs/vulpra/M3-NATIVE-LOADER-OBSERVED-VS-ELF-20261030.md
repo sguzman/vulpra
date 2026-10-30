@@ -95,3 +95,28 @@ feature removal can be authorized from counts alone.
 
 **Progress at this evidence checkpoint: M3 5/6 gates (83%), Vulpra
 overall 61%, Δ0 percentage points for this subtask.**
+
+## Separate private Wayland follow-up: unresolved CI-only baseline failure
+
+An additional private Weston/Wayland-native workload was attempted for the
+*same* immutable full-normal compiled source. Unlike the passing headless
+WebDriver result, the graphical
+[Wayland baseline run 41117899170](https://github.com/sguzman/vulpra/actions/runs/41117899170)
+**FAILED** without any LD_DEBUG instrumentation: the native launcher
+exited with **status 11** before the required **10-second** liveness
+check. Earlier tracer and browser-only tracer runs 41117245614 and
+41117471164, and a separate baseline run 41117687590, also failed the
+same liveness condition. Real protocol logs included Wayland buffer
+attach/commit activity, but the smoke script exits before it performs
+its own final same-surface frame acceptance. No native Wayland PASS is
+claimed here. The existing synthetic Wayland test harness and source
+recovery/build safety workflow remained green at 41117899121 and
+41117899217; they are **not** substitutes for a physical native pass.
+
+[Tracked CI reproduction issue #2](https://github.com/sguzman/vulpra/issues/2)
+requires investigating the native process's early exit and the
+launcher/GTK/Weston environment before a successful loader graph can
+be recorded for that workload. The result is **not yet** a demonstrated
+problem on the user's Arch/Wayland machine. The underlying independently
+verified **headless** 94-name loader and 50/50 static reconciliation
+remain valid and scoped. M3 still 5/6, Vulpra overall 61%, Δ0 pp.
