@@ -2,7 +2,7 @@
 # CI only, called inside sudo unshare --net: no outward network topology.
 set -euo pipefail
 if [[ $# -ne 4 ]]; then
-  echo 'usage: m3-wayland-private-topology.sh lo_down|lo_up|dummy_up user harness appdir' >&2
+  echo 'usage: m3-wayland-private-topology.sh lo_down|lo_up|dummy_up|dummy_default user harness appdir' >&2
   exit 2
 fi
 mode="$1"
@@ -19,12 +19,15 @@ case "$mode" in
   lo_up)
     ip link set lo up
     ;;
-  dummy_up)
-    # Only a locally scoped synthetic interface; documentation address,
-    # no default route, no link to the real network.
+  dummy_up|dummy_default)
+    # A standalone synthetic device entirely inside this network namespace.
+    # An optional default route is a local sink, NOT host network access.
     ip link add dummy0 type dummy
     ip addr add 192.0.2.1/32 dev dummy0
     ip link set dummy0 up
+    if [[ "$mode" = dummy_default ]]; then
+      ip -4 route add default dev dummy0
+    fi
     ;;
   *)
     echo 'Invalid isolated network topology' >&2
@@ -37,9 +40,19 @@ for name in $(ip -o link show | awk -F': ' '{print $2}'); do
     *) echo 'Unsafe interface in diagnostic namespace' >&2; exit 4 ;;
   esac
 done
-if ip -4 route show default | grep -q . || ip -6 route show default | grep -q .; then
-  echo 'Unsafe namespace: default outside route present' >&2
+if ip -6 route show default | grep -q .; then
+  echo 'Unsafe namespace: unexpected IPv6 default route' >&2
   exit 4
+fi
+if [[ "$mode" = dummy_default ]]; then
+  # Only the synthetic disposable sink is allowed. No real NIC or gateway.
+  test "$(ip -4 route show default | wc -l)" -eq 1
+  ip -4 route show default | grep -Eq '^default dev dummy0( |$)'
+else
+  if ip -4 route show default | grep -q .; then
+    echo 'Unsafe namespace: unexpected IPv4 default route' >&2
+    exit 4
+  fi
 fi
 # No public/global address on any interface in this disposable namespace.
 if ip -o -4 addr show | grep -Ev 'inet (127[.]|192[.]0[.]2[.]1/32)' | grep -q 'inet '; then

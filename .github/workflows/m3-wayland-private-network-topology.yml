@@ -1,6 +1,6 @@
 # Compare three disconnected network-interface topologies using one
 # authenticated original full-normal native browser and private Weston.
-name: M3 Native Wayland Isolated Interface Topology
+name: M3 Native Wayland Isolated Interface and Route Topology
 on:
   push:
     branches: [main]
@@ -54,7 +54,7 @@ jobs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
             --no-install-recommends iproute2 util-linux weston wayland-utils \
             libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
-      - name: Run three ten-second private Weston probes with no outside routes
+      - name: Run four private Weston probes with zero external network access
         shell: bash
         timeout-minutes: 8
         run: |
@@ -88,4 +88,5 @@ jobs:
           probe lo_down
           probe lo_up
           probe dummy_up
-          echo 'DIAGNOSTIC ONLY: network-interface states compared, no M3 gate credit'
+          probe dummy_default
+          echo 'DIAGNOSTIC ONLY: virtual default route is a sink, no real egress or M3 gate credit'
