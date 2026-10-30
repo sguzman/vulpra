@@ -30,7 +30,22 @@ const {DiscoveryStreamFeed} = ChromeUtils.importESModule(
   "resource://newtab/lib/DiscoveryStreamFeed.sys.mjs");
 const {AppConstants} = ChromeUtils.importESModule(
   "resource://gre/modules/AppConstants.sys.mjs");
-const keys = [...new ActivityStream().feeds.keys()];
+// Exercise both factory-map branches on *new, uninitialized* instances.
+// This is the testing.shouldInitializeFeeds flag, NOT the separate real
+// TopStoriesFeed legacy/DiscoveryStream-disabled network fallback.
+const gate="browser.newtabpage.activity-stream.testing.shouldInitializeFeeds";
+const hadUserValue=Services.prefs.prefHasUserValue(gate);
+const previous=Services.prefs.getBoolPref(gate,true);
+let keys, minimal;
+try {
+  Services.prefs.setBoolPref(gate,true);
+  keys=[...new ActivityStream().feeds.keys()];
+  Services.prefs.setBoolPref(gate,false);
+  minimal=[...new ActivityStream().feeds.keys()];
+} finally {
+  if (hadUserValue) Services.prefs.setBoolPref(gate,previous);
+  else Services.prefs.clearUserPref(gate);
+}
 return {
   mode: "retained_full_newtab_in_optin_normandy_free_browser",
   legacy_registered:keys.includes("feeds.system.topstories"),
@@ -41,6 +56,11 @@ return {
   legacy_factory_export:typeof TopStoriesFeed === "function",
   modern_factory_export:typeof DiscoveryStreamFeed === "function",
   newtab_adsfeed_omission_disabled:!AppConstants.VULPRA_NO_NEWTAB_ADSFEED,
+  testing_minimal_feed_map: minimal.length === 2 &&
+    minimal.includes("feeds.system.topsites") &&
+    minimal.includes("feeds.prefs") &&
+    !minimal.includes("feeds.system.topstories") &&
+    !minimal.includes("feeds.discoverystreamfeed"),
   no_feed_initialized_or_fetched_by_probe:true
 };
 """
@@ -49,7 +69,8 @@ CHECKS=(
   "legacy_registered","modern_registered","top_sites_registered",
   "preferences_registered","sponsored_adsfeed_retained",
   "legacy_factory_export","modern_factory_export",
-  "newtab_adsfeed_omission_disabled","no_feed_initialized_or_fetched_by_probe"
+  "newtab_adsfeed_omission_disabled","testing_minimal_feed_map",
+  "no_feed_initialized_or_fetched_by_probe"
 )
 
 def validate(page,registration):
