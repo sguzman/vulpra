@@ -38,6 +38,9 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
     seen=set()
     recorded_needed_by=set()
     recorded_dynamic_requests=set()
+    pre_libxul_request_init=set()
+    after_libxul_request_init=set()
+    traces_with_first_libxul_request=0
     for f in files:
         if not 0 < f.stat().st_size <= MAX_BYTES_PER_FILE:
             raise ValueError("Empty or oversized loader log")
@@ -49,12 +52,26 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
         opened=set()
         candidate_needed_by=set()
         candidate_dynamic=set()
-        for line in text.splitlines():
+        trace_pre_libxul=set()
+        trace_after_libxul=set()
+        # Multiple exec() images can append to one glibc LD_DEBUG_OUTPUT.PID
+        # file. The launcher is Bash and must not automatically be treated
+        # as a browser-origin library request. This marker is a bounded
+        # observation boundary, not an infallible proof of native ownership.
+        first_libxul_request=None
+        for line_index,line in enumerate(text.splitlines()):
+            m=OPEN.search(line)
+            if m and basename(m.group(1))=="libxul.so" and first_libxul_request is None:
+                first_libxul_request=line_index
             m=INIT.search(line)
             if m:
                 n=basename(m.group(1))
-                if n:init.add(n)
-            m=OPEN.search(line)
+                if n:
+                    init.add(n)
+                    if first_libxul_request is None:
+                        trace_pre_libxul.add(n)
+                    else:
+                        trace_after_libxul.add(n)
             if m:
                 n=basename(m.group(1))
                 if n:opened.add(n)
@@ -73,6 +90,10 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
         if len(init)<3:
             raise ValueError("Browser process had too few real loader init events")
         seen.update(init)
+        if first_libxul_request is not None:
+            traces_with_first_libxul_request+=1
+            pre_libxul_request_init.update(trace_pre_libxul)
+            after_libxul_request_init.update(trace_after_libxul)
         # A request line by itself does not establish that its library
         # initialized. Retain only edges whose target has an actual native
         # glibc "calling init" event in THIS same browser process trace.
@@ -102,6 +123,19 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
         "browser_process_traces_with_libxul":len(browsers),
         "observed_loader_init_library_basename_count":len(names),
         "observed_loader_init_library_basenames":names,
+        # These are the native loader's event-order *segments*, not a
+        # definitive process-of-origin classifier. Names before the first
+        # libxul request are possible Bash/launcher contamination; names
+        # appearing in both segments cannot be assigned exclusively.
+        "traces_with_first_libxul_request_boundary":traces_with_first_libxul_request,
+        "observed_before_first_libxul_request_basenames":sorted(pre_libxul_request_init),
+        "observed_after_first_libxul_request_basenames":sorted(after_libxul_request_init),
+        "observed_before_only_basenames":sorted(
+            pre_libxul_request_init-after_libxul_request_init),
+        "observed_after_only_basenames":sorted(
+            after_libxul_request_init-pre_libxul_request_init),
+        "post_first_libxul_request_stage_is_proven_exclusive_browser_code":False,
+        "pre_first_libxul_request_stage_is_proven_exclusive_launcher_code":False,
         "loader_reported_needed_by_initialized_edge_count":len(recorded_needed_by),
         "loader_reported_needed_by_initialized_edges":safe_edges(recorded_needed_by),
         "loader_reported_dynamic_initialized_edge_count":len(recorded_dynamic_requests),
@@ -134,6 +168,8 @@ def selftest() -> None:
         folder=Path(tmp)
         f=folder/"m3-loader.123"
         text=(
+            "    123: file=libtinfo.so.6 [0]; needed by /usr/bin/bash [0]\n"
+            "    123: calling init: /lib/libtinfo.so.6\n"
             "    123: file=libxul.so [0]; needed by /tmp/vulpra/vulpra-bin\n"
             "    123: file=libnss3.so [0]; dynamically loaded by /tmp/vulpra/libxul.so [0]\n"
             "    123: file=not-initialized.so [0]; dynamically loaded by /tmp/vulpra/libxul.so [0]\n"
@@ -146,6 +182,12 @@ def selftest() -> None:
         assert v["browser_process_traces_with_libxul"]==1
         assert "libxul.so" in v["observed_loader_init_library_basenames"]
         assert "libc.so.6" in v["observed_loader_init_library_basenames"]
+        assert v["traces_with_first_libxul_request_boundary"]==1
+        assert v["observed_before_only_basenames"]==["libtinfo.so.6"]
+        assert "libtinfo.so.6" not in v["observed_after_first_libxul_request_basenames"]
+        assert "libc.so.6" in v["observed_after_first_libxul_request_basenames"]
+        assert "libtinfo.so.6" in v["observed_loader_init_library_basenames"]
+        assert v["post_first_libxul_request_stage_is_proven_exclusive_browser_code"] is False
         assert v["loader_reported_needed_by_initialized_edges"]==[
             {"requester_basename":"vulpra-bin",
              "requested_library_basename":"libxul.so"}]
