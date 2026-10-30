@@ -2443,9 +2443,9 @@
     "documentation": "docs/vulpra/M3-NORMANDY-PHYSICAL-PAYLOAD-20261030.md"
   },
   "accepted_normandy_three_pair_variance": {
-    "status": "three_source_distinct_same_source_within_each_pair_native_comparison_reports_reconciled",
+    "status": "three_source_distinct_native_pairs_reconciled_under_corrected_non_additive_schema",
     "success_run_id": 40983703521,
-    "strict_schema_followup_run_id": null,
+    "strict_schema_followup_run_id": 40983784911,
     "artifact_id": 12945423159,
     "original_pair_comparison_runs": [
       40439793884,
@@ -2482,6 +2482,7 @@
     "causal_future_size_savings_guaranteed": false,
     "source_removal_authorized": false,
     "new_m3_roadmap_gate_passed": false,
-    "documentation": "docs/vulpra/M3-NORMANDY-PHYSICAL-PAYLOAD-20261030.md"
+    "documentation": "docs/vulpra/M3-NORMANDY-PHYSICAL-PAYLOAD-20261030.md",
+    "strict_followup_artifact_id": 12946415710
   }
 }
