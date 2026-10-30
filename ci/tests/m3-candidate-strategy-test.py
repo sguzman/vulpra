@@ -513,10 +513,10 @@ def validate(reg,paired,progress):
     assert promo["removal_authorized"] is False
 
     m3,=(m for m in progress["milestones"] if m["id"]=="M3")
-    assert m3["acceptance_gates"]["passed"]==4
+    assert m3["acceptance_gates"]["passed"]==5
     assert m3["acceptance_gates"]["total"]==6
-    assert m3["percent"]==66
-    assert progress["overall"]["percent"]==55
+    assert m3["percent"]==83
+    assert progress["overall"]["percent"]==61
     return counts
 
 def negative_fixtures(reg,paired,progress):
