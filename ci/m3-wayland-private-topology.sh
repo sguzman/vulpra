@@ -49,6 +49,9 @@ case "$mode" in
     ;;
 esac
 for name in $(ip -o link show | awk -F': ' '{print $2}'); do
+  # veth endpoints display as eth0@ifN / peer0@ifN, where the suffix is
+  # a peer index, not part of the interface's configured name.
+  name="$(printf '%s' "$name" | cut -d@ -f1)"
   case "$name" in
     lo|dummy0|eth0|peer0) ;;
     *) echo 'Unsafe interface in diagnostic namespace' >&2; exit 4 ;;
