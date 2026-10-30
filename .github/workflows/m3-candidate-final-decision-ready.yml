@@ -1,0 +1,148 @@
+# Fail-closed read-only acceptance decision for exactly 20 scoped M3 choices.
+# This proves classification readiness; source graph closure and further binary
+# removal remain separate M3 gates.
+name: M3 Verify All Scoped Candidate Decisions
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-candidate-final-decision-ready.yml
+      - docs/vulpra/DEBLOAT-CANDIDATES.json
+      - docs/vulpra/PROGRESS.json
+      - ci/m3-candidate-decision-contract.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile-decisions-fallbacks-and-native-acceptance:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - name: Checkout exact candidate and progress ledgers
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+            docs/vulpra/DEBLOAT-CANDIDATES.json
+            docs/vulpra/PROGRESS.json
+      - name: Verify all 20 scoped choices and default-safe rollbacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          jq -e -f ci/m3-candidate-decision-contract.jq \
+            docs/vulpra/DEBLOAT-CANDIDATES.json > "$RUNNER_TEMP/policy.json"
+          jq -e '
+            .schema_version==1 and .project=="Vulpra" and .phase=="M3" and
+            (.candidates|length)==20 and
+            ([.candidates[].id]|unique|length)==20 and
+            .m3_decision_classification.categories=={
+              "keep":13,"remove_source":4,"review":0,"conditional_compile":3
+            } and
+            .m3_decision_classification.complete_feature_dependency_inventory==false and
+            .m3_decision_classification.no_new_source_deletion==true and
+            .m3_decision_classification.no_normal_browser_feature_changed==true and
+            .m3_decision_classification.new_compiled_savings_bytes==null and
+            ([.candidates[]|select(.m3_strategy.strategy=="keep")]|length)==13 and
+            ([.candidates[]|select(.m3_strategy.strategy=="remove_source")]|length)==4 and
+            ([.candidates[]|select(.m3_strategy.strategy=="conditional_compile")]|length)==3 and
+            ([.candidates[]|select(.m3_strategy.strategy=="review")]|length)==0 and
+            ([.candidates[]|select(
+              (.m3_strategy.safety_and_fallback|length)<26 or
+              (.m3_strategy.provenance|length)<8 or
+              .m3_strategy.broad_feature_removal_authorized!=false or
+              (.evidence|length)==0)]|length)==0 and
+            ([.candidates[]|select(.m3_strategy.strategy=="keep" and
+              (.m3_strategy.permanent_removal_accepted!=false or
+               .m3_strategy.guarded_opt_in_omission_accepted!=false))]|length)==0 and
+            ([.candidates[]|select(.m3_strategy.strategy=="conditional_compile" and
+              (.m3_strategy.permanent_removal_accepted!=false or
+               .m3_strategy.guarded_opt_in_omission_accepted!=true))]|length)==0 and
+            ([.candidates[]|select(.m3_strategy.strategy=="remove_source" and
+              (.m3_strategy.permanent_removal_accepted!=true or
+               .m3_strategy.guarded_opt_in_omission_accepted!=false))]|length)==0 and
+            (.candidates[]|select(.id=="source_testing")|
+              .m3_strategy.strategy=="keep" and
+              .m3_strategy.permanent_removal_accepted==false and
+              .m3_strategy.requires_further_source_or_runtime_verification==false) and
+            .accepted_m3_candidate_scope_guard_and_genai_native.remaining_review_candidate_ids==[] and
+            .accepted_m3_candidate_scope_guard_and_genai_native.shared_testing_all_peripheral_fixtures_kept==true and
+            .accepted_m3_candidate_scope_guard_and_genai_native.shared_testing_peripheral_omission_authorized==false and
+            .accepted_source_pruning_cohort_totals.aggregate_removed_git_paths==14867 and
+            .accepted_source_pruning_cohort_totals.aggregate_original_git_blob_bytes==129967585 and
+            .accepted_source_pruning_cohort_totals.compiled_package_bytes_saved==null' \
+            docs/vulpra/DEBLOAT-CANDIDATES.json >/dev/null
+      - name: Authenticate previously successful source-prune, opt-in and native browser QA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Three independently compiled source-prune cohorts under original branch versions
+          # and three opt-in native candidates; success does NOT make sizes additive.
+          for run in \
+            40519242468 40585240593 40600510147 \
+            40968542013 40617558714 40787698972 \
+            41107821628 41109168322 41106584931 40997075527 \
+            41109622280 41109757924; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e '.status=="completed" and .conclusion=="success"' >/dev/null
+          done
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40997075527" |
+            jq -e '.head_sha=="b1482404dfb8b01342990ee99ea3df0f9756b5f7"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41109168322" |
+            jq -e '.head_sha=="8b8566bf1aec9a38b801b958c40746f9f69c4b20"' >/dev/null
+          echo "PASS: accepted original scoped source, guarded native opt-in and real browser QA"
+      - name: Require consistent progress ledger without inferring other gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --slurpfile p docs/vulpra/PROGRESS.json \
+            --slurpfile c docs/vulpra/DEBLOAT-CANDIDATES.json \
+            --arg sha "$GITHUB_SHA" '
+            ($p[0].milestones|map(select(.id=="M3"))|.[0]) as $m |
+            $c[0].m3_decision_classification as $d |
+            if $d.whole_m3_gate_passed then
+              if $d.complete_candidate_fallback_validation!=true or
+                 $m.acceptance_gates.passed!=3 or $m.percent!=50 or
+                 $p[0].overall.percent!=50 then error("Incomplete M3 decision gate advancement") else . end
+            else
+              if $d.complete_candidate_fallback_validation!=false or
+                 $m.acceptance_gates.passed!=2 or $m.percent!=33 or
+                 $p[0].overall.percent!=44 then error("Unexpected unfinished gate progress") else . end
+            end |
+            {schema_version:1,source_commit:$sha,
+             candidate_decision_scope_completed:true,
+             candidate_count:20,
+             expected_classes:{"keep":13,"remove_source":4,"review":0,"conditional_compile":3},
+             original_native_source_prune_cohorts_verified:3,
+             original_guarded_opt_in_native_candidates_verified:3,
+             real_native_webdriver_qa_verified:true,
+             all_peripheral_test_sources_still_retained:true,
+             complete_binary_and_dynamic_feature_graph_proven:false,
+             default_browser_changed:false,
+             new_source_deletion_authorized:false,
+             new_compiled_savings_bytes:null,
+             candidate_classification_gate_recorded:$d.whole_m3_gate_passed,
+             other_m3_gates_closed_by_this_check:false}' \
+            > "$RUNNER_TEMP/m3-scoped-final-candidate-decisions.json"
+          jq -e '.candidate_decision_scope_completed==true and
+                 .candidate_count==20 and .expected_classes.review==0 and
+                 .real_native_webdriver_qa_verified==true and
+                 .complete_binary_and_dynamic_feature_graph_proven==false and
+                 .new_source_deletion_authorized==false and
+                 .other_m3_gates_closed_by_this_check==false' \
+            "$RUNNER_TEMP/m3-scoped-final-candidate-decisions.json" >/dev/null
+          echo "PASS: every scoped candidate conservatively classified, native evidence authenticated"
+      - name: Archive bounded gate evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-final-scoped-candidate-decision-evidence
+          path: ${{ runner.temp }}/m3-scoped-final-candidate-decisions.json
+          if-no-files-found: warn
+          retention-days: 14
