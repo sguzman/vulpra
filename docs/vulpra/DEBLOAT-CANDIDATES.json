@@ -2648,5 +2648,20 @@
     "source_removal_authorized": false,
     "outer_package_compressed_savings_bytes": null,
     "documentation": "docs/vulpra/M3-NEWER-FULL-PACKAGE-RESOURCE-CROSSWALK-20261030.md"
+  },
+  "accepted_newer_full_normal_sync_fxa_native": {
+    "state": "passed_read_only_source_pinned_normal_native_api_test",
+    "run_id": 41078779642,
+    "artifact_id": 12987978329,
+    "compiled_source_sha": "b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+    "original_native_build_run_id": 40997075527,
+    "archive_sha256": "7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a",
+    "protected_runtime_assertions": 8,
+    "verified": true,
+    "no_credentials_or_user_profile": true,
+    "actual_remote_sync_or_account_login_proven": false,
+    "extension_storage_transaction_proven": false,
+    "safe_source_removal_proven": false,
+    "documentation": "docs/vulpra/M3-ARCHIVED-NATIVE-SYNC-FXA-BOUNDARIES-20261030.md"
   }
 }

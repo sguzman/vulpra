@@ -69,3 +69,37 @@ registration.
 **Progress:** Useful new runtime acceptance for the already
 protected retained modules; **M3 remains 2/6 (33%), overall 44%**.
 No source removal or new package savings.
+
+## Newer-source full-normal browser: eight protected account/Sync API checks
+
+[Newer full-normal actual browser CI 41078779642](https://github.com/sguzman/vulpra/actions/runs/41078779642)
+**PASSED**, bounded redacted evidence artifact **12987978329**,
+and [workflow lint 41078779645](https://github.com/sguzman/vulpra/actions/runs/41078779645)
+**PASSED**. The original compiled normal browser was produced at exact
+source `b1482404dfb8b01342990ee99ea3df0f9756b5f7` by [native build
+40997075527](https://github.com/sguzman/vulpra/actions/runs/40997075527).
+This actual full-Normandy package has SHA-256
+`7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`,
+**87,154,544 compressed bytes**. Its checksum, metadata, seven protected
+source-module/build Git blobs and prior full-normal headless New Tab test
+were authenticated before the separate Sync/FxAccounts native runtime.
+
+An independently started headless Vulpra in a disposable profile passed
+**8/8 actual shipped module/API observations**:
+`sync_ui_module`, `sync_ui_default_not_configured`,
+`weave_lazy_module`, `fxa_singleton`,
+`fxa_no_signed_in_account`, `extension_storage_sync_loaded`,
+`accounts_glue_module`, `firefox_view_controller`. No account token,
+real user profile, login, remote Sync or nonlocal Gecko connection was
+provided by the test.
+
+The evidence JSON inherits an older harness status name
+`historical_normal_native_sync_fxa_module_smoke_passed`, but its new
+explicit provenance fields authenticate the **newer exact compiled source**,
+original build run and full-normal archive digest. This is **not the
+post-test documentation HEAD** and does not prove signed-in Sync, remote
+cloud synchronization, WebExtension `storage.sync` transaction behavior,
+account authentication, or safety after source removal. Keep the protected
+Sync/FxAccounts clients and their fallback obligations.
+
+**M3 2/6 (33%), overall 44%, Δ0 pp; no new broad gate.**
