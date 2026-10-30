@@ -2567,5 +2567,86 @@
     "legacy_real_method_user_preference_off_skips_initialization": true,
     "source_legacy_method_test_is_production_context_end_to_end": false,
     "synthetic_fake_boundary_rejections": 16
+  },
+  "accepted_newer_full_physical_resource_crosswalk": {
+    "state": "accepted_read_only_exact_compiled_native_resource_census",
+    "compiled_source_sha": "b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+    "original_full_build_run_id": 40997075527,
+    "verified_inventory_run_id": 41077783489,
+    "verified_inventory_artifact_id": 12988211924,
+    "earlier_native_elf_locale_run_id": 41077034156,
+    "original_archive_sha256": "7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a",
+    "compressed_bytes": 87154544,
+    "native_elf_files": 28,
+    "direct_needed_edges": 268,
+    "unique_needed_names": 50,
+    "nested_omni_ja_entries": 8001,
+    "physical_groups": {
+      "newtab_bundle": {
+        "entries": 152,
+        "logical_bytes": 5713031
+      },
+      "newtab_feed_modules": {
+        "entries": 63,
+        "logical_bytes": 1079637
+      },
+      "asrouter": {
+        "entries": 31,
+        "logical_bytes": 797913
+      },
+      "normandy": {
+        "entries": 26,
+        "logical_bytes": 115994
+      },
+      "sync": {
+        "entries": 33,
+        "logical_bytes": 613058
+      },
+      "fxaccounts": {
+        "entries": 16,
+        "logical_bytes": 443370
+      },
+      "aiwindow": {
+        "entries": 257,
+        "logical_bytes": 2662819
+      },
+      "genai": {
+        "entries": 32,
+        "logical_bytes": 257306
+      },
+      "devtools": {
+        "entries": 2301,
+        "logical_bytes": 20824628
+      },
+      "remote_qa": {
+        "entries": 157,
+        "logical_bytes": 2192533
+      },
+      "fluent": {
+        "entries": 241,
+        "logical_bytes": 1001800
+      },
+      "hyphenation": {
+        "entries": 46,
+        "logical_bytes": 4471692
+      },
+      "dictionary": {
+        "entries": 2,
+        "logical_bytes": 552470
+      },
+      "telemetry_named": {
+        "entries": 16,
+        "logical_bytes": 403255
+      },
+      "crash_named": {
+        "entries": 3,
+        "logical_bytes": 71676
+      }
+    },
+    "physical_prefixes_can_overlap": true,
+    "full_runtime_dependency_graph": false,
+    "source_removal_authorized": false,
+    "outer_package_compressed_savings_bytes": null,
+    "documentation": "docs/vulpra/M3-NEWER-FULL-PACKAGE-RESOURCE-CROSSWALK-20261030.md"
   }
 }
