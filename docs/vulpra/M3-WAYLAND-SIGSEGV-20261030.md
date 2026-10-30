@@ -22,6 +22,10 @@ The Git comparison `cde4d83043f8c476173c8dbc78b66b078c3f6b5b...b1482404dfb8b0134
 
 The separate GDB probe uses the native executable directly with the same private-profile arguments, rather than the shell wrapper, and can change timing/sandbox interaction. The crash is localized only to the **stripped libxul library**, not a function or source line. Raw debugger output was retained only inside a disposable CI directory and deleted; only sanitized symbol/module summaries appear in CI logs.
 
+## Additional null-address fault confirmation (2026-10-30)
+
+In [CI 41133073378](https://github.com/sguzman/vulpra/actions/runs/41133073378), corrected position-aware GDB diagnostics showed **SIGSEGV**, memory address **exactly null (0x0)** and fault code **SEGV_MAPERR**, with the first 15 frames in stripped `libxul.so`. The original ten-second graphical acceptance **still failed**. A prior diagnostic incorrectly interpreted three numeric GDB booleans/code values as three independent signal codes; the replacement parser reads the first two boolean checks and third `si_code` in order. `ci/m3-wayland-gdb-sanitize.awk` plus `ci/tests/m3-wayland-gdb-sanitize-test.sh` now verify numeric and textual GDB output, two fault classes, sanitization of paths/addresses/arguments, and incomplete traces. This is fault classification, **not** a resolved source function or accepted graphical run.
+
 ## Next acceptance work
 
 1. Recover source-matched native debug symbols or a dedicated symbolized diagnostic build, then identify the crashing libxul function and validate a real fix; retain sandboxing and profile protection.
