@@ -95,7 +95,11 @@ env -u MOZ_HEADLESS "${loader_env[@]}" \
 browser_pid="$!"
 sleep "$duration"
 if ! kill -0 "$browser_pid" 2>/dev/null; then
-  echo "Vulpra exited before ${duration}s of Wayland startup smoke" >&2
+  # Distinguish an intentional parent/launcher exit from a native fault.
+  # Do not treat a failed/finished primary process as a successful browser.
+  browser_exit=0
+  wait "$browser_pid" || browser_exit="$?"
+  echo "Vulpra exited before ${duration}s of Wayland startup smoke (native exit status: $browser_exit)" >&2
   tail -n 80 "$work/browser.log" >&2 || true
   exit 1
 fi
