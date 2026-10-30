@@ -60,6 +60,16 @@ A further [disconnected-interface topology test](https://github.com/sguzman/vulp
 
 **Acceptance remains open:** the original ordinary-runner compiled browser still crashes. The network-namespace pass is a real native graphical result in a special test environment, not acceptance for the target Arch/Hyprland workstation and not a completed feature/build/binary dependency graph. M3 **5/6 (83%)**, overall **61%**, round **Δ0 pp**.
 
+## Interface and routing probes after namespace boundary isolation
+
+The identical archived original native package was tested with three disconnected interface states: [CI 41135743086](https://github.com/sguzman/vulpra/actions/runs/41135743086) **PASS** in all cases (loopback down, loopback up, synthetic dummy interface up). A follow-up [CI 41135964745](https://github.com/sguzman/vulpra/actions/runs/41135964745) **PASS** again in all those cases, plus a synthetic **default route to the dummy sink interface**, which cannot reach the host or the internet. Each case passed the real ten-second native Weston liveness and same-surface non-null buffer/commit test.
+
+These controls rule out *simple* loopback-up state, disconnected dummy-interface presence and a dummy-only default route as sufficient triggers. They do **not** rule out particular real host interfaces, kernel network notifications, address configurations, network services or other namespace-related differences.
+
+[Source-pinned native comparison/symbol build 41134661335](https://github.com/sguzman/vulpra/actions/runs/41134661335) is separately performing a native rebuild of `b1482404`; its contract preflight passed, but **the compile/package and symbol trace must be checked before claiming success or naming a source function**.
+
+The regular original Ubuntu runner still crashes; no workaround has been merged into normal browser packaging or the workstation. M3 **83% (5/6)**, overall **61%**, session **Δ0 pp**.
+
 ## Next acceptance work
 
 1. Recover source-matched native debug symbols or a dedicated symbolized diagnostic build, then identify the crashing libxul function and validate a real fix; retain sandboxing and profile protection.
