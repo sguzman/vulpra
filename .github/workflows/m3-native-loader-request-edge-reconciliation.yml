@@ -7,6 +7,8 @@ on:
       - .github/workflows/m3-native-loader-request-edge-reconciliation.yml
       - ci/m3-loader-request-edge-diff.sh
       - ci/tests/m3-loader-request-edge-diff-test.sh
+      - ci/m3-graphical-loader-reachability.sh
+      - ci/tests/m3-graphical-loader-reachability-test.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,6 +38,7 @@ jobs:
           bash -n ci/m3-loader-request-edge-diff.sh
           bash ci/tests/m3-graphical-loader-workload-diff-test.sh
           bash ci/tests/m3-loader-request-edge-diff-test.sh
+          bash ci/tests/m3-graphical-loader-reachability-test.sh
       - name: Authenticate two successful original-native real workload trace jobs
         shell: bash
         env:
@@ -75,6 +78,13 @@ jobs:
              .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/m3-native-loader-actual-request-edge-contrast.json" >/dev/null
           echo 'PASS: authenticated actual loader request edge subgraph, M3 sixth gate still OPEN'
+          bash ci/m3-graphical-loader-reachability.sh \
+            "$RUNNER_TEMP/m3-native-loader-actual-request-edge-contrast.json" \
+            "$RUNNER_TEMP/m3-original-native-graphical-reachability.json"
+          jq -e '.m3_sixth_gate_closed==false and
+                 .observed_graphical_only_basename_count==58 and
+                 .any_new_source_removal_authorized==false' \
+            "$RUNNER_TEMP/m3-original-native-graphical-reachability.json" >/dev/null
           echo 'DIAGNOSTIC: graphical-only dynamic requester -> requested library basenames:'
           jq -r '.dynamic_graphical_only_edges[] |
             .requester_basename + " -> " + .requested_library_basename' \
@@ -83,6 +93,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-native-headless-wayland-loader-request-edge-contrast
-          path: ${{ runner.temp }}/m3-native-loader-actual-request-edge-contrast.json
+          path: |
+            ${"$"}{{ runner.temp }}/m3-native-loader-actual-request-edge-contrast.json
+            ${"$"}{{ runner.temp }}/m3-original-native-graphical-reachability.json
           if-no-files-found: error
           retention-days: 14
