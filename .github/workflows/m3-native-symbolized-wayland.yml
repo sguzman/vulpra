@@ -1,0 +1,188 @@
+# Full-normal historical source rebuild for isolated Linux Wayland diagnosis.
+# Not an accepted graphical browser test or an M3 gate.
+name: M3 Native Source-Pinned Wayland Symbol Diagnosis
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-symbolized-wayland.yml
+      - ci/m3-symbolized-wayland-compare.sh
+      - ci/m3-wayland-gdb-sanitize.awk
+      - ci/tests/m3-wayland-gdb-sanitize-test.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: vulpra-m3-native-symbolized-wayland
+  cancel-in-progress: false
+jobs:
+  diagnostic-contract:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout current diagnostic scripts
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+            packaging
+      - name: Verify parser fixtures and shell syntax before any native build
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-symbolized-wayland-compare.sh
+          bash ci/tests/m3-wayland-gdb-sanitize-test.sh
+          test -f packaging/test-wayland.sh
+          echo 'PASS: diagnostic contract only, not browser acceptance'
+  compile-source-pinned-with-debug-symbols:
+    needs: diagnostic-contract
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ORIGINAL_ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_BUILD_RUN: '40997075527'
+      MOZCONFIG: ${{ github.workspace }}/source/ci/mozconfig-linux-m3-baseline
+      CARGO_BUILD_JOBS: '1'
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_GHA_VERSION: vulpra-1590b5-m3-normandy-v1
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Checkout current diagnostic code separately
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout: |
+            ci
+            packaging
+      - name: Checkout EXACT original browser source, not main
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: source
+          fetch-depth: 1
+      - name: Verify compiler source, parser and original immutable archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n diagnostics/ci/m3-symbolized-wayland-compare.sh
+          bash diagnostics/ci/tests/m3-wayland-gdb-sanitize-test.sh
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_BUILD_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/original"
+          gh run download "$SOURCE_BUILD_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ORIGINAL_ARCHIVE_SHA256"
+          echo 'PASS: original source and built full-normal package authenticated'
+      - name: Use existing Mozilla compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: v0.16.0
+      - name: Export Actions compiler cache credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - name: Bootstrap native compiler, GDB and private Weston
+        shell: bash
+        timeout-minutes: 55
+        working-directory: source
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends python3 python3-venv python3-dev git curl make jq \
+            binutils gdb weston wayland-utils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          ./mach --no-interactive bootstrap --application-choice browser
+          if ! test -x "$HOME/.mozbuild/clang/bin/clang" ||
+             ! test -x "$HOME/.mozbuild/clang/bin/clang++"; then
+            (cd "$HOME/.mozbuild" && "$GITHUB_WORKSPACE/source/mach" artifact toolchain --from-build linux64-clang)
+          fi
+      - name: Reserve sufficient native compilation swap
+        shell: bash
+        run: |
+          set -euo pipefail
+          free="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( free > 24*1024*1024*1024 + 8*1024*1024*1024 ))
+          sudo fallocate -l 24G /mnt/vulpra-symbolized-build.swap
+          sudo chmod 0600 /mnt/vulpra-symbolized-build.swap
+          sudo mkswap /mnt/vulpra-symbolized-build.swap
+          sudo swapon /mnt/vulpra-symbolized-build.swap
+          grep -Fq /mnt/vulpra-symbolized-build.swap /proc/swaps
+      - name: Configure exact original full-normal source
+        shell: bash
+        working-directory: source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          ./mach configure
+          test -f obj-vulpra-linux-m3-baseline/config.status
+          echo 'PASS: full-normal source configured; no omitted features'
+      - name: Compile pinned normal Vulpra retaining transient linked symbols
+        shell: bash
+        working-directory: source
+        timeout-minutes: 240
+        run: |
+          set -euo pipefail
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/symbolized-source-build.log"
+          linked="$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline/dist/bin/libxul.so"
+          test -f "$linked"
+          readelf -SW "$linked" | grep -Eq '[.]debug_info|[.]symtab'
+          echo 'PASS: linked native libxul retains symbols; not browser acceptance'
+      - name: Stage fresh package and diagnose old and fresh on one runner
+        shell: bash
+        working-directory: source
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist="$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline/dist"
+          archive="$(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print -quit)"
+          test -n "$archive"
+          test "$(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' | wc -l)" -eq 1
+          bash packaging/stage.sh "$archive" "$RUNNER_TEMP/fresh-native.tar.xz"
+          sha256sum "$RUNNER_TEMP/fresh-native.tar.xz" > "$RUNNER_TEMP/fresh-native.tar.xz.sha256"
+          bash "$GITHUB_WORKSPACE/diagnostics/ci/m3-symbolized-wayland-compare.sh" \
+            "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" \
+            "$RUNNER_TEMP/fresh-native.tar.xz" \
+            "$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline/dist/bin/libxul.so" \
+            "$RUNNER_TEMP/symbolized-native-wayland-report.txt"
+          test -s "$RUNNER_TEMP/symbolized-native-wayland-report.txt"
+          echo 'PASS: sanitized diagnostic evidence recorded; gate still open'
+      - name: Upload only sanitized source-pinned comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-symbolized-native-wayland-summary
+          path: |
+            ${{ runner.temp }}/symbolized-native-wayland-report.txt
+            ${{ runner.temp }}/fresh-native.tar.xz.sha256
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Preserve only bounded build-failure tail
+        if: failure()
+        shell: bash
+        run: |
+          if test -f "$RUNNER_TEMP/symbolized-source-build.log"; then
+            tail -n 200 "$RUNNER_TEMP/symbolized-source-build.log" >"$RUNNER_TEMP/symbolized-build-failure-tail.log"
+          fi
+      - name: Upload bounded build failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-symbolized-build-failure-tail
+          path: ${{ runner.temp }}/symbolized-build-failure-tail.log
+          if-no-files-found: warn
+          retention-days: 14
