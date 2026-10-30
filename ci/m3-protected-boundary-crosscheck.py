@@ -102,13 +102,19 @@ def check(report: dict, family: str, expected_source: str) -> list[dict]:
         if family == "telemetry" and row.get("classification") != "retain_protected":
             raise ValueError("Unsafe Telemetry classification")
         for proof in proofs:
+            # The established telemetry lifecycle scanner uses file/pattern;
+            # Pocket, Sync and deletion scanners use path/anchor. Do not
+            # silently require one scanner's output shape from the others.
+            path_key, anchor_key = (
+                ("file", "pattern") if family == "telemetry" else ("path", "anchor")
+            )
             if (not isinstance(proof, dict) or
-                not isinstance(proof.get("path"), str) or
-                PATH.fullmatch(proof["path"]) is None or
+                not isinstance(proof.get(path_key), str) or
+                PATH.fullmatch(proof[path_key]) is None or
                 not isinstance(proof.get("line"), int) or
                 isinstance(proof["line"], bool) or proof["line"] < 1 or
-                not isinstance(proof.get("anchor"), str) or
-                not 1 <= len(proof["anchor"]) <= 256):
+                not isinstance(proof.get(anchor_key), str) or
+                not 1 <= len(proof[anchor_key]) <= 256):
                 raise ValueError("Unverifiable source anchor in " + family)
     return rows
 
@@ -130,7 +136,13 @@ def combine(reports: dict[str, dict]) -> dict:
             row = families[family][key]
             references.append({
                 "boundary": key,
-                "representative_source_anchor": row["evidence"][0],
+                "representative_source_anchor": {
+                    "path": row["evidence"][0]["file"] if family == "telemetry"
+                            else row["evidence"][0]["path"],
+                    "line": row["evidence"][0]["line"],
+                    "anchor": row["evidence"][0]["pattern"] if family == "telemetry"
+                              else row["evidence"][0]["anchor"],
+                },
             })
         risks.append({
             "risk": slug, "source_audit": family,
@@ -168,7 +180,11 @@ def synthetic():
     for family, (collection, field, names) in EXPECTED.items():
         rows = []
         for name in names:
-            row = {field:name, "evidence":[dict(example)]}
+            synthetic_anchor = (
+                {"file": example["path"], "line": example["line"], "pattern": example["anchor"]}
+                if family == "telemetry" else dict(example)
+            )
+            row = {field:name, "evidence":[synthetic_anchor]}
             if family == "pocket": row["classification"]="retain"
             if family == "sync":
                 row["decision"]="retain_both" if name=="sync_source_vs_fxa_source" else "retain"
@@ -196,6 +212,7 @@ def synthetic():
         lambda x: x["deletion"]["source_boundaries"][0]["evidence"][0].update(path="../steal"),
         lambda x: x["deletion"]["source_boundaries"][0]["evidence"][0].update(line=True),
         lambda x: x["sync"]["boundaries"][0]["evidence"][0].update(anchor=""),
+        lambda x: x["telemetry"]["source_boundaries"][0]["evidence"][0].update(pattern=""),
         lambda x: x["pocket"].update(source_commit="c"*64),
     ]
     for index, mutate in enumerate(mutations,1):
