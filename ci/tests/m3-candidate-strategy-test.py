@@ -317,7 +317,9 @@ def validate(reg,paired,progress):
         assert physical[flag] is False,flag
     variance=reg["accepted_normandy_three_pair_variance"]
     assert variance["success_run_id"]==40983703521
-    assert variance["strict_schema_followup_run_id"] is None
+    assert variance["strict_schema_followup_run_id"]==40983784911
+    assert variance["strict_followup_artifact_id"]==12946415710
+    assert variance["status"]=="three_source_distinct_native_pairs_reconciled_under_corrected_non_additive_schema"
     assert variance["artifact_id"]==12945423159
     assert variance["original_pair_comparison_runs"]==[40439793884,40968688858,40976632873]
     assert variance["original_package_candidate_runtime_runs"]==[40439671494,40968542013,40976502356]
@@ -565,6 +567,7 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(net_regular_file_logical_deltas_bytes=[0,0,0]),
         lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(causal_component_bytes_proven=True),
         lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(new_m3_roadmap_gate_passed=True),
+        lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(strict_schema_followup_run_id=None),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
