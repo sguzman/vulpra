@@ -23,7 +23,9 @@ def basename(value: str) -> str | None:
     name = value.rstrip(";,").split("/")[-1]
     return name if SAFE_NAME.fullmatch(name) else None
 
-def inspect(folder: Path) -> dict:
+def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
+    if workload not in ("headless_webdriver", "private_weston_wayland"):
+        raise ValueError("unsupported real native workload mode")
     if not folder.is_dir():
         raise ValueError("Loader output folder missing")
     files=sorted(x for x in folder.iterdir()
@@ -74,7 +76,9 @@ def inspect(folder: Path) -> dict:
         "observed_loader_init_library_basenames":names,
         "libxul_requested_in_real_browser_process":True,
         "libc_loader_init_observed":"libc.so.6" in seen,
-        "real_native_webdriver_workload_passed":True,
+        "observed_workload_mode":workload,
+        "real_native_webdriver_workload_passed":workload=="headless_webdriver",
+        "real_native_wayland_surface_commit_passed":workload=="private_weston_wayland",
         "old_normal_native_archive_source":"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
         "old_normal_native_archive_sha256":
             "7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a",
@@ -130,6 +134,7 @@ def main() -> int:
     p=argparse.ArgumentParser()
     p.add_argument("folder",type=Path,nargs="?")
     p.add_argument("--output",type=Path)
+    p.add_argument("--workload",choices=["headless_webdriver","private_weston_wayland"],default="headless_webdriver")
     p.add_argument("--self-test",action="store_true")
     a=p.parse_args()
     if a.self_test:
@@ -137,7 +142,7 @@ def main() -> int:
         return 0
     if not a.folder or not a.output:
         p.error("actual observation requires folder and --output")
-    result=inspect(a.folder)
+    result=inspect(a.folder,a.workload)
     a.output.parent.mkdir(parents=True,exist_ok=True)
     a.output.write_text(json.dumps(result,indent=2)+"\n")
     print("PASS: observed",result["browser_process_traces_with_libxul"],
