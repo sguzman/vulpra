@@ -237,6 +237,30 @@ def validate(reg,paired,progress):
                  "additional_source_deletion_authorized","new_whole_m3_roadmap_gate_passed"):
         assert repeat[flag] is False,flag
 
+    third=reg["accepted_normandy_third_matched_native_recheck"]
+    assert third["status"]=="source_matched_third_normandy_optin_native_runtime_and_package_comparison_passed"
+    assert third["source_commit"]=="ad0dea4a317cfe5f22213f6dc778366c6dc042d0"
+    assert (third["lean_native_run_id"],third["independent_candidate_runtime_run_id"],
+            third["matched_full_native_comparison_run_id"],third["evidence_artifact_id"]) == (
+                40954395174,40976502356,40976632873,12943929109)
+    assert (third["full_compressed_bytes"],third["lean_compressed_bytes"],
+            third["signed_observed_compressed_reduction_bytes"]) == (87151648,87134296,17352)
+    assert third["full_compressed_bytes"]-third["lean_compressed_bytes"] == third["signed_observed_compressed_reduction_bytes"]
+    assert (third["full_regular_logical_bytes"],third["lean_regular_logical_bytes"]) == (339566140,339456251)
+    assert third["observed_reduction_percent_rounded"] == 0.02
+    assert third["full_archive_sha256"]=="ce033a97e72a673d6f174e82ba93a163ac39b8357428b5261c07da6b76376980"
+    assert third["lean_archive_sha256"]=="ca8f3495da6122dec7a7715459534605da7d9270375b3114c4c7bf06cfeff729"
+    assert third["earlier_independent_pairs_signed_observed_deltas_bytes"] == [27620,15752]
+    for flag in ("source_and_protected_non_omission_flags_matched","native_full_and_lean_builds_passed",
+                 "independent_real_browser_runtime_passed","normandy_runner_absent_only_in_lean",
+                 "shared_nimbus_helpers_preserved","default_browser_unchanged"):
+        assert third[flag] is True,flag
+    for flag in ("three_experiments_same_source","constant_or_intrinsic_component_savings_proven",
+                 "can_add_independent_trial_savings","general_feature_dependency_coverage_complete",
+                 "additional_source_deletion_authorized","new_m3_gate_credit"):
+        assert third[flag] is False,flag
+    assert third["documentation"]=="docs/vulpra/M3-NORMANDY-NATIVE-RECHECK-20261030.md"
+
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -442,6 +466,13 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(new_whole_m3_roadmap_gate_passed=True),
         lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(constant_component_compressed_savings_proven=True),
         lambda a,b,c:a["accepted_normandy_second_matched_native_recheck"].update(can_add_these_two_experiments_savings=True),
+        lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(new_m3_gate_credit=True),
+        lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(three_experiments_same_source=True),
+        lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(signed_observed_compressed_reduction_bytes=27620),
+        lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(full_compressed_bytes=87151647),
+        lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(independent_real_browser_runtime_passed=False),
+        lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(general_feature_dependency_coverage_complete=True),
+        lambda a,b,c:a["accepted_normandy_third_matched_native_recheck"].update(can_add_independent_trial_savings=True),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
