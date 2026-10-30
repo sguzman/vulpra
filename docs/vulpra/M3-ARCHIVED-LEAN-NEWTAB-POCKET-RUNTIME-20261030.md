@@ -146,3 +146,51 @@ were tested. A suitable downloadable full-Normandy normal browser
 artifact has not been verified for this specific cross-check.
 No source deletion, compressed-size saving, privacy guarantee or broad
 M3 gate credit follows. **M3 2/6 (33%), overall 44%, Δ0 pp.**
+
+## Original historical full-versus-lean native comparison (2026-10-30 UTC)
+
+[Paired real browser CI 40996685167](https://github.com/sguzman/vulpra/actions/runs/40996685167)
+**PASSED** with artifact **12951213932**,
+[regression of the later archived lean browser
+40996685005](https://github.com/sguzman/vulpra/actions/runs/40996685005)
+**PASSED** (artifact **12951706716**), and
+[workflow lint 40996684989](https://github.com/sguzman/vulpra/actions/runs/40996684989)
+**PASSED**. Implementation commit
+[`9cb22b0`](https://github.com/sguzman/vulpra/commit/9cb22b02f95ff1ff008b3f33f191b6ba9626ec64).
+
+This test reused **two originally independent native Linux builds from the
+exact same older source**
+`674db8e385c36aec23e78bbe059b2a1fec194fae`:
+normal full-Normandy [40431769117](https://github.com/sguzman/vulpra/actions/runs/40431769117)
+and opt-in Normandy-free [40431768974](https://github.com/sguzman/vulpra/actions/runs/40431768974).
+The already established successful original runtime
+[40439671494](https://github.com/sguzman/vulpra/actions/runs/40439671494)
+was required. Metadata, source identity, SHA-256 sidecars, tar sizes and
+physical `omni.ja` Normandy runner presence/absence were verified before
+execution. Full-normal tar.xz **86,937,548 B**, sha256
+`47c8ac5ce90747c051eac8daf24544d88767fdeb989293c0b50c5e8ac9e53c30`;
+lean tar.xz **86,909,928 B**. The runner exists only in full.
+
+The refactored common read-only test ran on **both actual extracted native
+browser executables**, with separate disposable HOME/profile, nonlocal Gecko
+connections disabled, `about:newtab` loaded, and full/lean variant
+identity preserved separately. **26/26 protected packaged-method/factory
+assertions passed for each variant** and their 26 boolean maps were equal.
+The live test exercised the real shipped legacy TopStories method and modern
+DiscoveryStream getters through *inert preference/store/initialization
+hooks* rather than fetching real stories. The previously successful newer
+Normandy-free browser continued to pass the same 26 checks.
+
+**Important source boundary:** the two original binaries are
+**source-matched to each other**, but **NOT to current main**. Among six
+previously audited New Tab source blobs, `TopStoriesFeed.sys.mjs`
+and `browser/extensions/newtab/moz.build` were identical to current main;
+`ActivityStream.sys.mjs`, `DiscoveryStreamFeed.sys.mjs`,
+`addon-jar.mn` and `AdBanner.jsx` differed. This paired test proves
+only that the selected behavior passed in the original historical pair,
+not that current-main full Normandy or all newer sponsored/UI behavior is
+source-equivalent. No network story recovery, actual user accounts,
+sign-in, production feed initialization, causal package saving, browser
+source deletion or a new full M3 gate is established.
+
+**Progress remains M3 2/6 (33%), overall 44%; Δ0 pp.**
