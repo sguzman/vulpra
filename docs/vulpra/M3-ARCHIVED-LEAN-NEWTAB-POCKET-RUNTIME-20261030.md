@@ -74,6 +74,40 @@ Top Sites/prefs map. The final test explicitly and reversibly checks
 **both** source-supported map branches. Neither preliminary failure was
 accepted as native runtime evidence.
 
+## Modern Discovery Stream fallback and opt-out getter runtime (follow-up)
+
+[Expanded native CI 40989926138](https://github.com/sguzman/vulpra/actions/runs/40989926138)
+**PASSED** at test/workflow commit `320abb31a2a044c027ee2e494e21bae424cfa1a5`,
+with original **identical** checksum-pinned candidate binary and six protected
+New Tab source blobs. Evidence artifact **12948896162**:
+`m3-archived-lean-pocket-native-registration-smoke`.
+[Workflow lint 40989926148](https://github.com/sguzman/vulpra/actions/runs/40989926148) also passed.
+The native positive assertions rose from **14 to 22**; the original 14
+legacy/registration checks remain required, and the eight additional checks
+invoke **actual packaged `DiscoveryStreamFeed` getter/method code** with
+inert constructed objects instead of instantiating a live feed.
+
+- Valid JSON configuration with system-enable preference retains enabled state
+  and expected ordinary layout property.
+- System-enable preference off disables an otherwise enabled configuration.
+- Explicit disabled JSON configuration stays disabled even with system pref on.
+- Malformed JSON takes the shipped empty-config error fallback.
+- A cached parsed config is reused without re-reading a deliberately throwing
+  store, verifying the tested cache fast path.
+- `showSponsoredStories` requires both user and system sponsorship preferences;
+  either opt-out disables it.
+- `showStories` respects system Top Stories disablement in the checked
+  user-enabled branch.
+- `onPocketExperimentUpdated` ignores load-only experiment/rollout notices,
+  but invokes the stub change hook for a subsequent feature update.
+
+This is a **controlled, real-packaged-method** test with a private profile and
+no requested content fetch, store dispatch or remote sponsored data. It does
+**not** test a live `DiscoveryStreamFeed` instance, all `showStories` override
+cases, real recommendation failure recovery, full production-context browser
+behavior or current-main compiled source equivalence. No source removal,
+package saving, completed broad M3 gate or opt-out privacy guarantee follows.
+
 **Limits:** This is proof of retained native packaged module imports
 and registration/factory maps in a Normandy-free opt-in build, **not**
 a successful signed-in user path, live Pocket recommendation network
