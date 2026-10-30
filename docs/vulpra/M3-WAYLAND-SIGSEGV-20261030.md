@@ -43,6 +43,23 @@ The unchanged, SHA-256-pinned original native archive has now been exercised in 
 
 **Interpretation:** A reproducible SIGSEGV in the original Ubuntu CI launch **is not inevitable for the original native binary**: the same checksum-pinned executable can pass real graphical frame and liveness checks in a different isolated environment. This is a diagnostic clue, not a resolved root cause, not a claim about the user's Arch/Hyprland workstation and not the complete M3 feature/build/ABI map. M3 remains **5/6 (83%)**, overall **61%**, session progress **+0 pp**.
 
+## Controlled launch-context matrix: namespace boundary confirmed
+
+[Initial matrix 41135404840](https://github.com/sguzman/vulpra/actions/runs/41135404840) and [independent shared-helper replay 41135492848](https://github.com/sguzman/vulpra/actions/runs/41135492848) both executed **the exact same SHA-256-pinned original native package, same 10-second frame/liveness contract and fresh disposable profiles** on Ubuntu 24.04.
+
+| Launch context | Initial | Repeat |
+| --- | --- | --- |
+| Ordinary GitHub runner, nonlocal connections disabled | **FAIL**, native exit 11 | **FAIL**, native exit 11 |
+| Scrubbed inherited variables, same UID/host network | **FAIL**, native exit 11 | **FAIL**, native exit 11 |
+| `runuser` under host network, restricted connections | **FAIL**, native exit 11 | **FAIL**, native exit 11 |
+| `runuser` in loopback-only network namespace, restricted connections | **PASS**, real 10s Weston check | **PASS**, real 10s Weston check |
+
+The source contract and archive are unchanged; the successful combination requires an isolated Linux network namespace. Environment scrubbing and changing the launch user **alone are insufficient**. This points to a network-namespace-related runtime condition but **does not prove** which network interface, route, notification or kernel-state difference is causal. The independent controlled `ci/m3-wayland-netns-launch.sh` refuses namespaces with additional interfaces or routes. [Workflow lint 41135492709](https://github.com/sguzman/vulpra/actions/runs/41135492709) **PASS**; network namespace [41135492695](https://github.com/sguzman/vulpra/actions/runs/41135492695) **PASS**.
+
+A further [disconnected-interface topology test](https://github.com/sguzman/vulpra/actions/workflows/m3-wayland-private-network-topology.yml) compares loopback down, loopback up, and a synthetic dummy interface without host or internet access. **That test's outcome must be checked separately before assigning a cause.**
+
+**Acceptance remains open:** the original ordinary-runner compiled browser still crashes. The network-namespace pass is a real native graphical result in a special test environment, not acceptance for the target Arch/Hyprland workstation and not a completed feature/build/binary dependency graph. M3 **5/6 (83%)**, overall **61%**, round **Δ0 pp**.
+
 ## Next acceptance work
 
 1. Recover source-matched native debug symbols or a dedicated symbolized diagnostic build, then identify the crashing libxul function and validate a real fix; retain sandboxing and profile protection.
