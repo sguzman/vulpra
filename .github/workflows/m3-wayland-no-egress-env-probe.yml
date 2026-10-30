@@ -64,11 +64,16 @@ jobs:
           # Preserve all runtime constraints and run unprivileged. Root is
           # used ONLY to create the empty network namespace; no host firewall
           # changes, no host private profiles, no network calls.
+          netns_unshare() {
+            # The non-root caller owns the redirected private diagnostic log;
+            # sudo only creates an isolated network namespace.
+            sudo unshare "$@"
+          }
           run_probe() {
             local label="$1"
             local env_mode="$2"
             local status=0
-            if sudo unshare --net -- bash -c '
+            if netns_unshare --net -- bash -c '
               set -euo pipefail
               if ip -4 route show default | grep -q . ||
                  ip -6 route show default | grep -q .; then
