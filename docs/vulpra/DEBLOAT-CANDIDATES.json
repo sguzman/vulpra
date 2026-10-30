@@ -882,7 +882,7 @@
     },
     {
       "id": "browser_genai",
-      "decision": "retain_pending_external_consumers",
+      "decision": "retain_verified_external_consumers_review_individual_optional_assets",
       "surface": "runtime_bundled",
       "paths": [
         "browser/components/genai/"
@@ -895,7 +895,7 @@
         "browser/components/genai/moz.build: MOZ_SRC_FILES GenAI, page/link preview, actors",
         "browser/components/moz.build unconditionally lists genai; browser/components/BrowserComponents.manifest has unguarded delayed startup LinkPreview.init; browser/components/genai/moz.build bundles GenAI, link preview, PageAssist and actors"
       ],
-      "next": "Target narrow optional GenAI promotional assets only after consumer-level import/registration guards are mapped. No whole-directory GenAI deletion. Required: isolated opt-in native build, full live runtime acceptance and matched source/config package byte reduction.",
+      "next": "Retain shared GenAI root. Separately scope optional promotional asset candidates only after explicit caller reachability, isolated opt-in guards, compiled native fallback/actor tests and source-matched package evidence. No blanket GenAI removal.",
       "audit_ci": "https://github.com/sguzman/vulpra/actions/workflows/m3-genai-reference-audit.yml",
       "removal_accepted": false,
       "audit_result": {
@@ -921,9 +921,9 @@
         "interpretation": "Literal reference scan only. Unconditional startup registration plus external actor/sidebar/preference callers block whole-directory deletion; no packaged size benefit or native removal has been demonstrated."
       },
       "m3_strategy": {
-        "strategy": "review",
+        "strategy": "keep",
         "scope": "GenAI source modules and cross-feature consumers pending complete caller audit",
-        "safety_and_fallback": "Cannot remove whole GenAI root before external consumers and fallback tests.",
+        "safety_and_fallback": "Retain shared GenAI root: startup, actor, preferences, sidebar, enterprise policy and Nimbus source callers plus nine real native module imports rely on its packaged functionality. Narrow optional removals require separate fallback and native tests.",
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
         "requires_further_source_or_runtime_verification": true,
@@ -1859,16 +1859,16 @@
     "next": "Obtain exact-source native linker map/symbol/section allocation and generated build/config values before crediting any compile-time removal; no disassembly or link graph completed by archive-level member census."
   },
   "m3_decision_classification": {
-    "state": "twenty_scoped_candidates_classified; AIWindow offline seed and Hungarian CSS language patterns protected by real packaged browser behavior, three review scopes remain",
+    "state": "twenty_scoped_candidates_classified; GenAI shared root retained after source/native evidence; source_testing and newtab_and_messaging remain review scopes",
     "as_of": "2026-10-29",
     "total_candidates": 20,
     "complete_feature_dependency_inventory": false,
     "complete_candidate_fallback_validation": false,
     "whole_m3_gate_passed": false,
     "categories": {
-      "keep": 10,
+      "keep": 11,
       "remove_source": 4,
-      "review": 3,
+      "review": 2,
       "conditional_compile": 3
     },
     "method": "Per-candidate scoped safety class, preserve prior immutable evidence; remove_source means bounded historical source deletions already accepted, conditional_compile means guarded opt-in native/bundle omission only, keep protects functional/security/privacy dependencies, review means insufficient caller graph.",
@@ -2671,9 +2671,9 @@
     "policy_workflow_lint_ci_run_id": 41080217307,
     "classified_candidate_count": 20,
     "candidate_strategy_counts": {
-      "keep": 10,
+      "keep": 11,
       "remove_source": 4,
-      "review": 3,
+      "review": 2,
       "conditional_compile": 3
     },
     "unsafe_candidate_policy_mutations_rejected": 32,
