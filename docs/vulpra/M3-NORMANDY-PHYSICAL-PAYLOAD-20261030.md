@@ -27,6 +27,30 @@ archive deltas (**15,752** and **17,352 B**). This is a repeatable
 **observed net logical-size difference**, not a demonstration that those
 bytes belong exclusively to one recipe-runner file.
 
+## Independent reconciliation across three source revisions
+
+[Three-pair variance CI 40983703521](https://github.com/sguzman/vulpra/actions/runs/40983703521)
+**PASSED**, artifact **12945423159**. It downloaded only
+the original checksum-bearing machine reports of source-matched comparisons
+[40439793884](https://github.com/sguzman/vulpra/actions/runs/40439793884),
+[40968688858](https://github.com/sguzman/vulpra/actions/runs/40968688858)
+and [40976632873](https://github.com/sguzman/vulpra/actions/runs/40976632873),
+not more full browser binaries. The workflow authenticated the
+original three native candidates and independent runtime acceptances.
+Ten falsification fixtures guard report source identity, SHA-256 fields,
+arithmetic, percentages and other invalid claims.
+
+| Source-matched pair | Signed observed compressed B | Signed net regular logical B |
+| --- | ---: | ---: |
+| `674db8e385c3` | 27,620 | 109,889 |
+| `034ddd665a08` | 15,752 | 109,889 |
+| `ad0dea4a317c` | 17,352 | 109,889 |
+
+The **regular-file net logical difference is identical in these three
+independent source revisions**, but the compressed archive difference
+is *not invariant*. Neither this report nor the physical payload audit
+isolates all causal recipe-runner bytes or measures future builds.
+
 ## SHA-256 physical file census
 
 - **47 regular files or links with matching paths** in both packages:
