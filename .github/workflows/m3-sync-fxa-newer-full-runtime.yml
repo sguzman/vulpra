@@ -137,6 +137,31 @@ jobs:
              .source_removal_authorized == false' \
             ".git/vulpra-native-build/m3-sync-fxa-archive-runtime.json" >/dev/null
           echo "PASS: packaged normal Vulpra protected module import and fresh account state"
+      - name: Attach immutable newer compiled-source provenance to bounded report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(".git/vulpra-native-build/m3-sync-fxa-archive-runtime.json")
+          d=json.loads(p.read_text())
+          assert d["schema_version"]==1
+          assert d["status"]=="historical_normal_native_sync_fxa_module_smoke_passed"
+          assert len(d["modules_verified"])==8 and all(d["modules_verified"].values())
+          assert d["archive_sha256_verified"] is True
+          assert d["account_credentials_or_user_profile_provided"] is False
+          assert d["any_login_or_remote_sync_attempted_by_probe"] is False
+          assert d["actual_sync_upload_or_account_login_proven"] is False
+          d["native_compiled_source_commit"]=os.environ["ARCHIVE_SOURCE_SHA"]
+          d["native_full_archive_sha256"]=os.environ["ARCHIVE_SHA256"]
+          d["original_full_native_build_run_id"]=40997075527
+          d["source_pinned_newer_full_normal_native_binary"]=True
+          d["future_main_head_binary_proven"]=False
+          d["report_name_retains_original_historical_harness_status"]=True
+          p.write_text(json.dumps(d,indent=2))
+          print("PASS: eight source-pinned normal Sync/FxAccounts native API checks")
+          PY
       - name: Preserve only redacted source/real browser API results
         if: always()
         uses: actions/upload-artifact@v4
