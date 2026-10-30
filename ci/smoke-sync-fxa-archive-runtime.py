@@ -76,7 +76,7 @@ const done=arguments[arguments.length-1];
 
     result.last_module="accounts_glue";
     const {AccountsGlue}=ChromeUtils.importESModule(
-      "resource:///modules/AccountsGlue.sys.mjs");
+      "moz-src:///browser/components/AccountsGlue.sys.mjs");
     result.accounts_glue_module = !!AccountsGlue &&
       typeof AccountsGlue.init === "function" &&
       typeof AccountsGlue.observe === "function";
