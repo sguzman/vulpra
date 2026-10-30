@@ -1,0 +1,59 @@
+# Exact-source bounded relationship guard, no browser compilation or deletion.
+name: M3 Protect New Tab ASRouter Message Bridge
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-newtab-messaging-bridge-contract.yml
+      - ci/m3-newtab-messaging-bridge-contract.sh
+      - browser/components/moz.build
+      - browser/components/newtab/**
+      - browser/components/asrouter/**
+      - browser/components/BrowserComponents.manifest
+      - browser/components/BrowserGlue.sys.mjs
+      - browser/extensions/newtab/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-source-messaging-bridge:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout test script and source-root marker
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          fetch-depth: 1
+          sparse-checkout: |
+            ci
+            mach
+      - name: Audit 34 true source anchors and reject 34 broken relations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-newtab-messaging-bridge-contract.sh
+          bash ci/m3-newtab-messaging-bridge-contract.sh \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/m3-newtab-messaging-bridge.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            '.schema_version==1 and .source_commit==$sha and
+             .candidate=="newtab_and_messaging" and
+             .protected_source_relationship_count==34 and
+             .deliberately_missing_anchor_mutations_rejected==34 and
+             .asrouter_newtab_bridge_preserved_by_source==true and
+             .tested_native_binary_here==false and
+             .complete_dynamic_dependency_map==false and
+             .no_source_or_binary_modified==true and
+             .source_removal_authorized==false and
+             .new_binary_savings_bytes==null and .whole_m3_gate_advanced==false' \
+            "$RUNNER_TEMP/m3-newtab-messaging-bridge.json" >/dev/null
+      - name: Preserve bounded non-sensitive source relationships
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-newtab-asrouter-source-bridge
+          path: ${{ runner.temp }}/m3-newtab-messaging-bridge.json
+          if-no-files-found: warn
+          retention-days: 14
