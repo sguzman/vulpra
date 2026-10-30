@@ -82,7 +82,7 @@ jobs:
           # Opt-in loader variable is passed to the browser ONLY by the
           # unmodified test harness, not to Weston, runuser, or the parser.
           if sudo unshare --net -- bash ci/m3-wayland-netns-launch.sh \
-            "$user" "$harness" "$app" enabled "$trace_dir/loader" \
+            "$user" "$harness" "$app" enabled "$trace_dir/m3-loader" \
             >"$trace_dir/traced.log" 2>&1; then
             echo 'PASS: real private Weston surface attach/commit survived traced ten-second native workload'
           else
