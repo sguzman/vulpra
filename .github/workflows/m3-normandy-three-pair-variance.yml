@@ -88,7 +88,7 @@ jobs:
              .per_pair_reported_archive_sha256_unique == true and
              .causal_compiled_or_feature_savings_proven == false and
              .independent_build_archive_reproducibility_proven == false and
-             .three_trails_additive == false and
+             .three_trials_additive == false and
              .native_browser_or_package_executed_by_reconciliation == false and
              .new_source_removal_authorized == false and
              .whole_m3_gate_passed == false' \
