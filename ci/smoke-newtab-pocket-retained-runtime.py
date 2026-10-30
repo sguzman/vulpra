@@ -8,13 +8,16 @@ No recommendation fetches, login or real user profile are requested.
 """
 from __future__ import annotations
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
+import zipfile
 
 ROOT=Path(__file__).resolve().parent
 spec=importlib.util.spec_from_file_location("vulpra_pocket_webdriver",
@@ -215,6 +218,38 @@ CHECKS=(
   "modern_experiment_notifications_guarded"
 )
 
+REQUIRED_ARCHIVED_NEWTAB=(
+    "newtab/lib/ActivityStream.sys.mjs",
+    "newtab/lib/TopStoriesFeed.sys.mjs",
+    "newtab/lib/DiscoveryStreamFeed.sys.mjs",
+)
+NORMANDY_RUNNER="res/normandy/Normandy.sys.mjs"
+
+def verify_physical_variant(archive:Path,variant:str):
+    """Do not infer feature presence from the caller's variant label."""
+    if variant not in ("full-normandy","normandy-free"):
+        raise ValueError("Unknown Normandy variant")
+    entries=set()
+    jars=0
+    with tarfile.open(archive,"r:xz") as bundle:
+        for member in bundle:
+            if member.isfile() and member.name.endswith("/omni.ja"):
+                jars+=1
+                fp=bundle.extractfile(member)
+                if fp is None:
+                    raise ValueError("Missing physical omni.ja archive")
+                with zipfile.ZipFile(io.BytesIO(fp.read())) as jar:
+                    entries.update(jar.namelist())
+    if jars < 2:
+        raise ValueError("Missing browser/toolkit omni.ja archives")
+    for item in REQUIRED_ARCHIVED_NEWTAB:
+        if not any(name.endswith(item) for name in entries):
+            raise ValueError("Missing physically packaged New Tab module: "+item)
+    present=any(name.endswith(NORMANDY_RUNNER) for name in entries)
+    if present != (variant=="full-normandy"):
+        raise ValueError("Normandy runner's physical presence contradicts variant")
+    return present
+
 def validate(page,registration):
     if not isinstance(page,dict) or not page.get("document") or (
         not isinstance(page.get("url"),str) or
@@ -233,6 +268,7 @@ def run(repo:Path,driver:str,variant="normandy-free"):
     if variant not in ("normandy-free","full-normandy"):
         raise ValueError("Unrecognized audited native browser variant")
     archive=webdriver.verified_archive(repo)
+    actual_normandy=verify_physical_variant(archive,variant)
     with tempfile.TemporaryDirectory(prefix="vulpra-m3-newtab-fallback-") as tmp:
         root=Path(tmp)
         dest=root/"app"
@@ -299,7 +335,7 @@ def run(repo:Path,driver:str,variant="normandy-free"):
                   "verified_archive_sha256":True,
                   "private_browser_profile_verified":True,
                   "gecko_nonlocal_connection_guard_enabled":True,
-                  "full_default_normandy_runner_present":variant=="full-normandy",
+                  "full_default_normandy_runner_present":actual_normandy,
                   "protected_newtab_factories_and_registry":checked,
                   "newtab_document_loaded":True,
                   "pocket_recommendation_data_downloaded_by_probe":False,
@@ -353,7 +389,38 @@ def main():
             try:validate(wrong,good)
             except ValueError:pass
             else:raise AssertionError("False packaged New Tab document accepted")
-        print("PASS:",len(CHECKS)+2,"New Tab fake-fallback/registration fixtures")
+        # A separate synthetic archive proves the real package scanner
+        # rejects mislabeled variants and omitted mandatory New Tab resources.
+        for include_normandy in (False,True):
+            with tempfile.TemporaryDirectory(prefix="vulpra-m3-paired-archive-fixture-") as tmp:
+                archive=Path(tmp)/"fake.tar.xz"
+                def make(omit_module=False):
+                    buffer=io.BytesIO()
+                    with zipfile.ZipFile(buffer,"w") as jar:
+                        for name in REQUIRED_ARCHIVED_NEWTAB:
+                            if omit_module and name==REQUIRED_ARCHIVED_NEWTAB[0]:
+                                continue
+                            jar.writestr(name,"export const present = true;")
+                        if include_normandy:
+                            jar.writestr(NORMANDY_RUNNER,"export const oldRunner = true;")
+                    content=buffer.getvalue()
+                    with tarfile.open(archive,"w:xz") as tar:
+                        for place in ("vulpra/omni.ja","vulpra/browser/omni.ja"):
+                            info=tarfile.TarInfo(place)
+                            info.size=len(content)
+                            tar.addfile(info,io.BytesIO(content))
+                make()
+                variant="full-normandy" if include_normandy else "normandy-free"
+                assert verify_physical_variant(archive,variant) is include_normandy
+                wrong="normandy-free" if include_normandy else "full-normandy"
+                try:verify_physical_variant(archive,wrong)
+                except ValueError:pass
+                else:raise AssertionError("False source variant accepted")
+                make(omit_module=True)
+                try:verify_physical_variant(archive,variant)
+                except ValueError:pass
+                else:raise AssertionError("Missing New Tab module accepted")
+        print("PASS:",len(CHECKS)+8,"New Tab fixtures plus physical full/lean negative checks")
         return
     driver=shutil.which("geckodriver")
     if not driver:raise RuntimeError("Need installed geckodriver; cannot fake native test")
