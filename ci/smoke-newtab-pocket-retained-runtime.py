@@ -46,8 +46,42 @@ try {
   if (hadUserValue) Services.prefs.setBoolPref(gate,previous);
   else Services.prefs.clearUserPref(gate);
 }
+// Call the *actual shipped TopStoriesFeed method* with a deliberately
+// inert object. Its init/properties hooks are counters, never network fetches.
+const makeFake = (loaded=false) => ({
+  storiesLoaded:loaded,
+  propertiesInitialized:false,
+  discoveryStreamEnabled:null,
+  propertiesCalls:0,
+  initCalls:0,
+  store:{getState:()=>({Prefs:{values:new Proxy({}, {get:()=>false})}})},
+  initializeProperties(){this.propertiesInitialized=true;this.propertiesCalls++;},
+  init(){this.initCalls++;}
+});
+const broken=makeFake();
+TopStoriesFeed.prototype.lazyLoadTopStories.call(
+  broken,{dsPref:"{invalid",userPref:true});
+const disabled=makeFake();
+TopStoriesFeed.prototype.lazyLoadTopStories.call(
+  disabled,{dsPref:'{"enabled":false}',userPref:true});
+const loaded=makeFake(true);
+TopStoriesFeed.prototype.lazyLoadTopStories.call(
+  loaded,{dsPref:'{"enabled":false}',userPref:true});
+const userOff=makeFake();
+TopStoriesFeed.prototype.lazyLoadTopStories.call(
+  userOff,{dsPref:'{"enabled":false}',userPref:false});
 return {
   mode: "retained_full_newtab_in_optin_normandy_free_browser",
+  legacy_malformed_config_stubbed_init:
+    broken.discoveryStreamEnabled===false &&
+    broken.propertiesCalls===1 && broken.initCalls===1,
+  legacy_disabled_config_stubbed_init:
+    disabled.discoveryStreamEnabled===false &&
+    disabled.propertiesCalls===1 && disabled.initCalls===1,
+  legacy_stories_already_loaded_skip:
+    loaded.propertiesCalls===0 && loaded.initCalls===0,
+  legacy_user_pref_disabled_skip:
+    userOff.propertiesCalls===0 && userOff.initCalls===0,
   legacy_registered:keys.includes("feeds.system.topstories"),
   modern_registered:keys.includes("feeds.discoverystreamfeed"),
   top_sites_registered:keys.includes("feeds.system.topsites"),
@@ -70,6 +104,9 @@ CHECKS=(
   "preferences_registered","sponsored_adsfeed_retained",
   "legacy_factory_export","modern_factory_export",
   "newtab_adsfeed_omission_disabled","testing_minimal_feed_map",
+  "legacy_malformed_config_stubbed_init",
+  "legacy_disabled_config_stubbed_init",
+  "legacy_stories_already_loaded_skip","legacy_user_pref_disabled_skip",
   "no_feed_initialized_or_fetched_by_probe"
 )
 
@@ -157,6 +194,7 @@ def run(repo:Path,driver:str):
                   "newtab_document_loaded":True,
                   "pocket_recommendation_data_downloaded_by_probe":False,
                   "actual_legacy_fallback_invoked":False,
+                  "real_shipped_legacy_method_exercised_with_inert_side_effect_hooks":True,
                   "actual_modern_content_fetch_invoked":False,
                   "runtime_signed_in_user_data_used":False,
                   "complete_current_head_native_binary_proven":False,
@@ -165,7 +203,7 @@ def run(repo:Path,driver:str):
                   "limitations":[
                     "Actual compiled opt-in Normandy-free browser, not a normal full-Normandy archive.",
                     "Proves packaged feed factory/registration and about:newtab document, not live Pocket recommendations.",
-                    "Does not activate the legacy DiscoveryStream-disabled fallback or remote sponsored sources.",
+                    "Legacy TopStoriesFeed method is executed with inert stub hooks; not a real feed instance or remote stories fetch.",
                     "No native source deletion, caller graph closure, cloud network or repeatable package savings.",
                   ]
                 }
