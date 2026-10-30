@@ -68,7 +68,15 @@ def inspect(path:Path) -> dict:
         for index,member in enumerate(tf,1):
             if index>MAX_ITEMS:
                 raise ValueError("Native archive exceeds member bounds")
-            name=safe_name(member.name)
+            if member.isdir() and member.name in (".", "./"):
+                # GNU tar may include a harmless root directory header.
+                continue
+            try:
+                name=safe_name(member.name)
+            except ValueError as exc:
+                raise ValueError(
+                    "Unsafe tar member "+repr(member.name)+": "+str(exc)
+                ) from exc
             if name in seen:
                 raise ValueError("Duplicate native archive member path")
             seen.add(name)
@@ -111,7 +119,12 @@ def inspect(path:Path) -> dict:
                 continue
             if member.issym() or member.islnk():
                 # Metadata comparison only; never follow archive link targets.
-                link=safe_name(member.linkname)
+                # Never follow this target, only preserve literal metadata.
+                # Relative links containing '..' are legitimate in packaged
+                # Linux software but would be unsafe to *extract* blindly.
+                link=member.linkname
+                if not isinstance(link,str) or len(link)>600 or "\0" in link:
+                    raise ValueError("Unsafe link metadata for "+repr(name))
                 regular[name]={"kind":"link","target":link,"hardlink":bool(member.islnk())}
                 continue
             raise ValueError("Unsupported special archive entry")
