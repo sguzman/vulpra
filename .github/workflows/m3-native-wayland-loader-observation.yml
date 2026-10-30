@@ -1,0 +1,124 @@
+# Execute the original SHA-256-pinned full-normal Vulpra in a real private
+# Weston Wayland compositor and compare actual loader init names.
+# No user profile, network calls, source deletion or full graph closure.
+name: M3 Actual Wayland Native Loader Observation
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-wayland-loader-observation.yml
+      - ci/m3-native-loader-runtime-observation.py
+      - packaging/test-wayland.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  privately-committed-wayland-frame-and-loader:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout exact current test harness and source-safe loader parser
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+            packaging
+      - name: Reject fake loader reports and authenticate native compilation source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n packaging/test-wayland.sh
+          python3 -m py_compile ci/m3-native-loader-runtime-observation.py
+          python3 ci/m3-native-loader-runtime-observation.py --self-test
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg source "$SOURCE_SHA" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$source' >/dev/null
+      - name: Authenticate exact full-Normandy compiled Linux archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/native"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/native"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          python3 - <<'PY'
+          import os,json,hashlib
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"native"
+          archive=root/"full-normandy-baseline.tar.xz"
+          m=json.loads((root/"m3-full-normandy-baseline.json").read_text())
+          assert m["schema_version"]==1
+          assert m["source_commit"]==os.environ["SOURCE_SHA"]
+          assert m["sha256"]==os.environ["ARCHIVE_SHA256"]==hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert m["variant"]=="full-normandy" and m["normandy_runner_present"] is True
+          assert m["required_newtab_modules_present"] is True
+          assert archive.stat().st_size==m["compressed_bytes"]==87154544
+          print("PASS: exact source and real original native package identity")
+          PY
+          mkdir -p "$RUNNER_TEMP/extracted"
+          tar -xf "$RUNNER_TEMP/native/full-normandy-baseline.tar.xz" \
+            -C "$RUNNER_TEMP/extracted"
+          test -f "$RUNNER_TEMP/extracted/vulpra/application.ini"
+      - name: Install private Wayland compositor and native GTK runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends weston wayland-utils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+      - name: Render and commit an actual Wayland frame while tracing native loader
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/loader"
+          env LD_DEBUG=libs,files LD_DEBUG_OUTPUT="$RUNNER_TEMP/loader/m3-loader" \
+            MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            VULPRA_WAYLAND_TEST_SECONDS=10 \
+            bash packaging/test-wayland.sh "$RUNNER_TEMP/extracted/vulpra"
+          python3 ci/m3-native-loader-runtime-observation.py \
+            "$RUNNER_TEMP/loader" --workload private_weston_wayland \
+            --output "$RUNNER_TEMP/m3-wayland-native-loader-observed.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="actual_native_full_normal_loader_observation" and
+            .observed_workload_mode=="private_weston_wayland" and
+            .real_native_wayland_surface_commit_passed==true and
+            .real_native_webdriver_workload_passed==false and
+            .browser_process_traces_with_libxul>=1 and
+            .observed_loader_init_library_basename_count>=3 and
+            .libxul_requested_in_real_browser_process==true and
+            .libc_loader_init_observed==true and
+            .raw_loader_traces_retained==false and
+            .complete_dlopen_graph_proven==false and
+            .unexecuted_feature_routes_proven==false and
+            .complete_dynamic_symbol_and_ABI_resolution_proven==false and
+            .current_main_browser_recompiled==false and
+            .new_source_removal_authorized==false and
+            .new_compressed_savings_bytes==null and
+            .whole_m3_feature_dependency_gate_completed==false' \
+            "$RUNNER_TEMP/m3-wayland-native-loader-observed.json" >/dev/null
+          rm -rf -- "$RUNNER_TEMP/loader"
+          echo 'PASS: real Wayland compositor frame + sanitized native loader'
+      - name: Preserve only sanitized current workload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-private-weston-wayland-loader-observed
+          path: ${{ runner.temp }}/m3-wayland-native-loader-observed.json
+          if-no-files-found: warn
+          retention-days: 14
