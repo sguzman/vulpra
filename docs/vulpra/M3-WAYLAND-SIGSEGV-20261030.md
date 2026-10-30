@@ -32,6 +32,17 @@ In [CI 41133073378](https://github.com/sguzman/vulpra/actions/runs/41133073378),
 
 Independent checks passed on the committed fixture revision: [workflow lint 41133467638](https://github.com/sguzman/vulpra/actions/runs/41133467638), [candidate boundaries 41133467616](https://github.com/sguzman/vulpra/actions/runs/41133467616), [source/build safety 41133467607](https://github.com/sguzman/vulpra/actions/runs/41133467607). M3 **5/6 (83%)**, overall **61%**, delta **+0 percentage points**.
 
+## Controlled environment comparisons (2026-10-30)
+
+The unchanged, SHA-256-pinned original native archive has now been exercised in two independently constrained settings, without changing Firefox source or the user's installed profile.
+
+- [Historical/current harness A/B 41134954781](https://github.com/sguzman/vulpra/actions/runs/41134954781): historical `b1482404` harness **FAIL** and current `main` harness **FAIL**, both using the exact same compiled archive and original 10-second private Weston contract on one Ubuntu runner. The only observed historical/current harness changes were opt-in loader environment injection and improved early-exit diagnostics. This does not establish a browser-engine regression or a successful native graphical run.
+- [Original empty-network-namespace probe 41135199262](https://github.com/sguzman/vulpra/actions/runs/41135199262): original archived browser **PASS** for the full 10-second private Weston contract under `sudo unshare --net`/unprivileged `runuser` with `MOZ_DISABLE_NONLOCAL_CONNECTIONS=1`; also **PASS** in the same namespace with the flag unset. Both probes have no default external network routes, disposable HOME/profiles and no changed browser binary.
+- [Independent namespace repeat 41135294175](https://github.com/sguzman/vulpra/actions/runs/41135294175): both network-namespace probes **PASS** again. These probes alter multiple conditions (namespace, launch through privilege drop and inherited environment), so the network flag cannot be identified as causal from these observations.
+- [Launch-context controlled matrix](https://github.com/sguzman/vulpra/actions/workflows/m3-wayland-launch-context-matrix.yml) now tests unmodified runner environment, scrubbed inherited variables, runuser on host networking and runuser inside a no-egress namespace using a common SHA-verified binary. **No matrix outcome is credited until actual CI has finished.**
+
+**Interpretation:** A reproducible SIGSEGV in the original Ubuntu CI launch **is not inevitable for the original native binary**: the same checksum-pinned executable can pass real graphical frame and liveness checks in a different isolated environment. This is a diagnostic clue, not a resolved root cause, not a claim about the user's Arch/Hyprland workstation and not the complete M3 feature/build/ABI map. M3 remains **5/6 (83%)**, overall **61%**, session progress **+0 pp**.
+
 ## Next acceptance work
 
 1. Recover source-matched native debug symbols or a dedicated symbolized diagnostic build, then identify the crashing libxul function and validate a real fix; retain sandboxing and profile protection.
