@@ -215,3 +215,28 @@ automatic post-build New Tab test must both finish successfully before
 the result may be credited. This is not an opt-in feature removal,
 causal size measurement, network recommendation fallback proof or entire
 M3 milestone gate. No user workstation/source browser modification.
+
+## Harness hardening: physical package variant cannot be faked
+
+[Commit bc3642c](https://github.com/sguzman/vulpra/commit/bc3642c85d617cd6d2f839f61d9d9ed47fb79649)
+moved a critical assertion into the common real packaged browser harness:
+before reporting a variant's result, it parses the verified native tar.xz
+and both browser/toolkit `omni.ja` archives, requires packaged
+`ActivityStream`, `TopStoriesFeed` and `DiscoveryStreamFeed`, and
+refuses a command-line full/lean label inconsistent with physical
+`res/normandy/Normandy.sys.mjs` presence. The result now reflects observed
+package content, rather than simply echoing the caller's option.
+Synthetic fixture archives deliberately omit a New Tab module or spoof
+the variant label; both cases are rejected.
+
+[Actual original full-versus-lean native CI 40997431443](https://github.com/sguzman/vulpra/actions/runs/40997431443)
+**PASSED**, evidence artifact **12951314579**, and
+[newer archived lean runtime CI 40997431383](https://github.com/sguzman/vulpra/actions/runs/40997431383)
+**PASSED**, artifact **12951598853**. In the original same-source pair
+both preserved all **26/26 protected method/factory checks** in the real
+headless browser, and in the newer lean browser all 26 checks also passed.
+This is evidence that the harness rejects wrong package identity while
+preserving its existing behavior; it does not prove live feeds, current
+full-normal compilation or whole milestone completion.
+
+**M3 2/6 (33%), overall 44%, Δ0 pp.**
