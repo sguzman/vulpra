@@ -88,7 +88,7 @@ def validate(candidate: dict, progress: dict) -> dict:
     m3 = next(x for x in progress["milestones"] if x["id"] == "M3")
     m4 = next(x for x in progress["milestones"] if x["id"] == "M4")
     gates = m3["acceptance_gates"]
-    assert gates["passed"] == 3 and gates["total"] == 6, "Unexpected M3 gates"
+    assert gates["passed"] == 4 and gates["total"] == 6, "Unexpected M3 gates"
     assert m3["percent"] == floor(100 * gates["passed"] / gates["total"])
     assert progress["overall"]["percent"] == floor(
         (m2["percent"] + m3["percent"] + m4["percent"]) / 3
