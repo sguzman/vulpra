@@ -141,12 +141,22 @@ jobs:
                       with zipfile.ZipFile(io.BytesIO(tf.extractfile(item).read())) as jar:
                           entries.update(jar.namelist())
           assert any(n.endswith("res/normandy/Normandy.sys.mjs") for n in entries)
+          # This full browser is intended to be replayed for real New Tab
+          # retained-feed tests; require physical packaged feed modules too.
+          required_newtab=(
+              "newtab/lib/ActivityStream.sys.mjs",
+              "newtab/lib/TopStoriesFeed.sys.mjs",
+              "newtab/lib/DiscoveryStreamFeed.sys.mjs",
+          )
+          for name in required_newtab:
+              assert any(p.endswith(name) for p in entries),name
           report={"schema_version":1,"source_commit":os.environ["CANDIDATE_SHA"],
                   "runner":"ubuntu-24.04","variant":"full-normandy",
                   "sha256":hashlib.sha256(archive.read_bytes()).hexdigest(),
                   "compressed_bytes":archive.stat().st_size,
                   "normandy_runner_present":True,
-                  "scope":"Baseline only; no savings accepted without source-pinned lean runtime"}
+                  "required_newtab_modules_present":True,
+                  "scope":"Baseline only; source-pinned New Tab runtime replay enabled, no new size savings"}
           (root/"m3-full-normandy-baseline.json").write_text(json.dumps(report,indent=2)+"\n")
           print(json.dumps(report,indent=2))
           PY

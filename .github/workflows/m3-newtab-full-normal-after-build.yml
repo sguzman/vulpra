@@ -1,0 +1,153 @@
+# Run only after an accepted full-Normandy native package is built.
+# All privileged New Tab tests use inert hooks and a disposable headless profile.
+name: M3 Full-Normandy Source-Pinned Native New Tab Runtime
+on:
+  workflow_run:
+    workflows: ["M3 Prebuild Source-Matched Full Normandy Baseline"]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verified-normal-native-newtab-factories:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      ORIGINAL_BUILD_RUN_ID: ${{ github.event.workflow_run.id }}
+      ORIGINAL_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+      MOZ_HEADLESS: '1'
+    steps:
+      - name: Checkout exact compiler source SHA for native-binary proof
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Validate immutable original-source scope and test safety fixtures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$ORIGINAL_SOURCE_COMMIT"
+          python3 -m py_compile ci/smoke-webextension-package-local.py             ci/smoke-newtab-pocket-retained-runtime.py
+          python3 ci/smoke-newtab-pocket-retained-runtime.py --self-test
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_BUILD_RUN_ID" |
+            jq -e --arg source "$ORIGINAL_SOURCE_COMMIT"               '.status == "completed" and .conclusion == "success" and .head_sha == $source' >/dev/null
+          python3 - <<'PY'
+          import subprocess
+          # Explicit scope; a future changed main source does not silently
+          # inherit acceptance from this exact older six-blob contract.
+          required={
+            "browser/extensions/newtab/lib/ActivityStream.sys.mjs":"e0b0eef5a3f4a9814888b60f5617d105db739454",
+            "browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs":"aa6239b92899d0ee3a0a57a6023d89109eb8829f",
+            "browser/extensions/newtab/lib/TopStoriesFeed.sys.mjs":"0bed6344ba11903efc06a31e98b7bf1737e68278",
+            "browser/extensions/newtab/moz.build":"9c9836ad4136dd4419ec56694c64176c4e9534a6",
+            "browser/extensions/newtab/addon-jar.mn":"6b3cce522bbff4ae6b3df3b1c44a771e64392c67",
+            "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx":"e1c3614ad411e764748edea5291d4dc92978dbf9",
+          }
+          for name,sha in required.items():
+              assert subprocess.check_output(["git","rev-parse","HEAD:"+name],text=True).strip()==sha,name
+          print("PASS: six current protected source blobs match native-build checkout")
+          PY
+      - name: Download successful full-Normandy browser package without compilation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/full"
+          gh run download "$ORIGINAL_BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY"             --name vulpra-m3-normandy-matched-full-baseline             --dir "$RUNNER_TEMP/full"
+      - name: Authenticate full-normal original binary and New Tab included modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,io,json,os,tarfile,zipfile
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"full"
+          pkg=root/"full-normandy-baseline.tar.xz"
+          report=json.loads((root/"m3-full-normandy-baseline.json").read_text())
+          digest=hashlib.sha256(pkg.read_bytes()).hexdigest()
+          assert digest==(root/"full-normandy-baseline.tar.xz.sha256").read_text().split()[0]
+          assert report["sha256"]==digest
+          assert report["schema_version"]==1
+          assert report["source_commit"]==os.environ["ORIGINAL_SOURCE_COMMIT"]
+          assert report["variant"]=="full-normandy"
+          assert report["normandy_runner_present"] is True
+          assert report["required_newtab_modules_present"] is True
+          assert report["compressed_bytes"]==pkg.stat().st_size
+          entries=set()
+          with tarfile.open(pkg,"r:xz") as tf:
+              for member in tf:
+                  if member.isfile() and member.name.endswith("/omni.ja"):
+                      with zipfile.ZipFile(io.BytesIO(tf.extractfile(member).read())) as jar:
+                          entries.update(jar.namelist())
+          for resource in ("res/normandy/Normandy.sys.mjs",
+                           "newtab/lib/ActivityStream.sys.mjs",
+                           "newtab/lib/TopStoriesFeed.sys.mjs",
+                           "newtab/lib/DiscoveryStreamFeed.sys.mjs"):
+              assert any(x.endswith(resource) for x in entries),resource
+          print("PASS: verified full-normal source-matched native package",digest[:16])
+          PY
+          mkdir -p .git/vulpra-native-build/packages
+          cp "$RUNNER_TEMP/full/full-normandy-baseline.tar.xz"              .git/vulpra-native-build/packages/vulpra-local-full-newtab-ci.tar.xz
+          (cd .git/vulpra-native-build/packages &&            sha256sum vulpra-local-full-newtab-ci.tar.xz >                     vulpra-local-full-newtab-ci.tar.xz.sha256)
+      - name: Install only normal-browser runtime dependencies and pinned driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y             --no-install-recommends libgtk-3-0t64 libdbus-glib-1-2             libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz"             https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+      - name: Verify real source-matched full-Normandy New Tab runtime
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH"             python3 ci/smoke-newtab-pocket-retained-runtime.py "$GITHUB_WORKSPACE"             --variant full-normandy
+          jq -e             '.schema_version == 1 and
+             .variant == "full-normandy" and
+             .status == "real_normal_full_normandy_native_newtab_factories_retained" and
+             .verified_archive_sha256 == true and
+             .private_browser_profile_verified == true and
+             .gecko_nonlocal_connection_guard_enabled == true and
+             .full_default_normandy_runner_present == true and
+             .newtab_document_loaded == true and
+             (.protected_newtab_factories_and_registry | length) == 26 and
+             (.protected_newtab_factories_and_registry | all(. == true)) and
+             .actual_legacy_fallback_invoked == false and
+             .actual_modern_content_fetch_invoked == false and
+             .runtime_signed_in_user_data_used == false and
+             .source_removal_authorized == false and
+             .new_m3_whole_gate_passed == false'             .git/vulpra-native-build/m3-newtab-pocket-preservation.json >/dev/null
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(".git/vulpra-native-build/m3-newtab-pocket-preservation.json")
+          r=json.loads(p.read_text())
+          r["native_build_run_id"]=int(os.environ["ORIGINAL_BUILD_RUN_ID"])
+          r["native_build_source_commit"]=os.environ["ORIGINAL_SOURCE_COMMIT"]
+          r["identical_compiler_source_and_test_checkout"]=True
+          r["full_default_source_branch_compiled_at_run"]=True
+          p.write_text(json.dumps(r,indent=2)+"\n")
+          PY
+          echo 'PASS: source-pinned normal native New Tab protected factories and fallback methods'
+      - name: Preserve bounded full-normal runtime evidence (no user data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-full-normal-source-pinned-newtab-native-evidence
+          path: .git/vulpra-native-build/m3-newtab-pocket-preservation.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
