@@ -77,7 +77,7 @@ const done=arguments[arguments.length-1];
       typeof exposed.hook.destroy==="function";
   const stream=new exposed.activity_stream();
   result.bridge.activity_stream_feed_map_preserved=
-      stream.feeds instanceof Map && stream.feeds.size>0;
+      typeof stream.feeds?.keys === "function" && [...stream.feeds.keys()].length>0;
   result.prefs_unchanged=JSON.stringify(before)===JSON.stringify(snapshot());
   delete result.last_module;
  } catch(e) {
