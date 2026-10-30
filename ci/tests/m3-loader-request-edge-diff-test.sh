@@ -52,6 +52,21 @@ reject() {
     exit 1
   fi
 }
+# Requester/target pairs can genuinely belong to both observed loader
+# categories across different PID traces, but cannot repeat WITHIN a class.
+jq '.loader_reported_dynamic_initialized_edges +=
+    [.loader_reported_needed_by_initialized_edges[0]] |
+    .loader_reported_dynamic_initialized_edge_count=2' \
+  "$work/g.json" >"$work/dual.json"
+bash "$root/ci/m3-loader-request-edge-diff.sh" \
+  "$work/h.json" "$work/dual.json" "$work/dual-output.json"
+jq -e '.graphical_dynamic_request_count==2 and .needed_by_both_count==1' \
+  "$work/dual-output.json" >/dev/null
+jq '.loader_reported_needed_by_initialized_edges +=
+     [.loader_reported_needed_by_initialized_edges[0]] |
+     .loader_reported_needed_by_initialized_edge_count=3' \
+  "$work/g.json" >"$work/bad.json"
+reject
 jq '.loader_reported_needed_by_initialized_edge_count=999' "$work/g.json" >"$work/bad.json"
 reject
 jq '.loader_reported_dynamic_initialized_edges=[{requester_basename:"/home/secret",requested_library_basename:"libfoo.so"}]' \

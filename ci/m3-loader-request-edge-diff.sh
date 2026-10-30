@@ -29,7 +29,12 @@ for report in "$headless" "$graphical"; do
     (
       [.loader_reported_needed_by_initialized_edges[],
        .loader_reported_dynamic_initialized_edges[]] as $all |
-      (($all|unique|length)==($all|length)) and
+      # One initialized target may be requested as DT_NEEDED and through
+      # dynamic loading in distinct process traces. Keep both classes.
+      ((.loader_reported_needed_by_initialized_edges|unique|length)==
+       (.loader_reported_needed_by_initialized_edges|length)) and
+      ((.loader_reported_dynamic_initialized_edges|unique|length)==
+       (.loader_reported_dynamic_initialized_edges|length)) and
       (($all|length)<=10000) and
       all($all[];
         (.requester_basename|type=="string" and
