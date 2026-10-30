@@ -1,0 +1,103 @@
+# Diagnostic, not graphical feature-map acceptance. Nonlocal egress is
+# forbidden only in the netns case; in normal runner environment, preserve
+# the already-required MOZ_DISABLE_NONLOCAL_CONNECTIONS security contract.
+name: M3 Native Wayland Network Syscall Contrast
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-wayland-network-syscall-contrast.yml
+      - ci/m3-network-syscall-launch.sh
+      - ci/m3-network-syscall-counts.awk
+      - ci/tests/m3-network-syscall-counts-test.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare-original-syscalls-under-isolation:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout standalone diagnostics and original Wayland harness
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+            packaging
+      - name: Authenticate original archive and test syscall sanitizer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-network-syscall-launch.sh
+          bash -n ci/tests/m3-network-syscall-counts-test.sh
+          bash ci/tests/m3-network-syscall-counts-test.sh
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/native" "$RUNNER_TEMP/extracted"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/native"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/native/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA256"
+          tar -xf "$RUNNER_TEMP/native/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/extracted"
+          test -x "$RUNNER_TEMP/extracted/vulpra/vulpra"
+      - name: Install syscall tracer and isolated Weston
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends strace iproute2 util-linux weston wayland-utils \
+            libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+      - name: Collect bounded syscall-class counts in both launch contexts
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf -- "$work"' EXIT
+          umask 077
+          app="$RUNNER_TEMP/extracted/vulpra"
+          harness="$GITHUB_WORKSPACE/packaging/test-wayland.sh"
+          user="$(id -un)"
+          trace_probe() {
+            local kind="$1"
+            shift
+            mkdir -p "$work/$kind"
+            local rc=0
+            if "$@" >"$work/$kind/output.log" 2>&1; then
+              echo "DIAGNOSTIC $kind: actual Wayland native 10s PASS under strace"
+            else
+              rc="$?"
+              echo "DIAGNOSTIC $kind: native Wayland 10s FAIL (probe $rc)"
+              if grep -Fq 'native exit status: 11' "$work/$kind/output.log"; then
+                echo "DIAGNOSTIC $kind: browser exit 11"
+              fi
+              if grep -Fq 'unshare failed' "$work/$kind/output.log"; then
+                echo "DIAGNOSTIC $kind: no supported namespace; comparison incomplete"
+              fi
+            fi
+            # Do not retain traces or raw logs after this same step.
+            if compgen -G "$work/$kind/trace.*" >/dev/null; then
+              echo "DIAGNOSTIC $kind: aggregated all Weston, browser and harness processes"
+              awk -f ci/m3-network-syscall-counts.awk "$work/$kind"/trace.*
+            else
+              echo "DIAGNOSTIC $kind: no syscall trace, do not infer differences"
+            fi
+          }
+          trace_probe host \
+            bash ci/m3-network-syscall-launch.sh host \
+            "$user" "$harness" "$app" "$work/host/trace"
+          trace_probe netns \
+            sudo unshare --net -- bash ci/m3-network-syscall-launch.sh netns \
+            "$user" "$harness" "$app" "$work/netns/trace"
+          echo 'DIAGNOSTIC ONLY: no raw traces retained or uploaded; no M3 acceptance'
