@@ -59,7 +59,7 @@ reject 'reject invalid flag type' '(.candidates[]|select(.id=="pocket_integratio
 reject 'reject fake complete candidate map' '.m3_decision_classification.complete_feature_dependency_inventory=true'
 reject 'reject fake fallback closure' '.m3_decision_classification.complete_candidate_fallback_validation=true'
 reject 'reject unearned gate' '.m3_decision_classification.whole_m3_gate_passed=true'
-reject 'reject inflated summary count' '.m3_decision_classification.categories.keep=12'
+reject 'reject inflated summary count' '.m3_decision_classification.categories.keep=13'
 reject 'reject claimed new normal browser change' '.m3_decision_classification.no_normal_browser_feature_changed=false'
 reject 'reject compiled saving without build' '.m3_decision_classification.new_compiled_savings_bytes=500000'
 reject 'reject inflated pruned Git file count' '.accepted_source_pruning_cohort_totals.aggregate_removed_git_paths+=1'
