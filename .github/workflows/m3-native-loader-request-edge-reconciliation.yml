@@ -85,6 +85,11 @@ jobs:
                  .observed_graphical_only_basename_count==58 and
                  .any_new_source_removal_authorized==false' \
             "$RUNNER_TEMP/m3-original-native-graphical-reachability.json" >/dev/null
+          jq -r '"DIAGNOSTIC source-root reachability: FFmpeg=\(.ffmpeg_seed_reached_count), GBM=\(.gbm_seed_reached_count), Pulse=\(.pulse_seed_reached_count), union=\(.reached_by_at_least_one_seed_count), unreached=\(.not_reached_by_the_three_seed_count)"' \
+            "$RUNNER_TEMP/m3-original-native-graphical-reachability.json"
+          echo 'DIAGNOSTIC: graphical-only library names without one of the three observed dynamic-load root paths:'
+          jq -r '.not_reached_by_the_three_seed_names[]' \
+            "$RUNNER_TEMP/m3-original-native-graphical-reachability.json"
           echo 'DIAGNOSTIC: graphical-only dynamic requester -> requested library basenames:'
           jq -r '.dynamic_graphical_only_edges[] |
             .requester_basename + " -> " + .requested_library_basename' \
