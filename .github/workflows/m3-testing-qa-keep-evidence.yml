@@ -1,0 +1,137 @@
+# Read-only evidence crosswalk for conservatively retaining the full testing/
+# source root. This is not a native rebuild or an optional-fixture deletion.
+name: M3 Reconcile Shared Testing QA Keep Evidence
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-testing-qa-keep-evidence.yml
+      - ci/m3-testing-shared-qa-preservation.sh
+      - ci/m3-testing-localization-boundaries.py
+      - docs/vulpra/DEBLOAT-CANDIDATES.json
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  crosscheck-source-manifests-and-native-webdriver:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout read-only source guards and verify current source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+            mach
+      - name: Reevaluate current testing/build source relationships without deletion
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-testing-shared-qa-preservation.sh
+          bash ci/m3-testing-shared-qa-preservation.sh "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/m3-current-testing-qa-source.json"
+          python3 ci/m3-testing-localization-boundaries.py --self-test \
+            --output "$RUNNER_TEMP/m3-current-testing-l10n-boundary.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            '.schema_version==1 and .source_commit==$sha and
+             .candidate=="source_testing" and
+             .verified_source_boundaries==25 and
+             .deliberately_broken_boundaries_rejected==25 and
+             .normal_browser_testing_source_policy=="keep_core_QA_and_build_roots" and
+             .optional_peripheral_test_fixtures_individually_audited==false and
+             .native_test_executed_by_this_audit==false and
+             .source_removal_authorized==false and .whole_m3_gate_advanced==false' \
+            "$RUNNER_TEMP/m3-current-testing-qa-source.json" >/dev/null
+          jq -e --arg sha "$GITHUB_SHA" \
+            '.source_commit==$sha and .source_only==true and
+             .removal_authorized==false and .native_runtime_tested==false and
+             (.boundaries|length)==14 and .invalid_mutations_rejected==17' \
+            "$RUNNER_TEMP/m3-current-testing-l10n-boundary.json" >/dev/null
+      - name: Authenticate original successful testing and actual native QA runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41107821628" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="adaeb72804192a2a91995617708429f346796e93"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40922064826" |
+            jq -e '.status=="completed" and .conclusion=="success"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41106584931" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="4845db07f790a02192bbbc42bf631dca7fdafc23"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40997075527" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="b1482404dfb8b01342990ee99ea3df0f9756b5f7"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/original-source" "$RUNNER_TEMP/old-boundary" "$RUNNER_TEMP/native"
+          gh run download 41107821628 --repo "$GITHUB_REPOSITORY" \
+            --name m3-testing-source-qa-preservation --dir "$RUNNER_TEMP/original-source"
+          gh run download 40922064826 --repo "$GITHUB_REPOSITORY" \
+            --name m3-testing-localization-boundaries --dir "$RUNNER_TEMP/old-boundary"
+          gh run download 41106584931 --repo "$GITHUB_REPOSITORY" \
+            --name m3-full-normal-native-asrouter-newtab-bridge --dir "$RUNNER_TEMP/native"
+      - name: Validate original immutable QA and native evidence without inventing compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          original="$(find "$RUNNER_TEMP/original-source" -type f -name 'm3-testing-shared-source.json')"
+          historical="$(find "$RUNNER_TEMP/old-boundary" -type f -name 'm3-testing-localization-boundaries.json')"
+          native="$(find "$RUNNER_TEMP/native" -type f -name 'm3-full-normal-asrouter-newtab-bridge.json')"
+          test -f "$original" && test -f "$historical" && test -f "$native"
+          jq -e '.source_commit=="adaeb72804192a2a91995617708429f346796e93" and
+             .verified_source_boundaries==25 and
+             .deliberately_broken_boundaries_rejected==25 and
+             .source_removal_authorized==false and
+             .evaluated_build_dependency_graph_complete==false' "$original" >/dev/null
+          jq -e '.source_only==true and .removal_authorized==false and
+             (.boundaries|length)==14 and .invalid_mutations_rejected==17' "$historical" >/dev/null
+          jq -e '.status=="full_normal_native_newtab_asrouter_bridge_preserved" and
+             .verified_archive_sha256==true and
+             .private_home_and_profile_verified==true and
+             .packaged_about_newtab_navigation_succeeded==true and
+             (.protected_real_native_module_imports|length)==10 and
+             (.protected_real_native_module_imports|all(.==true)) and
+             (.protected_real_native_inert_bridge_checks|length)==5 and
+             (.protected_real_native_inert_bridge_checks|all(.==true)) and
+             .source_removal_authorized==false and
+             .full_dynamic_dependency_graph_proven==false' "$native" >/dev/null
+          jq -n --arg source "$GITHUB_SHA" '{
+             schema_version:1,
+             tested_ledger_source:$source,
+             decision:"keep_shared_testing_root_with_peripheral_fixtures_unpruned",
+             current_testing_qa_source_guards:25,
+             current_testing_qa_deleted_anchor_mutations_rejected:25,
+             current_testing_locale_manifests_checked:14,
+             current_testing_locale_invalid_mutations_rejected:17,
+             prior_native_browser_run:41106584931,
+             prior_original_normal_build_run:40997075527,
+             independent_real_native_browser_qa_passed:true,
+             actual_original_native_source:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+             current_generated_build_graph_proven:false,
+             current_native_browser_rebuilt_by_this_workflow:false,
+             peripheral_fixture_omissions_proven:false,
+             new_source_deletion_authorized:false,
+             new_compiled_package_savings_bytes:null,
+             new_whole_M3_gate_passed_by_this_evidence_replay:false
+           }' > "$RUNNER_TEMP/m3-testing-qa-source-native-crosswalk.json"
+          jq -e '.current_testing_qa_source_guards==25 and
+            .current_testing_locale_manifests_checked==14 and
+            .independent_real_native_browser_qa_passed==true and
+            .peripheral_fixture_omissions_proven==false and
+            .new_source_deletion_authorized==false and
+            .new_compiled_package_savings_bytes==null' \
+            "$RUNNER_TEMP/m3-testing-qa-source-native-crosswalk.json" >/dev/null
+      - name: Preserve bounded comparison, no browser archive or user information
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-testing-qa-source-native-crosswalk
+          path: ${{ runner.temp }}/m3-testing-qa-source-native-crosswalk.json
+          if-no-files-found: warn
+          retention-days: 14
