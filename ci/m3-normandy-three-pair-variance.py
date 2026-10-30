@@ -53,7 +53,7 @@ def checked(report, label):
             "full_compressed_bytes":full,
             "lean_compressed_bytes":lean,
             "compressed_saved_bytes":full-lean,
-            "logical_regular_bytes_difference":full_regular-lean}
+            "logical_regular_bytes_difference":full_regular-lean_regular}
 
 def reconcile(reports):
     if not isinstance(reports,list) or len(reports)!=3:
