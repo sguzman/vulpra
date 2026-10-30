@@ -70,9 +70,11 @@ jobs:
           app="$RUNNER_TEMP/extracted/vulpra"
           user="$(id -un)"
           harness="$GITHUB_WORKSPACE/packaging/test-wayland.sh"
+          # Caller owns redirected private output; sudo only configures netns.
+          netns_run() { sudo unshare --net -- "$@"; }
           # First, ensure uninstrumented source-pinned native browser
           # truly passes frame+ten-second checks in the same no-egress mode.
-          sudo unshare --net -- bash ci/m3-wayland-netns-launch.sh \
+          netns_run bash ci/m3-wayland-netns-launch.sh \
             "$user" "$harness" "$app" enabled \
             >"$trace_dir/normal.log" 2>&1 || {
               echo 'FAIL: uninstrumented network-isolated native graphical baseline'
@@ -81,7 +83,7 @@ jobs:
           echo 'PASS: original native browser survived full private Weston frame/liveness in no-egress namespace'
           # Opt-in loader variable is passed to the browser ONLY by the
           # unmodified test harness, not to Weston, runuser, or the parser.
-          if sudo unshare --net -- bash ci/m3-wayland-netns-launch.sh \
+          if netns_run bash ci/m3-wayland-netns-launch.sh \
             "$user" "$harness" "$app" enabled "$trace_dir/m3-loader" \
             >"$trace_dir/traced.log" 2>&1; then
             echo 'PASS: real private Weston surface attach/commit survived traced ten-second native workload'
