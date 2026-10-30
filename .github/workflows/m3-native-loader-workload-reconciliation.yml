@@ -1,0 +1,80 @@
+# Compare actual observed native loader names across two distinct successful
+# workloads of the SAME SHA-256 authenticated original compiled Vulpra.
+# This is NOT a complete feature map, dlopen map, ABI proof or Arch test.
+name: M3 Cross-Workload Actual Native Loader Reconciliation
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-loader-workload-reconciliation.yml
+      - ci/m3-graphical-loader-workload-diff.sh
+      - ci/tests/m3-graphical-loader-workload-diff-test.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile-observed-native-libraries:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      HEADLESS_RUN: '41116477542'
+      GRAPHICAL_RUN: '41137086850'
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout only guarded comparison code
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Run independent synthetic adversarial fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-graphical-loader-workload-diff.sh
+          bash -n ci/tests/m3-graphical-loader-workload-diff-test.sh
+          bash ci/tests/m3-graphical-loader-workload-diff-test.sh
+      - name: Authenticate two original-source real browser workload runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$HEADLESS_RUN" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+                   .name=="M3 Native Dynamic Loader Startup Observation"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GRAPHICAL_RUN" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+                   .name=="M3 Actual Netns Wayland Native Loader Mapping"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/headless" "$RUNNER_TEMP/graphical"
+          gh run download "$HEADLESS_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-loader-startup-sanitized --dir "$RUNNER_TEMP/headless"
+          gh run download "$GRAPHICAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-netns-wayland-native-loader-observed --dir "$RUNNER_TEMP/graphical"
+          test -s "$RUNNER_TEMP/headless/m3-runtime-loader-observation.json"
+          test -s "$RUNNER_TEMP/graphical/m3-netns-wayland-native-loader-observed.json"
+      - name: Produce actual source-pinned overlap and nonoverlap of loader init names
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/m3-graphical-loader-workload-diff.sh \
+            "$RUNNER_TEMP/headless/m3-runtime-loader-observation.json" \
+            "$RUNNER_TEMP/graphical/m3-netns-wayland-native-loader-observed.json" \
+            "$RUNNER_TEMP/m3-native-headless-wayland-loader-contrast.json"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA256" \
+            '.source_commit==$src and .compiled_archive_sha256==$sha and
+             .observed_wayland_library_name_count>=.observed_both_count and
+             .observed_headless_library_name_count>=.observed_both_count and
+             .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-native-headless-wayland-loader-contrast.json" >/dev/null
+          echo 'PASS: actual executed workload overlap, no full dynamic feature closure'
+      - name: Upload sanitized counted library-name set differences only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-headless-wayland-native-loader-contrast
+          path: ${{ runner.temp }}/m3-native-headless-wayland-loader-contrast.json
+          if-no-files-found: error
+          retention-days: 14
