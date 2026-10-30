@@ -40,6 +40,7 @@ const done=arguments[arguments.length-1];
     network_or_account_login_attempted:false,
   };
   try {
+    result.last_module="sync_ui";
     const {UIState}=ChromeUtils.importESModule(
       "resource://services-sync/UIState.sys.mjs");
     result.sync_ui_module = typeof UIState.get === "function" &&
@@ -48,11 +49,13 @@ const done=arguments[arguments.length-1];
     result.sync_ui_default_not_configured =
       state && state.status === UIState.STATUS_NOT_CONFIGURED;
 
+    result.last_module="weave";
     const {Weave} = ChromeUtils.importESModule(
       "resource://services-sync/main.sys.mjs");
     result.weave_lazy_module = !!Weave && typeof Weave === "object" &&
       typeof Weave.perDeviceEngineChoices === "boolean";
 
+    result.last_module="fxaccounts";
     const {FxAccounts, getFxAccountsSingleton} = ChromeUtils.importESModule(
       "resource://gre/modules/FxAccounts.sys.mjs");
     const fxAccounts=getFxAccountsSingleton();
@@ -63,6 +66,7 @@ const done=arguments[arguments.length-1];
     const existingUser=await fxAccounts.getSignedInUser();
     result.fxa_no_signed_in_account=existingUser === null;
 
+    result.last_module="extension_storage";
     const {ExtensionStorageSyncKinto, extensionStorageSyncKinto}=
       ChromeUtils.importESModule(
         "resource://gre/modules/ExtensionStorageSyncKinto.sys.mjs");
@@ -70,12 +74,14 @@ const done=arguments[arguments.length-1];
       typeof ExtensionStorageSyncKinto === "function" &&
       !!extensionStorageSyncKinto;
 
+    result.last_module="accounts_glue";
     const {AccountsGlue}=ChromeUtils.importESModule(
       "resource:///modules/AccountsGlue.sys.mjs");
     result.accounts_glue_module = !!AccountsGlue &&
       typeof AccountsGlue.init === "function" &&
       typeof AccountsGlue.observe === "function";
 
+    result.last_module="firefox_view";
     const {SyncedTabsController}=ChromeUtils.importESModule(
       "resource:///modules/SyncedTabsController.sys.mjs");
     result.firefox_view_controller=
@@ -103,7 +109,10 @@ EXPECTED_KEYS=(
 
 def validate(observed):
     if not isinstance(observed,dict) or observed.get("status")!="loaded":
-        raise ValueError("Packaged Sync/FxAccounts probe did not fully load")
+        stage=observed.get("last_module","unknown") if isinstance(observed,dict) else "nonobject"
+        category=observed.get("error_category","unknown") if isinstance(observed,dict) else "unknown"
+        raise ValueError("Packaged Sync/FxAccounts import stage rejected: "+
+                         str(stage)[:32]+" / "+str(category)[:32])
     for key in EXPECTED_KEYS:
         if observed.get(key) is not True:
             raise ValueError("Missing protected packaged Sync/FxA boundary: "+key)
