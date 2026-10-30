@@ -1,0 +1,146 @@
+# Replays a previously compiled full-normal Firefox/Vulpra artifact.
+# No new native compilation, user profile, remote Pocket/ads or message delivery.
+name: M3 Full-Normal Native New Tab ASRouter Bridge
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-newtab-asrouter-native-bridge.yml
+      - ci/smoke-newtab-asrouter-native-bridge.py
+      - ci/smoke-webextension-package-local.py
+      - browser/components/asrouter/modules/**
+      - browser/extensions/newtab/lib/**
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-original-native-newtab-messaging:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPILED_SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      NATIVE_RUN: '40997075527'
+      ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      MOZ_HEADLESS: '1'
+    steps:
+      - name: Sparse checkout script and existing WebDriver support
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject false module and bridge assertions; match exact compiled source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/smoke-newtab-asrouter-native-bridge.py \
+            ci/smoke-webextension-package-local.py
+          python3 ci/smoke-newtab-asrouter-native-bridge.py --self-test
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NATIVE_RUN" |
+            jq -e --arg sha "$COMPILED_SOURCE" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          python3 - <<'PY'
+          import subprocess
+          expected={
+            "browser/components/asrouter/modules/ASRouter.sys.mjs":"2fac89b4c02444fed4ee79d24d19fce445596e06",
+            "browser/components/asrouter/modules/ASRouterNewTabHook.sys.mjs":"53e825db9381be3175282677b6f0abb621d2f28d",
+            "browser/components/asrouter/modules/ASRouterDefaultConfig.sys.mjs":"1f83fb3b4106b270465edbfe2f7458640a94e814",
+            "browser/components/asrouter/modules/ASRouterParentProcessMessageHandler.sys.mjs":"390bfcd647c428473d6edc69e7c3f980d61300be",
+            "browser/components/asrouter/modules/ASRouterTelemetry.sys.mjs":"1ae15f8a75f1d9fdf6471ded6d8fd4835fcdb6df",
+            "browser/extensions/newtab/lib/NewTabMessaging.sys.mjs":"4b6c99a03363eba18d88eacd2332f8a01d7c9700",
+            "browser/extensions/newtab/lib/NewTabActorRegistry.sys.mjs":"0492f65208d82b0a23c6c4502c0f8fafa8d503e7",
+            "browser/extensions/newtab/lib/ActivityStream.sys.mjs":"e0b0eef5a3f4a9814888b60f5617d105db739454",
+            "browser/extensions/newtab/lib/TopStoriesFeed.sys.mjs":"0bed6344ba11903efc06a31e98b7bf1737e68278",
+            "browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs":"aa6239b92899d0ee3a0a57a6023d89109eb8829f",
+          }
+          for path,sha in expected.items():
+              got=subprocess.check_output(["git","rev-parse","HEAD:"+path],text=True).strip()
+              assert got==sha,(path,"source changed since original native compilation")
+          print("PASS: 10 exact source blob identities match original compiled full browser")
+          PY
+      - name: Download and authenticate original real Linux full-Normandy browser package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/full"
+          gh run download "$NATIVE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/full"
+          (cd "$RUNNER_TEMP/full" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os
+          folder=Path(os.environ["RUNNER_TEMP"])/"full"
+          archive=folder/"full-normandy-baseline.tar.xz"
+          meta=json.loads((folder/"m3-full-normandy-baseline.json").read_text())
+          assert meta["schema_version"]==1
+          assert meta["source_commit"]==os.environ["COMPILED_SOURCE"]
+          assert meta["sha256"]==os.environ["ARCHIVE_SHA256"]==hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert meta["compressed_bytes"]==archive.stat().st_size==87154544
+          assert meta["variant"]=="full-normandy"
+          assert meta["normandy_runner_present"] is True
+          assert meta["required_newtab_modules_present"] is True
+          print("PASS: source/checksum/full-Normandy/New Tab native package manifest")
+          PY
+          mkdir -p .git/vulpra-native-build/packages
+          cp "$RUNNER_TEMP/full/full-normandy-baseline.tar.xz" \
+            .git/vulpra-native-build/packages/vulpra-local-asrouter-current-ci.tar.xz
+          (cd .git/vulpra-native-build/packages && \
+            sha256sum vulpra-local-asrouter-current-ci.tar.xz > \
+                      vulpra-local-asrouter-current-ci.tar.xz.sha256)
+      - name: Install only native runtime libraries and pinned Gecko WebDriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends libgtk-3-0t64 libdbus-glib-1-2 \
+            libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+      - name: Exercise actual about:newtab and native ASRouter/New Tab safe message surfaces
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH" \
+            python3 ci/smoke-newtab-asrouter-native-bridge.py "$GITHUB_WORKSPACE"
+          jq -e \
+            '.schema_version==1 and
+             .status=="full_normal_native_newtab_asrouter_bridge_preserved" and
+             .verified_archive_sha256==true and
+             .private_home_and_profile_verified==true and
+             .gecko_nonlocal_connections_disabled==true and
+             (.protected_real_native_module_imports|length)==10 and
+             (.protected_real_native_module_imports|all(.==true)) and
+             (.protected_real_native_inert_bridge_checks|length)==5 and
+             (.protected_real_native_inert_bridge_checks|all(.==true)) and
+             .packaged_about_newtab_navigation_succeeded==true and
+             .relevant_preferences_unchanged==true and
+             .remote_messaging_or_pocket_fetch_attempted_by_probe==false and
+             .router_storage_mutation_or_provider_fetch_attempted_by_probe==false and
+             .real_actors_initialized_by_probe==false and
+             .full_newtab_message_delivery_end_to_end_proven==false and
+             .full_dynamic_dependency_graph_proven==false and
+             .source_removal_authorized==false and
+             .new_whole_m3_gate_passed==false' \
+            .git/vulpra-native-build/m3-full-normal-asrouter-newtab-bridge.json >/dev/null
+          echo "PASS: 10 native imports, 5 inert bridge contracts, about:newtab navigation"
+      - name: Preserve bounded boolean evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-full-normal-native-asrouter-newtab-bridge
+          path: .git/vulpra-native-build/m3-full-normal-asrouter-newtab-bridge.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
