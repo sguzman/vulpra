@@ -1,0 +1,59 @@
+# M3 conservative scoped debloat decisions must not silently broaden.
+# This check asserts ledger policy and 32 deliberately corrupted fixtures.
+# It never touches native browser binaries, personal profiles, or source trees.
+name: M3 Reject Unsafe Candidate Removal Decisions
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-candidate-decision-contract.yml
+      - ci/m3-candidate-decision-contract.jq
+      - ci/tests/m3-candidate-decision-contract-test.sh
+      - docs/vulpra/DEBLOAT-CANDIDATES.json
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fail-closed-candidate-policy:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact versioned policy, candidate ledger and mutation tests
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+            docs/vulpra/DEBLOAT-CANDIDATES.json
+      - name: Enforce exact source fixture and jq syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          command -v jq
+          bash -n ci/tests/m3-candidate-decision-contract-test.sh
+          jq -e -f ci/m3-candidate-decision-contract.jq             docs/vulpra/DEBLOAT-CANDIDATES.json             > "$RUNNER_TEMP/m3-candidate-policy-guard.json"
+      - name: Reject 32 unsafe candidate and source-prune ledger mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/tests/m3-candidate-decision-contract-test.sh "$GITHUB_WORKSPACE"
+          jq -e '.candidates_checked==20 and
+                 .classes.remove_source==4 and
+                 .classes.conditional_compile==3 and
+                 .classes.keep==10 and .classes.review==3 and
+                 .verified_distinct_pruned_source_paths==14867 and
+                 .verified_distinct_pruned_git_blob_bytes==129967585 and
+                 .new_source_deletion_authorized==false and
+                 .new_whole_M3_gate_passed==false and
+                 .exact_source_or_binary_runtime_proven_by_this_check==false'             "$RUNNER_TEMP/m3-candidate-policy-guard.json" >/dev/null
+      - name: Preserve only bounded policy results (never raw candidate inventory)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-candidate-removal-policy-guard
+          path: ${{ runner.temp }}/m3-candidate-policy-guard.json
+          if-no-files-found: warn
+          retention-days: 14
