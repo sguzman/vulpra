@@ -1,0 +1,152 @@
+# Read-only exact-native-source ELF and locale crosswalk from successful full browser.
+# Reuses the independently checked original archive; no recompilation/deletion.
+name: M3 Newer Source Full Native ELF and Locale Inventory
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-newer-source-full-package-inventory.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-pinned-package-physical-inventory:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      COMPILED_SOURCE_SHA: 'b1482404dfb8b01342990ee99ea3df0f9756b5f7'
+      ORIGINAL_NATIVE_BUILD_RUN_ID: '40997075527'
+    steps:
+      - name: Checkout actual source that built the normal Vulpra browser
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Authenticate build source and reject corrupt census fixtures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$COMPILED_SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_NATIVE_BUILD_RUN_ID" |
+            jq -e --arg sha "$COMPILED_SOURCE_SHA"               '.status == "completed" and .conclusion == "success" and .head_sha == $sha' >/dev/null
+          command -v readelf
+          python3 -m py_compile ci/m3-native-elf-package-graph.py ci/m3-package-localization-census.py
+          python3 ci/m3-native-elf-package-graph.py --self-test
+          python3 ci/m3-package-localization-census.py --self-test
+      - name: Download and authenticate exact compiled full-Normandy package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/native"
+          gh run download "$ORIGINAL_NATIVE_BUILD_RUN_ID"             --repo "$GITHUB_REPOSITORY"             --name vulpra-m3-normandy-matched-full-baseline             --dir "$RUNNER_TEMP/native"
+          (
+            cd "$RUNNER_TEMP/native"
+            sha256sum -c full-normandy-baseline.tar.xz.sha256
+          )
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])/"native"
+          package=root/"full-normandy-baseline.tar.xz"
+          meta=json.loads((root/"m3-full-normandy-baseline.json").read_text())
+          assert meta["schema_version"]==1
+          assert meta["source_commit"]==os.environ["COMPILED_SOURCE_SHA"]
+          assert meta["variant"]=="full-normandy"
+          assert meta["normandy_runner_present"] is True
+          assert meta["required_newtab_modules_present"] is True
+          assert meta["compressed_bytes"]==package.stat().st_size
+          assert meta["sha256"]==hashlib.sha256(package.read_bytes()).hexdigest()
+          assert package.stat().st_size>80000000
+          print("PASS: compiled-source-pinned full-normal native package", meta["sha256"])
+          PY
+      - name: Scan real native ELF declarations and independently classified locale resources
+        shell: bash
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/native/full-normandy-baseline.tar.xz"
+          python3 ci/m3-native-elf-package-graph.py "$archive"             --output "$RUNNER_TEMP/newer-full-elf-direct-graph.json"
+          python3 ci/m3-package-localization-census.py "$archive"             --output "$RUNNER_TEMP/newer-full-localization-census.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          e=json.loads((root/"newer-full-elf-direct-graph.json").read_text())
+          l=json.loads((root/"newer-full-localization-census.json").read_text())
+          m=json.loads((root/"native/m3-full-normandy-baseline.json").read_text())
+          assert e["schema_version"]==l["schema_version"]==1
+          assert e["archive_sha256"]==l["sha256"]==m["sha256"]
+          assert e["archive_compressed_bytes"]==l["compressed_archive_bytes"]==m["compressed_bytes"]
+          assert e["archive_regular_members"]==l["tar_regular_members"]
+          assert len(e["elf_members"])>=20 and e["direct_needed_edges"]>100
+          assert len(e["not_packaged_needed_names"])>0
+          assert len(e["packaged_elf_needed_names"])>0
+          assert sum(f["name"]=="libxul.so" for f in e["elf_members"])==1
+          assert l["localized_content_present"] is True
+          assert len(l["omni_ja"])>=2
+          assert all(j["status"]=="readable" for j in l["omni_ja"])
+          assert e["all_native_binary_execution_avoided"] is True
+          assert e["host_dependency_resolution_verified"] is False
+          assert e["dlopen_and_indirect_runtime_dependencies_complete"] is False
+          assert e["source_removal_authorized"] is False
+          assert e["marginal_compressed_saving_bytes"] is None
+          assert l["archive_execution"] is False
+          assert l["source_removal_authorized"] is False
+          assert l["compiled_bytes_saved"] is None
+          report={
+            "schema_version":1,
+            "compiled_source_sha":os.environ["COMPILED_SOURCE_SHA"],
+            "actual_scanner_checkout_sha":os.environ["COMPILED_SOURCE_SHA"],
+            "native_build_run_id":int(os.environ["ORIGINAL_NATIVE_BUILD_RUN_ID"]),
+            "full_normal_archive_sha256":m["sha256"],
+            "full_normal_archive_compressed_bytes":m["compressed_bytes"],
+            "original_nommardy_runner_physically_present":m["normandy_runner_present"],
+            "original_required_newtab_modules_present":m["required_newtab_modules_present"],
+            "elf_regular_members":len(e["elf_members"]),
+            "elf_direct_needed_edges":e["direct_needed_edges"],
+            "elf_unique_needed_names":e["unique_needed_names"],
+            "elf_packaged_elf_needed_names":e["packaged_elf_needed_names"],
+            "elf_not_packaged_needed_names":e["not_packaged_needed_names"],
+            "locale_group_counts":l["nested_omni_ja_members"],
+            "locale_jar_entry_counts":[{"jar":j["archive_member"],"entries":j["entries"]} for j in l["omni_ja"]],
+            "same_physical_package_for_both_scans":True,
+            "no_native_execution_or_recompilation":True,
+            "linux_host_dynamic_loader_resolution_verified":False,
+            "complete_feature_dependency_map":False,
+            "candidate_source_removal_authorized":False,
+            "new_compressed_savings_claimed":None,
+            "limitations":[
+              "Read-only direct ELF DT_NEEDED plus bounded resource categories, not whole call graph.",
+              "Some dependencies may be resolved by the host or loaded dynamically.",
+              "Resources have consumers, so their ZIP logical bytes are not recoverable tar.xz savings.",
+              "Source matched to compiled SHA, not to future main commits.",
+              "No new removal, live network request or altered default browser.",
+            ]
+          }
+          (root/"m3-newer-full-elf-locale-inventory.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps({k:report[k] for k in (
+            "compiled_source_sha","full_normal_archive_compressed_bytes",
+            "elf_regular_members","elf_direct_needed_edges",
+            "elf_unique_needed_names","same_physical_package_for_both_scans")},indent=2))
+          print("PASS: source-pinned physical ELF + locale crosswalk, no deletion or saving")
+          PY
+      - name: Preserve bounded actual package and dependency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-newer-source-full-elf-locale-inventory
+          path: |
+            ${{ runner.temp }}/newer-full-elf-direct-graph.json
+            ${{ runner.temp }}/newer-full-localization-census.json
+            ${{ runner.temp }}/m3-newer-full-elf-locale-inventory.json
+          if-no-files-found: warn
+          retention-days: 14
