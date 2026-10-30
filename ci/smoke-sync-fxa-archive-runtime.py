@@ -53,12 +53,12 @@ const done=arguments[arguments.length-1];
     result.weave_lazy_module = !!Weave && typeof Weave === "object" &&
       typeof Weave.perDeviceEngineChoices === "boolean";
 
-    const {getFxAccountsSingleton} = ChromeUtils.importESModule(
+    const {FxAccounts, getFxAccountsSingleton} = ChromeUtils.importESModule(
       "resource://gre/modules/FxAccounts.sys.mjs");
     const fxAccounts=getFxAccountsSingleton();
     result.fxa_singleton = !!fxAccounts &&
       typeof fxAccounts.getSignedInUser === "function" &&
-      typeof fxAccounts.canConnectAccount === "function";
+      typeof FxAccounts.canConnectAccount === "function";
     // Local profile lookup only; no login, token requests or sync attempt.
     const existingUser=await fxAccounts.getSignedInUser();
     result.fxa_no_signed_in_account=existingUser === null;
