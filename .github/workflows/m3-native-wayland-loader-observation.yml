@@ -214,9 +214,9 @@ jobs:
               -ex 'set auto-load safe-path /dev/null' \
               -ex 'handle SIGPIPE nostop noprint pass' \
               -ex run \
-              -ex 'p ((unsigned long)$_siginfo._sifields._sigfault.si_addr < 4096)' \
-              -ex 'p ((unsigned long)$_siginfo._sifields._sigfault.si_addr == 0)' \
-              -ex 'p $_siginfo.si_code' \
+              -ex "p ((unsigned long)\$_siginfo._sifields._sigfault.si_addr < 4096)" \
+              -ex "p ((unsigned long)\$_siginfo._sifields._sigfault.si_addr == 0)" \
+              -ex "p \$_siginfo.si_code" \
               -ex 'bt 15' \
               --args "$native" --no-remote --new-instance \
               --profile "$work/home/.local/share/vulpra/default" \
