@@ -1,0 +1,110 @@
+# Diagnostic only: compare current vs exact historical harness, same native
+# full-normal package and Ubuntu 24.04 Wayland host. No disabled security.
+name: M3 Original Native Wayland Harness Crosscheck
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-wayland-harness-source-crosscheck.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  historical-and-current-ten-second-contract:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      HISTORICAL_SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout current Wayland contract
+        uses: actions/checkout@v4
+        with:
+          path: current
+          sparse-checkout: |
+            packaging
+      - name: Checkout historical Wayland contract from original built source
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: historical
+          sparse-checkout: |
+            packaging
+      - name: Reject swapped source and authenticate exact original ELF package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C historical rev-parse HEAD)" = "$HISTORICAL_SOURCE"
+          test "$(git -C current rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n current/packaging/test-wayland.sh
+          bash -n historical/packaging/test-wayland.sh
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$HISTORICAL_SOURCE" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/baseline" "$RUNNER_TEMP/extracted"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/baseline"
+          (cd "$RUNNER_TEMP/baseline" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/baseline/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA256"
+          tar -xf "$RUNNER_TEMP/baseline/full-normandy-baseline.tar.xz" \
+            -C "$RUNNER_TEMP/extracted"
+          test -x "$RUNNER_TEMP/extracted/vulpra/vulpra"
+          echo 'PASS: current and historical harness pinned, original native archive authenticated'
+      - name: Install same compositor and GTK runtime for both runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends weston wayland-utils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+      - name: Test both real 10-second Wayland contracts without weakening either
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/extracted/vulpra"
+          old_status=0
+          current_status=0
+          # Both runs receive the exact same runtime environment, true native
+          # executable and the same ten-second/non-null-same-surface contract.
+          # Each harness creates and deletes its own private Weston and HOME.
+          if env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            VULPRA_WAYLAND_TEST_SECONDS=10 \
+            bash historical/packaging/test-wayland.sh "$app" \
+            >"$RUNNER_TEMP/historical-wayland-private.log" 2>&1; then
+            echo 'HISTORICAL: full ten-second private Weston contract PASS'
+          else
+            old_status="$?"
+            echo "HISTORICAL: full ten-second private Weston contract FAIL (harness exit $old_status)"
+          fi
+          if env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            VULPRA_WAYLAND_TEST_SECONDS=10 \
+            bash current/packaging/test-wayland.sh "$app" \
+            >"$RUNNER_TEMP/current-wayland-private.log" 2>&1; then
+            echo 'CURRENT: full ten-second private Weston contract PASS'
+          else
+            current_status="$?"
+            echo "CURRENT: full ten-second private Weston contract FAIL (harness exit $current_status)"
+          fi
+          for kind in historical current; do
+            log="$RUNNER_TEMP/$kind-wayland-private.log"
+            if grep -Fq 'native exit status: 11' "$log"; then
+              echo "$kind: browser exit status 11 recorded"
+            elif grep -Fq 'native exit status: 139' "$log"; then
+              echo "$kind: browser exit status 139 recorded"
+            fi
+          done
+          # If historical passes and current fails, the harness difference
+          # deserves investigation. If both fail, suspect native/host behavior.
+          # NEVER convert one passing case into full source/binary mapping.
+          if [[ "$old_status" -ne 0 || "$current_status" -ne 0 ]]; then
+            echo 'FAIL: source-matched private Wayland acceptance not satisfied by both harnesses'
+            exit 1
+          fi
+          echo 'PASS: both pinned native graphical runtime contracts; separate M3 gate remains open'
