@@ -240,6 +240,12 @@ def main() -> int:
           result["observed_loader_init_library_basename_count"],
           "libc/glibc init library basenames")
     print("PASS: sanitized initialized targets with", result["loader_reported_needed_by_initialized_edge_count"], "needed-by and", result["loader_reported_dynamic_initialized_edge_count"], "dynamic-request observed relations")
+    print("DIAGNOSTIC first-libxul request boundaries:", result["traces_with_first_libxul_request_boundary"],
+          "before-only init basenames:", len(result["observed_before_only_basenames"]),
+          "after-boundary init basenames:", len(result["observed_after_first_libxul_request_basenames"]))
+    print("DIAGNOSTIC before-only safe basenames:",
+          ", ".join(result["observed_before_only_basenames"]) or "(none)")
+    print("LIMIT: before/after libxul marker segments are not exclusive process ownership proof")
     print("LIMIT: one", a.workload, "workload on Ubuntu, not complete dlopen, Arch, ABI or feature map")
     return 0
 
