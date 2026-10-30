@@ -1,0 +1,60 @@
+# Only bounded read-only testing/QA dependency evidence. No native build.
+name: M3 Protect Shared Testing and WebDriver Build Roots
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-testing-shared-qa-preservation.yml
+      - ci/m3-testing-shared-qa-preservation.sh
+      - moz.build
+      - testing/moz.build
+      - testing/marionette/moz.build
+      - toolkit/toolkit.mozbuild
+      - browser/installer/package-manifest.in
+      - browser/moz.build
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  protect-essential-qa-roots:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - name: Sparse checkout source-tree marker and read-only QA guard
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+            mach
+      - name: Verify 25 actual core test/build paths and 25 negative mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-testing-shared-qa-preservation.sh
+          bash ci/m3-testing-shared-qa-preservation.sh \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/m3-testing-shared-source.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            '.schema_version==1 and .source_commit==$sha and
+             .candidate=="source_testing" and
+             .verified_source_boundaries==25 and
+             .deliberately_broken_boundaries_rejected==25 and
+             .normal_browser_testing_source_policy=="keep_core_QA_and_build_roots" and
+             .optional_peripheral_test_fixtures_individually_audited==false and
+             .evaluated_build_dependency_graph_complete==false and
+             .source_only==true and .native_test_executed_by_this_audit==false and
+             .source_removal_authorized==false and
+             .compiled_package_savings_bytes==null and
+             .whole_m3_gate_advanced==false' \
+            "$RUNNER_TEMP/m3-testing-shared-source.json" >/dev/null
+      - name: Preserve only bounded tracked-source relationships
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-testing-source-qa-preservation
+          path: ${{ runner.temp }}/m3-testing-shared-source.json
+          if-no-files-found: warn
+          retention-days: 14
