@@ -225,15 +225,25 @@ jobs:
           set -e
           echo "DIAGNOSTIC GDB process exit status: $probe_status (not browser acceptance)"
           awk '
-            /^[$][0-9]+ = (true|false)$/ {
-              ++fault_addr_checks
-              if (fault_addr_checks == 1) print "DIAGNOSTIC fault address under 4096 bytes: " $3
-              else if (fault_addr_checks == 2) print "DIAGNOSTIC fault address exactly null: " $3
-            }
-            /^[$][0-9]+ = -?[0-9]+$/ {
-              if ($3 == 1) print "DIAGNOSTIC fault class: SEGV_MAPERR"
-              else if ($3 == 2) print "DIAGNOSTIC fault class: SEGV_ACCERR"
-              else print "DIAGNOSTIC fault class: other"
+            # GDB may render boolean expressions as 0/1 rather than
+            # true/false. Parse the three successive print results in order,
+            # not as independent regex branches (which mislabels 1 as MAPERR).
+            /^[$][0-9]+ = / {
+              ++fault_field
+              value=$3
+              if (fault_field == 1) {
+                if (value=="true" || value=="1") print "DIAGNOSTIC fault address under 4096 bytes: yes"
+                else if (value=="false" || value=="0") print "DIAGNOSTIC fault address under 4096 bytes: no"
+                else print "DIAGNOSTIC fault address under 4096 bytes: unavailable"
+              } else if (fault_field == 2) {
+                if (value=="true" || value=="1") print "DIAGNOSTIC fault address exactly null: yes"
+                else if (value=="false" || value=="0") print "DIAGNOSTIC fault address exactly null: no"
+                else print "DIAGNOSTIC fault address exactly null: unavailable"
+              } else if (fault_field == 3) {
+                if (value=="1") print "DIAGNOSTIC fault class: SEGV_MAPERR"
+                else if (value=="2") print "DIAGNOSTIC fault class: SEGV_ACCERR"
+                else print "DIAGNOSTIC fault class: other-or-unavailable"
+              }
             }
             /received signal/ {
               if (/SIGSEGV/) print "DIAGNOSTIC signal: SIGSEGV";
