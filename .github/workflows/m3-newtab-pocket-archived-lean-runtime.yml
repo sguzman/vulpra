@@ -84,7 +84,7 @@ jobs:
           assert metadata["schema_version"]==1
           assert metadata["compressed_bytes"]==pkg.stat().st_size==87138100
           assert (root/"vulpra-normandy-candidate.tar.xz.sha256").read_text().split()[0]==digest
-          assert "Normandy.sys.mjs" in metadata["forbidden_resource_absent"]
+          assert "res/normandy/Normandy.sys.mjs" in metadata["forbidden_resource_absent"]
           print("PASS: original source-matched lean native archive digest, guarded omission")
           PY
           mkdir -p .git/vulpra-native-build/packages
