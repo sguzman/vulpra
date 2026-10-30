@@ -194,3 +194,24 @@ sign-in, production feed initialization, causal package saving, browser
 source deletion or a new full M3 gate is established.
 
 **Progress remains M3 2/6 (33%), overall 44%; Δ0 pp.**
+
+## Newer-source full normal browser verification dependency
+
+[Commit b148240](https://github.com/sguzman/vulpra/commit/b1482404dfb8b01342990ee99ea3df0f9756b5f7)
+adds positive New Tab resource checks to the existing
+[normal full-Normandy native build workflow](https://github.com/sguzman/vulpra/actions/workflows/build-m3-normandy-matched-baseline.yml)
+and a new automatic
+[post-build actual browser test](https://github.com/sguzman/vulpra/blob/main/.github/workflows/m3-newtab-full-normal-after-build.yml)
+that pins the original build's commit, rehashes its archived native package,
+checks its physical full-Normandy and New Tab modules, then executes the
+same 26 shipped-method and registration checks on a disposable real Vulpra
+browser profile. The first compile run is
+[40997075527](https://github.com/sguzman/vulpra/actions/runs/40997075527);
+workflow lint [40997075529](https://github.com/sguzman/vulpra/actions/runs/40997075529)
+**PASSED**.
+
+**Acceptance not yet earned:** Native compilation/package result and the
+automatic post-build New Tab test must both finish successfully before
+the result may be credited. This is not an opt-in feature removal,
+causal size measurement, network recommendation fallback proof or entire
+M3 milestone gate. No user workstation/source browser modification.
