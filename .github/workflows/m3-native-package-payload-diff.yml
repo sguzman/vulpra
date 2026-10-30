@@ -105,7 +105,22 @@ jobs:
              .causal_source_feature_byte_savings_proven == false and
              .native_executable_run_by_comparison == false and
              .new_source_removal_authorized == false and
-             .new_m3_roadmap_gate_passed == false' \
+             .new_m3_roadmap_gate_passed == false and
+             .full_tar_member_count == .lean_tar_member_count and
+             .native_tar_content_diff.removed_count == 0 and
+             .native_tar_content_diff.added_count == 0 and
+             .native_tar_content_diff.changed_count == 13 and
+             .native_tar_content_diff.identical_count == 34 and
+             .native_tar_content_diff.paths_truncated_for_report == false and
+             .embedded_omni_content_diff.removed_count == 22 and
+             .embedded_omni_content_diff.added_count == 1 and
+             .embedded_omni_content_diff.changed_count == 5 and
+             .embedded_omni_content_diff.identical_count == 7974 and
+             .embedded_omni_content_diff.paths_truncated_for_report == false and
+             (.embedded_omni_content_diff.removed_paths_sample |
+                 all(startswith("vulpra/omni.ja::chrome/toolkit/res/normandy/"))) and
+             .embedded_omni_content_diff.added_paths_sample ==
+                 ["vulpra/omni.ja::moz-src/toolkit/components/nimbus/NimbusBootstrap.sys.mjs"]' \
             "$RUNNER_TEMP/m3-native-package-payload-diff.json" >/dev/null
           echo "PASS: real package content identity without causal saving or new M3 claim"
       - name: Preserve bounded physical file and nested resource report
