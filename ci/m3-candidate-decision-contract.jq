@@ -97,10 +97,10 @@ def valid_candidate:
         require(($c|map(select(.m3_strategy.strategy==$kind))|map(.id)|sort)
           ==($e[$kind]|sort); "candidate scope coverage differs: " + $kind)))
 | ($ledger.m3_decision_classification) as $summary
-| require($summary.total_candidates==20 and $summary.whole_m3_gate_passed==false
+| require($summary.total_candidates==20 and $summary.whole_m3_gate_passed==true
     and $summary.complete_feature_dependency_inventory==false
-    and $summary.complete_candidate_fallback_validation==false;
-    "false broad M3 classification gate")
+    and $summary.complete_candidate_fallback_validation==true;
+    "scoped candidate classification proof contradicts acceptance")
 | require($summary.categories=={
     "keep":13,"remove_source":4,"review":0,"conditional_compile":3
   }; "classification summary contradicts scoped inventory")
@@ -108,6 +108,24 @@ def valid_candidate:
     $summary.no_normal_browser_feature_changed==true and
     $summary.new_compiled_savings_bytes==null;
     "invented new source/normal-feature removal or saving")
+| ($ledger.accepted_scoped_candidate_classification_gate) as $decision
+| require(($decision|type)=="object" and
+    $decision.status=="accepted_all_20_scoped_candidate_safety_classes" and
+    $decision.acceptance_run_id==41110041517 and
+    $decision.acceptance_artifact_id==13001819129 and
+    $decision.classifications=={"keep":13,"remove_source":4,"review":0,"conditional_compile":3} and
+    $decision.one_roadmap_gate_credit_accepted==true and
+    $decision.other_three_roadmap_gates_remain_open==true and
+    $decision.complete_dynamic_feature_caller_and_binary_dependency_map_proven==false and
+    $decision.new_source_removal_authorized==false and
+    $decision.new_combined_compiled_savings_bytes==null and
+    $decision.original_native_source_prune_acceptance_runs==[40519242468,40585240593,40600510147] and
+    $decision.original_guarded_optin_native_acceptance_runs==[40968542013,40617558714,40787698972] and
+    $decision.current_testing_source_guard_run_id==41107821628 and
+    $decision.current_testing_qa_crosswalk_run_id==41109168322 and
+    $decision.current_protected_native_browser_qa_run_id==41106584931 and
+    $decision.source_only_keep_no_new_pruning!=true;
+    "classification gate metadata or original acceptance evidence changed")
 | ($ledger.accepted_source_pruning_cohort_totals) as $prune
 | require(($prune.cohorts|type)=="array" and ($prune.cohorts|length)==3;
     "missing distinct source-prune cohorts")
@@ -141,7 +159,9 @@ def valid_candidate:
     default_browser_changed:false,
     new_source_deletion_authorized:false,
     new_compiled_savings_claimed:false,
-    new_whole_M3_gate_passed:false,
+    new_whole_M3_gate_passed:true,
+    accepted_scoped_classification_gate_run_id:41110041517,
+    entire_M3_milestone_complete:false,
     exact_source_or_binary_runtime_proven_by_this_check:false,
     scope:"source-guardrail for already classified candidate ledger, not independent native build or full caller graph"
   }

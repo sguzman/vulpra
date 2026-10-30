@@ -22,7 +22,8 @@ jq -e '
   .default_browser_changed==false and
   .new_source_deletion_authorized==false and
   .new_compiled_savings_claimed==false and
-  .new_whole_M3_gate_passed==false and
+  .new_whole_M3_gate_passed==true and
+  .accepted_scoped_classification_gate_run_id==41110041517 and
   .exact_source_or_binary_runtime_proven_by_this_check==false
 ' "$tmp/accepted.json" >/dev/null
 
@@ -58,9 +59,10 @@ reject 'reject missing failure-safe fallback' '(.candidates[]|select(.id=="sourc
 reject 'reject missing runtime/source evidence' '(.candidates[]|select(.id=="newtab_and_messaging")|.evidence)=[]'
 reject 'reject missing provenance' '(.candidates[]|select(.id=="browser_genai")|.m3_strategy.provenance)=""'
 reject 'reject invalid flag type' '(.candidates[]|select(.id=="pocket_integration")|.m3_strategy.broad_feature_removal_authorized)="false"'
+reject 'reject missing original gate acceptance' '.accepted_scoped_candidate_classification_gate.acceptance_run_id=0'
 reject 'reject fake complete candidate map' '.m3_decision_classification.complete_feature_dependency_inventory=true'
-reject 'reject fake fallback closure' '.m3_decision_classification.complete_candidate_fallback_validation=true'
-reject 'reject unearned gate' '.m3_decision_classification.whole_m3_gate_passed=true'
+reject 'reject fake fallback closure' '.m3_decision_classification.complete_candidate_fallback_validation=false'
+reject 'reject unearned gate' '.m3_decision_classification.whole_m3_gate_passed=false'
 reject 'reject inflated summary count' '.m3_decision_classification.categories.keep=14'
 reject 'reject claimed new normal browser change' '.m3_decision_classification.no_normal_browser_feature_changed=false'
 reject 'reject compiled saving without build' '.m3_decision_classification.new_compiled_savings_bytes=500000'
@@ -71,8 +73,8 @@ reject 'reject source-only claims of binary savings' '.accepted_source_pruning_c
 reject 'reject source-only claims of native library removal' '.accepted_source_pruning_cohort_totals.native_library_removed=true'
 reject 'reject add old overlapping candidate inventories' '.accepted_source_pruning_cohort_totals.candidate_fields_source_files_not_additive_as_pruned_totals=false'
 reject 'reject incorrectly declared milestone progress' '.accepted_source_pruning_cohort_totals.broader_m3_gate_advanced_by_this_accounting=true'
-if [[ "$rejected" -ne 35 ]]; then
-  echo "FAIL: expected 35 unsafe mutation rejections, saw $rejected" >&2
+if [[ "$rejected" -ne 36 ]]; then
+  echo "FAIL: expected 36 unsafe mutation rejections, saw $rejected" >&2
   exit 1
 fi
 echo "PASS: real 20-candidate scoped policy; $rejected deliberately unsafe mutations rejected"

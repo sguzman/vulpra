@@ -35,7 +35,7 @@ jobs:
           command -v jq
           bash -n ci/tests/m3-candidate-decision-contract-test.sh
           jq -e -f ci/m3-candidate-decision-contract.jq             docs/vulpra/DEBLOAT-CANDIDATES.json             > "$RUNNER_TEMP/m3-candidate-policy-guard.json"
-      - name: Reject 35 unsafe candidate and source-prune ledger mutations
+      - name: Reject 36 unsafe candidate and source-prune ledger mutations
         shell: bash
         run: |
           set -euo pipefail
@@ -47,7 +47,7 @@ jobs:
                  .verified_distinct_pruned_source_paths==14867 and
                  .verified_distinct_pruned_git_blob_bytes==129967585 and
                  .new_source_deletion_authorized==false and
-                 .new_whole_M3_gate_passed==false and
+                 .new_whole_M3_gate_passed==true and
                  .exact_source_or_binary_runtime_proven_by_this_check==false'             "$RUNNER_TEMP/m3-candidate-policy-guard.json" >/dev/null
       - name: Preserve only bounded policy results (never raw candidate inventory)
         if: always()

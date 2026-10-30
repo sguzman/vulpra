@@ -1865,12 +1865,12 @@
     "next": "Obtain exact-source native linker map/symbol/section allocation and generated build/config values before crediting any compile-time removal; no disassembly or link graph completed by archive-level member census."
   },
   "m3_decision_classification": {
-    "state": "twenty_scoped_candidates_assigned_conservative_strategies; all shared GenAI, NewTab/ASRouter and testing roots retained; candidate gate awaits separate cross-evidence acceptance",
-    "as_of": "2026-10-29",
+    "state": "accepted_all_twenty_scoped_candidate_decisions_with_conservative_keep_and_verified_fallbacks; independent full dependency mapping remains open",
+    "as_of": "2026-10-30",
     "total_candidates": 20,
     "complete_feature_dependency_inventory": false,
-    "complete_candidate_fallback_validation": false,
-    "whole_m3_gate_passed": false,
+    "complete_candidate_fallback_validation": true,
+    "whole_m3_gate_passed": true,
     "categories": {
       "keep": 13,
       "remove_source": 4,
@@ -2669,6 +2669,41 @@
     "extension_storage_transaction_proven": false,
     "safe_source_removal_proven": false,
     "documentation": "docs/vulpra/M3-ARCHIVED-NATIVE-SYNC-FXA-BOUNDARIES-20261030.md"
+  },
+  "accepted_scoped_candidate_classification_gate": {
+    "status": "accepted_all_20_scoped_candidate_safety_classes",
+    "acceptance_run_id": 41110041517,
+    "acceptance_artifact_id": 13001819129,
+    "actionlint_run_id": 41110041605,
+    "original_native_source_prune_acceptance_runs": [
+      40519242468,
+      40585240593,
+      40600510147
+    ],
+    "original_guarded_optin_native_acceptance_runs": [
+      40968542013,
+      40617558714,
+      40787698972
+    ],
+    "current_testing_source_guard_run_id": 41107821628,
+    "current_testing_qa_crosswalk_run_id": 41109168322,
+    "current_protected_native_browser_qa_run_id": 41106584931,
+    "source_and_native_current_policy_run_id": 41109622280,
+    "source_and_build_safety_run_id": 41109757924,
+    "classifications": {
+      "keep": 13,
+      "remove_source": 4,
+      "review": 0,
+      "conditional_compile": 3
+    },
+    "fallback_scope": "Exactly 20 scoped source candidates: preserve all 13 keep roots without omission, retain original fallback for three guarded opt-in variants, and rely on separately accepted native regressions for four historically pruned non-Linux source categories.",
+    "complete_dynamic_feature_caller_and_binary_dependency_map_proven": false,
+    "new_source_removal_authorized": false,
+    "full_M3_milestone_completed": false,
+    "new_combined_compiled_savings_bytes": null,
+    "one_roadmap_gate_credit_accepted": true,
+    "other_three_roadmap_gates_remain_open": true,
+    "documentation": "docs/vulpra/M3-SCOPED-CANDIDATE-CLASSIFICATION-20261030.md"
   },
   "accepted_m3_candidate_scope_guard_and_genai_native": {
     "status": "accepted_bounded_candidate_policy_and_genai_dependency_guards_only",

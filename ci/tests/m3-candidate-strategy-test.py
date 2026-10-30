@@ -64,8 +64,8 @@ def validate(reg,paired,progress):
     assert counts==control["categories"]
     assert counts=={"keep":13,"remove_source":4,"review":0,"conditional_compile":3}
     assert control["complete_feature_dependency_inventory"] is False
-    assert control["complete_candidate_fallback_validation"] is False
-    assert control["whole_m3_gate_passed"] is False
+    assert control["complete_candidate_fallback_validation"] is True
+    assert control["whole_m3_gate_passed"] is True
     assert control["no_new_source_deletion"] is True
     assert control["no_normal_browser_feature_changed"] is True
     assert control["new_compiled_savings_bytes"] is None
@@ -513,10 +513,10 @@ def validate(reg,paired,progress):
     assert promo["removal_authorized"] is False
 
     m3,=(m for m in progress["milestones"] if m["id"]=="M3")
-    assert m3["acceptance_gates"]["passed"]==2
+    assert m3["acceptance_gates"]["passed"]==3
     assert m3["acceptance_gates"]["total"]==6
-    assert m3["percent"]==33
-    assert progress["overall"]["percent"]==44
+    assert m3["percent"]==50
+    assert progress["overall"]["percent"]==50
     return counts
 
 def negative_fixtures(reg,paired,progress):
@@ -530,7 +530,7 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:change_strategy(a,"remove_source"),
         lambda a,b,c:change_strategy(a,"unknown"),
         lambda a,b,c:a["m3_decision_classification"]["categories"].update(keep=8),
-        lambda a,b,c:a["m3_decision_classification"].update(whole_m3_gate_passed=True),
+        lambda a,b,c:a["m3_decision_classification"].update(whole_m3_gate_passed=False),
         lambda a,b,c:a["m3_decision_classification"].update(new_compiled_savings_bytes=6000000),
         lambda a,b,c:change_remove(a),
         lambda a,b,c:change_promo(a,"normal_run",1),
@@ -540,7 +540,7 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="localization_default_and_repack")["m3_strategy"].update(guarded_opt_in_omission_accepted=True),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="source_testing")["m3_strategy"].update(safety_and_fallback=""),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="newtab_adsfeed_optout")["m3_strategy"].update(permanent_removal_accepted=True),
-        lambda a,b,c:c["milestones"][2]["acceptance_gates"].update(passed=3),
+        lambda a,b,c:c["milestones"][2]["acceptance_gates"].update(passed=2),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed").update(removal_authorized=True),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed").update(package_logical_bytes=0),
         lambda a,b,c:next(x for x in a["candidates"] if x["id"]=="aiwindow_prompt_seed")["native_offline_prompt_runtime"].update(seed_record_count=0),
