@@ -86,7 +86,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/loader"
-          env LD_DEBUG=libs,files LD_DEBUG_OUTPUT="$RUNNER_TEMP/loader/m3-loader" \
+          env VULPRA_M3_LOADER_TRACE_PREFIX="$RUNNER_TEMP/loader/m3-loader" \
             MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             VULPRA_WAYLAND_TEST_SECONDS=10 \
             bash packaging/test-wayland.sh "$RUNNER_TEMP/extracted/vulpra"
