@@ -109,7 +109,7 @@ jobs:
             "native_build_run_id":int(os.environ["ORIGINAL_NATIVE_BUILD_RUN_ID"]),
             "full_normal_archive_sha256":m["sha256"],
             "full_normal_archive_compressed_bytes":m["compressed_bytes"],
-            "original_nommardy_runner_physically_present":m["normandy_runner_present"],
+            "original_normandy_runner_physically_present":m["normandy_runner_present"],
             "original_required_newtab_modules_present":m["required_newtab_modules_present"],
             "elf_regular_members":len(e["elf_members"]),
             "elf_direct_needed_edges":e["direct_needed_edges"],
@@ -139,6 +139,69 @@ jobs:
             "elf_unique_needed_names","same_physical_package_for_both_scans")},indent=2))
           print("PASS: source-pinned physical ELF + locale crosswalk, no deletion or saving")
           PY
+      - name: Reproducible physical feature resource root census
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,io,json,os,tarfile,zipfile
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          p=root/"native/full-normandy-baseline.tar.xz"
+          inventory=json.loads((root/"m3-newer-full-elf-locale-inventory.json").read_text())
+          assert hashlib.sha256(p.read_bytes()).hexdigest()==inventory["full_normal_archive_sha256"]
+          specs={"newtab_bundle":["chrome/browser/builtin-addons/newtab/",152],"newtab_feed_modules":["chrome/browser/builtin-addons/newtab/lib/",63],"asrouter":["modules/asrouter/",31],"normandy":["chrome/toolkit/res/normandy/",26],"sync":["modules/services-sync/",33],"fxaccounts":["modules/FxAccounts",16],"aiwindow":["moz-src/browser/components/aiwindow/","chrome/browser/content/browser/aiwindow/",257],"genai":["moz-src/browser/components/genai/","chrome/browser/content/browser/genai/",32],"devtools":["chrome/devtools/","moz-src/devtools/",2301],"remote_qa":["chrome/remote/",157],"fluent":["localization/",241],"hyphenation":["hyphenation/",46],"dictionary":["dictionaries/",2],"telemetry_named":["modules/Telemetry","modules/BrowserTelemetry","modules/ClientID","modules/Glean","moz-src/toolkit/components/telemetry/","moz-src/toolkit/components/glean/",16],"crash_named":["moz-src/toolkit/crashreporter/","modules/CrashManager","modules/CrashSubmit",3]}
+          entries=[]
+          jars=[]
+          with tarfile.open(p,"r:xz") as tf:
+              for member in tf:
+                  if not (member.isfile() and member.name.endswith("/omni.ja")):
+                      continue
+                  with zipfile.ZipFile(io.BytesIO(tf.extractfile(member).read())) as jar:
+                      items=[i for i in jar.infolist() if not i.is_dir()]
+                  assert len(items)==len(set(i.filename for i in items)), "duplicate ZIP path"
+                  jars.append({"path":member.name,"entries":len(items)})
+                  entries.extend((member.name,i) for i in items)
+          assert len(jars)==2 and len(entries)==8001,(jars,len(entries))
+          groups={}
+          for name,spec in specs.items():
+              prefixes=spec[:-1]
+              expected_count=spec[-1]
+              found=[(jar,m) for jar,m in entries if any(
+                  m.filename.startswith(prefix) for prefix in prefixes)]
+              groups[name]={
+                  "prefixes":prefixes,
+                  "entries":len(found),
+                  "logical_bytes":sum(m.file_size for _,m in found),
+                  "inner_zip_bytes":sum(m.compress_size for _,m in found),
+                  "per_jar":{j:sum(t==j for t,_ in found) for j in sorted(set(
+                      t for t,_ in found))}
+              }
+              assert len(found)==expected_count,(name,len(found),expected_count)
+          locale=json.loads((root/"newer-full-localization-census.json").read_text())
+          assert groups["fluent"]["entries"] == (
+              locale["nested_omni_ja_members"]["browser_l10n"]["files"]+
+              locale["nested_omni_ja_members"]["toolkit_l10n"]["files"])
+          assert groups["newtab_feed_modules"]["entries"]<groups["newtab_bundle"]["entries"]
+          report={
+              "schema_version":1,"compiled_source_sha":os.environ["COMPILED_SOURCE_SHA"],
+              "native_build_run_id":int(os.environ["ORIGINAL_NATIVE_BUILD_RUN_ID"]),
+              "archive_sha256":inventory["full_normal_archive_sha256"],
+              "omni_ja":jars,"nested_entries":len(entries),"feature_prefix_groups":groups,
+              "prefix_groups_can_overlap":True,"full_feature_inventory":False,
+              "runtime_reachability_proven":False,"removal_authorized":False,
+              "compressed_byte_savings":None,
+              "limitations":[
+                  "Exact ZIP path prefixes only, not dynamic import or caller graph.",
+                  "Overlapping groups must never be added as independent sizes.",
+                  "Physical ZIP logical bytes are not removable XZ bytes.",
+                  "Preserved safety, account, locale and QA resources have known consumers."
+              ]}
+          (root/"m3-newer-full-feature-resource-crosswalk.json").write_text(
+              json.dumps(report,indent=2)+"\\n")
+          print("PASS: authenticated exact-source native package physical feature roots")
+          print({k:v["entries"] for k,v in groups.items()})
+          PY
       - name: Preserve bounded actual package and dependency evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -148,5 +211,6 @@ jobs:
             ${{ runner.temp }}/newer-full-elf-direct-graph.json
             ${{ runner.temp }}/newer-full-localization-census.json
             ${{ runner.temp }}/m3-newer-full-elf-locale-inventory.json
+            ${{ runner.temp }}/m3-newer-full-feature-resource-crosswalk.json
           if-no-files-found: warn
           retention-days: 14
