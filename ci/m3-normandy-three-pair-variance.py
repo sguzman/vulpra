@@ -84,7 +84,7 @@ def reconcile(reports):
         "native_browser_or_package_executed_by_reconciliation":False,
         "independent_build_archive_reproducibility_proven":False,
         "causal_compiled_or_feature_savings_proven":False,
-        "three_trails_additive":False,
+        "three_trials_additive":False,
         "new_source_removal_authorized":False,
         "whole_m3_gate_passed":False,
         "limitations":[
