@@ -213,7 +213,11 @@ jobs:
               -ex 'set debuginfod enabled off' \
               -ex 'set auto-load safe-path /dev/null' \
               -ex 'handle SIGPIPE nostop noprint pass' \
-              -ex run -ex 'bt 15' \
+              -ex run \
+              -ex 'p ((unsigned long)$_siginfo._sifields._sigfault.si_addr < 4096)' \
+              -ex 'p ((unsigned long)$_siginfo._sifields._sigfault.si_addr == 0)' \
+              -ex 'p $_siginfo.si_code' \
+              -ex 'bt 15' \
               --args "$native" --no-remote --new-instance \
               --profile "$work/home/.local/share/vulpra/default" \
               about:blank >"$work/gdb.log" 2>&1
@@ -221,6 +225,16 @@ jobs:
           set -e
           echo "DIAGNOSTIC GDB process exit status: $probe_status (not browser acceptance)"
           awk '
+            /^[$][0-9]+ = (true|false)$/ {
+              ++fault_addr_checks
+              if (fault_addr_checks == 1) print "DIAGNOSTIC fault address under 4096 bytes: " $3
+              else if (fault_addr_checks == 2) print "DIAGNOSTIC fault address exactly null: " $3
+            }
+            /^[$][0-9]+ = -?[0-9]+$/ {
+              if ($3 == 1) print "DIAGNOSTIC fault class: SEGV_MAPERR"
+              else if ($3 == 2) print "DIAGNOSTIC fault class: SEGV_ACCERR"
+              else print "DIAGNOSTIC fault class: other"
+            }
             /received signal/ {
               if (/SIGSEGV/) print "DIAGNOSTIC signal: SIGSEGV";
               else print "DIAGNOSTIC signal: other";
