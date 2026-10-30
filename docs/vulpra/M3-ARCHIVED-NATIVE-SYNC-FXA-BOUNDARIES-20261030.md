@@ -59,8 +59,10 @@ This is not approval to drop Sync/FxAccounts or ship a lean build.
 
 The initial two trials [40984761275](https://github.com/sguzman/vulpra/actions/runs/40984761275)
 and [40984871838](https://github.com/sguzman/vulpra/actions/runs/40984871838)
-failed due to test-harness assumptions (static-vs-instance API and
-`AccountsGlue` import path), not a proven browser regression.
+failed on a mistaken test-harness `AccountsGlue` import URL; the
+actual registration is under `moz-src:///browser/components/`.
+The static-vs-instance FxAccounts API check was corrected before the
+first workflow was launched. Neither failure proved a browser regression.
 The final passing runtime uses the corrected actual source module
 registration.
 
