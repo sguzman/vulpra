@@ -1,0 +1,162 @@
+# Historical source-matched original normal/runner-free Normandy pair.
+# No native compilation or user profile. Test exact packaged New Tab methods.
+name: M3 Historical Full vs Lean Native New Tab Pair
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-newtab-historical-full-lean-pair.yml
+      - ci/smoke-newtab-pocket-retained-runtime.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-normal-versus-lean-newtab-factories:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 36
+    env:
+      HISTORICAL_SOURCE_SHA: '674db8e385c36aec23e78bbe059b2a1fec194fae'
+      FULL_SHA256: '47c8ac5ce90747c051eac8daf24544d88767fdeb989293c0b50c5e8ac9e53c30'
+      MOZ_HEADLESS: '1'
+    steps:
+      - name: Checkout only independent test harness
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Require source-pinned archived binary provenance and safe fixtures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/smoke-newtab-pocket-retained-runtime.py ci/smoke-webextension-package-local.py
+          python3 ci/smoke-newtab-pocket-retained-runtime.py --self-test
+          for run in 40431769117 40431768974; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e --arg source "$HISTORICAL_SOURCE_SHA"                 '.status == "completed" and .conclusion == "success" and .head_sha == $source' >/dev/null
+          done
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40439671494" |
+            jq -e '.status == "completed" and .conclusion == "success"' >/dev/null
+          # Full source equivalence is NOT claimed: four of six New Tab blobs
+          # differ from this original archived revision; two match main.
+          test "$(git rev-parse HEAD:browser/extensions/newtab/lib/TopStoriesFeed.sys.mjs)" =             "0bed6344ba11903efc06a31e98b7bf1737e68278"
+          echo 'PASS: original full/lean source SHA, authentic successful builds, bounded test fixtures'
+      - name: Retrieve the two already-built original normal and lean archives
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/full" "$RUNNER_TEMP/lean"
+          gh run download 40431769117 --repo "$GITHUB_REPOSITORY"             --name vulpra-m3-normandy-matched-full-baseline             --dir "$RUNNER_TEMP/full"
+          gh run download 40431768974 --repo "$GITHUB_REPOSITORY"             --name vulpra-m3-normandy-linux-candidate             --dir "$RUNNER_TEMP/lean"
+      - name: Verify exact artifact manifests, sidecars and physical Normandy difference
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,io,json,os,tarfile,zipfile
+          base=Path(os.environ["RUNNER_TEMP"])
+          source=os.environ["HISTORICAL_SOURCE_SHA"]
+          cases=(
+              ("full","full-normandy-baseline.tar.xz","m3-full-normandy-baseline.json",
+               86937548,True),
+              ("lean","vulpra-normandy-candidate.tar.xz","m3-normandy-package.json",
+               86909928,False),
+          )
+          for label,filename,manifest_name,bytes_expected,has_normandy in cases:
+              folder=base/label
+              pkg=folder/filename
+              meta=json.loads((folder/manifest_name).read_text())
+              digest=hashlib.sha256(pkg.read_bytes()).hexdigest()
+              assert digest==meta["sha256"],(label,"manifest SHA mismatch")
+              assert digest==(folder/(filename+".sha256")).read_text().split()[0]
+              assert pkg.stat().st_size==bytes_expected==meta["compressed_bytes"]
+              assert meta["schema_version"]==1 and meta["source_commit"]==source
+              if has_normandy:
+                  assert digest==os.environ["FULL_SHA256"]
+                  assert meta["normandy_runner_present"] is True
+                  assert meta["variant"]=="full-normandy"
+              else:
+                  assert "res/normandy/Normandy.sys.mjs" in meta["forbidden_resource_absent"]
+              jars=0
+              normandy=False
+              newtab=[]
+              with tarfile.open(pkg,"r:xz") as tar:
+                  for member in tar:
+                      if member.isfile() and member.name.endswith("/omni.ja"):
+                          jars+=1
+                          with zipfile.ZipFile(io.BytesIO(tar.extractfile(member).read())) as jar:
+                              names=jar.namelist()
+                              normandy|=any(x.endswith("res/normandy/Normandy.sys.mjs") for x in names)
+                              newtab.extend(x for x in names if x.endswith("newtab/lib/ActivityStream.sys.mjs"))
+              assert jars>=2 and normandy is has_normandy,(label,"physical variant mismatch")
+              assert newtab,(label,"New Tab missing from original package")
+              print("PASS",label,"original source",source[:12],"archive",digest[:16],
+                    "Normandy present",normandy,"JARs",jars)
+          PY
+      - name: Install only normal-browser runtime libraries and pinned geckodriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y             --no-install-recommends libgtk-3-0t64 libdbus-glib-1-2             libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz"             https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+      - name: Execute identical guarded New Tab methods on both original native binaries
+        shell: bash
+        timeout-minutes: 9
+        run: |
+          set -euo pipefail
+          mkdir -p .git/vulpra-native-build/packages
+          for variant in full lean; do
+            if [[ "$variant" == full ]]; then
+              source="$RUNNER_TEMP/full/full-normandy-baseline.tar.xz"
+              option=full-normandy
+            else
+              source="$RUNNER_TEMP/lean/vulpra-normandy-candidate.tar.xz"
+              option=normandy-free
+            fi
+            dest=".git/vulpra-native-build/packages/vulpra-local-newtab-pair.tar.xz"
+            cp "$source" "$dest"
+            sha256sum "$dest" > "$dest.sha256"
+            PATH="$RUNNER_TEMP:$PATH"               python3 ci/smoke-newtab-pocket-retained-runtime.py "$GITHUB_WORKSPACE"               --variant "$option"
+            cp .git/vulpra-native-build/m3-newtab-pocket-preservation.json               ".git/vulpra-native-build/m3-newtab-original-$variant.json"
+          done
+          jq -e --slurpfile lean .git/vulpra-native-build/m3-newtab-original-lean.json             '.schema_version == 1 and
+             .status == "real_normal_full_normandy_native_newtab_factories_retained" and
+             .variant == "full-normandy" and .full_default_normandy_runner_present == true and
+             .verified_archive_sha256 == true and
+             .private_browser_profile_verified == true and
+             .gecko_nonlocal_connection_guard_enabled == true and
+             .newtab_document_loaded == true and
+             (.protected_newtab_factories_and_registry | length) == 26 and
+             (.protected_newtab_factories_and_registry | all(. == true)) and
+             ($lean[0].status == "real_normandy_free_native_newtab_feed_factories_retained") and
+             ($lean[0].variant == "normandy-free") and
+             ($lean[0].full_default_normandy_runner_present == false) and
+             ($lean[0].protected_newtab_factories_and_registry == .protected_newtab_factories_and_registry) and
+             ($lean[0].private_browser_profile_verified == true) and
+             ($lean[0].gecko_nonlocal_connection_guard_enabled == true) and
+             (.actual_legacy_fallback_invoked == false) and
+             (.actual_modern_content_fetch_invoked == false) and
+             (.source_removal_authorized == false) and
+             (.new_m3_whole_gate_passed == false)'             .git/vulpra-native-build/m3-newtab-original-full.json >/dev/null
+          echo 'PASS: 26 actual shipped New Tab method/registry checks in both historical source-matched variants'
+      - name: Upload only bounded normal and lean real-runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-historical-full-lean-newtab-runtime-pair
+          path: .git/vulpra-native-build/m3-newtab-original-*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

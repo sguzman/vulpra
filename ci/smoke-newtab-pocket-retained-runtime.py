@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Real packaged lean-Normandy Vulpra New Tab feed registration smoke.
+"""Real packaged Vulpra New Tab feed registration and fallback smoke.
 
-This is *not* a normal full-Normandy binary: it is the source-matched
-opt-in runner-free archive, with built-in New Tab/Pocket untouched.
-No external recommendation fetches, login or real user profile permitted.
+Used for a checksum-verified archived runner-free build and for an original
+full-Normandy archived baseline. The workflow must authenticate the source,
+identity and physical package variant before this script executes.
+No recommendation fetches, login or real user profile are requested.
 """
 from __future__ import annotations
 import importlib.util
@@ -136,7 +137,7 @@ const ignoredExperimentChanges=experiment.changes===0;
 DiscoveryStreamFeed.prototype.onPocketExperimentUpdated.call(
   experiment,null,"feature-updated");
 return {
-  mode: "retained_full_newtab_in_optin_normandy_free_browser",
+  mode: "retained_builtin_newtab_feed_factories",
   legacy_malformed_config_stubbed_init:
     broken.discoveryStreamEnabled===false &&
     broken.propertiesCalls===1 && broken.initCalls===1,
@@ -221,14 +222,16 @@ def validate(page,registration):
     ):
         raise ValueError("Real packaged New Tab did not show an HTML document")
     if not isinstance(registration,dict) or registration.get("mode")!=(
-        "retained_full_newtab_in_optin_normandy_free_browser"):
+        "retained_builtin_newtab_feed_factories"):
         raise ValueError("Unexpected New Tab source/variant or import failure")
     for k in CHECKS:
         if registration.get(k) is not True:
             raise ValueError("Missing protected New Tab feed/factory: "+k)
     return {key:True for key in CHECKS}
 
-def run(repo:Path,driver:str):
+def run(repo:Path,driver:str,variant="normandy-free"):
+    if variant not in ("normandy-free","full-normandy"):
+        raise ValueError("Unrecognized audited native browser variant")
     archive=webdriver.verified_archive(repo)
     with tempfile.TemporaryDirectory(prefix="vulpra-m3-newtab-fallback-") as tmp:
         root=Path(tmp)
@@ -289,11 +292,14 @@ def run(repo:Path,driver:str):
                     raise ValueError("Browser altered unrelated profile sentinel")
                 return {
                   "schema_version":1,
-                  "status":"real_normandy_free_native_newtab_feed_factories_retained",
+                  "status":("real_normal_full_normandy_native_newtab_factories_retained"
+                      if variant=="full-normandy" else
+                      "real_normandy_free_native_newtab_feed_factories_retained"),
+                  "variant":variant,
                   "verified_archive_sha256":True,
                   "private_browser_profile_verified":True,
                   "gecko_nonlocal_connection_guard_enabled":True,
-                  "full_default_normandy_runner_present":False,
+                  "full_default_normandy_runner_present":variant=="full-normandy",
                   "protected_newtab_factories_and_registry":checked,
                   "newtab_document_loaded":True,
                   "pocket_recommendation_data_downloaded_by_probe":False,
@@ -305,7 +311,9 @@ def run(repo:Path,driver:str):
                   "source_removal_authorized":False,
                   "new_m3_whole_gate_passed":False,
                   "limitations":[
-                    "Actual compiled opt-in Normandy-free browser, not a normal full-Normandy archive.",
+                    ("Archived normal full-Normandy browser, not a complete current-main binary."
+                     if variant=="full-normandy" else
+                     "Archived compiled opt-in Normandy-free browser, not a normal full-Normandy archive."),
                     "Proves packaged feed factory/registration and about:newtab document, not live Pocket recommendations.",
                     "Legacy TopStoriesFeed method runs with inert hooks; modern DiscoveryStream getters run on inert preference state. Neither test initializes a feed or fetches remote stories.",
                     "No native source deletion, caller graph closure, cloud network or repeatable package savings.",
@@ -327,10 +335,12 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("repo",type=Path,nargs="?",default=Path.cwd())
     p.add_argument("--self-test",action="store_true")
+    p.add_argument("--variant",choices=("normandy-free","full-normandy"),
+                   default="normandy-free")
     a=p.parse_args()
     if a.self_test:
         good={k:True for k in CHECKS}
-        good["mode"]="retained_full_newtab_in_optin_normandy_free_browser"
+        good["mode"]="retained_builtin_newtab_feed_factories"
         page={"url":"about:newtab","document":True}
         assert validate(page,good)=={k:True for k in CHECKS}
         for key in CHECKS:
@@ -347,11 +357,12 @@ def main():
         return
     driver=shutil.which("geckodriver")
     if not driver:raise RuntimeError("Need installed geckodriver; cannot fake native test")
-    report=run(a.repo.resolve(),driver)
+    report=run(a.repo.resolve(),driver,a.variant)
     output=a.repo/".git/vulpra-native-build/m3-newtab-pocket-preservation.json"
     output.parent.mkdir(parents=True,exist_ok=True)
     output.write_text(json.dumps(report,indent=2)+"\n")
-    print("PASS: real opt-in Normandy-free native browser retains protected New Tab feed factories")
+    print("PASS: real",a.variant,"native browser retains",len(CHECKS),
+          "protected New Tab feed checks")
 
 if __name__=="__main__":
     try:main()
