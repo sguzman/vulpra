@@ -926,7 +926,7 @@
         "safety_and_fallback": "Retain shared GenAI root: startup, actor, preferences, sidebar, enterprise policy and Nimbus source callers plus nine real native module imports rely on its packaged functionality. Narrow optional removals require separate fallback and native tests.",
         "permanent_removal_accepted": false,
         "broad_feature_removal_authorized": false,
-        "requires_further_source_or_runtime_verification": true,
+        "requires_further_source_or_runtime_verification": false,
         "provenance": "source and native evidence links in candidate.evidence; not generated linker graph",
         "guarded_opt_in_omission_accepted": false
       }
