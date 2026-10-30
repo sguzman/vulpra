@@ -287,6 +287,55 @@ def validate(reg,paired,progress):
     assert cross["new_compiled_savings_bytes"] is None
     assert cross["documentation"]=="docs/vulpra/M3-PROTECTED-SOURCE-CROSSCHECK-20261030.md"
 
+    physical=reg["accepted_normandy_first_pair_physical_payload"]
+    assert physical["status"]=="real_two_native_archive_tar_and_omni_payload_sha256_diff_passed"
+    assert physical["matching_original_source_commit"]=="674db8e385c36aec23e78bbe059b2a1fec194fae"
+    assert (physical["original_full_native_run_id"],physical["original_optin_native_run_id"],
+            physical["original_candidate_runtime_run_id"]) == (40431769117,40431768974,40439671494)
+    assert (physical["physical_payload_diff_run_id"],physical["stricter_only_normandy_remove_guard_run_id"],
+            physical["physical_payload_artifact_id"])==(40983063003,40983193150,12945337486)
+    assert physical["full_archive_sha256"]=="47c8ac5ce90747c051eac8daf24544d88767fdeb989293c0b50c5e8ac9e53c30"
+    assert physical["lean_archive_sha256"]=="4888a1955883406f64a48cca6eedd28e359d0583596e68ec23f3d7280c165062"
+    assert (physical["full_compressed_bytes"],physical["lean_compressed_bytes"],
+            physical["signed_observed_compressed_delta_bytes"])==(86937548,86909928,27620)
+    assert (physical["full_regular_logical_bytes"],physical["lean_regular_logical_bytes"],
+            physical["observed_regular_file_net_logical_delta_bytes"])==(339564498,339454609,109889)
+    assert physical["full_regular_logical_bytes"]-physical["lean_regular_logical_bytes"] == physical["observed_regular_file_net_logical_delta_bytes"]
+    assert (physical["full_tar_members_including_directories"],physical["lean_tar_members_including_directories"])==(58,58)
+    assert (physical["tar_file_paths_added"],physical["tar_file_paths_removed"])==(0,0)
+    assert (physical["tar_file_payloads_sha256_changed"],physical["tar_file_payloads_sha256_identical"])==(13,34)
+    assert (physical["embedded_omni_resources_removed"],physical["embedded_omni_resources_added"],
+            physical["embedded_omni_resources_changed"],
+            physical["embedded_omni_resources_sha256_identical"])==(22,1,5,7974)
+    assert physical["sole_added_inner_resource"]=="vulpra/omni.ja::moz-src/toolkit/components/nimbus/NimbusBootstrap.sys.mjs"
+    for flag in ("all_removed_inner_resources_namespaced_under_normandy",
+                 "shared_nimbus_helpers_retained","some_native_elf_payloads_differ"):
+        assert physical[flag] is True,flag
+    for flag in ("package_payloads_bit_identical","equal_native_runtime_semantics_proven",
+                 "causal_archive_bytes_per_feature_proven","source_removal_authorized",
+                 "new_m3_roadmap_gate_passed"):
+        assert physical[flag] is False,flag
+    variance=reg["accepted_normandy_three_pair_variance"]
+    assert variance["success_run_id"]==40983703521
+    assert variance["strict_schema_followup_run_id"] is None
+    assert variance["artifact_id"]==12945423159
+    assert variance["original_pair_comparison_runs"]==[40439793884,40968688858,40976632873]
+    assert variance["original_package_candidate_runtime_runs"]==[40439671494,40968542013,40976502356]
+    assert variance["source_commits"]==[
+        "674db8e385c36aec23e78bbe059b2a1fec194fae",
+        "034ddd665a080f173ce45094ae3afb8868b45e1a",
+        "ad0dea4a317cfe5f22213f6dc778366c6dc042d0"]
+    assert variance["observed_compressed_deltas_bytes"]==[27620,15752,17352]
+    assert variance["net_regular_file_logical_deltas_bytes"]==[109889,109889,109889]
+    assert variance["test_cases_rejecting_false_source_hash_and_arithmetic"]==10
+    assert variance["net_regular_logical_difference_invariant_for_these_three_trials"] is True
+    for flag in ("same_source_revision_across_three_trials","compressed_archive_delta_invariant",
+                 "native_package_executed_or_recompiled_by_reconciliation",
+                 "compressed_omission_savings_additive","causal_component_bytes_proven",
+                 "causal_future_size_savings_guaranteed","source_removal_authorized",
+                 "new_m3_roadmap_gate_passed"):
+        assert variance[flag] is False,flag
+
     source=reg["accepted_source_pruning_cohort_totals"]
     cohorts=source["cohorts"]
     assert len(cohorts)==3
@@ -507,6 +556,15 @@ def negative_fixtures(reg,paired,progress):
         lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(all_source_audits_same_commit=False),
         lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(new_compiled_savings_bytes=1),
         lambda a,b,c:a["accepted_m3_protected_source_crosscheck"].update(source_commit="0"*40),
+        lambda a,b,c:a["accepted_normandy_first_pair_physical_payload"].update(embedded_omni_resources_removed=23),
+        lambda a,b,c:a["accepted_normandy_first_pair_physical_payload"].update(tar_file_payloads_sha256_changed=0),
+        lambda a,b,c:a["accepted_normandy_first_pair_physical_payload"].update(all_removed_inner_resources_namespaced_under_normandy=False),
+        lambda a,b,c:a["accepted_normandy_first_pair_physical_payload"].update(causal_archive_bytes_per_feature_proven=True),
+        lambda a,b,c:a["accepted_normandy_first_pair_physical_payload"].update(source_removal_authorized=True),
+        lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(observed_compressed_deltas_bytes=[27620,27620,27620]),
+        lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(net_regular_file_logical_deltas_bytes=[0,0,0]),
+        lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(causal_component_bytes_proven=True),
+        lambda a,b,c:a["accepted_normandy_three_pair_variance"].update(new_m3_roadmap_gate_passed=True),
     ]
     for index,mutate in enumerate(mutations,1):
         a,b,c=deepcopy(reg),deepcopy(paired),deepcopy(progress)
