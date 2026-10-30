@@ -1,0 +1,146 @@
+# Independently reconcile two checksum-bound full-native ELF reports and
+# the protected localization categories. Read-only; no new native build.
+name: M3 Compare New Full-Normal ELF and Locale Evidence
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-compare-new-full-elf-locale.yml
+      - ci/m3-native-elf-import-diff.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare-immutable-full-native-artifacts:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout existing read-only ELF comparison harness
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Validate mutating fixture rejections
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-elf-import-diff.py --self-test
+      - name: Authenticate successful original compiled full-normal packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40963098075" |
+            jq -e '.status=="completed" and .conclusion=="success" and .head_sha=="cde4d83043f8c476173c8dbc78b66b078c3f6b5b"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40997075527" |
+            jq -e '.status=="completed" and .conclusion=="success" and .head_sha=="b1482404dfb8b01342990ee99ea3df0f9756b5f7"' >/dev/null
+          for run in 41004025705 41077034156 40923776304; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e '.status=="completed" and .conclusion=="success"' >/dev/null
+          done
+          mkdir -p "$RUNNER_TEMP/old" "$RUNNER_TEMP/new" "$RUNNER_TEMP/historical"
+          gh run download 40963098075 --repo "$GITHUB_REPOSITORY" \
+            --name m3-source-matched-native-link-evidence --dir "$RUNNER_TEMP/old"
+          gh run download 41077034156 --repo "$GITHUB_REPOSITORY" \
+            --name m3-newer-source-full-elf-locale-inventory --dir "$RUNNER_TEMP/new"
+          gh run download 40923776304 --repo "$GITHUB_REPOSITORY" \
+            --name m3-historical-package-localization-census --dir "$RUNNER_TEMP/historical"
+      - name: Reconcile evidence source pins and protected resource boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          def read(folder,name):
+              matches=list((root/folder).rglob(name))
+              assert len(matches)==1,(folder,name,len(matches))
+              return json.loads(matches[0].read_text())
+          old=read("old","m3-native-link-elf-package-graph.json")
+          link=read("old","m3-native-link-inputs.json")
+          new=read("new","newer-full-elf-direct-graph.json")
+          meta=read("new","m3-newer-full-elf-locale-inventory.json")
+          newer=read("new","newer-full-localization-census.json")
+          historical=read("historical","m3-package-localization-census.json")
+          old_source="cde4d83043f8c476173c8dbc78b66b078c3f6b5b"
+          new_source="b1482404dfb8b01342990ee99ea3df0f9756b5f7"
+          old_sha="18798900c5307fd136f7d93db6681741616981b609741a4b2209a1810273eb51"
+          new_sha="7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a"
+          assert old["source_commit"]==link["source_commit"]==old_source
+          assert link["workflow_run_id"]==40963098075
+          assert link["runtime_passed_after_link_audit"] is True
+          assert old["archive_sha256"]==link["package"]["package_sha256"]==old_sha
+          assert new["archive_sha256"]==meta["full_normal_archive_sha256"]==newer["sha256"]==new_sha
+          assert meta["compiled_source_sha"]==meta["actual_scanner_checkout_sha"]==new_source
+          assert meta["native_build_run_id"]==40997075527
+          assert meta["original_nommardy_runner_physically_present"] is True
+          assert meta["original_required_newtab_modules_present"] is True
+          assert meta["same_physical_package_for_both_scans"] is True
+          assert meta["candidate_source_removal_authorized"] is False
+          assert old["archive_compressed_bytes"]==87154700
+          assert new["archive_compressed_bytes"]==87154544
+          assert new["archive_regular_members"]==old["archive_regular_members"]==47
+          assert newer["tar_regular_members"]==historical["tar_regular_members"]==47
+          assert historical["sha256"]=="e8717fd10a1ffc330ef96f802a4112da335aaf57c6e68d70e639b3e137c9e97f"
+          assert historical["archive_original_build_source_commit"]=="1683ca67b69389a879717bcd537772c3b40624b6"
+          cats=("browser_l10n","toolkit_l10n","default_locale","dictionaries","hyphenation","legacy_chrome_locale")
+          a={x:historical["nested_omni_ja_members"][x] for x in cats}
+          b={x:newer["nested_omni_ja_members"][x] for x in cats}
+          assert a==b,"Protected resource categories changed between full builds"
+          assert sum(z["logical_bytes"] for z in b.values())==6300493
+          assert [(x["archive_member"],x["entries"]) for x in newer["omni_ja"]]==[
+            ("./vulpra/omni.ja",2674),("./vulpra/browser/omni.ja",5327)]
+          (root/"old-verified.json").write_text(json.dumps(old))
+          new["source_commit"]=new_source
+          (root/"new-verified.json").write_text(json.dumps(new))
+          report={"schema_version":1,"older_full_source":old_source,
+            "newer_full_source":new_source,"older_archive_sha256":old_sha,
+            "newer_archive_sha256":new_sha,
+            "observed_cross_source_compressed_byte_delta":-156,
+            "protected_locale_buckets_unchanged":True,
+            "protected_locale_logical_bytes":6300493,
+            "protected_locale_counts":b,
+            "packaged_full_browser_runtime_test_run_id":41004025705,
+            "same_source_size_savings_proven":False,
+            "feature_removal_authorized":False,
+            "complete_dependency_closure_proven":False}
+          (root/"m3-newer-locale-crosswalk.json").write_text(json.dumps(report,indent=2)+"\n")
+          print("PASS: two exact compiled native source packages and immutable locale categories")
+          PY
+      - name: Compare all ELF file direct imports and contents
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-elf-import-diff.py \
+            --historical "$RUNNER_TEMP/old-verified.json" \
+            --current "$RUNNER_TEMP/new-verified.json" \
+            --output "$RUNNER_TEMP/m3-newer-full-native-elf-import-diff.json"
+          jq -e \
+            '.earlier_ELF_member_count==28 and .current_ELF_member_count==28 and
+             .earlier_direct_needed_edges==268 and .current_direct_needed_edges==268 and
+             (.removed_ELF_file_paths | length)==0 and
+             (.added_ELF_file_paths | length)==0 and
+             (.changed_per_file_DT_NEEDED_or_SONAME | length)==0 and
+             .changed_ELF_member_SHA256_paths==[
+               "./vulpra/libxul.so","./vulpra/vulpra","./vulpra/vulpra-bin"] and
+             .unchanged_ELF_member_SHA256_count==25 and
+             .historical_graph_source_commit=="cde4d83043f8c476173c8dbc78b66b078c3f6b5b" and
+             .current_graph_source_commit=="b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
+             .new_compressed_feature_savings_bytes==null and
+             .actual_host_loader_resolution_proven==false and
+             .source_removal_authorized==false' \
+            "$RUNNER_TEMP/m3-newer-full-native-elf-import-diff.json" >/dev/null
+          echo 'PASS: exact 28-ELF graph stable; 268 per-file direct imports; three physical changes'
+      - name: Archive bounded real source/ELF/locale comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-newer-full-native-elf-and-locale-reconciliation
+          path: |
+            ${{ runner.temp }}/m3-newer-full-native-elf-import-diff.json
+            ${{ runner.temp }}/m3-newer-locale-crosswalk.json
+          if-no-files-found: warn
+          retention-days: 14
