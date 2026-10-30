@@ -1,0 +1,118 @@
+# Read-only physical SHA256 diff of previously accepted paired full and lean packages.
+name: M3 Source Matched Native Package Payload Diff
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-package-payload-diff.py
+      - .github/workflows/m3-native-package-payload-diff.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect-actual-native-files:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      PAIR_SOURCE_SHA: '674db8e385c36aec23e78bbe059b2a1fec194fae'
+    steps:
+      - name: Sparse checkout bounded read-only inspector
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject malicious tar paths and false-identity test fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-native-package-payload-diff.py
+          python3 ci/m3-native-package-payload-diff.py --self-test
+      - name: Authenticate earlier full, lean, and runtime runs at original source SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 40431768974 40431769117; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" |
+              jq -e --arg sha "$PAIR_SOURCE_SHA" \
+                '.status == "completed" and .conclusion == "success" and .head_sha == $sha' >/dev/null
+          done
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40439671494" |
+            jq -e '.status == "completed" and .conclusion == "success"' >/dev/null
+          echo "PASS: both native builds and candidate runtime completed successfully"
+      - name: Download both immutable native tarballs and SHA sidecars
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40431768974 --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-linux-candidate \
+            --dir "$RUNNER_TEMP/lean"
+          gh run download 40431769117 --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline \
+            --dir "$RUNNER_TEMP/full"
+      - name: Rehash and require both original metadata and source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,re
+          from pathlib import Path
+          root=Path(os.environ["RUNNER_TEMP"])
+          source=os.environ["PAIR_SOURCE_SHA"]
+          pairs=(
+            ("full","full-normandy-baseline.tar.xz","m3-full-normandy-baseline.json",86937548),
+            ("lean","vulpra-normandy-candidate.tar.xz","m3-normandy-package.json",86909928),
+          )
+          for kind,name,report,expected_bytes in pairs:
+              folder=root/kind
+              archive=folder/name
+              info=json.loads((folder/report).read_text())
+              sidecar=(folder/(name+".sha256")).read_text()
+              digest=hashlib.sha256(archive.read_bytes()).hexdigest()
+              assert info["schema_version"]==1 and info["source_commit"]==source,kind
+              assert info["sha256"]==digest,kind
+              assert info["compressed_bytes"]==expected_bytes==archive.stat().st_size,kind
+              assert re.match(r"^[0-9a-f]{64}\b",sidecar) and sidecar[:64]==digest,kind
+          print("PASS: authentic SHA256, same source, original artifact size and metadata")
+          PY
+      - name: Compare physical tar members and nested zip content, without execution
+        shell: bash
+        timeout-minutes: 18
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-package-payload-diff.py \
+            --full "$RUNNER_TEMP/full/full-normandy-baseline.tar.xz" \
+            --lean "$RUNNER_TEMP/lean/vulpra-normandy-candidate.tar.xz" \
+            --output "$RUNNER_TEMP/m3-native-package-payload-diff.json"
+          jq -e \
+            '.schema_version == 1 and
+             .full_compressed_bytes == 86937548 and
+             .lean_compressed_bytes == 86909928 and
+             .observed_outer_compressed_difference_bytes == 27620 and
+             .full_normandy_runner_resource_found == true and
+             .lean_normandy_runner_resource_found == false and
+             .lean_shared_nimbus_helpers_found == true and
+             .all_browser_source_hashes_proven_equal == false and
+             .binary_runtime_equivalence_proven == false and
+             .archive_reproducibility_across_builds_proven == false and
+             .causal_source_feature_byte_savings_proven == false and
+             .native_executable_run_by_comparison == false and
+             .new_source_removal_authorized == false and
+             .new_m3_roadmap_gate_passed == false' \
+            "$RUNNER_TEMP/m3-native-package-payload-diff.json" >/dev/null
+          echo "PASS: real package content identity without causal saving or new M3 claim"
+      - name: Preserve bounded physical file and nested resource report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-package-hash-level-diff
+          path: ${{ runner.temp }}/m3-native-package-payload-diff.json
+          if-no-files-found: warn
+          retention-days: 14
