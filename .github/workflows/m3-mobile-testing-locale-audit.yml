@@ -120,7 +120,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/41107821628" |
             jq -e '.head_sha=="adaeb72804192a2a91995617708429f346796e93"' >/dev/null
           mkdir -p "$RUNNER_TEMP/physical" "$RUNNER_TEMP/qa"
-          gh run download 41077034156 --repo "$GITHUB_REPOSITORY" \
+          gh run download 41077783489 --repo "$GITHUB_REPOSITORY" \
             --name m3-newer-source-full-elf-locale-inventory --dir "$RUNNER_TEMP/physical"
           gh run download 41109168322 --repo "$GITHUB_REPOSITORY" \
             --name m3-testing-qa-source-native-crosswalk --dir "$RUNNER_TEMP/qa"
