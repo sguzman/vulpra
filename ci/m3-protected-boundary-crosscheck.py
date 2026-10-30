@@ -95,7 +95,9 @@ def check(report: dict, family: str, expected_source: str) -> list[dict]:
             "narrow_jsx_opt_in_candidate_not_removal_ready",
         ):
             raise ValueError("Unsafe Pocket classification")
-        if family == "sync" and row.get("decision") != "retain":
+        if family == "sync" and row.get("decision") != (
+            "retain_both" if row[id_field] == "sync_source_vs_fxa_source" else "retain"
+        ):
             raise ValueError("Unsafe Sync classification")
         if family == "telemetry" and row.get("classification") != "retain_protected":
             raise ValueError("Unsafe Telemetry classification")
@@ -168,7 +170,8 @@ def synthetic():
         for name in names:
             row = {field:name, "evidence":[dict(example)]}
             if family == "pocket": row["classification"]="retain"
-            if family == "sync": row["decision"]="retain"
+            if family == "sync":
+                row["decision"]="retain_both" if name=="sync_source_vs_fxa_source" else "retain"
             if family == "telemetry": row["classification"]="retain_protected"
             rows.append(row)
         report[family] = {
