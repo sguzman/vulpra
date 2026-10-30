@@ -198,7 +198,7 @@ jobs:
                   "Preserved safety, account, locale and QA resources have known consumers."
               ]}
           (root/"m3-newer-full-feature-resource-crosswalk.json").write_text(
-              json.dumps(report,indent=2)+"\\n")
+              json.dumps(report,indent=2))
           print("PASS: authenticated exact-source native package physical feature roots")
           print({k:v["entries"] for k,v in groups.items()})
           PY
