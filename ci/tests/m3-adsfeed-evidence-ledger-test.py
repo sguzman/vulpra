@@ -88,7 +88,7 @@ def validate(candidate: dict, progress: dict) -> dict:
     m3 = next(x for x in progress["milestones"] if x["id"] == "M3")
     m4 = next(x for x in progress["milestones"] if x["id"] == "M4")
     gates = m3["acceptance_gates"]
-    assert gates["passed"] == 2 and gates["total"] == 6, "Unexpected M3 gates"
+    assert gates["passed"] == 3 and gates["total"] == 6, "Unexpected M3 gates"
     assert m3["percent"] == floor(100 * gates["passed"] / gates["total"])
     assert progress["overall"]["percent"] == floor(
         (m2["percent"] + m3["percent"] + m4["percent"]) / 3
@@ -115,7 +115,7 @@ def test_mutation_failures(candidate: dict, progress: dict) -> None:
             observed_delta_spread_bytes=0),
         lambda c, p: c.update(normal_browser_changed=True),
         lambda c, p: p["overall"].update(percent=p["overall"]["percent"] + 1),
-        lambda c, p: p["milestones"][2]["acceptance_gates"].update(passed=3),
+        lambda c, p: p["milestones"][2]["acceptance_gates"].update(passed=2),
     )
     for mutate in mutations:
         bad_candidate = deepcopy(candidate)

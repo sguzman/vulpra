@@ -119,9 +119,9 @@ def validate(e: dict, register: dict, progress: dict, roadmap: str) -> None:
 
     milestones = {m["id"]: m for m in progress["milestones"]}
     m3 = milestones["M3"]
-    assert m3["acceptance_gates"]["passed"] == 2
+    assert m3["acceptance_gates"]["passed"] == 3
     assert m3["acceptance_gates"]["total"] == 6
-    assert m3["percent"] == 33
+    assert m3["percent"] == 50
     assert progress["overall"]["percent"] == floor(
         (milestones["M2"]["percent"] + m3["percent"] + milestones["M4"]["percent"]) / 3)
     records = [r for r in m3["verified_removals"] if r["id"] == "opt-in-newtab-promocard-jsx"]
@@ -138,7 +138,7 @@ def validate(e: dict, register: dict, progress: dict, roadmap: str) -> None:
     assert record["lean_compressed_bytes"] == lean["compressed_package_bytes"]
     assert record["observed_signed_archive_delta_bytes"] == diff["signed_full_minus_optin_compressed_archive_bytes"]
     assert record["observed_uncompressed_js_delta_bytes"] == diff["signed_full_minus_optin_uncompressed_newtab_js_bytes"]
-    assert "2/6 (33%)" in roadmap and "overall 44%" in roadmap
+    assert "3/6 acceptance gates (50%)" in roadmap and "overall 50%" in roadmap
     assert "M3-PROMOCARD-NATIVE-PAIR.json" in roadmap
 
 
@@ -157,8 +157,8 @@ def negative_tests(e: dict, register: dict, progress: dict, roadmap: str) -> Non
         lambda a, b, c: next(x for x in b["candidates"] if x["id"] == "newtab_promocard_optout")["native_trial"].update(signed_full_minus_optin_archive_bytes=99999),
         lambda a, b, c: next(x for x in b["candidates"] if x["id"] == "newtab_promocard_optout")["native_trial"].update(repeatability_established=True),
         lambda a, b, c: next(x for x in b["candidates"] if x["id"] == "newtab_promocard_optout")["native_trial"].update(default_browser_changed=True),
-        lambda a, b, c: c["overall"].update(percent=45),
-        lambda a, b, c: c["milestones"][2]["acceptance_gates"].update(passed=3),
+        lambda a, b, c: c["overall"].update(percent=49),
+        lambda a, b, c: c["milestones"][2]["acceptance_gates"].update(passed=2),
     )
     for mutate in cases:
         a, b, c = deepcopy(e), deepcopy(register), deepcopy(progress)
