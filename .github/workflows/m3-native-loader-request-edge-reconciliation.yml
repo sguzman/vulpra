@@ -75,6 +75,10 @@ jobs:
              .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/m3-native-loader-actual-request-edge-contrast.json" >/dev/null
           echo 'PASS: authenticated actual loader request edge subgraph, M3 sixth gate still OPEN'
+          echo 'DIAGNOSTIC: graphical-only dynamic requester -> requested library basenames:'
+          jq -r '.dynamic_graphical_only_edges[] |
+            .requester_basename + " -> " + .requested_library_basename' \
+            "$RUNNER_TEMP/m3-native-loader-actual-request-edge-contrast.json"
       - name: Upload only bounded sanitized real native request edge sets
         uses: actions/upload-artifact@v4
         with:
