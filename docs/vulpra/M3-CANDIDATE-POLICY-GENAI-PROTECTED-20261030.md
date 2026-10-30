@@ -19,9 +19,9 @@ ledger and independently guards **all 20 scoped classifications**:
 
 | Historical scope class | Number | Semantics |
 | --- | ---: | --- |
-| Keep protected | **10** | Core GTK/Wayland/WebExtensions/security, Sync, FxAccounts, telemetry/data-deletion safety, DevTools, Pocket feeds, default localization, AI Window offline seed and Hungarian hyphenation |
+| Keep protected | **11** | Core GTK/Wayland/WebExtensions/security, Sync, FxAccounts, telemetry/data-deletion safety, DevTools, Pocket feeds, default localization, AI Window offline seed, Hungarian hyphenation and the shared GenAI root |
 | Previously accepted bounded source prune | **4** | Windows/Cocoa, Android apps and independently verified Android/iOS/UIKit leaves; not a general platform removal permit |
-| Requires source/runtime review | **3** | `source_testing`, `browser_genai`, `newtab_and_messaging` |
+| Requires source/runtime review | **2** | `source_testing`, `newtab_and_messaging` |
 | Guarded opt-in conditional omission | **3** | Normandy recipe runner, New Tab AdsFeed, New Tab PromoCard; default browser unchanged |
 
 The test deliberately corrupts existing candidate IDs, moves protected
@@ -38,7 +38,7 @@ those source removals.
 candidates, not a full binary dependency map or proof that the list
 exhausts all future Firefox features. Any new candidate or changed
 classification requires an explicit, reviewed contract update. The
-three review scopes remain open.
+two review scopes remain open. GenAI's shared root is now conservatively classified **keep** after verified source and native module behavior; narrow optional assets still need independent acceptance.
 
 ## 2. Source-pinned GenAI external consumer safety map
 
@@ -123,3 +123,24 @@ support and standard-compliance QA until separately source-matched,
 packaged and functionally verified.
 
 **No new whole M3 gate and no user workstation action required.**
+
+## Verified GenAI whole-root classification change
+
+[Updated candidate policy 41082489259](https://github.com/sguzman/vulpra/actions/runs/41082489259)
+**PASSED**, artifact **12990406989**. The existing
+[local source/build safety suite 41082489351](https://github.com/sguzman/vulpra/actions/runs/41082489351)
+**PASSED** too. The first policy run 41080217282 checked the historical
+**10 keep / 3 review** snapshot; this newer successful run checked the
+revised **11 keep / 2 review** snapshot. All **32 intentionally unsafe
+classification and pruning-report mutations** remain rejected, and the
+older candidate-strategy/accepted-evidence suite passes.
+
+The shared `browser_genai` root now has strategy **keep**, based on
+**33 existing source callers/registrations** and **nine successful real
+compiled native module imports**, while optional GenAI subfeature
+removal remains conditional on a *different, narrower and separately
+accepted* candidate. The two remaining coarse review scopes are
+`source_testing` and `newtab_and_messaging`. This classification
+change neither removes a feature nor closes the full M3 classification
+gate; complete dynamic callers and independent optional-feature
+fallbacks are not established. **M3 2/6, overall 44%, Δ0 pp.**

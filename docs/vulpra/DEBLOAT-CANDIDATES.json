@@ -2667,6 +2667,11 @@
   "accepted_m3_candidate_scope_guard_and_genai_native": {
     "status": "accepted_bounded_candidate_policy_and_genai_dependency_guards_only",
     "policy_ci_run_id": 41080217282,
+    "accepted_new_genai_keep_classification_ci_run_id": 41082489259,
+    "accepted_new_genai_keep_classification_artifact_id": 12990406989,
+    "accepted_new_genai_keep_source_safety_ci_run_id": 41082489351,
+    "genai_shared_root_decision": "keep",
+    "remaining_review_candidate_ids": ["source_testing","newtab_and_messaging"],
     "policy_artifact_id": 12989500427,
     "policy_workflow_lint_ci_run_id": 41080217307,
     "classified_candidate_count": 20,
