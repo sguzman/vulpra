@@ -34,7 +34,7 @@ bash "$root/ci/m3-dynamic-request-source-map.sh" \
   "$work/valid.json" "$src" "$work/output.json"
 jq -e '
   .source_candidates_confirmed_with_exact_original_tree==true and
-  .observed_three_dynamic_library_requests|length==3
+  (.observed_three_dynamic_library_requests|length)==3
 ' "$work/output.json" >/dev/null
 reject() {
   if bash "$root/ci/m3-dynamic-request-source-map.sh" \
