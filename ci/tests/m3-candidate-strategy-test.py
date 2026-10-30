@@ -57,6 +57,8 @@ def validate(reg,paired,progress):
         if strategy=="conditional_compile":
             assert c["decision"].startswith("accepted_")
             assert strategy!="remove_source"
+    for decision in ("keep","remove_source","review","conditional_compile"):
+        counts.setdefault(decision,0)
     control=reg["m3_decision_classification"]
     assert control["total_candidates"]==20
     assert counts==control["categories"]
