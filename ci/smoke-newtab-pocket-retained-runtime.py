@@ -70,6 +70,52 @@ TopStoriesFeed.prototype.lazyLoadTopStories.call(
 const userOff=makeFake();
 TopStoriesFeed.prototype.lazyLoadTopStories.call(
   userOff,{dsPref:'{"enabled":false}',userPref:false});
+// Exercise shipped modern DiscoveryStream getters with *inert preference
+// state only*. No feed constructor, network request, cache I/O or dispatch.
+const configGetter=Object.getOwnPropertyDescriptor(
+  DiscoveryStreamFeed.prototype,"config")?.get;
+const sponsorGetter=Object.getOwnPropertyDescriptor(
+  DiscoveryStreamFeed.prototype,"showSponsoredStories")?.get;
+const storiesGetter=Object.getOwnPropertyDescriptor(
+  DiscoveryStreamFeed.prototype,"showStories")?.get;
+if ([configGetter,sponsorGetter,storiesGetter].some(f=>typeof f!=="function")) {
+  throw new Error("Packaged modern feed getter absent");
+}
+const modernState=(raw,enabled,sponsored=true,systemSponsored=true,
+                   systemStories=true,userStories=true)=>({
+  _prefCache:{},
+  store:{getState:()=>({Prefs:{values:{
+    "discoverystream.config":raw,
+    "discoverystream.enabled":enabled,
+    "showSponsored":sponsored,
+    "system.showSponsored":systemSponsored,
+    "feeds.system.topstories":systemStories,
+    "feeds.section.topstories":userStories
+  }}})}
+});
+const modern=modernState('{"enabled":true,"layout":"modern"}',true);
+const modernConfig=configGetter.call(modern);
+// A cached config must not reread (or unexpectedly execute) the store.
+modern.store.getState=()=>{throw new Error("Modern config unexpectedly reread");};
+const modernCached=configGetter.call(modern)===modernConfig;
+const disabledSystem=configGetter.call(modernState('{"enabled":true}',false));
+const disabledJson=configGetter.call(modernState('{"enabled":false}',true));
+// Invalid JSON deliberately hits the shipped parse-error fallback, with no
+// live pref modification and no feed initialization.
+const malformed=configGetter.call(modernState("{invalid",true));
+const bothSponsored=modernState("{}",true,true,true);
+const userOptOut=modernState("{}",true,false,true);
+const systemOptOut=modernState("{}",true,true,false);
+const storiesOn=modernState("{}",true,true,true,true,true);
+const storiesOff=modernState("{}",true,true,true,false,true);
+const experiment={changes:0,pocketNewTabExperimentChanged(){this.changes++;}};
+DiscoveryStreamFeed.prototype.onPocketExperimentUpdated.call(
+  experiment,null,"feature-experiment-loaded");
+DiscoveryStreamFeed.prototype.onPocketExperimentUpdated.call(
+  experiment,null,"feature-rollout-loaded");
+const ignoredExperimentChanges=experiment.changes===0;
+DiscoveryStreamFeed.prototype.onPocketExperimentUpdated.call(
+  experiment,null,"feature-updated");
 return {
   mode: "retained_full_newtab_in_optin_normandy_free_browser",
   legacy_malformed_config_stubbed_init:
@@ -82,6 +128,22 @@ return {
     loaded.propertiesCalls===0 && loaded.initCalls===0,
   legacy_user_pref_disabled_skip:
     userOff.propertiesCalls===0 && userOff.initCalls===0,
+  modern_config_enabled_and_keeps_layout:
+    modernConfig.enabled===true && modernConfig.layout==="modern",
+  modern_config_disabled_by_system_pref:disabledSystem.enabled===false,
+  modern_config_disabled_by_json:disabledJson.enabled===false,
+  modern_malformed_json_fallback:
+    Object.keys(malformed).length===1 && !malformed.enabled,
+  modern_config_pref_cache_preserved:modernCached,
+  modern_sponsor_requires_both_prefs:
+    sponsorGetter.call(bothSponsored)===true &&
+    sponsorGetter.call(userOptOut)===false &&
+    sponsorGetter.call(systemOptOut)===false,
+  modern_stories_respect_system_pref:
+    storiesGetter.call(storiesOn)===true &&
+    storiesGetter.call(storiesOff)===false,
+  modern_experiment_notifications_guarded:
+    ignoredExperimentChanges && experiment.changes===1,
   legacy_registered:keys.includes("feeds.system.topstories"),
   modern_registered:keys.includes("feeds.discoverystreamfeed"),
   top_sites_registered:keys.includes("feeds.system.topsites"),
@@ -107,7 +169,15 @@ CHECKS=(
   "legacy_malformed_config_stubbed_init",
   "legacy_disabled_config_stubbed_init",
   "legacy_stories_already_loaded_skip","legacy_user_pref_disabled_skip",
-  "no_feed_initialized_or_fetched_by_probe"
+  "no_feed_initialized_or_fetched_by_probe",
+  "modern_config_enabled_and_keeps_layout",
+  "modern_config_disabled_by_system_pref",
+  "modern_config_disabled_by_json",
+  "modern_malformed_json_fallback",
+  "modern_config_pref_cache_preserved",
+  "modern_sponsor_requires_both_prefs",
+  "modern_stories_respect_system_pref",
+  "modern_experiment_notifications_guarded"
 )
 
 def validate(page,registration):
@@ -203,7 +273,7 @@ def run(repo:Path,driver:str):
                   "limitations":[
                     "Actual compiled opt-in Normandy-free browser, not a normal full-Normandy archive.",
                     "Proves packaged feed factory/registration and about:newtab document, not live Pocket recommendations.",
-                    "Legacy TopStoriesFeed method is executed with inert stub hooks; not a real feed instance or remote stories fetch.",
+                    "Legacy TopStoriesFeed method runs with inert hooks; modern DiscoveryStream getters run on inert preference state. Neither test initializes a feed or fetches remote stories.",
                     "No native source deletion, caller graph closure, cloud network or repeatable package savings.",
                   ]
                 }
