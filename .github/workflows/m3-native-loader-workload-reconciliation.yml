@@ -71,6 +71,10 @@ jobs:
              .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/m3-native-headless-wayland-loader-contrast.json" >/dev/null
           echo 'PASS: actual executed workload overlap, no full dynamic feature closure'
+          echo 'DIAGNOSTIC: authenticated GRAPHICAL-ONLY observed library basenames (no raw paths/PIDs):'
+          jq -r '.observed_wayland_only_library_basenames[]' \
+            "$RUNNER_TEMP/m3-native-headless-wayland-loader-contrast.json"
+          echo 'DIAGNOSTIC: observed-only does NOT imply required only by Wayland or removable elsewhere'
       - name: Upload sanitized counted library-name set differences only
         uses: actions/upload-artifact@v4
         with:
