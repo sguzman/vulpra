@@ -2,8 +2,8 @@
 # CI-only: invoke private Weston with NO outside network interfaces or routes.
 # This helper MUST be launched under: sudo unshare --net -- bash SCRIPT ...
 set -euo pipefail
-if [[ $# -ne 4 ]]; then
-  echo 'usage: m3-wayland-netns-launch.sh runner-user harness appdir enabled|unset' >&2
+if [[ $# -lt 4 || $# -gt 5 ]]; then
+  echo 'usage: m3-wayland-netns-launch.sh runner-user harness appdir enabled|unset [loader-prefix]' >&2
   exit 2
 fi
 user="$1"
@@ -27,9 +27,26 @@ if ip -4 route show | grep -q . || ip -6 route show | grep -q .; then
   echo 'Unsafe network namespace: routing table is not empty' >&2
   exit 4
 fi
+# Optional loader observation is enabled ONLY for a named browser workload;
+# it never changes the default network-isolated tests.
+trace_env=()
+if [[ $# -eq 5 ]]; then
+  prefix="$5"
+  [[ "$mode" = enabled && "$prefix" == /* && "$prefix" != *..* ]] || {
+    echo 'Loader trace requires enabled mode and absolute safe prefix' >&2
+    exit 2
+  }
+  parent="$(dirname -- "$prefix")"
+  [[ -d "$parent" ]] || { echo 'Loader trace directory missing' >&2; exit 2; }
+  runuser -u "$user" -- test -w "$parent" || {
+    echo 'Loader trace directory not writable by unprivileged runner' >&2
+    exit 2
+  }
+  trace_env=("VULPRA_M3_LOADER_TRACE_PREFIX=$prefix")
+fi
 case "$mode" in
   enabled)
-    exec runuser -u "$user" -- env \
+    exec runuser -u "$user" -- env "${trace_env[@]}" \
       MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_WAYLAND_TEST_SECONDS=10 \
       bash "$harness" "$appdir"
     ;;

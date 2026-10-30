@@ -1,0 +1,122 @@
+# Observe *actual successful* Wayland graphical runtime dynamic-loader
+# dependencies using the isolated no-egress network namespace. Do not credit
+# ordinary-host graphical acceptance or the whole feature dependency map.
+name: M3 Actual Netns Wayland Native Loader Mapping
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-wayland-netns-loader.yml
+      - ci/m3-native-loader-runtime-observation.py
+      - ci/m3-wayland-netns-launch.sh
+      - packaging/test-wayland.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-pinned-graphical-native-loader:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout current guarded Wayland and loader diagnostic tools
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+            packaging
+      - name: Verify exact source, checksum and parser rejection fixtures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-wayland-netns-launch.sh
+          bash -n packaging/test-wayland.sh
+          python3 ci/m3-native-loader-runtime-observation.py --self-test
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/native" "$RUNNER_TEMP/extracted"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/native"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/native/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA256"
+          tar -xf "$RUNNER_TEMP/native/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/extracted"
+          test -x "$RUNNER_TEMP/extracted/vulpra/vulpra"
+      - name: Install isolated Wayland compositor, namespace and GTK runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends iproute2 util-linux weston wayland-utils \
+            libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+      - name: Preserve ten-second contract and collect isolated graphical loader traces
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          umask 077
+          trace_dir="$(mktemp -d)"
+          cleanup() { rm -rf -- "$trace_dir"; }
+          trap cleanup EXIT
+          app="$RUNNER_TEMP/extracted/vulpra"
+          user="$(id -un)"
+          harness="$GITHUB_WORKSPACE/packaging/test-wayland.sh"
+          # First, ensure uninstrumented source-pinned native browser
+          # truly passes frame+ten-second checks in the same no-egress mode.
+          sudo unshare --net -- bash ci/m3-wayland-netns-launch.sh \
+            "$user" "$harness" "$app" enabled \
+            >"$trace_dir/normal.log" 2>&1 || {
+              echo 'FAIL: uninstrumented network-isolated native graphical baseline'
+              exit 1
+            }
+          echo 'PASS: original native browser survived full private Weston frame/liveness in no-egress namespace'
+          # Opt-in loader variable is passed to the browser ONLY by the
+          # unmodified test harness, not to Weston, runuser, or the parser.
+          if sudo unshare --net -- bash ci/m3-wayland-netns-launch.sh \
+            "$user" "$harness" "$app" enabled "$trace_dir/loader" \
+            >"$trace_dir/traced.log" 2>&1; then
+            echo 'PASS: real private Weston surface attach/commit survived traced ten-second native workload'
+          else
+            echo 'FAIL: LD_DEBUG altered the network-isolated graphical workload; never credit this as Wayland loader mapping'
+            exit 1
+          fi
+          python3 ci/m3-native-loader-runtime-observation.py "$trace_dir" \
+            --workload private_weston_wayland \
+            --output "$RUNNER_TEMP/m3-netns-wayland-native-loader-observed.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="actual_native_full_normal_loader_observation" and
+            .observed_workload_mode=="private_weston_wayland" and
+            .real_native_wayland_surface_commit_passed==true and
+            .real_native_webdriver_workload_passed==false and
+            .browser_process_traces_with_libxul>=1 and
+            .observed_loader_init_library_basename_count>=3 and
+            .libxul_requested_in_real_browser_process==true and
+            .libc_loader_init_observed==true and
+            .raw_loader_traces_retained==false and
+            .complete_dlopen_graph_proven==false and
+            .unexecuted_feature_routes_proven==false and
+            .complete_dynamic_symbol_and_ABI_resolution_proven==false and
+            .current_main_browser_recompiled==false and
+            .new_source_removal_authorized==false and
+            .new_compressed_savings_bytes==null and
+            .whole_m3_feature_dependency_gate_completed==false' \
+            "$RUNNER_TEMP/m3-netns-wayland-native-loader-observed.json" >/dev/null
+          echo 'PASS: real native graphical Wayland loader observation; not the full M3 map or ordinary-host acceptance'
+      - name: Upload sanitized, exact-source graphical loader evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-netns-wayland-native-loader-observed
+          path: ${{ runner.temp }}/m3-netns-wayland-native-loader-observed.json
+          if-no-files-found: warn
+          retention-days: 14
