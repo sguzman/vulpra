@@ -1,0 +1,104 @@
+# Cheap immutable recheck of three native full/opt-in original comparison reports.
+# Separates logical-byte invariant from variable archive compression; no recompiles.
+name: M3 Three Native Normandy Pair Variance
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-normandy-three-pair-variance.py
+      - .github/workflows/m3-normandy-three-pair-variance.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile-original-matched-pair-observations:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout only bounded JSON reconciliation test
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject malformed matching, arithmetic and false feature-savings claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-normandy-three-pair-variance.py
+          python3 ci/m3-normandy-three-pair-variance.py --self-test
+      - name: Authenticate three full pair CI runs plus corresponding candidate and runtime successes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 40439793884 40968688858 40976632873 \
+                    40439671494 40968542013 40976502356; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" |
+              jq -e '.status == "completed" and .conclusion == "success"' >/dev/null
+          done
+          check_native() {
+            local run="$1" sha="$2"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e --arg source "$sha" \
+                '.status == "completed" and .conclusion == "success" and .head_sha == $source' >/dev/null
+          }
+          check_native 40431768974 674db8e385c36aec23e78bbe059b2a1fec194fae
+          check_native 40954193793 034ddd665a080f173ce45094ae3afb8868b45e1a
+          check_native 40954395174 ad0dea4a317cfe5f22213f6dc778366c6dc042d0
+          echo "PASS: all three source-pinned native candidates and independent runtime and pair jobs passed"
+      - name: Fetch only bounded archived comparison JSON, not 87 MB browser binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run download 40439793884 --repo "$GITHUB_REPOSITORY" \
+            --name m3-normandy-matched-package-comparison --dir "$RUNNER_TEMP/first"
+          gh run download 40968688858 --repo "$GITHUB_REPOSITORY" \
+            --name m3-normandy-matched-package-comparison --dir "$RUNNER_TEMP/second"
+          gh run download 40976632873 --repo "$GITHUB_REPOSITORY" \
+            --name m3-normandy-matched-package-comparison --dir "$RUNNER_TEMP/third"
+          jq -e '.source_commit == "674db8e385c36aec23e78bbe059b2a1fec194fae"' \
+            "$RUNNER_TEMP/first/m3-matched-package-comparison.json" >/dev/null
+          jq -e '.source_commit == "034ddd665a080f173ce45094ae3afb8868b45e1a"' \
+            "$RUNNER_TEMP/second/m3-matched-package-comparison.json" >/dev/null
+          jq -e '.source_commit == "ad0dea4a317cfe5f22213f6dc778366c6dc042d0"' \
+            "$RUNNER_TEMP/third/m3-matched-package-comparison.json" >/dev/null
+      - name: Bound the repeated net logical change without inventing per-feature bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-normandy-three-pair-variance.py \
+            --first "$RUNNER_TEMP/first/m3-matched-package-comparison.json" \
+            --second "$RUNNER_TEMP/second/m3-matched-package-comparison.json" \
+            --third "$RUNNER_TEMP/third/m3-matched-package-comparison.json" \
+            --output "$RUNNER_TEMP/m3-normandy-three-pair-variance.json"
+          jq -e \
+            '.schema_version == 1 and
+             .compressed_archive_deltas_bytes == [27620,15752,17352] and
+             .regular_logical_file_net_size_deltas_bytes == [109889,109889,109889] and
+             .compressed_delta_invariant == false and
+             .regular_logical_delta_invariant == true and
+             .three_distinct_source_revisions == true and
+             .per_pair_reported_archive_sha256_unique == true and
+             .causal_compiled_or_feature_savings_proven == false and
+             .independent_build_archive_reproducibility_proven == false and
+             .three_trails_additive == false and
+             .native_browser_or_package_executed_by_reconciliation == false and
+             .new_source_removal_authorized == false and
+             .whole_m3_gate_passed == false' \
+            "$RUNNER_TEMP/m3-normandy-three-pair-variance.json" >/dev/null
+          echo "PASS: all 3 source matched trials have +109889 logical bytes but variable compressed deltas"
+      - name: Preserve only bounded immutable three-trial accounting
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-normandy-three-trial-variance
+          path: ${{ runner.temp }}/m3-normandy-three-pair-variance.json
+          if-no-files-found: warn
+          retention-days: 14
