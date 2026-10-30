@@ -177,7 +177,8 @@ jobs:
             rm -rf -- "$work"
           }
           trap cleanup EXIT
-          mkdir -m 0700 -p "$work/runtime" "$work/home/.local/share/vulpra/default"
+          umask 077
+          mkdir -p -- "$work/runtime" "$work/home/.local/share/vulpra/default"
           export XDG_RUNTIME_DIR="$work/runtime"
           export WAYLAND_DISPLAY=wayland-vulpra-debug
           unset DISPLAY
@@ -186,7 +187,7 @@ jobs:
             --log="$work/weston.log" >"$work/weston.stdout" 2>&1 &
           weston_pid="$!"
           socket_ready=0
-          for attempt in {1..40}; do
+          for ((attempt=1; attempt<=40; ++attempt)); do
             if [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then
               socket_ready=1
               break
