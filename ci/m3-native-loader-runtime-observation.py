@@ -15,6 +15,8 @@ import sys
 PID_FILE = re.compile(r"^m3-loader\.(\d+)$")
 INIT = re.compile(r"calling init:\s+(\S+)")
 OPEN = re.compile(r"file=(\S+)")
+REQUEST = re.compile(r"file=(\S+)\s+\[\d+\];\s+(needed by|dynamically loaded by)\s+(\S+)")
+MAX_REQUEST_EDGES = 10000
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.+\-]{0,110}$")
 MAX_FILES = 100
 MAX_BYTES_PER_FILE = 22_000_000
@@ -34,6 +36,8 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
         raise ValueError("No bounded numeric-PID LD_DEBUG logs")
     browsers=[]
     seen=set()
+    recorded_needed_by=set()
+    recorded_dynamic_requests=set()
     for f in files:
         if not 0 < f.stat().st_size <= MAX_BYTES_PER_FILE:
             raise ValueError("Empty or oversized loader log")
@@ -43,6 +47,8 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
             continue
         init=set()
         opened=set()
+        candidate_needed_by=set()
+        candidate_dynamic=set()
         for line in text.splitlines():
             m=INIT.search(line)
             if m:
@@ -52,11 +58,28 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
             if m:
                 n=basename(m.group(1))
                 if n:opened.add(n)
+            m=REQUEST.search(line)
+            if m:
+                requested=basename(m.group(1))
+                requester=basename(m.group(3))
+                if requested and requester and requested!=requester:
+                    edge=(requester,requested)
+                    if m.group(2)=="needed by":
+                        candidate_needed_by.add(edge)
+                    elif m.group(2)=="dynamically loaded by":
+                        candidate_dynamic.add(edge)
         if "libxul.so" not in opened and "libxul.so" not in init:
             continue
         if len(init)<3:
             raise ValueError("Browser process had too few real loader init events")
         seen.update(init)
+        # A request line by itself does not establish that its library
+        # initialized. Retain only edges whose target has an actual native
+        # glibc "calling init" event in THIS same browser process trace.
+        recorded_needed_by.update((src,dest) for src,dest in candidate_needed_by
+                                  if dest in init)
+        recorded_dynamic_requests.update((src,dest) for src,dest in candidate_dynamic
+                                         if dest in init)
         browsers.append({"observed_loaded_name_count":len(init),
                          "original_compiled_libxul_referenced":True,
                          "glibc_init_events_present":True})
@@ -66,7 +89,12 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
         if required not in seen and required!="libxul.so":
             raise ValueError("No observed core glibc initialization: "+required)
     # No path, user state, PID or raw message is ever emitted.
+    if len(recorded_needed_by)+len(recorded_dynamic_requests)>MAX_REQUEST_EDGES:
+        raise ValueError("Too many distinct real loader request relations")
     names=sorted(seen)
+    def safe_edges(pairs):
+        return [{"requester_basename":src,"requested_library_basename":dest}
+                for src,dest in sorted(pairs)]
     return {
         "schema_version":1,
         "status":"actual_native_full_normal_loader_observation",
@@ -74,6 +102,13 @@ def inspect(folder: Path, workload: str = "headless_webdriver") -> dict:
         "browser_process_traces_with_libxul":len(browsers),
         "observed_loader_init_library_basename_count":len(names),
         "observed_loader_init_library_basenames":names,
+        "loader_reported_needed_by_initialized_edge_count":len(recorded_needed_by),
+        "loader_reported_needed_by_initialized_edges":safe_edges(recorded_needed_by),
+        "loader_reported_dynamic_initialized_edge_count":len(recorded_dynamic_requests),
+        "loader_reported_dynamic_initialized_edges":safe_edges(recorded_dynamic_requests),
+        "request_relationships_from_same_browser_pid_trace":True,
+        "only_initialized_request_targets_included":True,
+        "loader_request_edges_complete":False,
         "libxul_requested_in_real_browser_process":True,
         "libc_loader_init_observed":"libc.so.6" in seen,
         "observed_workload_mode":workload,
@@ -100,6 +135,8 @@ def selftest() -> None:
         f=folder/"m3-loader.123"
         text=(
             "    123: file=libxul.so [0]; needed by /tmp/vulpra/vulpra-bin\n"
+            "    123: file=libnss3.so [0]; dynamically loaded by /tmp/vulpra/libxul.so [0]\\n"
+            "    123: file=not-initialized.so [0]; dynamically loaded by /tmp/vulpra/libxul.so [0]\\n"
             "    123: calling init: /lib/x86_64-linux-gnu/libc.so.6\n"
             "    123: calling init: /lib/x86_64-linux-gnu/libnss3.so\n"
             "    123: calling init: /tmp/vulpra/libxul.so\n"
@@ -109,6 +146,17 @@ def selftest() -> None:
         assert v["browser_process_traces_with_libxul"]==1
         assert "libxul.so" in v["observed_loader_init_library_basenames"]
         assert "libc.so.6" in v["observed_loader_init_library_basenames"]
+        assert v["loader_reported_needed_by_initialized_edges"]==[
+            {"requester_basename":"vulpra-bin",
+             "requested_library_basename":"libxul.so"}]
+        assert v["loader_reported_dynamic_initialized_edges"]==[
+            {"requester_basename":"libxul.so",
+             "requested_library_basename":"libnss3.so"}]
+        assert v["loader_reported_needed_by_initialized_edge_count"]==1
+        assert v["loader_reported_dynamic_initialized_edge_count"]==1
+        assert not v["loader_request_edges_complete"]
+        assert all("/" not in str(pair) for pair in
+                   v["loader_reported_dynamic_initialized_edges"])
         for altered in [
             text.replace("file=libxul.so","file=other.so").replace(
                 "/tmp/vulpra/libxul.so","/tmp/vulpra/other.so"),
@@ -149,6 +197,7 @@ def main() -> int:
           "actual browser loader process trace(s),",
           result["observed_loader_init_library_basename_count"],
           "libc/glibc init library basenames")
+    print("PASS: sanitized initialized targets with", result["loader_reported_needed_by_initialized_edge_count"], "needed-by and", result["loader_reported_dynamic_initialized_edge_count"], "dynamic-request observed relations")
     print("LIMIT: one", a.workload, "workload on Ubuntu, not complete dlopen, Arch, ABI or feature map")
     return 0
 
