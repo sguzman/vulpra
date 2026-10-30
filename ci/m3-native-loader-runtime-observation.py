@@ -135,8 +135,8 @@ def selftest() -> None:
         f=folder/"m3-loader.123"
         text=(
             "    123: file=libxul.so [0]; needed by /tmp/vulpra/vulpra-bin\n"
-            "    123: file=libnss3.so [0]; dynamically loaded by /tmp/vulpra/libxul.so [0]\\n"
-            "    123: file=not-initialized.so [0]; dynamically loaded by /tmp/vulpra/libxul.so [0]\\n"
+            "    123: file=libnss3.so [0]; dynamically loaded by /tmp/vulpra/libxul.so [0]\n"
+            "    123: file=not-initialized.so [0]; dynamically loaded by /tmp/vulpra/libxul.so [0]\n"
             "    123: calling init: /lib/x86_64-linux-gnu/libc.so.6\n"
             "    123: calling init: /lib/x86_64-linux-gnu/libnss3.so\n"
             "    123: calling init: /tmp/vulpra/libxul.so\n"
