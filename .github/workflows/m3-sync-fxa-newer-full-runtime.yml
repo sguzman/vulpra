@@ -1,0 +1,148 @@
+# Read-only runtime smoke on source-pinned archived normal Vulpra package.
+# A completed, checksum-pinned native binary is reused instead of recompiling.
+# No login, remote Sync, account credentials, or user profiles are involved.
+name: M3 Newer-Source Native Sync FxAccounts Boundary Runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-sync-fxa-newer-full-runtime.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect-protected-modules-in-real-normal-vulpra:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ARCHIVE_SOURCE_SHA: 'b1482404dfb8b01342990ee99ea3df0f9756b5f7'
+      ARCHIVE_SHA256: '7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a'
+      MOZ_HEADLESS: '1'
+    steps:
+      - name: Sparse checkout private native runtime harness, not all Firefox
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Validate harness and historical source continuity for protected APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/smoke-webextension-package-local.py \
+            ci/smoke-sync-fxa-archive-runtime.py
+          python3 ci/smoke-sync-fxa-archive-runtime.py --self-test
+          python3 - <<'PY'
+          import subprocess
+          # The compiled browser is pinned to its exact original source SHA; HEAD may advance after the build.
+          # Only these seven protected source modules/build files are
+          # proven bit-identical by Git blob SHA; browser/moz.configure is
+          # deliberately excluded because that file changed since the run.
+          required={
+            "services/sync/modules/UIState.sys.mjs":"958bbf35b53d169c2e3d0cc1c3fba2aa4c24074d",
+            "services/sync/modules/main.sys.mjs":"f0ee003929b97324ba8c7647f7e388c2530d1918",
+            "services/fxaccounts/FxAccounts.sys.mjs":"51f3f793b0cd72243c75a5fa5d7e0967d428a979",
+            "toolkit/components/extensions/ExtensionStorageSyncKinto.sys.mjs":"280692c6225669dfdc8a6f3fc30216caeea7480c",
+            "browser/components/AccountsGlue.sys.mjs":"fe44c8924c1ba510091ef875787b1d5f2341efc5",
+            "browser/components/firefoxview/SyncedTabsController.sys.mjs":"2c79ad94ed95ef0cc6b83f77cc626aa6f2514720",
+            "services/moz.build":"d65345e439e98e2f45df5cf5ff5e9e43b925ad72",
+          }
+          for name,expected in required.items():
+              actual=subprocess.check_output(
+                  ["git","rev-parse","HEAD:"+name],text=True).strip()
+              assert actual==expected,(name,"source blob no longer matches")
+          print("PASS: seven exact protected source module/build blob SHAs unchanged")
+          print("SCOPE: archive build configuration and all unrelated source not current-source-matched")
+          PY
+      - name: Authenticate successful original full native archive and its runtime
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/40997075527" |
+            jq -e --arg source "$ARCHIVE_SOURCE_SHA" \
+              '.status == "completed" and .conclusion == "success" and .head_sha == $source' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41004025705" |
+            jq -e '.status == "completed" and .conclusion == "success"' >/dev/null
+          gh run download 40997075527 --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline \
+            --dir "$RUNNER_TEMP/normal-archive"
+      - name: Verify checksum sidecar, original manifest and normal default identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os
+          root=Path(os.environ["RUNNER_TEMP"])/"normal-archive"
+          p=root/"full-normandy-baseline.tar.xz"
+          metadata=json.loads((root/"m3-full-normandy-baseline.json").read_text())
+          digest=hashlib.sha256(p.read_bytes()).hexdigest()
+          assert digest==os.environ["ARCHIVE_SHA256"]==metadata["sha256"]
+          assert metadata["schema_version"]==1
+          assert metadata["variant"]=="full-normandy"
+          assert metadata["normandy_runner_present"] is True
+          assert metadata["source_commit"]==os.environ["ARCHIVE_SOURCE_SHA"]
+          assert metadata["compressed_bytes"]==p.stat().st_size==87154544
+          sidecar=(root/"full-normandy-baseline.tar.xz.sha256").read_text().split()
+          assert sidecar[0]==digest
+          print("PASS: authentic historic full-Normandy normal Linux browser archive")
+          PY
+          mkdir -p .git/vulpra-native-build/packages
+          cp "$RUNNER_TEMP/normal-archive/full-normandy-baseline.tar.xz" \
+            .git/vulpra-native-build/packages/vulpra-local-sync-ci.tar.xz
+          sha256sum .git/vulpra-native-build/packages/vulpra-local-sync-ci.tar.xz \
+            > .git/vulpra-native-build/packages/vulpra-local-sync-ci.tar.xz.sha256
+      - name: Install only native runtime libraries and geckodriver, not compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends libgtk-3-0t64 libdbus-glib-1-2 \
+            libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 \
+            -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+      - name: Exercise preserved Sync, FxA, WebExtension storage and Firefox View APIs
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH" \
+            python3 ci/smoke-sync-fxa-archive-runtime.py "$GITHUB_WORKSPACE"
+          jq -e \
+            '.schema_version == 1 and
+             .status == "historical_normal_native_sync_fxa_module_smoke_passed" and
+             .archive_sha256_verified == true and
+             .private_home_and_profile_verified == true and
+             .nonlocal_gecko_connections_blocked == true and
+             .account_credentials_or_user_profile_provided == false and
+             .any_login_or_remote_sync_attempted_by_probe == false and
+             (.modules_verified | length) == 8 and
+             (.modules_verified | all(. == true)) and
+             .actual_sync_upload_or_account_login_proven == false and
+             .current_head_complete_native_binary_proven == false and
+             .whole_m3_gate_passed == false and
+             .source_removal_authorized == false' \
+            ".git/vulpra-native-build/m3-sync-fxa-archive-runtime.json" >/dev/null
+          echo "PASS: packaged normal Vulpra protected module import and fresh account state"
+      - name: Preserve only redacted source/real browser API results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-newer-normal-sync-fxa-native-runtime
+          path: .git/vulpra-native-build/m3-sync-fxa-archive-runtime.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
