@@ -119,7 +119,7 @@ jobs:
              .gecko_nonlocal_connection_guard_enabled == true and
              .full_default_normandy_runner_present == false and
              .newtab_document_loaded == true and
-             (.protected_newtab_factories_and_registry | length) == 22 and
+             (.protected_newtab_factories_and_registry | length) == 26 and
              .real_shipped_legacy_method_exercised_with_inert_side_effect_hooks == true and
              (.protected_newtab_factories_and_registry | all(. == true)) and
              .pocket_recommendation_data_downloaded_by_probe == false and

@@ -70,6 +70,24 @@ TopStoriesFeed.prototype.lazyLoadTopStories.call(
 const userOff=makeFake();
 TopStoriesFeed.prototype.lazyLoadTopStories.call(
   userOff,{dsPref:'{"enabled":false}',userPref:false});
+// Check the real modern-vs-legacy selection without initializing either feed.
+const modernSelected=makeFake();
+modernSelected.store.getState=()=>({Prefs:{values:{
+  "discoverystream.enabled":true,
+  "feeds.section.topstories":true
+}}});
+TopStoriesFeed.prototype.lazyLoadTopStories.call(
+  modernSelected,{dsPref:'{"enabled":true}',userPref:true});
+// JSON-enabled Discovery Stream with the system pref off must select legacy.
+const modernSystemOff=makeFake();
+TopStoriesFeed.prototype.lazyLoadTopStories.call(
+  modernSystemOff,{dsPref:'{"enabled":true}',userPref:true});
+// Repeated legacy fallback must initialize properties only once.
+const legacyRepeated=makeFake();
+for (let i=0; i<2; i++) {
+  TopStoriesFeed.prototype.lazyLoadTopStories.call(
+    legacyRepeated,{dsPref:'{"enabled":false}',userPref:true});
+}
 // Exercise shipped modern DiscoveryStream getters with *inert preference
 // state only*. No feed constructor, network request, cache I/O or dispatch.
 const configGetter=Object.getOwnPropertyDescriptor(
@@ -108,6 +126,7 @@ const userOptOut=modernState("{}",true,false,true);
 const systemOptOut=modernState("{}",true,true,false);
 const storiesOn=modernState("{}",true,true,true,true,true);
 const storiesOff=modernState("{}",true,true,true,false,true);
+const userStoriesOff=modernState("{}",true,true,true,true,false);
 const experiment={changes:0,pocketNewTabExperimentChanged(){this.changes++;}};
 DiscoveryStreamFeed.prototype.onPocketExperimentUpdated.call(
   experiment,null,"feature-experiment-loaded");
@@ -128,6 +147,15 @@ return {
     loaded.propertiesCalls===0 && loaded.initCalls===0,
   legacy_user_pref_disabled_skip:
     userOff.propertiesCalls===0 && userOff.initCalls===0,
+  legacy_modern_enabled_avoids_old_properties:
+    modernSelected.discoveryStreamEnabled===true &&
+    modernSelected.propertiesCalls===0 && modernSelected.initCalls===1,
+  legacy_modern_system_pref_off_uses_fallback:
+    modernSystemOff.discoveryStreamEnabled===false &&
+    modernSystemOff.propertiesCalls===1 && modernSystemOff.initCalls===1,
+  legacy_repeated_fallback_does_not_reinitialize_properties:
+    legacyRepeated.discoveryStreamEnabled===false &&
+    legacyRepeated.propertiesCalls===1 && legacyRepeated.initCalls===2,
   modern_config_enabled_and_keeps_layout:
     modernConfig.enabled===true && modernConfig.layout==="modern",
   modern_config_disabled_by_system_pref:disabledSystem.enabled===false,
@@ -142,6 +170,8 @@ return {
   modern_stories_respect_system_pref:
     storiesGetter.call(storiesOn)===true &&
     storiesGetter.call(storiesOff)===false,
+  modern_stories_respect_user_optout_without_space_override:
+    storiesGetter.call(userStoriesOff)===false,
   modern_experiment_notifications_guarded:
     ignoredExperimentChanges && experiment.changes===1,
   legacy_registered:keys.includes("feeds.system.topstories"),
@@ -169,6 +199,9 @@ CHECKS=(
   "legacy_malformed_config_stubbed_init",
   "legacy_disabled_config_stubbed_init",
   "legacy_stories_already_loaded_skip","legacy_user_pref_disabled_skip",
+  "legacy_modern_enabled_avoids_old_properties",
+  "legacy_modern_system_pref_off_uses_fallback",
+  "legacy_repeated_fallback_does_not_reinitialize_properties",
   "no_feed_initialized_or_fetched_by_probe",
   "modern_config_enabled_and_keeps_layout",
   "modern_config_disabled_by_system_pref",
@@ -177,6 +210,7 @@ CHECKS=(
   "modern_config_pref_cache_preserved",
   "modern_sponsor_requires_both_prefs",
   "modern_stories_respect_system_pref",
+  "modern_stories_respect_user_optout_without_space_override",
   "modern_experiment_notifications_guarded"
 )
 
