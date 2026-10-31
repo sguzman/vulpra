@@ -1,0 +1,160 @@
+# Cross-check the *actual emitted* additional Nimbus fallback with the exact
+# pinned moz.build source conditional and physically packaged native resources.
+# A bounded source/build/resource witness, NOT all-graph or linker closure.
+name: M3 Original Generated Nimbus Fallback Source-to-Package Crosswalk
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-nimbus-generated-source-package-crosswalk.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-configured-source-to-native-nimbus-fallback-witness:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      SOURCE_NIMBUS_MOZBUILD_BLOB: 263de482d19bf6afa5ad0ae2e986ffad6d007456
+      ORIGINAL_ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      COMBINED_ARCHIVE_SHA: e7aa6273fc1078134c216408c7cc110886dc60ada90c062d7f2482fd3f288eec
+      FULL_RUN: '40997075527'
+      COMBINED_RUN: '41222758405'
+      FRONTEND_RUN: '41234342128'
+    steps:
+      - name: Checkout only immutable original Nimbus build declaration
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/components/nimbus/moz.build
+      - name: Pin exact original source and authenticate three successful evidence-producing CI jobs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD:toolkit/components/nimbus/moz.build)" = "$SOURCE_NIMBUS_MOZBUILD_BLOB"
+          grep -Fq 'CONFIG["MOZ_BUILD_APP"] == "browser"' toolkit/components/nimbus/moz.build
+          grep -Fq 'CONFIG["MOZ_WIDGET_TOOLKIT"] == "gtk"' toolkit/components/nimbus/moz.build
+          grep -Fq 'not CONFIG["MOZ_NORMANDY"]' toolkit/components/nimbus/moz.build
+          grep -Fq 'MOZ_SRC_FILES += ["NimbusBootstrap.sys.mjs"]' toolkit/components/nimbus/moz.build
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FULL_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$COMBINED_RUN" |
+            jq -e --arg sha e9e52a0ca36f54fab071784cea31d2a6a55789ad '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FRONTEND_RUN" |
+            jq -e --arg sha 9e07f2d697d020d37b17ef994aa764caeda49d55 '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+      - name: Authenticate and fetch original full, four-feature compiled, and generated graph artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/full" "$RUNNER_TEMP/lean" "$RUNNER_TEMP/graph" "$RUNNER_TEMP/audit"
+          gh run download "$FULL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/full"
+          gh run download "$COMBINED_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-native-combined-four-optin-candidate --dir "$RUNNER_TEMP/lean"
+          gh run download "$FRONTEND_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-fully-evaluated-normal-vs-combined-mozbuild-frontend --dir "$RUNNER_TEMP/graph"
+          (cd "$RUNNER_TEMP/full" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          (cd "$RUNNER_TEMP/lean" && sha256sum -c vulpra-four-lean.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/full/full-normandy-baseline.tar.xz" | awk '{print $1}')" = "$ORIGINAL_ARCHIVE_SHA"
+          test "$(sha256sum "$RUNNER_TEMP/lean/vulpra-four-lean.tar.xz" | awk '{print $1}')" = "$COMBINED_ARCHIVE_SHA"
+          jq -e --arg sha "$SOURCE_SHA" --arg archive "$COMBINED_ARCHIVE_SHA" '
+            .original_source_commit==$sha and
+            .combined_native_archive_sha256==$archive and
+            .all_four_generated_config_guards_verified==true and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/lean/m3-original-four-native-size.json" >/dev/null
+      - name: Require one extra actual evaluated MozSrcFiles under toolkit/components and unchanged directory edges
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e --arg sha "$SOURCE_SHA" '
+            .status=="exact_original_source_generated_full_vs_four_optin_frontend_evaluated" and
+            .source_commit==$sha and
+            .actual_mozilla_BuildReader_and_TreeMetadataEmitter_executed==true and
+            .normal_evaluated_objects==19139 and .combined_evaluated_objects==19140 and
+            .full_directory_edges==1959 and .combined_directory_edges==1959 and
+            (.full_only_evaluated_directory_edges|length)==0 and
+            (.combined_only_evaluated_directory_edges|length)==0 and
+            .full_object_type_counts.MozSrcFiles==85 and
+            .combined_object_type_counts.MozSrcFiles==86 and
+            (.full_object_type_counts|del(.MozSrcFiles))==(.combined_object_type_counts|del(.MozSrcFiles)) and
+            .full_scoped_type_counts["toolkit/components/"].MozSrcFiles==20 and
+            .combined_scoped_type_counts["toolkit/components/"].MozSrcFiles==21 and
+            (.full_scoped_type_counts["toolkit/components/"]|del(.MozSrcFiles)) ==
+              (.combined_scoped_type_counts["toolkit/components/"]|del(.MozSrcFiles)) and
+            .normal_generated_flag_values.MOZ_NORMANDY.value=="1" and
+            .combined_generated_flag_values.MOZ_NORMANDY.present==false and
+            .complete_build_link_ffi_dlopen_graph==false and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/graph/frontend-delta-summary.json" >/dev/null
+      - name: Verify actual compiled browser packaged Nimbus bootstrap fallback and Normandy runner inversion
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/full/extracted" "$RUNNER_TEMP/lean/extracted"
+          tar -xf "$RUNNER_TEMP/full/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/full/extracted"
+          tar -xf "$RUNNER_TEMP/lean/vulpra-four-lean.tar.xz" -C "$RUNNER_TEMP/lean/extracted"
+          for variant in full lean; do
+            find "$RUNNER_TEMP/$variant/extracted/vulpra" -name omni.ja -type f -print |
+              while IFS= read -r jar; do unzip -Z1 "$jar"; done |
+              sort -u > "$RUNNER_TEMP/audit/$variant-zip-entries.txt"
+            test -s "$RUNNER_TEMP/audit/$variant-zip-entries.txt"
+            for retained in newtab/lib/ActivityStream.sys.mjs newtab/lib/TopStoriesFeed.sys.mjs newtab/lib/DiscoveryStreamFeed.sys.mjs; do
+              grep -Fq "$retained" "$RUNNER_TEMP/audit/$variant-zip-entries.txt"
+            done
+          done
+          grep -Fq 'res/normandy/Normandy.sys.mjs' "$RUNNER_TEMP/audit/full-zip-entries.txt"
+          if grep -Fq 'res/normandy/Normandy.sys.mjs' "$RUNNER_TEMP/audit/lean-zip-entries.txt"; then exit 1; fi
+          grep -Fq 'moz-src/toolkit/components/nimbus/NimbusBootstrap.sys.mjs' "$RUNNER_TEMP/audit/lean-zip-entries.txt"
+          if grep -Fq 'moz-src/toolkit/components/nimbus/NimbusBootstrap.sys.mjs' "$RUNNER_TEMP/audit/full-zip-entries.txt"; then exit 1; fi
+          jq -n --arg sha "$SOURCE_SHA" --arg full "$ORIGINAL_ARCHIVE_SHA" \
+            --arg lean "$COMBINED_ARCHIVE_SHA" --arg source "$SOURCE_NIMBUS_MOZBUILD_BLOB" '{
+             schema_version:1,
+             status:"original_nimbus_evaluated_build_guard_and_physical_package_fallback_witness",
+             original_compiler_source_commit:$sha,
+             original_full_archive_sha256:$full,
+             combined_lean_archive_sha256:$lean,
+             nimbus_mozbuild_exact_original_source_blob:$source,
+             actual_evaluated_full_mozsrcfiles_count:85,
+             actual_evaluated_combined_mozsrcfiles_count:86,
+             toolkit_components_mozsrcfiles_emission_delta_plus_one:true,
+             evaluated_directory_traversal_edges_unchanged:true,
+             source_conditional_requires_linux_browser_and_no_normandy:true,
+             compiled_normal_normandy_runner_present:true,
+             compiled_normal_nimbus_bootstrap_absent:true,
+             compiled_combined_normandy_runner_absent:true,
+             compiled_combined_nimbus_bootstrap_present:true,
+             protected_newtab_factory_module_resources_retained:true,
+             causal_unique_emitted_object_source_path_verified:false,
+             generated_backend_caller_or_ffi_graph_complete:false,
+             personal_browser_or_profile_modified:false,
+             source_pruning_authorized:false,
+             m3_sixth_gate_closed:false
+           }' > "$RUNNER_TEMP/audit/original-nimbus-generated-fallback-witness.json"
+          jq -e '.status=="original_nimbus_evaluated_build_guard_and_physical_package_fallback_witness" and
+            .toolkit_components_mozsrcfiles_emission_delta_plus_one==true and
+            .compiled_combined_nimbus_bootstrap_present==true and
+            .compiled_normal_nimbus_bootstrap_absent==true and
+            .source_conditional_requires_linux_browser_and_no_normandy==true and
+            .causal_unique_emitted_object_source_path_verified==false and
+            .generated_backend_caller_or_ffi_graph_complete==false and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/audit/original-nimbus-generated-fallback-witness.json" >/dev/null
+          echo 'PASS: actual source conditional, emitted build object delta, and physical Nimbus/Normandy compiled package inversion'
+      - name: Upload only sanitized bounded source/generated/resource witness
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-compiled-nimbus-evaluated-graph-physical-package-witness
+          path: ${{ runner.temp }}/audit/original-nimbus-generated-fallback-witness.json
+          if-no-files-found: error
+          retention-days: 14
