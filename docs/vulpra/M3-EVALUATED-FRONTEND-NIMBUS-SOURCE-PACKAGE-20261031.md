@@ -66,6 +66,21 @@ The established compiled full/lean package crosswalk for Normandy/Nimbus remains
 
 Each tuple retains owning build directory, frontend source class, static/generated declaration phase, source/object origin, and path relative to the corresponding source or object root. This proves **the emitted native compilation-source membership is unchanged** between the two *original-source configured* variants. It does **not** establish identical generated file contents, compile defines/flags, compilation commands, actual object-file binaries, linker input lists, FFI relationships, or conditional runtime loading. The compiled 28-ELF DT_NEEDED parity remains separate native-package evidence; neither result closes the full M3 build/FFI/dlopen gate.
 
+## Evaluated native Linkable declarations (2026-10-31)
+
+[**Pinned original Mozilla Linkable source-matched graph 41239615187 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41239615187) executed the extended actual `BuildReader`/`TreeMetadataEmitter` collector against both independently configured original `b1482404` variants. I inspected the archived pair's *exact records*, not just counts.
+
+| Actual evaluated declared link relationship | Full normal | Combined lean | Unique to either |
+| --- | ---: | ---: | ---: |
+| Linkable target identities | **1,342** | **1,342** | **0** |
+| Direct library-to-linkable declarations | **1,424** | **1,424** | **0** |
+| Explicit system-library link declarations | **242** | **242** | **0** |
+| Static library `link_into` declarations | **1,219** | **1,219** | **0** |
+
+The emitter's `Linkable.linked_libraries`, `linked_system_libs`, and static `link_into` references were collected **after full frontend emission**, avoiding premature snapshots of late-resolved links. Each direct edge includes the consuming and providing target's owner directory, frontend type, host/target kind, and declared name. The comparison is exact after source/objdir-neutral normalization.
+
+**Limit:** This is *declared evaluated frontend linkage*, not actual `ld`/Ninja invocations, complete object-file members, flag equivalence, native-to-Rust FFI closure, or runtime `dlopen` coverage. Source deletion and the sixth M3 acceptance gate remain unauthorized. No extra binary-size reduction has been established.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
