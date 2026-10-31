@@ -35,7 +35,7 @@ fn binding(line: &str) -> Option<(&str, &str)> {
     if namespace.is_empty() || !namespace.bytes().all(|b| b.is_ascii_digit()) { return None; }
     let (symbol, _) = tail.split_once('\'')?;
     if symbol.is_empty() || symbol.len() > 2048 ||
-        !symbol.bytes().all(|b| b.is_ascii_graphic() && b != b'\'') { return None; }
+        !symbol.bytes().all(|b| b.is_ascii_graphic() && b != b'\'' && b != b'/' && b != b'\\') { return None; }
     if clean_basename(requester)? != "libxul.so" { return None; }
     Some((clean_basename(provider)?, symbol))
 }
