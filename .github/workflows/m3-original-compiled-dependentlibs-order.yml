@@ -1,0 +1,97 @@
+# Verify actual original generated dependentlibs.list (not a guessed source list).
+name: M3 Original Compiled GTK Wayland Native Preload Order
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-compiled-dependentlibs-order.yml
+      - ci/m3-original-generated-dependentlibs-order.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-built-wayland-native-dependentlibs-preload:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout bounded Rust compiled preload verifier
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Checkout just historical Gecko generated native load order manifests
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: original-source
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/library/moz.build
+            toolkit/library/build/moz.build
+      - name: Authenticate original compiled run and source and compile Rust guard
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          rustc --edition=2021 --test ci/m3-original-generated-dependentlibs-order.rs -o "$RUNNER_TEMP/dep-order-tests"
+          "$RUNNER_TEMP/dep-order-tests"
+          rustc --edition=2021 -O ci/m3-original-generated-dependentlibs-order.rs -o "$RUNNER_TEMP/dep-order"
+      - name: Recover only immutable original source-matched compiled native archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+      - name: Check generated native order against exact pinned source and packaged files
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/dep-order" "$RUNNER_TEMP/package/vulpra" \
+            "$GITHUB_WORKSPACE/original-source/toolkit/library/moz.build" \
+            "$GITHUB_WORKSPACE/original-source/toolkit/library/build/moz.build" \
+            "$RUNNER_TEMP/m3-original-generated-dependentlibs-order.json"
+          jq -e --arg sha "$ARCHIVE_SHA" --arg src "$SOURCE_SHA" '
+            .schema_version==1 and
+            .status=="original_compiled_generated_native_dependentlibs_order_verified" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .original_dependentlibs_count>=5 and
+            (.ordered_package_member_basenames|length)==.original_dependentlibs_count and
+            .mozgtk_position_zero_indexed < .mozwayland_position_zero_indexed and
+            .mozwayland_position_zero_indexed < .libxul_position_zero_indexed and
+            .source_declares_gtk_before_wayland_before_gecko==true and
+            .source_declares_generated_dependentlibs==true and
+            .all_listed_native_files_exist_in_original_archive==true and
+            .runtime_dlopen_success_for_every_item_proven==false and
+            .complete_feature_bundle_link_graph_proven==false and
+            .generated_ninja_ownership_proven==false and
+            .safe_source_or_library_removal_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-generated-dependentlibs-order.json" >/dev/null
+          echo 'PASS: native GTK before Wayland before Gecko and all original generated dependentlibs packaged'
+      - name: Upload original generated native preload basenames and order only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-compiled-generated-dependentlibs-order
+          path: ${{ runner.temp }}/m3-original-generated-dependentlibs-order.json
+          if-no-files-found: error
+          retention-days: 14
