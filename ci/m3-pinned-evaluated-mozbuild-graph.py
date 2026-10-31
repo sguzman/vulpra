@@ -332,8 +332,7 @@ def main():
             evaluated_rust_program_targets.add(
                 consumer + (
                     cargo_origin, cargo_member,
-                    portable_member(str(obj.output_category or "")),
-                    portable_member(str(getattr(obj, "location", "") or ""))))
+                    portable_member(str(obj.output_category or ""))))
             for feature in getattr(obj, "features", ()):
                 evaluated_rust_program_features.add(
                     consumer + (portable_member(str(feature)),))
