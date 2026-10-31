@@ -13,6 +13,7 @@ ip link set lo up
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 mkdir -m 0700 "$work/home"
+repo="$(cd -- "$(dirname -- "$0")/.." && pwd -P)"
 cd "$work"
 umask 077
 export HOME="$work/home" TMPDIR="$work/home" XDG_CONFIG_HOME="$work/home/config"
@@ -55,7 +56,6 @@ else
   echo 'Original read-only updater channel query took unexpected route' >&2
   exit 1
 fi
-repo="$(cd -- "$(dirname -- "$0")/.." && pwd -P)"
 python3 "$repo/ci/m3-auxiliary-guarded-cli-version-checks.py" \
   --traces "$work" --static "$static" --output "$out"
 [[ ! -e "$work/home/.mozilla" ]] || exit 1
