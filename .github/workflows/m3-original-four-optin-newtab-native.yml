@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 35
     env:
       ORIGINAL_SOURCE_COMMIT: b1482404dfb8b01342990ee99ea3df0f9756b5f7
-      BUILD_RUN: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || 41222758405 }}
+      BUILD_RUN: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '41222758405' }}
       MOZ_HEADLESS: '1'
     steps:
       - name: Checkout isolated four-opt-in validation script and unchanged native WebDriver helper
