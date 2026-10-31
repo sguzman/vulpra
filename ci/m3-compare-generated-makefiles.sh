@@ -72,6 +72,15 @@ lean_only_count=$(wc -l < "$tmp/only-lean")
 grep -Fxq 'faster/Makefile' "$tmp/different"
 normalized_makefile "$full" faster/Makefile > "$tmp/faster-full"
 normalized_makefile "$lean" faster/Makefile > "$tmp/faster-lean"
+# This is the sole intended boolean difference in faster/Makefile;
+# compare the COMPLETE normalized files after removing only that token.
+grep -Fq -- ' -DMOZ_NORMANDY=1 ' "$tmp/faster-full"
+if grep -Fq -- ' -DMOZ_NORMANDY=1 ' "$tmp/faster-lean"; then
+  echo 'FAIL: lean faster Makefile still defines MOZ_NORMANDY' >&2
+  exit 1
+fi
+sed -e 's/ -DMOZ_NORMANDY=1 / /g' "$tmp/faster-full" > "$tmp/faster-full-expected"
+cmp -s "$tmp/faster-full-expected" "$tmp/faster-lean"
 if diff -U 0 "$tmp/faster-full" "$tmp/faster-lean" > "$tmp/faster-diff"; then
   echo 'FAIL: faster/Makefile differs in hashes but has no line differences' >&2
   exit 1
@@ -105,6 +114,7 @@ jq -n --arg sha "$SOURCE_SHA" \
       faster_makefile_normalized_diff_excerpt:$scoped_diff,
       faster_makefile_diff_bounded:true,
       only_faster_makefile_differs:true,
+      faster_makefile_only_normandy_define_removed:true,
       normalized_configured_objdir_path_and_basename_only:true,
       actual_generated_makefile_contents_hashed:true,
       all_generated_makefile_rules_equal:false,
@@ -125,6 +135,7 @@ jq -e '
    .shared_generated_makefile_count) and
   ((.differing_generated_makefiles|length) == .differing_normalized_makefile_count) and
   .only_faster_makefile_differs==true and
+  .faster_makefile_only_normandy_define_removed==true and
   ((.faster_makefile_normalized_diff_excerpt|length)>0) and
   .native_compiler_or_linker_executed==false and .m3_sixth_gate_closed==false
 ' "$out" >/dev/null
