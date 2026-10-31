@@ -296,17 +296,19 @@ Both original full and combined lean emitted **2 exact Rust-staticlib-to-native-
 
 Both variants have **4 Rust roots, 2 direct Rust-to-native link edges, 4 reachable native consumer records, 2 roots without directly emitted native consumers, and 0 full/lean differences**. Absence of a direct Mozilla `linked_libraries` edge does **not** prove the UniFFI crates unused; Cargo/integration relations and generated FFI can lie outside that relation. Cycles are bounded via shortest-path traversal. No compiler/rustc/linker execution, build artifact attribution, complete FFI call graph, or dynamic loader closure was proven.
 
-## Actual compiled full-versus-opt-in ELF dynamic export ABI surface
+## Actual compiled full-versus-opt-in ELF dynamic import/export ABI surface
 
-[**Checksum-authenticated source-matched full vs combined-four native export audit 41253276903 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253276903), [**workflow lint 41253276916 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253276916). The independent std-only Rust observer `ci/m3-combined-four-elf-dynsym-abi.rs` compiled and passed its fixtures, authenticated both separately built original-source browser packages using existing pinned SHA-256 and successful build-run identities, then examined the **actual ELF dynamic symbol tables** read-only with `readelf --wide --dyn-syms`, without invoking the browser executables.
+[**Checksum-authenticated source-matched full vs combined-four native dynamic-symbol export audit 41253276903 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253276903), [**workflow lint 41253276916 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253276916). The independent std-only Rust observer `ci/m3-combined-four-elf-dynsym-abi.rs` compiled and passed its fixtures, authenticated both separately built original-source browser packages using existing pinned SHA-256 and successful build-run identities, then examined the **actual ELF dynamic symbol tables** read-only with `readelf --wide --dyn-syms`, without invoking the browser executables. The [**expanded paired imported-and-exported symbol audit 41253438551 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253438551), [**lint 41253438662 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253438662) additionally checks undefined dynamic import records and requires positive import inventories. Its exact archived JSON was downloaded and inspected.
 
 | Checked compiled ABI surface | Full normal | Combined opt-in | Difference |
 | --- | --- | --- | --- |
 | Identical relative ELF member paths | 28 | 28 | 0 |
 | Exported dynamic-symbol occurrences (name, type, binding, visibility, multiplicity; excluding relocation values and section-index layout) | **4,669** | **4,669** | **0** |
+| Undefined dynamic-symbol imports (versioned name, type, binding, visibility, multiplicity) | **6,764** | **6,764** | **0** |
+| **Total dynamic symbol occurrences** | **11,433** | **11,433** | **0** |
 | ELF paths with exported-symbol record drift | — | — | **0** |
 
-This extends the previously verified 28-ELF identical ordered `DT_NEEDED` inventory to an **actual compiled exported dynamic ABI surface comparison**, not identical file bytes, internal/static Rust/C++ FFI symbols, linker arguments, runtime symbol binding, or late `dlopen`. It does not authorize deleting any Rust root, protected browser feature, or native library. No new compressed-byte savings or M3 gate credit. **M3 remains 5/6 (83%), overall 61%, Δ0 percentage points.**
+This extends the previously verified 28-ELF identical ordered `DT_NEEDED` inventory to an **actual compiled imported-and-exported dynamic ABI surface comparison**, not identical file bytes, internal/static Rust/C++ FFI symbols, linker arguments, runtime symbol binding, or late `dlopen`. It does not authorize deleting any Rust root, protected browser feature, or native library. No new compressed-byte savings or M3 gate credit. **M3 remains 5/6 (83%), overall 61%, Δ0 percentage points.**
 
 ## Boundaries and next actual work
 
