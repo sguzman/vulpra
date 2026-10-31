@@ -149,7 +149,7 @@ def main():
     from mozbuild.backend.configenvironment import BuildConfig, ConfigEnvironment
     from mozbuild.frontend.reader import BuildReader
     from mozbuild.frontend.emitter import TreeMetadataEmitter
-    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, UnifiedSources, WebIDLCollection, Linkable, BaseLibrary, BaseRustLibrary
+    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, UnifiedSources, WebIDLCollection, Linkable, BaseLibrary, BaseRustLibrary, BaseRustProgram
 
     status = Path(status_path).resolve(strict=True)
     cfg = BuildConfig.from_config_status(str(status))
@@ -318,12 +318,27 @@ def main():
     declared_system_library_links = set()
     declared_static_link_into = set()
     declared_linkable_compile_units = set()
+    evaluated_rust_program_targets = set()
+    evaluated_rust_program_features = set()
     evaluated_rust_library_targets = set()
     evaluated_rust_library_features = set()
     evaluated_rust_library_dependencies = set()
     unresolved_relative_compile_units = 0
     for obj in emitted_linkables:
         consumer = linkable_identity(obj)
+        if isinstance(obj, BaseRustProgram):
+            cargo_origin, cargo_member = source_identity(
+                obj.cargo_file, root, object_root)
+            evaluated_rust_program_targets.add(
+                consumer + (
+                    cargo_origin, cargo_member,
+                    portable_member(str(obj.output_category or "")),
+                    portable_member(str(getattr(obj, "location", "") or ""))))
+            for feature in getattr(obj, "features", ()):
+                evaluated_rust_program_features.add(
+                    consumer + (portable_member(str(feature)),))
+            if len(evaluated_rust_program_targets) > 5000:
+                raise ValueError("Unexpectedly many declared Rust programs")
         if isinstance(obj, BaseRustLibrary):
             cargo_origin, cargo_member = source_identity(
                 obj.cargo_file, root, object_root)
@@ -410,6 +425,12 @@ def main():
         "variant": variant,
         "evaluated_mozbuild_emission": True,
         "native_linker_or_binary_executed": False,
+        "actual_evaluated_rust_program_targets": sorted(
+            [list(x) for x in evaluated_rust_program_targets]),
+        "actual_evaluated_rust_program_target_count": len(evaluated_rust_program_targets),
+        "actual_evaluated_rust_program_features": sorted(
+            [list(x) for x in evaluated_rust_program_features]),
+        "actual_evaluated_rust_program_feature_count": len(evaluated_rust_program_features),
         "actual_evaluated_rust_library_targets": sorted(
             [list(x) for x in evaluated_rust_library_targets]),
         "actual_evaluated_rust_library_target_count": len(evaluated_rust_library_targets),
