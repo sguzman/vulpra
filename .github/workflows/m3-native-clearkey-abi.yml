@@ -1,0 +1,111 @@
+
+# Original packaged ClearKey CDM invalid-version C ABI, no user DRM sessions.
+name: M3 Original Native ClearKey CDM C ABI No-Egress Negative Probe
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-clearkey-abi.yml
+      - ci/m3-clearkey-negative-capi-probe.rs
+      - ci/m3-clearkey-no-egress.sh
+      - ci/m3-clearkey-version-checks.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  validate-original-clearkey-negative-cdm-entrypoint:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+      STATIC_RUN: '41157293087'
+      STATIC_HEAD: 184d5b33678152c1bd28b0c35cecc450e49c93f1
+    steps:
+      - name: Checkout test-only original native CDM ABI probe
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Compile minimal Rust C ABI and reject forged ELF version observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-clearkey-version-checks.py
+          python3 ci/m3-clearkey-version-checks.py --self-test
+          bash -n ci/m3-clearkey-no-egress.sh
+          rustc --edition=2021 -C opt-level=1 ci/m3-clearkey-negative-capi-probe.rs \
+            -o "$RUNNER_TEMP/clearkey-original-probe"
+          test -x "$RUNNER_TEMP/clearkey-original-probe"
+      - name: Install isolated native ELF and CDM loader dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends iproute2 libstdc++6 libnss3 libnspr4 binutils
+      - name: Authenticate original compiled browser package and exported CDM entrypoint
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$STATIC_RUN" |
+            jq -e --arg sha "$STATIC_HEAD" '
+              .status=="completed" and .conclusion=="success" and .head_sha==$sha and
+              .name=="M3 Source-Pinned Native ELF Version-Name Inventory"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/static"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          gh run download "$STATIC_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-version-name-contract --dir "$RUNNER_TEMP/static"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          plugin="$RUNNER_TEMP/package/vulpra/gmp-clearkey/0.1/libclearkey.so"
+          test -f "$plugin"
+          readelf -Ws "$plugin" >"$RUNNER_TEMP/clearkey-symbols.txt"
+          if ! grep -E ' CreateCdmInstance(@|$)' "$RUNNER_TEMP/clearkey-symbols.txt" >/dev/null; then
+            echo 'Original ClearKey CreateCdmInstance C export missing' >&2
+            exit 1
+          fi
+      - name: Exercise native CDM interface-version rejection in no-egress namespace
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          sudo unshare --net -- bash ci/m3-clearkey-no-egress.sh \
+            "$RUNNER_TEMP/package/vulpra" "$RUNNER_TEMP/clearkey-original-probe" \
+            "$RUNNER_TEMP/static/m3-native-elf-version-contract.json" \
+            "$RUNNER_TEMP/m3-clearkey-native-abi.json"
+          jq -e --arg source "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and .original_native_compiled_source==$source and
+            .original_native_archive_sha256==$sha and
+            .real_original_libclearkey_dlopen_and_invalid_CDM_version_rejected==true and
+            .original_clearkey_version_contracts==14 and
+            .observed_original_clearkey_version_checks==14 and
+            .not_observed_original_clearkey_version_checks==0 and
+            (.observed_original_version_contracts|length)==14 and
+            .real_EME_playback_or_decryption_tested==false and
+            .valid_CDM_session_created==false and
+            .user_media_or_keys_used==false and
+            .browser_CDM_host_integration_verified==false and
+            .external_network_or_user_data_accessed==false and
+            .raw_loader_paths_and_pids_retained==false and
+            .safe_source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-clearkey-native-abi.json" >/dev/null
+          echo 'PASS: original CDM C API negative path and 14 compiled loader contracts'
+      - name: Preserve bounded original native ClearKey ABI-only evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-clearkey-cdm-negative-capi
+          path: ${{ runner.temp }}/m3-clearkey-native-abi.json
+          if-no-files-found: error
+          retention-days: 14
