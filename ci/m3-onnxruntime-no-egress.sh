@@ -32,7 +32,8 @@ grep -Fxq 'PASS: original packaged ONNX Runtime C API base and nonempty version 
   echo 'Original ONNX API version function not confirmed' >&2
   exit 1
 }
-python3 "$GITHUB_WORKSPACE/ci/m3-onnxruntime-version-checks.py" \
+repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+python3 "$repo/ci/m3-onnxruntime-version-checks.py" \
   --traces "$work" --static "$static" --output "$out"
 [[ ! -e "$work/home/.mozilla" ]] || {
   echo 'No-egress ONNX library probe created browser user profile' >&2
