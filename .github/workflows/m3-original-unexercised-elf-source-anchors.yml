@@ -1,0 +1,87 @@
+# Source-only historical moz.build lookup for nine real native package
+# members not activated during a single about:blank graphical startup.
+name: M3 Original Unexercised Native ELF Source Anchors
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-unexercised-elf-source-anchors.py
+      - .github/workflows/m3-original-unexercised-elf-source-anchors.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  attribute-limited-real-loader-coverage-to-historical-source:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ORIGINAL_SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      LOADER_RUN: '41157865349'
+      LOADER_HEAD: f6d57770dc15ba074bca059bf4fb0d69b25051bc
+    steps:
+      - name: Checkout current exact-audit helper
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout: |
+            ci
+      - name: Checkout actual original Firefox compile-source manifestrules
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: original
+          sparse-checkout: |
+            browser/app
+            media/gmp-clearkey/0.1
+            third_party/llama.cpp
+            toolkit/crashreporter
+            toolkit/mozapps/update
+            toolkit/components/telemetry
+            toolkit/components/ml
+            toolkit/xre
+      - name: Authenticate original pinned checkout and actual graphical runtime
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original rev-parse HEAD)" = "$ORIGINAL_SOURCE"
+          python3 diagnostics/ci/m3-original-unexercised-elf-source-anchors.py --self-test
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LOADER_RUN" |
+            jq -e --arg sha "$LOADER_HEAD" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha and
+              .name=="M3 Native Wayland Real GNU Loader Version Check Reconciliation"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/verified"
+          gh run download "$LOADER_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-graphical-loader-version-checks \
+            --dir "$RUNNER_TEMP/verified"
+          test -s "$RUNNER_TEMP/verified/m3-native-loader-version-checks.json"
+      - name: Verify exact original build declarations and preserve inactive boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 diagnostics/ci/m3-original-unexercised-elf-source-anchors.py \
+            --original-source original \
+            --runtime-report "$RUNNER_TEMP/verified/m3-native-loader-version-checks.json" \
+            --output "$RUNNER_TEMP/m3-original-unexercised-elf-source-anchors.json"
+          jq -e '
+            .schema_version==1 and
+            .unexercised_native_elf_member_count==9 and
+            .unexercised_original_elf_version_contract_count==183 and
+            .runtime_activation_of_these_modules_proven==false and
+            .symbol_bindings_when_features_activate_proven==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-unexercised-elf-source-anchors.json" >/dev/null
+          echo 'PASS: nine authentic dormant-startup ELF source/build anchors; none removable by inference'
+      - name: Publish only bounded original source declaration anchors
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-unexercised-elf-source-anchors
+          path: ${{ runner.temp }}/m3-original-unexercised-elf-source-anchors.json
+          if-no-files-found: error
+          retention-days: 14
