@@ -1,0 +1,154 @@
+# Genuine configured Mozilla moz.build frontend emits actual graph from a single
+# pinned Vulpra source with two separate candidate objdirs. No full compile.
+# The std-only wrapper cannot replace Mozilla's own Python BuildReader API.
+name: M3 Pinned Actual Evaluated Full Versus Combined Build Frontend
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-pinned-evaluated-mozbuild-graph.yml
+      - ci/m3-pinned-evaluated-mozbuild-graph.py
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vulpra-m3-pinned-evaluated-mozbuild-frontend
+  cancel-in-progress: false
+jobs:
+  original-native-configured-full-versus-combined-frontend:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      DEBIAN_FRONTEND: noninteractive
+      CARGO_BUILD_JOBS: '1'
+    steps:
+      - name: Checkout exact immutable native compiled original browser source
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          fetch-depth: 1
+          path: original
+      - name: Checkout only bounded current graph observer and source-matched mozconfigs
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: controls
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-pinned-evaluated-mozbuild-graph.py
+            ci/mozconfig-linux-m3-baseline
+            ci/mozconfig-linux-m3-combined-lean
+            browser/moz.configure
+      - name: Authenticate unchanged original source config and isolated build controls
+        shell: bash
+        working-directory: original
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git -C ../controls rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git hash-object browser/moz.configure)" = "$(git -C ../controls hash-object browser/moz.configure)"
+          test "$(git hash-object ci/mozconfig-linux-m3-baseline)" = "$(git -C ../controls hash-object ci/mozconfig-linux-m3-baseline)"
+          python3 -m py_compile ../controls/ci/m3-pinned-evaluated-mozbuild-graph.py
+          # No user's computer nor browser profile is in this CI workflow.
+          mkdir -p "$RUNNER_TEMP/m3-generated-frontend"
+      - name: Bootstrap same pinned Firefox 159 Linux native configure toolchain
+        shell: bash
+        working-directory: original
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends python3 python3-venv python3-dev git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+      - name: Configure original full-normal browser and collect genuine emitted frontend objects
+        shell: bash
+        working-directory: original
+        timeout-minutes: 14
+        env:
+          MOZCONFIG: ${{ github.workspace }}/controls/ci/mozconfig-linux-m3-baseline
+        run: |
+          set -euo pipefail
+          ./mach configure
+          test -f obj-vulpra-linux-m3-baseline/config.status
+          ./mach python ../controls/ci/m3-pinned-evaluated-mozbuild-graph.py \
+            normal obj-vulpra-linux-m3-baseline/config.status \
+            "$RUNNER_TEMP/m3-generated-frontend/full-normal-evaluated.json"
+      - name: Configure four guarded native omissions and collect genuine emitted frontend objects
+        shell: bash
+        working-directory: original
+        timeout-minutes: 14
+        env:
+          MOZCONFIG: ${{ github.workspace }}/controls/ci/mozconfig-linux-m3-combined-lean
+        run: |
+          set -euo pipefail
+          ./mach configure
+          test -f obj-vulpra-linux-m3-combined-lean/config.status
+          ./mach python ../controls/ci/m3-pinned-evaluated-mozbuild-graph.py \
+            combined_four obj-vulpra-linux-m3-combined-lean/config.status \
+            "$RUNNER_TEMP/m3-generated-frontend/combined-four-evaluated.json"
+      - name: Independently reconcile generated full and combined directory edges and emitted object types
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          jq -n \
+            --slurpfile f "$RUNNER_TEMP/m3-generated-frontend/full-normal-evaluated.json" \
+            --slurpfile l "$RUNNER_TEMP/m3-generated-frontend/combined-four-evaluated.json" '
+            ($f[0]) as $a | ($l[0]) as $b |
+            (($a.directory_edges|map(join(" -> "))) -
+             ($b.directory_edges|map(join(" -> ")))) as $full_only |
+            (($b.directory_edges|map(join(" -> "))) -
+             ($a.directory_edges|map(join(" -> ")))) as $lean_only |
+            {
+              schema_version:1,
+              status:"exact_original_source_generated_full_vs_four_optin_frontend_evaluated",
+              source_commit:$a.original_source_commit,
+              actual_mozilla_BuildReader_and_TreeMetadataEmitter_executed:true,
+              normal_evaluated_objects:$a.emitted_object_count,
+              combined_evaluated_objects:$b.emitted_object_count,
+              full_directory_edges:$a.evaluated_directory_edges,
+              combined_directory_edges:$b.evaluated_directory_edges,
+              full_only_evaluated_directory_edges:$full_only,
+              combined_only_evaluated_directory_edges:$lean_only,
+              normal_generated_flag_values:$a.generated_configure_flag_values,
+              combined_generated_flag_values:$b.generated_configure_flag_values,
+              full_object_type_counts:$a.all_emitted_object_type_counts,
+              combined_object_type_counts:$b.all_emitted_object_type_counts,
+              full_scoped_type_counts:$a.scoped_emitted_type_counts,
+              combined_scoped_type_counts:$b.scoped_emitted_type_counts,
+              full_native_linker_executed:false,
+              combined_native_linker_executed:false,
+              complete_build_link_ffi_dlopen_graph:false,
+              source_pruning_authorized:false,
+              m3_sixth_gate_closed:false
+            }' > "$RUNNER_TEMP/m3-generated-frontend/frontend-delta-summary.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+             .status=="exact_original_source_generated_full_vs_four_optin_frontend_evaluated" and
+             .source_commit==$sha and
+             .actual_mozilla_BuildReader_and_TreeMetadataEmitter_executed==true and
+             .normal_evaluated_objects>500 and .combined_evaluated_objects>500 and
+             .full_directory_edges>200 and .combined_directory_edges>200 and
+             .normal_generated_flag_values.MOZ_NORMANDY.value=="1" and
+             .combined_generated_flag_values.VULPRA_NO_ASROUTER_PROMOS.value=="1" and
+             .combined_generated_flag_values.VULPRA_NO_NEWTAB_ADSFEED.value=="1" and
+             .combined_generated_flag_values.VULPRA_NO_NEWTAB_PROMOCARD.value=="1" and
+             .complete_build_link_ffi_dlopen_graph==false and
+             .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
+             "$RUNNER_TEMP/m3-generated-frontend/frontend-delta-summary.json" >/dev/null
+          echo 'PASS: both pinned configured original Mozilla frontend object/DirectoryTraversal graphs independently emitted'
+      - name: Archive bounded generated relative build graphs and exact comparison
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-fully-evaluated-normal-vs-combined-mozbuild-frontend
+          path: |
+            ${{ runner.temp }}/m3-generated-frontend/full-normal-evaluated.json
+            ${{ runner.temp }}/m3-generated-frontend/combined-four-evaluated.json
+            ${{ runner.temp }}/m3-generated-frontend/frontend-delta-summary.json
+          if-no-files-found: error
+          retention-days: 14
