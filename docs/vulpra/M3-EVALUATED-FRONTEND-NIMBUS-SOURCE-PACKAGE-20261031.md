@@ -228,6 +228,20 @@ The four source-root libraries are `toolkit/library/rust` (`gkrust`), `toolkit/c
 
 The two emitted programs are `toolkit/components/uniffi-bindgen-gecko-js` (`uniffi-bindgen-gecko-js`) and `toolkit/crashreporter/client/app` (`crashreporter`). The same archived run reverified **4/4** Rust static-library targets, **18/18** static-library features, and **39/39** direct Cargo dependency declarations with **zero one-sided records**. This closes the **bounded evaluated Mozilla Rust executable/static-library roots** inventory, not Cargo's full transitive feature-resolved package graph, `build.rs` outputs, `rustc` commands, dynamic linking, native/Cargo FFI, or runtime `dlopen` closure. No removal, new size saving, or M3 gate credit: **M3 5/6 (83%), overall 61%, Δ0pp.**
 
+## Actual pinned offline Cargo metadata dependency-and-feature resolution
+
+[**Pinned full/lean `gkrust` Cargo metadata resolution 41250371149 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41250371149), [**workflow lint 41250371146 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41250371146). The verifier read the exact 17 explicitly emitted `gkrust-shared/*` feature requests from the normal and lean original-source evaluated frontend artifacts, temporarily activated the existing Mozilla vendored Cargo config **only in the ephemeral CI source checkout**, and invoked `cargo metadata --offline --locked --format-version 1 --manifest-path toolkit/library/rust/Cargo.toml --features <emitted list>` separately for each variant. No Cargo dependency download, `rustc`, native compiler, or linker execution occurred.
+
+| Offline Cargo metadata | Full normal | Four-opt-in lean | One-sided |
+| --- | ---: | ---: | ---: |
+| Requested `gkrust` Cargo features | **17** | **17** | **0** |
+| Resolved workspace package records | **889** | **889** | **0** |
+| Resolved node records with activated feature sets and dependency edges | **889** | **889** | **0** |
+
+Every complete normalized `[package-ID, enabled-feature-set, dependency-kind/target edges]` node matched, as did the package identity/version/source records. These are real **Cargo-resolved metadata** and more conclusive than comparing only `Cargo.toml` root declarations or `Cargo.lock` text. **Important scope:** Cargo's metadata output includes the *entire workspace* under the requested `gkrust` features, not just nodes transitively reachable from `gkrust`. The other emitted Rust root libraries/programs' distinct explicit feature combinations were not independently resolved in this check, and build-script output / actual `rustc` command lines / native linker object archives / FFI and conditional runtime `dlopen` remain outside scope. The raw Cargo metadata and filesystem paths were not uploaded, only bounded aggregate evidence.
+
+No profile/browser modified and no new source pruning or packaged savings. **M3 remains 5/6 (83%); Vulpra overall 61%, milestone delta +0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
