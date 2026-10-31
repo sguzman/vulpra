@@ -8,8 +8,8 @@ ac_add_options --with-ccache=sccache
 # Candidate CI/native builds are memory-sensitive; prefer predictable success.
 mk_add_options MOZ_PARALLEL_BUILD=1
 
-# Normandy remains enabled by default. All other build settings match
-# ci/mozconfig-linux-normandy-experiment. No verified M2 object tree is used.
+# This file disables Normandy only for the explicitly selected experiment;
+# the default/baseline mozconfig still retains Normandy and all core features.
 
 # Combine only four independently guarded M3 experiment flags.
 # No normal build, user profile or installed Firefox default is modified.
