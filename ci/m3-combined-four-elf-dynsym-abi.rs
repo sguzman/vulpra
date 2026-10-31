@@ -257,7 +257,7 @@ fn run() -> Result<(), String> {
         .collect::<Vec<_>>().join(",");
     let base = result.trim().strip_suffix('}')
         .ok_or("Invalid generated dynamic ABI report")?;
-    let result = format!("{base},\"text_sections_compared\":28,\"text_sections_equal\":{equal_text},\"text_sections_different\":{different_text},\"changed_text_elf_paths\":[{changed_text_json}],\"only_text_section_bytes_examined\":true}\n");
+    let result = format!("{base},\"text_sections_compared\":28,\"text_sections_equal\":{equal_text},\"text_sections_different\":{different_text},\"changed_text_elf_paths\":[{changed_text_json}],\"only_text_section_bytes_examined\":true}}\n");
     fs::write(&args[3], result).map_err(|e| e.to_string())?;
     println!("PASS: compared exported dynamic symbols for 28 exact-path compiled ELF files");
     Ok(())
