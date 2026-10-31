@@ -100,6 +100,26 @@ sed -n -E 's/^INSTALL_MANIFESTS[[:space:]]*[:+?]?=[[:space:]]*//p' "$tmp/faster-
 [ -s "$tmp/manifests-full" ] && [ -s "$tmp/manifests-lean" ]
 comm -23 "$tmp/manifests-full" "$tmp/manifests-lean" > "$tmp/manifests-full-only"
 comm -13 "$tmp/manifests-full" "$tmp/manifests-lean" > "$tmp/manifests-lean-only"
+# Fail closed unless the exact source-pinned generated declaration changes
+# match the four expected opt-in/Nimbus members.
+printf '%s\n' '-DMOZ_NORMANDY=1' > "$tmp/expected-normal-defines"
+printf '%s\n' '-DVULPRA_NO_ASROUTER_PROMOS=1' '-DVULPRA_NO_NEWTAB_ADSFEED=1' > "$tmp/expected-lean-defines"
+printf '%s\n' 'dist/bin/moz-src/toolkit/components/nimbus' > "$tmp/expected-lean-manifests"
+cmp -s "$tmp/defines-full-only" "$tmp/expected-normal-defines"
+cmp -s "$tmp/defines-lean-only" "$tmp/expected-lean-defines"
+[ ! -s "$tmp/manifests-full-only" ]
+cmp -s "$tmp/manifests-lean-only" "$tmp/expected-lean-manifests"
+# Compare complete normalized generated files after removing precisely the
+# sanctioned ACDEFINES and INSTALL_MANIFESTS entries; no other changed lines.
+sed -e '/^ACDEFINES = /s/ -DMOZ_NORMANDY=1//g' "$tmp/faster-full" > "$tmp/full-expected-only"
+sed -e '/^ACDEFINES = /s/ -DVULPRA_NO_ASROUTER_PROMOS=1//g' \
+    -e '/^ACDEFINES = /s/ -DVULPRA_NO_NEWTAB_ADSFEED=1//g' \
+    -e '/^INSTALL_MANIFESTS = /s| dist/bin/moz-src/toolkit/components/nimbus||g' \
+    "$tmp/faster-lean" > "$tmp/lean-expected-only"
+if ! cmp -s "$tmp/full-expected-only" "$tmp/lean-expected-only"; then
+  echo 'FAIL: faster/Makefile has additional generated rule drift beyond the four expected entries' >&2
+  exit 1
+fi
 [ "$(wc -l < "$tmp/manifests-full")" -lt 200 ] &&
   [ "$(wc -l < "$tmp/manifests-lean")" -lt 200 ]
 if diff -U 0 "$tmp/faster-full" "$tmp/faster-lean" > "$tmp/faster-diff"; then
@@ -111,6 +131,8 @@ else
 fi
 sed -n '3,55p' "$tmp/faster-diff" | head -c 9000 > "$tmp/faster-diff-bounded"
 sed -n -E '/^[+-][A-Za-z_][A-Za-z0-9_]*[[:space:]]*[+:?]?=/s/^[+-]([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*[+:?]?=.*/\1/p' "$tmp/faster-diff" | sort -u > "$tmp/changed-variable-names"
+printf '%s\n' ACDEFINES INSTALL_MANIFESTS > "$tmp/expected-variable-names"
+cmp -s "$tmp/changed-variable-names" "$tmp/expected-variable-names"
 
 jq -n --arg sha "$SOURCE_SHA" \
   --argjson normal "$normal_count" --argjson lean "$lean_count" \
@@ -142,6 +164,8 @@ jq -n --arg sha "$SOURCE_SHA" \
       faster_makefile_normalized_diff_excerpt:$scoped_diff,
       faster_makefile_diff_bounded:true,
       only_faster_makefile_differs:true,
+      exactly_four_expected_faster_makefile_token_deltas:true,
+      full_generated_faster_makefile_reconciles_after_expected_only:true,
       faster_makefile_only_normandy_define_removed:$only_normandy,
       differing_makefile_variable_names:($variable_names|lines),
       full_only_acdefines:($full_only_defines|lines),
@@ -168,6 +192,8 @@ jq -e '
    .shared_generated_makefile_count) and
   ((.differing_generated_makefiles|length) == .differing_normalized_makefile_count) and
   .only_faster_makefile_differs==true and
+  .exactly_four_expected_faster_makefile_token_deltas==true and
+  .full_generated_faster_makefile_reconciles_after_expected_only==true and
   ((.faster_makefile_normalized_diff_excerpt|length)>0) and
   .native_compiler_or_linker_executed==false and .m3_sixth_gate_closed==false
 ' "$out" >/dev/null
