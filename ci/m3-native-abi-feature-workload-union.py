@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source-pinned real native ELF version-check union across three workloads.
+"""Source-pinned real native ELF version-check union across four workloads.
 
 Only compares independently CI-authenticated runtime artifacts with the same
 original archived compiled source/ELF VERNEED baseline. A witnessed loader
@@ -24,7 +24,6 @@ UNSEEN={
     "libmozinference.so":24,
     "vulpra-bin":21,
     "crashreporter":20,
-    "libonnxruntime.so":20,
     "libclearkey.so":14
 }
 
@@ -75,7 +74,7 @@ def verify_runtime(data, label, total_key, observed_key, observed_rows,
         raise ValueError("Invalid actual feature runtime report")
     if require_source is not None and data.get(require_source)!=SOURCE:
         raise ValueError("Feature activation compiled-source mismatch")
-    if data.get("original_native_archive_sha256" if label in ("gfxtest","pingsender")
+    if data.get("original_native_archive_sha256" if label in ("gfxtest","pingsender","onnx")
                 else "original_archive_sha256")!=ARCHIVE:
         raise ValueError("Feature activation binary archive mismatch")
     if data.get(total_key)!=expected_static:
@@ -89,7 +88,7 @@ def verify_runtime(data, label, total_key, observed_key, observed_rows,
     return observed
 
 
-def analyze(static,browser,gfx,ping):
+def analyze(static,browser,gfx,ping,onnx):
     original=verify_static(static)
     if any((
         browser.get("source_commit")!=SOURCE,
@@ -132,17 +131,32 @@ def analyze(static,browser,gfx,ping):
                      require_source="original_native_source")
     if len(p)!=22 or any(x[0]!="pingsender" for x in p):
         raise ValueError("Missing/incorrect synthetic no-egress helper test")
-    for label,rows in (("browser",b),("gfxtest",g),("pingsender",p)):
+    if any((
+        onnx.get("real_onxx_native_dlopen_and_c_api_version_invoked") is not True,
+        onnx.get("model_loaded_or_inference_performed") is not False,
+        onnx.get("browser_ml_feature_integrated_and_passed") is not False,
+        onnx.get("external_network_or_user_data_exposed") is not False,
+        onnx.get("safe_original_source_removal_authorized") is not False,
+        onnx.get("m3_sixth_gate_closed") is not False
+    )):
+        raise ValueError("Untrusted original ONNX C ABI activation")
+    o=verify_runtime(onnx,"onnx","original_onnxruntime_version_contracts",
+                     "observed_original_onnxruntime_version_checks",
+                     "observed_original_version_contracts",20,
+                     require_source="original_native_compiled_source")
+    if len(o)!=20 or any(x[0]!="libonnxruntime.so" for x in o):
+        raise ValueError("Original ONNX C API source-version contract was not fully exercised")
+    for label,rows in (("browser",b),("gfxtest",g),("pingsender",p),("onnx",o)):
         if not rows<=original:
             raise ValueError("Real "+label+" version checks are not in exact original static package")
-    if b & g or b & p or g & p:
+    if b & g or b & p or g & p or b & o or g & o or p & o:
         raise ValueError("Overlapping workload ABI triples counted as novel coverage")
-    total=b|g|p
+    total=b|g|p|o
     missing=original-total
     absent=Counter(x[0] for x in missing)
     if dict(absent)!=UNSEEN:
         raise ValueError("Original unexercised member list changed unexpectedly")
-    if len(total)!=366 or len(missing)!=153:
+    if len(total)!=386 or len(missing)!=133:
         raise ValueError("Wrong verified runtime version coverage union")
     return {
         "schema_version":1,
@@ -154,11 +168,13 @@ def analyze(static,browser,gfx,ping):
             {"workload":"original_gfxtest_Wayland_EGL_roundtrip",
              "successful_ci_run_id":41158839352,"original_version_triples_seen":len(g)},
             {"workload":"original_pingsender_synthetic_local_POST_no_egress",
-             "successful_ci_run_id":41159158976,"original_version_triples_seen":len(p)}
+             "successful_ci_run_id":41159158976,"original_version_triples_seen":len(p)},
+            {"workload":"original_onnxruntime_C_API_base_version_no_egress",
+             "successful_ci_run_id":41159617600,"original_version_triples_seen":len(o)}
         ],
         "original_static_compiled_ELF_version_contracts":len(original),
-        "original_abi_version_contracts_observed_across_three_feature_workloads":len(total),
-        "original_abi_version_contracts_unexercised_across_three_workloads":len(missing),
+        "original_abi_version_contracts_observed_across_four_feature_workloads":len(total),
+        "original_abi_version_contracts_unexercised_across_four_workloads":len(missing),
         "remaining_not_exercised_native_package_ELF_basenames":[
             {"basename":name,"not_exercised_version_triples":count}
             for name,count in sorted(absent.items())
@@ -193,31 +209,31 @@ def selftest():
         try:tuples(bad)
         except ValueError:pass
         else:raise AssertionError("False browser-native loader tuple accepted")
-    assert sum(UNSEEN.values())==153
+    assert sum(UNSEEN.values())==133
     return 5
 
 
 def main():
     p=argparse.ArgumentParser()
-    for field in ("static","browser","gfx","ping","output"):
+    for field in ("static","browser","gfx","ping","onnx","output"):
         p.add_argument("--"+field,type=Path)
     p.add_argument("--self-test",action="store_true")
     a=p.parse_args()
     if a.self_test:
         print("PASS:",selftest(),"strict native ELF ABI tuple/provenance fixtures")
         if a.static is None:return
-    if not all(getattr(a,k) for k in ("static","browser","gfx","ping","output")):
-        p.error("Need --static, --browser, --gfx, --ping and --output")
-    docs=[json.loads(getattr(a,k).read_text()) for k in ("static","browser","gfx","ping")]
+    if not all(getattr(a,k) for k in ("static","browser","gfx","ping","onnx","output")):
+        p.error("Need --static, --browser, --gfx, --ping, --onnx and --output")
+    docs=[json.loads(getattr(a,k).read_text()) for k in ("static","browser","gfx","ping","onnx")]
     result=analyze(*docs)
     a.output.write_text(json.dumps(result,indent=2)+"\n")
     print("PASS: independently verified real source-matched GUI/helper ABI version coverage union")
     print("ORIGINAL DECLARED VERSION CONTRACTS:",result["original_static_compiled_ELF_version_contracts"])
-    print("OBSERVED ACROSS THREE REAL EXECUTED PATHS:",
-          result["original_abi_version_contracts_observed_across_three_feature_workloads"])
-    print("NOT OBSERVED ACROSS THESE THREE PATHS:",
-          result["original_abi_version_contracts_unexercised_across_three_workloads"])
-    print("LIMIT: 153 not exercised is not permission to prune")
+    print("OBSERVED ACROSS FOUR REAL EXECUTED PATHS:",
+          result["original_abi_version_contracts_observed_across_four_feature_workloads"])
+    print("NOT OBSERVED ACROSS THESE FOUR PATHS:",
+          result["original_abi_version_contracts_unexercised_across_four_workloads"])
+    print("LIMIT: 133 not exercised is not permission to prune")
 if __name__=="__main__":
     try:main()
     except (ValueError,AssertionError,OSError,KeyError) as ex:
