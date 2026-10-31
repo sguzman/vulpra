@@ -112,6 +112,10 @@ jobs:
               $b.actual_evaluated_linkable_nodes) as $full_only_linkable_nodes |
              ($b.actual_evaluated_linkable_nodes -
               $a.actual_evaluated_linkable_nodes) as $lean_only_linkable_nodes |
+             ($a.actual_evaluated_linkable_compile_units -
+              $b.actual_evaluated_linkable_compile_units) as $full_only_compile_owners |
+             ($b.actual_evaluated_linkable_compile_units -
+              $a.actual_evaluated_linkable_compile_units) as $lean_only_compile_owners |
              ($a.actual_evaluated_library_link_edges -
               $b.actual_evaluated_library_link_edges) as $full_only_link_edges |
              ($b.actual_evaluated_library_link_edges -
@@ -151,6 +155,13 @@ jobs:
               combined_evaluated_linkable_node_count:$b.actual_evaluated_linkable_node_count,
               full_only_evaluated_linkable_nodes:$full_only_linkable_nodes,
               combined_only_evaluated_linkable_nodes:$lean_only_linkable_nodes,
+              full_evaluated_linkable_compile_unit_count:$a.actual_evaluated_linkable_compile_unit_count,
+              combined_evaluated_linkable_compile_unit_count:$b.actual_evaluated_linkable_compile_unit_count,
+              full_only_evaluated_linkable_compile_units:$full_only_compile_owners,
+              combined_only_evaluated_linkable_compile_units:$lean_only_compile_owners,
+              full_unresolved_relative_compile_units:$a.unresolved_relative_linkable_compile_unit_count,
+              combined_unresolved_relative_compile_units:$b.unresolved_relative_linkable_compile_unit_count,
+              declared_compile_owner_is_linker_object_proof:false,
               full_evaluated_library_link_edge_count:$a.actual_evaluated_library_link_edge_count,
               combined_evaluated_library_link_edge_count:$b.actual_evaluated_library_link_edge_count,
               full_only_evaluated_library_link_edges:$full_only_link_edges,
@@ -203,6 +214,9 @@ jobs:
              .combined_evaluated_compile_source_count>500 and
              .full_evaluated_linkable_node_count>500 and
              .combined_evaluated_linkable_node_count>500 and
+             .full_evaluated_linkable_compile_unit_count>500 and
+             .combined_evaluated_linkable_compile_unit_count>500 and
+             .declared_compile_owner_is_linker_object_proof==false and
              .full_evaluated_library_link_edge_count>0 and
              .combined_evaluated_library_link_edge_count>0 and
              .actual_linker_commands_executed==false and
@@ -227,6 +241,9 @@ jobs:
           jq -c '{
             emitted_compile_sources:[.full_evaluated_compile_source_count,.combined_evaluated_compile_source_count],
             declared_link_nodes:[.full_evaluated_linkable_node_count,.combined_evaluated_linkable_node_count],
+            linkable_compile_units:[.full_evaluated_linkable_compile_unit_count,.combined_evaluated_linkable_compile_unit_count],
+            differing_compile_owners:[(.full_only_evaluated_linkable_compile_units|length),(.combined_only_evaluated_linkable_compile_units|length)],
+            unresolved_relative_compile_units:[.full_unresolved_relative_compile_units,.combined_unresolved_relative_compile_units],
             declared_link_edges:[.full_evaluated_library_link_edge_count,.combined_evaluated_library_link_edge_count],
             differing_link_edges:[(.full_only_evaluated_library_link_edges|length),(.combined_only_evaluated_library_link_edges|length)],
             differing_compile_sources:[(.full_only_evaluated_compile_sources|length),(.combined_only_evaluated_compile_sources|length)],
