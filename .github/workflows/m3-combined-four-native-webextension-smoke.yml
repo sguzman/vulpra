@@ -1,0 +1,125 @@
+# Original compiled four-opt-in native candidate with actual local JS HTTP 302,
+# WebExtension install/message/storage/uninstall, Nimbus and guarded promo/ads.
+# No user profiles, real accounts, or remote recommendation fetching.
+name: M3 Combined Four-Opt-In Native JS WebExtension Nimbus Fallback
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-combined-four-native-webextension-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-native-original-four-optin-protected-browser-features:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: e7aa6273fc1078134c216408c7cc110886dc60ada90c062d7f2482fd3f288eec
+      NATIVE_RUN: '41222758405'
+      MOZ_HEADLESS: '1'
+      MOZ_DISABLE_NONLOCAL_CONNECTIONS: '1'
+      VULPRA_M3_VERIFY_NIMBUS: '1'
+      VULPRA_M3_VERIFY_NO_ASROUTER_PROMOS: '1'
+      VULPRA_M3_VERIFY_NO_NEWTAB_ADSFEED: '1'
+    steps:
+      - name: Checkout only original tested real native WebDriver helper
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/smoke-webextension-package-local.py
+      - name: Verify original helper unchanged and compiler-built four-flag candidate authentic
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD:ci/smoke-webextension-package-local.py)" = caf643f7f6c959d26da1f816822b171a34652a44
+          python3 -m py_compile ci/smoke-webextension-package-local.py
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NATIVE_RUN" |
+            jq -e --arg sha e9e52a0ca36f54fab071784cea31d2a6a55789ad '
+              .status=="completed" and .conclusion=="success" and .head_sha==$sha and
+              .path==".github/workflows/m3-original-four-optin-native-build.yml"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/four"
+          gh run download "$NATIVE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-native-combined-four-optin-candidate --dir "$RUNNER_TEMP/four"
+          (cd "$RUNNER_TEMP/four" && sha256sum -c vulpra-four-lean.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/four/vulpra-four-lean.tar.xz" | cut -d' ' -f1)" = "$ARCHIVE_SHA"
+          jq -e --arg sha "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" '
+            .status=="original_native_four_optin_combined_package_built" and
+            .original_source_commit==$sha and .combined_native_archive_sha256==$archive and
+            .all_four_generated_config_guards_verified==true and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/four/m3-original-four-native-size.json" >/dev/null
+          mkdir -p .git/vulpra-native-build/packages
+          cp "$RUNNER_TEMP/four/vulpra-four-lean.tar.xz" \
+            .git/vulpra-native-build/packages/vulpra-local-four-webextension-ci.tar.xz
+          (cd .git/vulpra-native-build/packages &&
+            sha256sum vulpra-local-four-webextension-ci.tar.xz > vulpra-local-four-webextension-ci.tar.xz.sha256)
+      - name: Install only native Linux browser host libraries and pinned geckodriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends libgtk-3-0t64 libdbus-glib-1-2 \
+            libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+      - name: Run actual combined four-optin native JS, temporary WebExtension, Nimbus and omitted feature guards
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          count="$(find .git/vulpra-native-build -maxdepth 1 -type f -name 'webextension-smoke-*.json' | wc -l)"
+          test "$count" -eq 1
+          report="$(find .git/vulpra-native-build -maxdepth 1 -type f -name 'webextension-smoke-*.json' -print -quit)"
+          jq -e '.schema_version==1 and .status=="pass" and
+            .webextension.temporary_unsigned_install==true and
+            .webextension.content_scripts==true and
+            .webextension.background_messaging==true and
+            .webextension.storage_local==true and
+            .webextension.uninstall==true and
+            .security.original_firefox_profile_preserved==true and
+            .security.temporary_home==true and
+            .nimbus.store_ready==true and
+            .nimbus.api_ready==true and
+            .asrouter_promotion_optout.status=="pass" and
+            .asrouter_promotion_optout.templates==2 and
+            .newtab_adsfeed_optout.factory_guard.omitted==true and
+            .newtab_adsfeed_optout.factory_guard.topsites==true and
+            .newtab_adsfeed_optout.factory_guard.prefs==true' "$report" >/dev/null
+          jq -n --arg sha "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" '{
+            schema_version:1,
+            status:"four_optin_native_js_extension_nimbus_fallback_accepted",
+            original_compiler_source:$sha,
+            exact_compiled_archive_sha256:$archive,
+            local_redirect_and_js_dom_verified:true,
+            temporary_unsigned_webextension_install_message_storage_uninstall:true,
+            private_firefox_profile_sentinel_preserved:true,
+            nimbus_native_api_and_store_ready:true,
+            guarded_both_asrouter_promo_templates_retain_dispatch:true,
+            guarded_adsfeed_omission_preserves_top_sites_and_prefs:true,
+            real_signed_extension_or_cloud_services_tested:false,
+            complete_feature_dependency_graph_proven:false,
+            default_browser_modified:false,
+            m3_sixth_gate_closed:false
+          }' > "$RUNNER_TEMP/four-native-extension-safe-result.json"
+      - name: Upload only sanitized pass/fail assertions, no profile or WebDriver logs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-four-optin-js-ext-nimbus-guarded-runtime
+          path: ${{ runner.temp }}/four-native-extension-safe-result.json
+          if-no-files-found: error
+          retention-days: 14
