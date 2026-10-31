@@ -1,0 +1,160 @@
+# Real original compiled Vulpra GUI surfaces on private Arch Linux Weston.
+# No network, no user display, no permanent profile, no Hyprland claim.
+name: M3 Combined Four-Opt-In Arch Wayland Frame and Profile
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-combined-four-optin-arch-wayland-replay.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  combined-four-pinned-arch-private-weston-real-frame:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: e7aa6273fc1078134c216408c7cc110886dc60ada90c062d7f2482fd3f288eec
+      SOURCE_RUN: '41222758405'
+    steps:
+      - name: Checkout only existing strict private Wayland graphical verification harness
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            packaging/test-wayland.sh
+      - name: Authenticate original compiled Vulpra archive and isolated test harness
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n packaging/test-wayland.sh
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "e9e52a0ca36f54fab071784cea31d2a6a55789ad" '.status=="completed" and .conclusion=="success" and .head_sha==$sha and .path==".github/workflows/m3-original-four-optin-native-build.yml"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/arch-wayland"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-native-combined-four-optin-candidate --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c vulpra-four-lean.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/vulpra-four-lean.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          jq -e --arg sha "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" '
+            .status=="original_native_four_optin_combined_package_built" and
+            .original_source_commit==$sha and .combined_native_archive_sha256==$archive and
+            .native_browser_compilation_verified==true and
+            .all_four_generated_config_guards_verified==true and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false'             "$RUNNER_TEMP/archive/m3-original-four-native-size.json" >/dev/null
+          tar -xf "$RUNNER_TEMP/archive/vulpra-four-lean.tar.xz" -C "$RUNNER_TEMP/package"
+          test -x "$RUNNER_TEMP/package/vulpra/vulpra"
+          test "$(head -c 4 "$RUNNER_TEMP/package/vulpra/vulpra" | od -An -tx1 | tr -d ' \n')" = 7f454c46
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/package/vulpra/application.ini"
+      - name: Build disposable Arch userspace with private Weston and Wayland protocols
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-weston-context"
+          cat >"$RUNNER_TEMP/arch-weston-context/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            coreutils grep sed findutils bash python gtk3 dbus-glib alsa-lib nss \
+            mesa libglvnd ttf-dejavu weston wayland-utils \
+            && command -v wayland-info \
+            && command -v weston \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t m3-combined-four-arch-weston:ci \
+            "$RUNNER_TEMP/arch-weston-context"
+      - name: Validate committed Wayland frame and private initialized Vulpra profile
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          # Create the compatibility shim on the ephemeral CI runner, check
+          # executable permissions, and bind-mount it read-only. It never
+          # replaces the original packaged native binary or any user launcher.
+          mkdir -p "$RUNNER_TEMP/arch-wayland/shim"
+          # Intentionally defer the private XDG_DATA_HOME and "$@" expansions
+          # to the isolated container launcher, not the CI host.
+          # shellcheck disable=SC2016
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'set -euo pipefail' \
+            'umask 077' \
+            'mkdir -p -m 0700 "$XDG_DATA_HOME/vulpra/default"' \
+            'exec /original/vulpra --no-remote --new-instance --profile "$XDG_DATA_HOME/vulpra/default" "$@"' \
+            >"$RUNNER_TEMP/arch-wayland/shim/vulpra-launch"
+          chmod 0755 "$RUNNER_TEMP/arch-wayland/shim/vulpra-launch"
+          test -x "$RUNNER_TEMP/arch-wayland/shim/vulpra-launch"
+          bash -n "$RUNNER_TEMP/arch-wayland/shim/vulpra-launch"
+          docker run --rm --network none --read-only --shm-size 256m \
+            --user "$(id -u):$(id -g)" --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,nosuid,nodev,size=512m \
+            --mount type=bind,src="$RUNNER_TEMP/package/vulpra",dst=/original,readonly \
+            --mount type=bind,src="$RUNNER_TEMP/arch-wayland/shim",dst=/shim,readonly \
+            --mount type=bind,src="$GITHUB_WORKSPACE/packaging/test-wayland.sh",dst=/audit/test-wayland.sh,readonly \
+            --env HOME=/tmp/isolated-private-home \
+            --env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            --env VULPRA_WAYLAND_TEST_OFFLINE=1 \
+            --env VULPRA_WAYLAND_TEST_SECONDS=10 \
+            m3-combined-four-arch-weston:ci /bin/bash -c '
+              set -euo pipefail
+              mkdir -m 0700 /tmp/isolated-private-home
+              test -x /shim/vulpra-launch
+              bash /audit/test-wayland.sh /shim
+              test ! -e /tmp/isolated-private-home/.mozilla
+              echo "PASS: combined-four Vulpra private Weston real attached-and-committed Wayland surface in Arch userspace"
+            '
+          image_id="$(docker image inspect m3-combined-four-arch-weston:ci --format '{{.Id}}')"
+          printf '%s' "$image_id" | grep -Eq '^sha256:[a-f0-9]{64}$'
+          glibc_version="$(docker run --rm --network none --read-only --cap-drop ALL \
+            m3-combined-four-arch-weston:ci pacman -Q glibc | awk '{print $2}')"
+          printf '%s' "$glibc_version" | grep -Eq '^[0-9][0-9A-Za-z.+_:-]*$'
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --arg image "$image_id" --arg glibc "$glibc_version" '{
+             schema_version:1,
+             status:"combined_four_archlinux_userspace_private_weston_wayland_frame_verified",
+             original_source_commit:$src,
+             combined_four_archive_sha256:$sha,
+             combined_four_native_elf:"vulpra",
+             arch_container_image_id:$image,
+             arch_userspace_glibc_version:$glibc,
+             real_private_weston_compositor:true,
+             wayland_registry_and_xdg_wm_base_present:true,
+             native_browser_graphical_10_seconds_alive:true,
+             native_browser_nonnull_wayland_surface_buffer_attached_then_committed:true,
+             isolated_native_vulpra_profile_compatibility_initialized:true,
+             only_disposable_private_profile:true,
+             offline_network_namespace:true,
+             source_browser_sandbox_preferences_not_disabled:true,
+             any_real_user_or_installed_browser_profile_accessed:false,
+             actual_hyprland_or_gpu_acceleration_tested:false,
+             full_browser_rare_feature_paths_tested:false,
+             source_build_graph_closure_proven:false,
+             source_pruning_authorized:false,
+             m3_sixth_gate_closed:false
+           }' > "$RUNNER_TEMP/arch-wayland/four-arch-wayland-frame.json"
+          jq -e '
+            .status=="combined_four_archlinux_userspace_private_weston_wayland_frame_verified" and
+            .real_private_weston_compositor==true and
+            .native_browser_graphical_10_seconds_alive==true and
+            .native_browser_nonnull_wayland_surface_buffer_attached_then_committed==true and
+            .isolated_native_vulpra_profile_compatibility_initialized==true and
+            .offline_network_namespace==true and
+            .actual_hyprland_or_gpu_acceleration_tested==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/arch-wayland/four-arch-wayland-frame.json" >/dev/null
+      - name: Upload only sanitized combined-four Arch userspace Wayland evidence flags
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-combined-four-archlinux-private-weston-frame
+          path: ${{ runner.temp }}/arch-wayland/four-arch-wayland-frame.json
+          if-no-files-found: error
+          retention-days: 14
