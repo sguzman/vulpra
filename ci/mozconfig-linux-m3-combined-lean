@@ -1,0 +1,20 @@
+# Vulpra M3 ISOLATED combined-lean variant. Never overwrite accepted M2/default browser.
+# Never use the existing obj-vulpra-linux or overwrite the verified M2 package.
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux-m3-combined-lean
+ac_add_options --with-branding=browser/branding/unofficial
+ac_add_options --with-app-basename=Vulpra
+ac_add_options --disable-tests
+ac_add_options --with-ccache=sccache
+# Candidate CI/native builds are memory-sensitive; prefer predictable success.
+mk_add_options MOZ_PARALLEL_BUILD=1
+
+# Normandy remains enabled by default. All other build settings match
+# ci/mozconfig-linux-normandy-experiment. No verified M2 object tree is used.
+
+# Combine only four independently guarded M3 experiment flags.
+# No normal build, user profile or installed Firefox default is modified.
+# A passing configure is NOT proof of browser runtime or compressed bytes saved.
+export VULPRA_EXPERIMENT_NO_NORMANDY=1
+export VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS=1
+export VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED=1
+export VULPRA_EXPERIMENT_NO_NEWTAB_PROMOCARD=1
