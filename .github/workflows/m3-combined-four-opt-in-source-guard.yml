@@ -1,0 +1,66 @@
+# Cheap fail-closed source contract before any expensive original native build.
+name: M3 Four-Opt-In Combined Lean Source Guard
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-combined-four-opt-in-source-guard.yml
+      - ci/m3-combined-optin-source-guard.rs
+      - ci/mozconfig-linux-m3-baseline
+      - ci/mozconfig-linux-m3-combined-lean
+      - browser/moz.configure
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  four-guarded-experiments-same-default-native-options:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only source guard, two mozconfigs and browser flags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-combined-optin-source-guard.rs
+            ci/mozconfig-linux-m3-baseline
+            ci/mozconfig-linux-m3-combined-lean
+            browser/moz.configure
+      - name: Assert protected combined opt-in source-only contract with Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-combined-optin-source-guard.rs -o "$RUNNER_TEMP/m3-four-flag-tests"
+          "$RUNNER_TEMP/m3-four-flag-tests"
+          rustc --edition=2021 -O ci/m3-combined-optin-source-guard.rs -o "$RUNNER_TEMP/m3-four-flag-guard"
+          "$RUNNER_TEMP/m3-four-flag-guard" \
+            ci/mozconfig-linux-m3-baseline \
+            ci/mozconfig-linux-m3-combined-lean \
+            browser/moz.configure \
+            "$RUNNER_TEMP/m3-four-flag-source-contract.json"
+          jq -e '
+            .status=="combined_four_opt_in_source_configuration_guarded" and
+            .schema_version==1 and
+            .normal_base_unchanged==true and
+            .combined_isolated_objdir==true and
+            .explicit_experiment_flags==4 and
+            .original_browser_config_guards_present==true and
+            .protected_sync_devtools_migrator_unchanged==true and
+            .native_compilation_or_runtime_tested==false and
+            .combined_size_saving_verified==false and
+            .default_browser_changed==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-four-flag-source-contract.json" >/dev/null
+          echo 'PASS: unchanged normal config, exactly four guarded experimental opt-ins'
+      - name: Upload safe combined-source contract only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-four-optin-combined-lean-source-guard
+          path: ${{ runner.temp }}/m3-four-flag-source-contract.json
+          if-no-files-found: error
+          retention-days: 14
