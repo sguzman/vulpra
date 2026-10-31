@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import re
 import sys
+from urllib.parse import quote
 
 TARGETS = (
     "browser/components/",
@@ -86,6 +87,18 @@ def assert_flags(substs, variant):
             raise ValueError(f"Normal build unexpectedly omits protected {key}")
 
 
+def portable_member(value):
+    """Reversibly percent-encode unusual upstream filenames, not discard them."""
+    if not isinstance(value, str):
+        raise ValueError("Expected source or installation member")
+    value = value.replace("\\\\", "/").strip("/")
+    if ".." in value.split("/"):
+        raise ValueError("Unsafe parent traversal in ownership member")
+    if "\\x00" in value:
+        raise ValueError("NUL in ownership member")
+    return quote(value, safe="/._-+@")
+
+
 def source_identity(item, root, object_root):
     """Label a frontend file by its *actual* source/obj origin, never host paths."""
     raw = str(getattr(item, "full_path", item)).replace("\\", "/")
@@ -95,8 +108,8 @@ def source_identity(item, root, object_root):
     for label, directory in (("src", root), ("obj", object_root)):
         prefix = str(directory).replace("\\", "/").rstrip("/") + "/"
         if physical.startswith(prefix):
-            return (label, normalized(physical[len(prefix):]))
-    return ("other", normalized(os.path.basename(physical)))
+            return (label, portable_member(physical[len(prefix):]))
+    return ("other", portable_member(os.path.basename(physical)))
 
 
 def install_component(value):
@@ -105,7 +118,7 @@ def install_component(value):
     if raw.startswith("/") or raw.startswith("\\"):
         return "@noncanonical-install-component"
     try:
-        return normalized(raw)
+        return portable_member(raw)
     except ValueError:
         return "@noncanonical-install-component"
 
