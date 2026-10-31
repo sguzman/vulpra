@@ -1,0 +1,108 @@
+# Authenticates the actual historical successful compiled configure job's
+# evaluated config.status assertions. Read-only and source SHA pinned.
+name: M3 Original Compiled Feature Configure Guard Evidence
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-compiled-feature-guards.yml
+      - ci/m3-original-compiled-config-status-evidence.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-original-compiled-baseline-config-status-assertions:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      SOURCE_RUN: '40997075527'
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout only bounded current Rust verifier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Checkout only original compiled source's configure workflow and mozconfig
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: original-source
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/build-m3-normandy-matched-baseline.yml
+            ci/mozconfig-linux-m3-baseline
+      - name: Authenticate exact build job and successful original configure and compile steps
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha and
+              .path==".github/workflows/build-m3-normandy-matched-baseline.yml"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/jobs" |
+            jq -e '
+              [.jobs[]|select(
+                .name=="full-normandy-baseline" and .conclusion=="success" and
+                ([.steps[]|select(
+                  .name=="Configure protected full-Normandy feature set" and
+                  .conclusion=="success")]|length)==1 and
+                ([.steps[]|select(
+                  .name=="Compile original full-Normandy browser" and
+                  .conclusion=="success")]|length)==1 and
+                ([.steps[]|select(
+                  .name=="Package original Normandy and produce source-pinned evidence" and
+                  .conclusion=="success")]|length)==1
+               )]|length)==1' >/dev/null
+          rustc --edition=2021 --test ci/m3-original-compiled-config-status-evidence.rs \
+            -o "$RUNNER_TEMP/original-config-tests"
+          "$RUNNER_TEMP/original-config-tests"
+          rustc --edition=2021 -O ci/m3-original-compiled-config-status-evidence.rs \
+            -o "$RUNNER_TEMP/original-config-assertions"
+      - name: Cross-check original evaluated source-matched compiled feature assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/original-config-assertions" \
+            "$GITHUB_WORKSPACE/original-source/.github/workflows/build-m3-normandy-matched-baseline.yml" \
+            "$GITHUB_WORKSPACE/original-source/ci/mozconfig-linux-m3-baseline" \
+            "$RUNNER_TEMP/m3-original-compiled-evaluated-feature-config.json"
+          jq -e --arg sha "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_compiled_baseline_evaluated_feature_guards_authenticated" and
+            .original_source_commit==$sha and
+            .original_compiled_archive_sha256==$archive and
+            .original_compiled_source_run==40997075527 and
+            .historical_config_status_step_success_authenticated_externally==true and
+            .moz_normandy==true and .moz_widget_toolkit=="gtk" and
+            .moz_app_basename=="Vulpra" and .moz_devtools=="all" and
+            .moz_sandbox==true and .moz_wayland==true and
+            .moz_services_sync==true and
+            .source_matched_mozconfig_confirmed==true and
+            .full_generated_ninja_ownership_proven==false and
+            .nss_codec_or_ml_runtime_feature_exhaustiveness_proven==false and
+            .current_source_config_status_evaluated==false and
+            .cross_platform_config_equivalence_proven==false and
+            .new_feature_omission_or_source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-compiled-evaluated-feature-config.json" >/dev/null
+          echo 'PASS: seven exact generated config.status assertions were executed by successful original pinned native build'
+      - name: Upload bounded original compiled feature-guard evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-evaluated-compiled-feature-config-guards
+          path: ${{ runner.temp }}/m3-original-compiled-evaluated-feature-config.json
+          if-no-files-found: error
+          retention-days: 14
