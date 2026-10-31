@@ -1,0 +1,141 @@
+# Actually start four-optin source-matched Vulpra in official Arch Linux
+# userspace. Isolated headless about:blank only; not Arch host or Hyprland.
+name: M3 Combined Four-Opt-In Arch Headless Native Replay
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-combined-four-optin-arch-headless-replay.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  combined-four-native-arch-disposable-private-headless-blank:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: e7aa6273fc1078134c216408c7cc110886dc60ada90c062d7f2482fd3f288eec
+      SOURCE_RUN: '41222758405'
+    steps:
+      - name: Checkout only workflow configuration
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Authenticate successful original compiled archive provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "e9e52a0ca36f54fab071784cea31d2a6a55789ad" '.status=="completed" and .conclusion=="success" and .head_sha==$sha and .path==".github/workflows/m3-original-four-optin-native-build.yml"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/arch-headless"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-native-combined-four-optin-candidate --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c vulpra-four-lean.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/vulpra-four-lean.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          jq -e --arg sha "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" '
+            .status=="original_native_four_optin_combined_package_built" and
+            .original_source_commit==$sha and .combined_native_archive_sha256==$archive and
+            .native_browser_compilation_verified==true and
+            .all_four_generated_config_guards_verified==true and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false'             "$RUNNER_TEMP/archive/m3-original-four-native-size.json" >/dev/null
+          tar -xf "$RUNNER_TEMP/archive/vulpra-four-lean.tar.xz" -C "$RUNNER_TEMP/package"
+          test -x "$RUNNER_TEMP/package/vulpra/vulpra"
+          test "$(head -c 4 "$RUNNER_TEMP/package/vulpra/vulpra" | od -An -tx1 | tr -d ' \n')" = '7f454c46'
+          test -f "$RUNNER_TEMP/package/vulpra/application.ini"
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/package/vulpra/application.ini"
+      - name: Prepare disposable official Arch userspace with native GTK and font dependencies
+        shell: bash
+        timeout-minutes: 14
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-container-build"
+          cat >"$RUNNER_TEMP/arch-container-build/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            binutils coreutils gtk3 dbus-glib alsa-lib nss mesa libglvnd ttf-dejavu \
+            && test -x /lib64/ld-linux-x86-64.so.2 \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t m3-four-lean-arch-headless:ci \
+            "$RUNNER_TEMP/arch-container-build"
+      - name: Execute original native browser offline with disposable headless profile
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          # Browser's entire writable HOME/profile/cache/screenshot live on
+          # disposable tmpfs. No network or persistent host browser access.
+          docker run --rm --network none --read-only --shm-size 256m \
+            --user "$(id -u):$(id -g)" \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,nosuid,nodev,size=512m \
+            --mount type=bind,src="$RUNNER_TEMP/package/vulpra",dst=/original,readonly \
+            --env MOZ_HEADLESS=1 --env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            --env HOME=/tmp/private-home --env XDG_CACHE_HOME=/tmp/private-home/cache \
+            --env XDG_DATA_HOME=/tmp/private-home/data \
+            --env XDG_RUNTIME_DIR=/tmp/private-runtime \
+            m3-four-lean-arch-headless:ci /bin/bash -c '
+              set -euo pipefail
+              mkdir -m 0700 /tmp/private-home /tmp/private-runtime /tmp/private-profile
+              cd /tmp/private-home
+              timeout --signal=TERM --kill-after=5s 100s \
+                /original/vulpra -headless -no-remote \
+                  -profile /tmp/private-profile --window-size 320,200 \
+                  --screenshot /tmp/private-screenshot.png about:blank \
+                >/tmp/private-browser.log 2>&1 || {
+                  printf "FAIL: four-opt-in Arch browser headless process exited nonzero\n"
+                  exit 1
+                }
+              test -s /tmp/private-screenshot.png
+              test "$(head -c 8 /tmp/private-screenshot.png | od -An -tx1 | tr -d " \n")" = "89504e470d0a1a0a"
+              test ! -e /tmp/private-home/.mozilla/firefox/profiles.ini
+              echo "PASS: combined-four compiled native Vulpra headless about:blank screenshot on offline Arch Linux userspace"
+            '
+          image_id="$(docker image inspect m3-four-lean-arch-headless:ci --format '{{.Id}}')"
+          printf '%s' "$image_id" | grep -Eq '^sha256:[a-f0-9]{64}$'
+          glibc_version="$(docker run --rm --network none --read-only --cap-drop ALL \
+            m3-four-lean-arch-headless:ci pacman -Q glibc | awk '{print $2}')"
+          printf '%s' "$glibc_version" | grep -Eq '^[0-9][0-9A-Za-z.+_:-]*$'
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --arg image "$image_id" --arg glibc "$glibc_version" '{
+              schema_version:1,
+              status:"combined_four_archlinux_userspace_native_headless_blank_rendered",
+              original_source_commit:$src,
+              combined_four_archive_sha256:$sha,
+              arch_container_image_id:$image,
+              arch_userspace_glibc_version:$glibc,
+              native_browser_elf_executable:"vulpra",
+              combined_four_application_ini_name:"Vulpra",
+              combined_four_browser_headless_about_blank_screenshot_png_verified:true,
+              disposable_private_profile_only:true,
+              host_network_disabled:true,
+              four_optin_sandbox_prefs_not_intentionally_disabled:true,
+              installed_browser_or_user_profiles_touched:false,
+              real_arch_host_or_hyprland_graphical_test:false,
+              all_app_features_or_future_dlopen_paths_tested:false,
+              no_new_source_pruning_authorized:true,
+              m3_sixth_gate_closed:false
+            }' > "$RUNNER_TEMP/arch-headless/arch-four-headless-startup.json"
+          jq -e '
+             .combined_four_browser_headless_about_blank_screenshot_png_verified==true and
+             .disposable_private_profile_only==true and .host_network_disabled==true and
+             .four_optin_sandbox_prefs_not_intentionally_disabled==true and
+             .installed_browser_or_user_profiles_touched==false and
+             .real_arch_host_or_hyprland_graphical_test==false and
+             .all_app_features_or_future_dlopen_paths_tested==false and
+             .no_new_source_pruning_authorized==true and
+             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/arch-headless/arch-four-headless-startup.json" >/dev/null
+      - name: Preserve only source and platform status; never screenshot or profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-combined-four-archlinux-native-headless-blank-result
+          path: ${{ runner.temp }}/arch-headless/arch-four-headless-startup.json
+          if-no-files-found: error
+          retention-days: 14
