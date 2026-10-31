@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/m3-original-vulpra-bin-runtime-bindings.yml
       - ci/m3-vulpra-bin-wayland.sh
+      - packaging/test-wayland.sh
       - ci/m3-vulpra-bin-version-reconcile.py
       - ci/m3-native-original-feature-module-bindings.rs
   workflow_dispatch:
