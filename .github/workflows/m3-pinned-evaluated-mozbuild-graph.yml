@@ -359,6 +359,8 @@ jobs:
             .actual_generated_makefile_contents_hashed==true and
             .only_faster_makefile_differs==true and
             .only_faster_makefile_differs==true and
+            .exactly_four_expected_faster_makefile_token_deltas==true and
+            .full_generated_faster_makefile_reconciles_after_expected_only==true and
             (.differing_makefile_variable_names|type)=="array" and
             (.full_only_acdefines|type)=="array" and
             (.combined_only_acdefines|type)=="array" and
