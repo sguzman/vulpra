@@ -191,6 +191,20 @@ This narrows original-source **generated installer declaration ownership** but i
 
 This is *stronger than emitted `BaseSources` membership parity* because it includes generated C/C++ compiler command strings, arguments, and flags from the actual Mozilla CompileDB backend. It does **not** prove the commands were executed, what generated source bytes contain, the actual native object outputs or their equality, Cargo/`rustc` commands, linker command-line/archives, FFI edges, dynamic `dlopen` use or installed browser behavior. The earlier compiled native smoke tests remain separate evidence. No new source pruning or package-size savings are authorized. **M3 remains 5/6 (83%); overall 61%; accepted delta +0pp.**
 
+## Actual serialized FasterMake installer-manifest record delta
+
+[**Source-pinned Mozilla InstallManifest v5 serialized-entry reconciliation 41248639266 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41248639266) examined only the **three differing existing** generated FasterMake manifest files and the **one lean-only Nimbus manifest**. Records were validated as version 5 and split on Mozilla's actual ASCII unit-separator format, compared exactly after the configured object-root normalization, and destination names were sampled at a bounded size. The full serialized manifests and host paths were not archived.
+
+| Changed manifest | Full records | Lean records | Full-only exact records | Lean-only exact records |
+| --- | ---: | ---: | ---: | ---: |
+| `install_dist_bin` | **1,687** | **1,682** | **13** | **8** |
+| `install_dist_bin_browser` | **3,875** | **3,918** | **3** | **46** |
+| `unified_install_dist_bin` | **6,152** | **6,191** | **16** | **55** |
+
+The new lean-only `install_dist_bin_moz-src_toolkit_components_nimbus` contains precisely **one record**, declaring `NimbusBootstrap.sys.mjs`. Representative changed destination declarations include opt-in Normandy/ASRouter paths, the new-tab `lib/*` wildcard versus individually declared resources, and generated/preprocessed toolkit files.
+
+**Interpretation boundary:** An exact serialized record can differ even if its **destination is unchanged** (for example preprocessing inputs or manifest content), and a wildcard can account for many concrete resources without explicit one-to-one records. The full-only and lean-only counts must therefore **not** be presented as physical package file additions/removals. This proves bounded generated installer rule differences, not final installed package bytes or browser runtime resource behavior. No new source deletion or package-size saving. M3 **5/6 (83%)**, overall **61%**, delta **+0pp**.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
