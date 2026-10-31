@@ -27,7 +27,7 @@ ELF=VERSIONED.BASE
 MAX_SYMS=16000000
 # C++ template instantiations in original libxul have mangled names >254 bytes.
 # Preserve them without weakening pathname, control-char or output size bounds.
-PLAIN_SYMBOL=re.compile(r"[A-Za-z_$?][A-Za-z0-9_.$?+:~%-]{0,8191}\\Z")
+PLAIN_SYMBOL=re.compile(r"[A-Za-z_$?][A-Za-z0-9_.$?+:~%-]{0,8191}\Z")
 GROUPS={"libpthread.so.0","libdl.so.2","librt.so.1","libresolv.so.2"}
 
 
