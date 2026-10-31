@@ -1,0 +1,105 @@
+# Original 28-file cross-distro provider sets only: no app startup.
+name: M3 Original Ubuntu vs Arch ELF Loader Provider Crosswalk
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-ubuntu-arch-loader-platform-crosswalk.yml
+      - ci/m3-original-ubuntu-arch-loader-platform-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-28-elf-ubuntu-arch-provider-set-crosswalk:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      UBUNTU_RUN: '41207364061'
+      UBUNTU_HEAD: 68f05ab747249c95edeb92cc12c2d7ec8ec911d7
+      ARCH_RUN: '41211418491'
+      ARCH_HEAD: 7d2443f4ce732852afb6a8b1891ac14ac2e91d60
+    steps:
+      - name: Checkout only source-authenticated cross-distro jq verifier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Authenticate two independent successful original native loader runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$UBUNTU_RUN" |
+            jq -e --arg sha "$UBUNTU_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ARCH_RUN" |
+            jq -e --arg sha "$ARCH_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+      - name: Download only bounded, redacted original native ELF loader-list artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          fetch() {
+            local id="$1" name="$2" folder="$3"
+            mkdir -p "$folder"
+            for attempt in 1 2 3; do
+              if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "$folder"; then return 0; fi
+              if test "$attempt" = 3; then break; fi
+              sleep 2
+            done
+            return 1
+          }
+          fetch "$UBUNTU_RUN" m3-original-all-28-elf-glibc-loader-list "$RUNNER_TEMP/ubuntu"
+          fetch "$ARCH_RUN" m3-original-archlinux-all-28-elf-loader-list "$RUNNER_TEMP/arch"
+          test -s "$RUNNER_TEMP/ubuntu/m3-original-all-elf-loader-list.json"
+          test -s "$RUNNER_TEMP/arch/original-arch-platform-audit.json"
+      - name: Verify exact original 28-ELF provider-set union and classify platform differences
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --slurpfile ubuntu "$RUNNER_TEMP/ubuntu/m3-original-all-elf-loader-list.json" \
+            --slurpfile arch "$RUNNER_TEMP/arch/original-arch-platform-audit.json" \
+            -f ci/m3-original-ubuntu-arch-loader-platform-crosswalk.jq \
+            > "$RUNNER_TEMP/m3-original-ubuntu-arch-elf-platform-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_28_elf_ubuntu_arch_container_loader_platform_crosswalk" and
+            .original_elf_member_count==28 and
+            .original_direct_needed_edges==268 and
+            .ubuntu_direct_needed_names_resolved==268 and
+            .arch_userspace_direct_needed_names_resolved==268 and
+            .ubuntu_loader_provider_name_count==91 and
+            .arch_loader_provider_name_count==90 and
+            .shared_provider_basename_count==81 and
+            .ubuntu_only_provider_basename_count==10 and
+            .arch_only_provider_basename_count==9 and
+            .distinct_provider_basename_union_count==100 and
+            (.ubuntu_only_provider_basenames|length)==10 and
+            (.arch_only_provider_basenames|length)==9 and
+            (.shared_provider_basenames|length)==81 and
+            .arch_hyprland_host_or_real_browser_tested==false and
+            .shared_library_name_difference_does_not_indicate_missing_dependency==true and
+            .no_native_application_entrypoints_executed==true and
+            .full_future_dlopen_or_feature_coverage_proven==false and
+            .complete_source_build_ownership_proven==false and
+            .user_browser_or_profiles_modified==false and
+            .pruning_or_package_savings_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-ubuntu-arch-elf-platform-crosswalk.json" >/dev/null
+          echo 'PASS: 268 original direct ELF SONAME names resolve on both Ubuntu and Arch; 81 shared/10 Ubuntu-only/9 Arch-only providers'
+      - name: Preserve only safe original Ubuntu versus Arch provider basenames and counts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-ubuntu-arch-elf-loader-platform-crosswalk
+          path: ${{ runner.temp }}/m3-original-ubuntu-arch-elf-platform-crosswalk.json
+          if-no-files-found: error
+          retention-days: 14
