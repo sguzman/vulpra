@@ -315,6 +315,8 @@ def main():
     # objects appear, so inspect them only after the complete emission.
     declared_link_target_nodes = set()
     declared_library_link_edges = set()
+    declared_rust_staticlib_native_consumer_edges = set()
+    declared_rust_staticlib_outgoing_library_edges = set()
     declared_system_library_links = set()
     declared_static_link_into = set()
     declared_linkable_compile_units = set()
@@ -374,6 +376,12 @@ def main():
             if not isinstance(lib, BaseLibrary):
                 raise ValueError("Non-library in emitted linked_libraries")
             declared_library_link_edges.add(consumer + linkable_identity(lib))
+            if isinstance(lib, BaseRustLibrary):
+                declared_rust_staticlib_native_consumer_edges.add(
+                    consumer + linkable_identity(lib))
+            if isinstance(obj, BaseRustLibrary):
+                declared_rust_staticlib_outgoing_library_edges.add(
+                    consumer + linkable_identity(lib))
         for system_lib in obj.linked_system_libs:
             if not isinstance(system_lib, str):
                 raise ValueError("Unexpected system library link token")
@@ -424,6 +432,16 @@ def main():
         "variant": variant,
         "evaluated_mozbuild_emission": True,
         "native_linker_or_binary_executed": False,
+        "actual_evaluated_rust_staticlib_native_consumer_edges": sorted(
+            [list(x) for x in declared_rust_staticlib_native_consumer_edges]),
+        "actual_evaluated_rust_staticlib_native_consumer_edge_count":
+            len(declared_rust_staticlib_native_consumer_edges),
+        "actual_evaluated_rust_staticlib_outgoing_library_edges": sorted(
+            [list(x) for x in declared_rust_staticlib_outgoing_library_edges]),
+        "actual_evaluated_rust_staticlib_outgoing_library_edge_count":
+            len(declared_rust_staticlib_outgoing_library_edges),
+        "rust_native_linker_flags_and_object_archive_proven": False,
+        "rust_cpp_ffi_symbols_and_call_graph_proven": False,
         "actual_evaluated_rust_program_targets": sorted(
             [list(x) for x in evaluated_rust_program_targets]),
         "actual_evaluated_rust_program_target_count": len(evaluated_rust_program_targets),
