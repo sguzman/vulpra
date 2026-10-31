@@ -93,6 +93,14 @@ The emitter's `Linkable.linked_libraries`, `linked_system_libs`, and static `lin
 
 These are **declared frontend compile-unit associations**, not all `BaseSources` member records (11,104 per variant), not evidence that 4,367 separate object files were compiled, and not a complete one-to-one generated-to-original-source mapping. For example, the emitted `Unified_cpp_accessible_aom0.cpp` unit is labeled unresolved relative rather than assigned a fabricated object path. Compilation options, actual compiler/linker invocations and generated contents remain unverified. No feature default, installed browser or source was altered; no M3 gate or byte-saving credit was added.
 
+## Exact Mozilla generated unified translation-unit crosswalk
+
+[**Actual original-source `UnifiedSources.unified_source_mapping` inventory 41240538279 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41240538279). Both independently configured source-matched original browser variants emitted **1,180 distinct generated unified units** and **7,959 exact original-source-to-unified-unit membership records**. I inspected the two archived inventories and verified **zero full-only and zero combined-only members**.
+
+Each of the **1,180** previously unresolved `Unified_*` compiler units referenced by a linkable target exactly matches a generated-unit key in Mozilla's actual `UnifiedSources.unified_source_mapping`. The source member associations are not guessed from the generated filename. **Zero unmatched unified units** were reported in either configuration. The additional **41** non-`Unified_` relative linkable compile units (e.g. `BindingNames.cpp`, `RegisterBindings.cpp`, `UnifiedBindings0.cpp`) remain outside this specific mapping and require separate generated-provenance tracing.
+
+The mapping documents the **frontend's generated grouping declarations**, not that those generated files were written, compiled successfully, or linked into byte-identical objects. The real `ld`/Ninja command, compiler options, generated source bytes, FFI and conditional runtime loading remain out of scope. No new source was deleted, no package-size claim added, and M3's final gate remains open.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
