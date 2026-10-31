@@ -54,9 +54,13 @@ jobs:
           # Region lookup is preseeded inside the ephemeral smoke profile.
           # The network guard must remain enabled, not silently disabled.
           test "${MOZ_DISABLE_NONLOCAL_CONNECTIONS:-}" = 1
+          # Temporary endpoint overrides are only respected with this
+          # test-only environment flag on release/beta source variants.
+          test "${MOZ_REMOTE_SETTINGS_DEVTOOLS:-}" = 1
           profile="${XDG_DATA_HOME}/vulpra/default"
           test -f "$profile/user.js"
           grep -Fxq 'user_pref("browser.search.region", "ZZ");' "$profile/user.js"
+          grep -Fxq 'user_pref("services.settings.server", "http://127.0.0.1:9/v1");' "$profile/user.js"
           test "$(stat -c '%a' "$profile")" = 700
           test "$(stat -c '%a' "$profile/user.js")" = 600
           # Fake only Gecko's profile-initialization marker in this mock test.

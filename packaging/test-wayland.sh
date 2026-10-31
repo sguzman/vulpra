@@ -44,7 +44,10 @@ mkdir -m 0700 -p "$work/runtime" "$work/home"
 # disable that guard or affect installed/user profiles to get a green test.
 test_profile="$work/home/.local/share/vulpra/default"
 mkdir -p -m 0700 -- "$test_profile"
-printf '%s\n' 'user_pref("browser.search.region", "ZZ");' > "$test_profile/user.js"
+printf '%s\n' \
+  'user_pref("browser.search.region", "ZZ");' \
+  'user_pref("services.settings.server", "http://127.0.0.1:9/v1");' \
+  > "$test_profile/user.js"
 chmod 0600 -- "$test_profile/user.js"
 export XDG_RUNTIME_DIR="$work/runtime"
 export WAYLAND_DISPLAY="wayland-vulpra"
@@ -99,6 +102,7 @@ fi
 env -u MOZ_HEADLESS "${loader_env[@]}" \
   HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
   XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
+  MOZ_REMOTE_SETTINGS_DEVTOOLS=1 \
   WAYLAND_DEBUG=client \
   "$launcher" about:blank >"$work/browser.log" 2>&1 &
 browser_pid="$!"
