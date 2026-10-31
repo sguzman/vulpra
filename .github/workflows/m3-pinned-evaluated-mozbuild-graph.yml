@@ -14,6 +14,7 @@ on:
       - ci/m3-compare-compile-db.sh
       - ci/m3-compare-faster-manifest-entries.sh
       - ci/m3-compare-gkrust-resolve.sh
+      - ci/m3-compare-other-rust-roots.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -52,6 +53,7 @@ jobs:
             ci/m3-compare-compile-db.sh
             ci/m3-compare-faster-manifest-entries.sh
             ci/m3-compare-gkrust-resolve.sh
+            ci/m3-compare-other-rust-roots.sh
             ci/mozconfig-linux-m3-baseline
             ci/mozconfig-linux-m3-combined-lean
             browser/moz.configure
@@ -71,6 +73,7 @@ jobs:
           bash -n ../controls/ci/m3-compare-compile-db.sh
           bash -n ../controls/ci/m3-compare-faster-manifest-entries.sh
           bash -n ../controls/ci/m3-compare-gkrust-resolve.sh
+          bash -n ../controls/ci/m3-compare-other-rust-roots.sh
           # No user's computer nor browser profile is in this CI workflow.
           mkdir -p "$RUNNER_TEMP/m3-generated-frontend"
       - name: Bootstrap same pinned Firefox 159 Linux native configure toolchain
@@ -541,6 +544,29 @@ jobs:
             .source_pruning_authorized==false and
             .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/m3-generated-frontend/gkrust-cargo-resolved.json" >/dev/null
+      - name: Resolve other five emitted Rust roots individually offline and locked
+        shell: bash
+        working-directory: original
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          bash ../controls/ci/m3-compare-other-rust-roots.sh \
+            "$RUNNER_TEMP/m3-generated-frontend/full-normal-evaluated.json" \
+            "$RUNNER_TEMP/m3-generated-frontend/combined-four-evaluated.json" \
+            "$RUNNER_TEMP/m3-generated-frontend/other-rust-root-cargo-closures.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .status=="pinned_offline_other_five_rust_roots_resolved" and
+            .original_source_commit==$sha and
+            .distinct_emitted_other_rust_root_count==5 and
+            .offline_locked_cargo_metadata==true and
+            .root_reachability_and_enabled_feature_edges_compared==true and
+            (.root_results|length)==5 and
+            .crates_compiled==false and
+            .linker_executed==false and
+            .feature_unification_of_actual_native_build_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-generated-frontend/other-rust-root-cargo-closures.json" >/dev/null
       - name: Archive bounded generated relative build graphs and exact comparison
         if: success()
         uses: actions/upload-artifact@v4
@@ -555,6 +581,7 @@ jobs:
             ${{ runner.temp }}/m3-generated-frontend/compile-command-declarations.json
             ${{ runner.temp }}/m3-generated-frontend/faster-manifest-entry-delta.json
             ${{ runner.temp }}/m3-generated-frontend/gkrust-cargo-resolved.json
+            ${{ runner.temp }}/m3-generated-frontend/other-rust-root-cargo-closures.json
             ${{ runner.temp }}/m3-generated-frontend/generated-faster-install-manifests.json
           if-no-files-found: error
           retention-days: 14
