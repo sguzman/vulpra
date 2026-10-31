@@ -81,6 +81,18 @@ The emitter's `Linkable.linked_libraries`, `linked_system_libs`, and static `lin
 
 **Limit:** This is *declared evaluated frontend linkage*, not actual `ld`/Ninja invocations, complete object-file members, flag equivalence, native-to-Rust FFI closure, or runtime `dlopen` coverage. Source deletion and the sixth M3 acceptance gate remain unauthorized. No extra binary-size reduction has been established.
 
+## Evaluated compile units assigned to native linkable targets
+
+[**Real original-source normal/combined ownership CI 41240056177 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41240056177), [**workflow lint 41240056235 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41240056235). The independently configured actual Mozilla frontend populated each `Linkable.sources` set; the collector retained target owner/class/host-vs-target/name, compilation suffix, file provenance and source-relative member, and compared exact records after original source emission. The archived output was inspected, not only job completion.
+
+| Scoped actual evaluated source-to-link-target record | Full normal | Combined four-opt-in | Unique to either |
+| --- | ---: | ---: | ---: |
+| Distinct compile-unit/target tuples | **4,367** | **4,367** | **0** |
+| Source/object-root classified tuples | **3,146** | **3,146** | **0** |
+| Explicitly unresolved relative generated/source tuples | **1,221** | **1,221** | **0** |
+
+These are **declared frontend compile-unit associations**, not all `BaseSources` member records (11,104 per variant), not evidence that 4,367 separate object files were compiled, and not a complete one-to-one generated-to-original-source mapping. For example, the emitted `Unified_cpp_accessible_aom0.cpp` unit is labeled unresolved relative rather than assigned a fabricated object path. Compilation options, actual compiler/linker invocations and generated contents remain unverified. No feature default, installed browser or source was altered; no M3 gate or byte-saving credit was added.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
