@@ -1,0 +1,112 @@
+
+# Independently authenticate six successful original compiled-feature runs.
+# Leave the historical five-workload validator and reports unchanged.
+name: M3 Original Native Six-Workload ELF ABI Coverage Union
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-abi-six-workload-union.py
+      - .github/workflows/m3-native-abi-six-workload-union.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile-six-original-native-feature-workloads:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      STATIC_RUN: '41157293087'
+      STATIC_HEAD: 184d5b33678152c1bd28b0c35cecc450e49c93f1
+      BROWSER_RUN: '41157865349'
+      BROWSER_HEAD: f6d57770dc15ba074bca059bf4fb0d69b25051bc
+      GFX_RUN: '41158839352'
+      GFX_HEAD: 957925d459cdf66b0c0f99471883b60ebee8347d
+      PING_RUN: '41159158976'
+      PING_HEAD: 18164d18c20e2d51c1b9b6d1996a0d5a2714bf90
+      ONNX_RUN: '41159617600'
+      ONNX_HEAD: 2b0c8d8bdd386d6c14f15ffc6ac6f6dc4e54897b
+      ALT_RUN: '41160038198'
+      ALT_HEAD: 6ba72f8ef779bf734760b00f9045d2ec915aa4d4
+      INFERENCE_RUN: '41160836283'
+      INFERENCE_HEAD: 3b90b825f43e34e022592fe10b1ed6bc676f1a59
+    steps:
+      - name: Checkout original and new bounded validators only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Reject forged native ELF version tuples
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-native-abi-feature-workload-union.py ci/m3-native-abi-six-workload-union.py
+          python3 ci/m3-native-abi-feature-workload-union.py --self-test
+          python3 ci/m3-native-abi-six-workload-union.py --self-test
+      - name: Authenticate all seven immutable original-source CI evidence runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for kind in STATIC BROWSER GFX PING ONNX ALT INFERENCE; do
+            runkey="${kind}_RUN"
+            headkey="${kind}_HEAD"
+            runid="${!runkey}"
+            source_sha="${!headkey}"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$runid" |
+              jq -e --arg sha "$source_sha" '
+                .status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          done
+          for kind in static browser gfx ping onnx alternate inference; do
+            mkdir -p "$RUNNER_TEMP/$kind"
+          done
+          gh run download "$STATIC_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-version-name-contract --dir "$RUNNER_TEMP/static"
+          gh run download "$BROWSER_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-graphical-loader-version-checks --dir "$RUNNER_TEMP/browser"
+          gh run download "$GFX_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-gfxtest-wayland-activation --dir "$RUNNER_TEMP/gfx"
+          gh run download "$PING_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-pingsender-local-activation --dir "$RUNNER_TEMP/ping"
+          gh run download "$ONNX_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-onnxruntime-capi-no-egress --dir "$RUNNER_TEMP/onnx"
+          gh run download "$ALT_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-alternate-vulpra-bin-wayland --dir "$RUNNER_TEMP/alternate"
+          gh run download "$INFERENCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-mozinference-native-capi --dir "$RUNNER_TEMP/inference"
+      - name: Verify exact non-overlapping original ELF ABI version-check union
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-abi-six-workload-union.py \
+            --static "$RUNNER_TEMP/static/m3-native-elf-version-contract.json" \
+            --browser "$RUNNER_TEMP/browser/m3-native-loader-version-checks.json" \
+            --gfx "$RUNNER_TEMP/gfx/m3-native-gfxtest-wayland-activation.json" \
+            --ping "$RUNNER_TEMP/ping/m3-original-pingsender-local-activation.json" \
+            --onnx "$RUNNER_TEMP/onnx/m3-onnxruntime-native-capi-verification.json" \
+            --alternate "$RUNNER_TEMP/alternate/m3-vulpra-bin-native-wayland.json" \
+            --inference "$RUNNER_TEMP/inference/m3-mozinference-native-abi.json" \
+            --output "$RUNNER_TEMP/m3-native-six-workload-abi-union.json"
+          jq -e '
+            .schema_version==1 and
+            .original_static_compiled_ELF_version_contracts==519 and
+            .original_abi_version_contracts_observed_across_six_feature_workloads==431 and
+            .original_abi_version_contracts_unexercised_across_six_workloads==88 and
+            (.remaining_not_exercised_native_package_ELF_basenames|length)==4 and
+            .runtime_version_checks_are_not_symbol_bindings==true and
+            .browser_integrated_inference_proven==false and
+            .browser_source_deletions_authorized==false and
+            .new_binary_savings_bytes==null and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-native-six-workload-abi-union.json" >/dev/null
+          echo 'PASS: six source-pinned original native paths covered 431 of 519 exact ELF version triples'
+      - name: Preserve only sanitized compiled ABI coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-native-six-feature-workload-abi-union
+          path: ${{ runner.temp }}/m3-native-six-workload-abi-union.json
+          if-no-files-found: error
+          retention-days: 14
