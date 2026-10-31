@@ -46,6 +46,24 @@ These are **transitive loader-list provider basename observations**, not failed 
 
 These native Arch startup tests exercise a useful portion of the target platform boundary without modifying the user's live EndeavourOS system. They still use a **headless/pixman Weston compositor and Ubuntu CI host kernel**, not Hyprland, real graphics drivers or the user's exact Arch package inventory. They do **not** prove DRM playback, arbitrary `dlopen`, crash report delivery, updater apply/restart or complete original build/source feature dependency ownership.
 
+## Actual browser dynamic loader initializers during Arch graphical Wayland startup
+
+[**Original real Arch Weston frame + bounded glibc `LD_DEBUG=libs,files` observation 41212665605 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41212665605), [global workflow lint 41212665584 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41212665584). The same original native compiled browser again passed the existing private Weston ten-second same-surface buffer commit and isolated native profile checks, this time with **browser-process-only** loader traces. The source-pinned standard-library Rust observer `ci/m3-original-arch-wayland-loader-events.rs` consumed the traces **inside the temporary network-disabled Arch container**, exported safe provider basenames and counts only, and discarded raw traces, absolute paths, symbols and PID data with container termination.
+
+| Real original browser loader observation | Verified |
+|---|---:|
+| Native process loader traces with initializer events | **7** |
+| Distinct native library basenames whose glibc initializer was called | **103** |
+| Distinct basenames *requested* via dynamically loaded-by paths | **40** |
+| Distinct basenames *requested* via direct needed-by paths | **84** |
+| Core `libmozgtk.so`, `libmozwayland.so`, `libxul.so` initializers | **All observed** |
+
+**A dynamically requested basename is not a claim that 40 individual `dlopen` operations succeeded or that all future `dlopen` paths were exercised.** These counts refer to a bounded graphical workload, not all imported symbols and not every conceivable process path.
+
+[**Independent original compiled 14-library generated preload vs real Arch initializer reconciliation 41212920509 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41212920509), [global lint 41212920443 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41212920443). This separate validator source/run-authenticated both the historical actual compiled `dependentlibs.list` workflow [41210245353](https://github.com/sguzman/vulpra/actions/runs/41210245353) and the successful live Arch graphical loader run 41212665605, checked the same immutable original source/archive SHAs, real private Wayland frame acceptance flags and redacted provider sets. **Every one of the original 14/14 generated preload library basenames was actually observed receiving a glibc initializer call during the private Arch graphical frame.** This directly connects a **generated build artifact** to **actual Linux runtime library initialization** on a second distribution. The list's recorded `mozgtk` → `mozwayland` → `libxul` order is a *preload declaration order*, not an assertion that glibc initializer call order was independently proven.
+
+The successful 14/14 result is an **original compiled runtime/preload preparatory subtask**. The full conditional feature tree, generated Ninja/FFI graph, full lazy/future-dlopen paths, exact host Hyprland/GPU support and all rare end-to-end workflows remain unverified; the sixth M3 acceptance gate remains open.
+
 ## Limits, especially for the actual user's EndeavourOS + Hyprland workstation
 
 The container's **Arch userspace** ran on an **Ubuntu GitHub Actions host**. It does not test the user's actual Arch-derived EndeavourOS kernel, graphics hardware, driver stack, Hyprland compositor, existing Firefox profile, remote/DRM media, updates, crash reporting or every future `dlopen` feature path. The read-only loader audit itself does not execute the browser; the separate successful Arch native headless and Weston startup tests above cover bounded real startup paths. This read-only loader audit does not check ABI symbol relocation completion nor the generated Ninja/FFI feature graph. Its Arch base image was unpinned by tag but the resulting image ID and glibc version are recorded for audit; these findings are for that recorded snapshot, not all future Arch releases.
