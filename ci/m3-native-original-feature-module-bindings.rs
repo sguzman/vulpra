@@ -16,6 +16,7 @@ fn target(module:&str)->Option<&'static str>{
         "libonnxruntime.so"=>Some("onnx-loader."),
         "pingsender"=>Some("pingsender-loader."),
         "gfxtest"=>Some("gfxtest-loader."),
+        "vulpra-bin"=>Some("vulpra-bin-loader."),
         _=>None
     }
 }
@@ -45,10 +46,11 @@ fn observe(dir:&Path,module:&str)->Result<(usize,usize,usize,BTreeSet<String>),S
         let Some(pid)=filename.strip_prefix(prefix) else {continue};
         if pid.is_empty()||!pid.bytes().all(|b|b.is_ascii_digit()){continue;}
         let m=fs::symlink_metadata(&p).map_err(|e|e.to_string())?;
-        if !m.file_type().is_file()||m.len()==0||m.len()>48_000_000{return Err("invalid glibc trace type or size".into());}
+        if !m.file_type().is_file()||m.len()==0||m.len()>(if module=="vulpra-bin"{256_000_000}else{48_000_000}){return Err("invalid glibc trace type or size".into());}
         files.push(p);
     }
-    if files.is_empty()||files.len()>8{return Err("missing/too many PID traces".into());}
+    let max_files=if module=="vulpra-bin"{64}else{8};
+    if files.is_empty()||files.len()>max_files{return Err("missing/too many PID traces".into());}
     let mut events=0;let mut traced=0;
     let mut observed=HashSet::new();let mut providers=BTreeSet::new();
     for p in files{
@@ -84,13 +86,13 @@ fn run()->Result<(),String>{
         " \"original_requester_basename\":\"{}\",\n \"pid_traces_with_original_requester_bindings\":{},\n",
         " \"normal_symbol_binding_events\":{},\n \"distinct_symbol_provider_pairs\":{},\n",
         " \"observed_provider_basename_count\":{},\n \"observed_provider_basenames\":[{}],\n",
-        " \"original_c_api_diagnostic_only\":{},\n \"synthetic_loopback_telemetry_only\":{},\n \"private_weston_wayland_gfx_probe_only\":{},\n \"no_network_egress\":{},\n",
+        " \"original_c_api_diagnostic_only\":{},\n \"synthetic_loopback_telemetry_only\":{},\n \"private_weston_wayland_gfx_probe_only\":{},\n \"alternate_browser_wayland_frame_only\":{},\n \"no_network_egress\":{},\n",
         " \"actual_normal_symbol_bindings_observed\":true,\n",
         " \"raw_loader_logs_exported\":false,\n \"symbol_names_exported\":false,\n",
         " \"model_inference_or_drm_decryption_proven\":false,\n",
         " \"all_lazy_or_transitive_bindings_proven\":false,\n",
         " \"new_source_pruning_authorized\":false\n}}\n"
-    ),SOURCE,ARCHIVE,module,traces,events,pairs,providers.len(),providers_json,module!="pingsender" && module!="gfxtest",module=="pingsender",module=="gfxtest",module!="gfxtest");
+    ),SOURCE,ARCHIVE,module,traces,events,pairs,providers.len(),providers_json,!matches!(module,"pingsender"|"gfxtest"|"vulpra-bin"),module=="pingsender",module=="gfxtest",module=="vulpra-bin",!matches!(module,"gfxtest"|"vulpra-bin"));
     let mut file=File::create(&args[2]).map_err(|e|e.to_string())?;
     file.write_all(report.as_bytes()).map_err(|e|e.to_string())?;
     println!("PASS: actual original native feature-module bindings observed; sanitized module/provider counts");
@@ -109,6 +111,7 @@ mod tests{
         assert_eq!(target("libonnxruntime.so"),Some("onnx-loader."));
         assert_eq!(target("pingsender"),Some("pingsender-loader."));
         assert_eq!(target("gfxtest"),Some("gfxtest-loader."));
+        assert_eq!(target("vulpra-bin"),Some("vulpra-bin-loader."));
         assert_eq!(target("libxul.so"),None);
     }
 }
