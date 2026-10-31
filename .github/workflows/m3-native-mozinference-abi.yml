@@ -76,8 +76,8 @@ jobs:
             exit 1
           fi
           readelf -Ws "$RUNNER_TEMP/package/vulpra/libmozinference.so" >"$RUNNER_TEMP/mozinference-symbols.txt"
-          if ! grep -E ' llama_backend_init(@|$)' "$RUNNER_TEMP/mozinference-symbols.txt" >/dev/null; then
-            echo 'Pinned llama_backend_init C export missing in compiled package' >&2
+          if ! grep -E ' llama_log_set(@|$)' "$RUNNER_TEMP/mozinference-symbols.txt" >/dev/null; then
+            echo 'Pinned llama_log_set C export missing in compiled package' >&2
             grep -E 'llama_(backend|time_us|supports_mmap)' "$RUNNER_TEMP/mozinference-symbols.txt" | head -n 12 >&2 || :
             exit 1
           fi
@@ -104,7 +104,7 @@ jobs:
             .raw_loader_paths_and_pids_retained==false and
             .safe_source_pruning_authorized==false and
             .m3_sixth_gate_closed==false'             "$RUNNER_TEMP/m3-mozinference-native-abi.json" >/dev/null
-          echo 'PASS: original mozinference real C API and all compiled version checks'
+          echo 'PASS: original mozinference production-linked C API and all compiled version checks'
       - name: Preserve bounded sanitized compiled backend evidence
         uses: actions/upload-artifact@v4
         with:

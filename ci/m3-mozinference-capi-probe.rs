@@ -36,29 +36,23 @@ fn run() -> Result<(), &'static str> {
         return Err("Original native mozinference library failed to load");
     }
     let result = (|| {
-        // Exact signatures are pinned to the original Firefox 159 beta llama.h.
-        let init: unsafe extern "C" fn() =
-            unsafe { std::mem::transmute(symbol(handle, "llama_backend_init")?) };
-        let time_us: unsafe extern "C" fn() -> i64 =
-            unsafe { std::mem::transmute(symbol(handle, "llama_time_us")?) };
-        let supports_mmap: unsafe extern "C" fn() -> bool =
-            unsafe { std::mem::transmute(symbol(handle, "llama_supports_mmap")?) };
-        let free: unsafe extern "C" fn() =
-            unsafe { std::mem::transmute(symbol(handle, "llama_backend_free")?) };
-        unsafe { init(); }
-        let clock = unsafe { time_us() };
-        let _mmap_supported = unsafe { supports_mmap() };
-        unsafe { free(); }
-        if clock <= 0 {
-            return Err("Original llama C API clock was not initialized");
-        }
+        // Source-pinned production LlamaRuntimeLinker.h binds both exports.
+        // llama_model_default_params returns a large struct by value, so do not
+        // invoke it from a handwritten foreign ABI; its export is checked only.
+        let _default_params = symbol(handle, "llama_model_default_params")?;
+        let set_log: unsafe extern "C" fn(
+            extern "C" fn(c_int, *const c_char, *mut c_void),
+            *mut c_void,
+        ) = unsafe { std::mem::transmute(symbol(handle, "llama_log_set")?) };
+        extern "C" fn discard_log(_level: c_int, _message: *const c_char, _data: *mut c_void) {}
+        unsafe { set_log(discard_log, std::ptr::null_mut()); }
         Ok(())
     })();
     if unsafe { dlclose(handle) } != 0 {
         return Err("Could not close the original inference shared library");
     }
     result?;
-    println!("PASS: original packaged mozinference llama backend initialized and C API invoked");
+    println!("PASS: original packaged mozinference production-linked llama C API invoked");
     Ok(())
 }
 

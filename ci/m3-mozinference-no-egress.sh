@@ -33,7 +33,7 @@ timeout --signal=TERM --kill-after=3s 25s \
     sed -n '1,8p' "$work/probe.err" >&2
     exit 1
   }
-grep -Fxq 'PASS: original packaged mozinference llama backend initialized and C API invoked' \
+grep -Fxq 'PASS: original packaged mozinference production-linked llama C API invoked' \
   "$work/probe.out" || exit 1
 repo="$(cd -- "$(dirname -- "$0")/.." && pwd -P)"
 python3 "$repo/ci/m3-mozinference-version-checks.py" \
