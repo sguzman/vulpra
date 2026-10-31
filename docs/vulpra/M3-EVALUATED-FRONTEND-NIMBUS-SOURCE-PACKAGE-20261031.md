@@ -143,9 +143,24 @@ This is a bounded generated recursive-Make output invariant, not proof of identi
 | Identical normalized full-file hashes | **2,027** | **2,027** |
 | Differing normalized full-file hashes | **1** | **1** |
 
-The **only differing generated Makefile path is `faster/Makefile`**. A separate, narrowly scoped line-level diff is required to identify its precise cause; equal file counts and all other hash matches must not be substituted for this. Together with the **2,024/2,024 existing `backend.mk` files** already reconciled under the exact opt-in configure delta, this covers both known generated recursive-Make file classes, **not** the generated Ninja/rustc/Clang commands that an actual full build might invoke.
+The **only differing generated Makefile path is `faster/Makefile`**. Its exact changed definitions and installation-manifest targets have since been reconciled by the independently verified intended-only check below; raw count equality alone was not used as proof. Together with the **2,024/2,024 existing `backend.mk` files** already reconciled under the exact opt-in configure delta, this covers both known generated recursive-Make file classes, **not** the generated Ninja/rustc/Clang commands that an actual full build might invoke.
 
 No native compiler or linker was invoked by this new comparison, nor were generated code bytes, feature-specific link objects, FFI or late `dlopen` closure established. No new pruning, browser/profile modifications, package-size savings or M3 gate credit. **M3 remains 5/6 (83%), overall 61%, Δ0pp.**
+
+## Exact intended-only faster Makefile contract
+
+[**Scoped original-source generated faster Makefile diff 41245705972 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41245705972) first exposed that `faster/Makefile` changes more than just the Normandy definition. [**Structured exact `ACDEFINES` and installer-manifest comparison 41246349867 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41246349867), followed by [**manifest-target ownership 41246873618 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41246873618), established the exact four changed entries:
+
+| Actual emitted `faster/Makefile` item | Full normal | Four-opt-in lean |
+| --- | --- | --- |
+| `ACDEFINES`: `-DMOZ_NORMANDY=1` | Present | Absent |
+| `ACDEFINES`: `-DVULPRA_NO_ASROUTER_PROMOS=1` | Absent | Present |
+| `ACDEFINES`: `-DVULPRA_NO_NEWTAB_ADSFEED=1` | Absent | Present |
+| `INSTALL_MANIFESTS`: `dist/bin/moz-src/toolkit/components/nimbus` | Absent | Present |
+
+[**Strict normalized complete-file assertion 41247224120 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41247224120) now fails closed if any of the original **2,028** `Makefile` paths are missing/added, if any other path differs, if the changed variable names are not exactly `ACDEFINES` and `INSTALL_MANIFESTS`, if the listed full/lean token sets differ from these four values, **or if the entire normalized `faster/Makefile` contents fail byte-for-byte comparison after removing only those intended entries**. The archived result explicitly records `full_generated_faster_makefile_reconciles_after_expected_only=true`. Full-normal and lean preserve **2,027** otherwise-identical complete Makefiles, and the single remaining file is thus accounted for by exact expected configure/resource differences.
+
+`FasterMakeBackend.consume_finished` in the pinned original Mozilla source constructs both `ACDEFINES` from generated configure substitutions and `INSTALL_MANIFESTS` from actual frontend resource targets. The Nimbus target matches the separately compiled/runtime-checked fallback crosswalk. A separate stricter check also reconciles **all 2,024 generated `backend.mk` files** after exactly the expected opt-in arguments and Normandy boolean. This closes *the generated recursive-Make file-content parity subtask*, not code generation execution, full Clang/Rust compilation commands or object/linker/FFI/`dlopen` closure. No user workstation files/profiles, browser source or installed binary were touched; no new source removal or package-size saving. **M3 5/6 (83%), overall 61%, Δ0pp.**
 
 ## Boundaries and next actual work
 
