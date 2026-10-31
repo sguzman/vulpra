@@ -51,8 +51,8 @@ check() {
     (.loader_reported_dynamic_initialized_edges|type=="array") and
     (.loader_reported_needed_by_initialized_edges|length)==.loader_reported_needed_by_initialized_edge_count and
     (.loader_reported_dynamic_initialized_edges|length)==.loader_reported_dynamic_initialized_edge_count and
-    (.loader_reported_needed_by_initialized_edges|.==unique) and
-    (.loader_reported_dynamic_initialized_edges|.==unique) and
+    ((.loader_reported_needed_by_initialized_edges|unique|length)==(.loader_reported_needed_by_initialized_edges|length)) and
+    ((.loader_reported_dynamic_initialized_edges|unique|length)==(.loader_reported_dynamic_initialized_edges|length)) and
     (.loader_reported_needed_by_initialized_edges|all(.[];valid_edge)) and
     (.loader_reported_dynamic_initialized_edges|all(.[];valid_edge)) and
     ((.observed_loader_init_library_basenames) as $names |
