@@ -60,7 +60,30 @@ for side in full lean; do
     "$tmp/$side-metadata.json" | sort -u > "$tmp/$side-resolved"
   jq -c '.packages[] | [.id,.name,.version,(.source//"")] | @json' \
     "$tmp/$side-metadata.json" | sort -u > "$tmp/$side-packages"
+  # Walk the actual resolved dependency edges from the gkrust package ID,
+  # filtering out unrelated workspace roots before comparing activated features.
+  jq -rc --arg root "$(cat "$tmp/$side-gkrust-id")" '
+    def closure($adj; $r):
+      {todo:[$r],visited:{}} |
+      until((.todo|length)==0;
+        .todo[0] as $next |
+        .todo |= .[1:] |
+        if .visited[$next] then .
+        else .visited[$next]=true | .todo += ($adj[$next]//[])
+        end
+      ) | .visited | keys;
+    (.resolve.nodes|map({key:.id,value:[.deps[].pkg]})|from_entries) as $adj |
+    (closure($adj;$root)|reduce .[] as $key ({}; .[$key]=true)) as $reachable |
+    .resolve.nodes[] | select($reachable[.id]) |
+    [.id, (.features|sort), ([.deps[] |
+      [.pkg, ([.dep_kinds[]? | [.kind, (.target//"")] | @json] | sort)]
+      | @json] | sort)] | @json
+  ' "$tmp/$side-metadata.json" | sort -u > "$tmp/$side-gkrust-reachable"
+  [ "$(wc -l < "$tmp/$side-gkrust-reachable")" -gt 100 ]
 done
+comm -12 "$tmp/full-gkrust-reachable" "$tmp/lean-gkrust-reachable" > "$tmp/shared-rooted"
+comm -23 "$tmp/full-gkrust-reachable" "$tmp/lean-gkrust-reachable" > "$tmp/full-only-rooted"
+comm -13 "$tmp/full-gkrust-reachable" "$tmp/lean-gkrust-reachable" > "$tmp/lean-only-rooted"
 comm -12 "$tmp/full-resolved" "$tmp/lean-resolved" > "$tmp/shared-resolved"
 comm -23 "$tmp/full-resolved" "$tmp/lean-resolved" > "$tmp/full-only-resolved"
 comm -13 "$tmp/full-resolved" "$tmp/lean-resolved" > "$tmp/lean-only-resolved"
@@ -69,6 +92,13 @@ comm -13 "$tmp/full-packages" "$tmp/lean-packages" > "$tmp/lean-only-packages"
 comm -23 "$tmp/full-features" "$tmp/lean-features" > "$tmp/full-only-features"
 comm -13 "$tmp/full-features" "$tmp/lean-features" > "$tmp/lean-only-features"
 
+full_rooted=$(wc -l < "$tmp/full-gkrust-reachable")
+lean_rooted=$(wc -l < "$tmp/lean-gkrust-reachable")
+shared_rooted=$(wc -l < "$tmp/shared-rooted")
+full_only_rooted=$(wc -l < "$tmp/full-only-rooted")
+lean_only_rooted=$(wc -l < "$tmp/lean-only-rooted")
+[ "$full_rooted" -eq "$((shared_rooted+full_only_rooted))" ]
+[ "$lean_rooted" -eq "$((shared_rooted+lean_only_rooted))" ]
 full_resolved=$(wc -l < "$tmp/full-resolved")
 lean_resolved=$(wc -l < "$tmp/lean-resolved")
 shared=$(wc -l < "$tmp/shared-resolved")
@@ -81,6 +111,10 @@ lean_packages=$(wc -l < "$tmp/lean-packages")
 
 # Do not archive the full Cargo metadata or raw host filesystem paths.
 jq -n --arg sha "$SOURCE_SHA" \
+  --argjson full_rooted "$full_rooted" --argjson lean_rooted "$lean_rooted" \
+  --argjson shared_rooted "$shared_rooted" \
+  --argjson full_only_rooted "$full_only_rooted" \
+  --argjson lean_only_rooted "$lean_only_rooted" \
   --argjson full_nodes "$full_resolved" --argjson lean_nodes "$lean_resolved" \
   --argjson shared "$shared" --argjson full_only "$full_only" \
   --argjson lean_only "$lean_only" --argjson full_packages "$full_packages" \
@@ -112,6 +146,12 @@ jq -n --arg sha "$SOURCE_SHA" \
     normal_only_resolve_node_feature_edge_records:$full_only,
     lean_only_resolve_node_feature_edge_records:$lean_only,
     metadata_includes_workspace_not_just_gkrust_closure:true,
+    gkrust_reachable_root_only_graph_extracted:true,
+    normal_gkrust_reachable_resolved_node_records:$full_rooted,
+    lean_gkrust_reachable_resolved_node_records:$lean_rooted,
+    identical_gkrust_reachable_node_feature_edge_records:$shared_rooted,
+    normal_only_gkrust_reachable_node_records:$full_only_rooted,
+    lean_only_gkrust_reachable_node_records:$lean_only_rooted,
     commands_resolved_not_executed:true,
     rustc_invoked:false,
     native_linker_invoked:false,
@@ -121,6 +161,15 @@ jq -n --arg sha "$SOURCE_SHA" \
     m3_sixth_gate_closed:false
   }' > "$out"
 jq -e '
+  .gkrust_reachable_root_only_graph_extracted == true and
+  .normal_gkrust_reachable_resolved_node_records > 100 and
+  .lean_gkrust_reachable_resolved_node_records > 100 and
+  (.identical_gkrust_reachable_node_feature_edge_records +
+   .normal_only_gkrust_reachable_node_records) ==
+    .normal_gkrust_reachable_resolved_node_records and
+  (.identical_gkrust_reachable_node_feature_edge_records +
+   .lean_only_gkrust_reachable_node_records) ==
+    .lean_gkrust_reachable_resolved_node_records and
   .normal_requested_gkrust_features > 10 and
   .lean_requested_gkrust_features > 10 and
   .normal_resolve_node_records > 100 and
@@ -138,6 +187,9 @@ jq -c '{
   resolved_packages:[.normal_metadata_package_records,.lean_metadata_package_records],
   resolved_node_records:[.normal_resolve_node_records,.lean_resolve_node_records],
   identical_nodes:.identical_resolve_nodes_features_and_dependency_edges,
+  gkrust_reachable_nodes:[.normal_gkrust_reachable_resolved_node_records,.lean_gkrust_reachable_resolved_node_records],
+  gkrust_reachable_identical:.identical_gkrust_reachable_node_feature_edge_records,
+  gkrust_reachable_differences:[.normal_only_gkrust_reachable_node_records,.lean_only_gkrust_reachable_node_records],
   one_sided_nodes:[.normal_only_resolve_node_feature_edge_records,.lean_only_resolve_node_feature_edge_records],
   one_sided_package_records:[.normal_only_metadata_package_records,.lean_only_metadata_package_records]
 }' "$out"
