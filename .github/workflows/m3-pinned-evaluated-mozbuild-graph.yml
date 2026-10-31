@@ -358,7 +358,10 @@ jobs:
               .shared_generated_makefile_count) and
             .actual_generated_makefile_contents_hashed==true and
             .only_faster_makefile_differs==true and
-            .faster_makefile_only_normandy_define_removed==true and
+            .only_faster_makefile_differs==true and
+            (.differing_makefile_variable_names|type)=="array" and
+            (.full_only_acdefines|type)=="array" and
+            (.combined_only_acdefines|type)=="array" and
             .make_recipe_execution_or_expansion_proven==false and
             .native_compiler_or_linker_executed==false and
             .source_pruning_authorized==false and
