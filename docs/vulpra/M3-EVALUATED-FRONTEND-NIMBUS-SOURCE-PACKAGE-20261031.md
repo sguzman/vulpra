@@ -36,6 +36,23 @@ The independent CI re-authenticated the two compiled browser package SHA-256 val
 
 This is now a strict **exact source-condition + evaluated `MOZ_SRC_FILES` member path + actual compiled package resource** crosswalk, not merely a source-scope or object-count inference. The independent verifier requires the single added "toolkit/components/nimbus/NimbusBootstrap.sys.mjs" member, **zero removed members**, matched normal/lean configure conditions and the inverse physical Normandy/Nimbus package resources. It does not prove that other source-object classes or generated backend installer rules are identical, nor that the added bootstrap is the only change to compiled JavaScript.
 
+## Original evaluated JAR manifests and installer-resource declarations (continued)
+
+[**Pinned original full-versus-combined evaluated resource-input graph 41237474046 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41237474046), with [**workflow lint 41237474231 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41237474231). The earlier first extension run [41237136182 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41237136182) exposed that the original object directories live under the checkout's source root; the follow-up collector explicitly prioritizes the configured objdir when classifying provenance and separately labels unexpanded globs. The original compiler source remains the pinned `b1482404` revision in independently configured full and four-opt-in trees.
+
+| Evaluated frontend input declaration | Normal | Four opt-ins combined |
+| --- | ---: | ---: |
+| `JARManifest` source inputs | **121** | **121** |
+| JAR manifest records unique to variant | **0** | **0** |
+| Installer-resource input records | **2,928** | **2,971** |
+| Records unique to variant after objdir-relative normalization | **3** | **46** |
+| Explicitly unexpanded wildcard declarations | **16** | **22** |
+| Noncanonical installer-component declarations, retained as unresolved | **1** | **1** |
+
+The three full-only input records consist of the two deliberately omitted ASRouter promotion-module declarations, plus the normal New Tab `lib/**` wildcard. The combined New Tab build expands that broad declaration into a guarded, explicit list of 46 differently represented declarations (including narrower wildcard families); **46 does not mean 46 features were added**. The exact generated input records distinguish source files, object-generated files, declared installation targets and wildcards. They do **not** expand all `jar.mn` entries, demonstrate that a named resource actually reached `omni.ja`, establish unique generated backend/installer rules, or demonstrate causal packaged bytes. Reversible percent-encoding is used to keep unusual upstream filenames distinct rather than dropping them.
+
+The established compiled full/lean package crosswalk for Normandy/Nimbus remains the physical packaged-resource witness. The new broad frontend inventory must not be substituted for that independently validated native acceptance. No extra source removal, browser modification or M3 gate credit is authorized by this comparison.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
