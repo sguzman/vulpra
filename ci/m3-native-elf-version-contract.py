@@ -267,7 +267,7 @@ Version definition section '.gnu.version_d' contains 2 entries:
         "Cnt: 2", "Cnt: 3", 1
     ).replace(
         "  0x0030:   Name: GLIBC_2.2.5  Flags: none  Version: 2",
-        "  0x0030:   Name: GLIBC_2.2.5  Flags: none  Version: 2\\n"
+        "  0x0030:   Name: GLIBC_2.2.5  Flags: none  Version: 2\n"
         "  0x0040:   Name: GLIBC_2.34  Flags: none  Version: 4"
     )
     assert version_blocks(duplicate_elf_aux)[0] == needs
