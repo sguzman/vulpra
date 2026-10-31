@@ -50,8 +50,30 @@ done
 port="$(cat "$work/port")"
 [[ "$port" =~ ^[0-9]{1,5}$ ]] || exit 1
 ((port>=1024 && port<=65535)) || exit 1
-# Pinned source allows "localhost", but not numeric 127.0.0.1 as a hostname.
-# Deliberately use the allowed literal in this no-egress namespace.
+# Source accepts literal hostname "localhost" but does not accept
+# numeric 127.0.0.1. Negative-route check happens WHILE the one-request
+# server listens: if numeric-host validation accidentally allowed the request,
+# the rejected payload would be transmitted and deleted; fail closed.
+printf '%s' '{"probe":"vulpra-source-pinned-only","count":1}' > "$work/rejected.json"
+if timeout --signal=TERM --kill-after=3s 10s \
+  env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy \
+    HOME="$work/home" NO_PROXY="localhost,127.0.0.1" \
+    MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+    "$package/pingsender" "http://127.0.0.1:$port/pingsender-fixture" "$work/rejected.json" \
+    >"$work/rejected.out" 2>"$work/rejected.err"; then
+  echo 'pingsender incorrectly accepted forbidden numeric host' >&2
+  exit 1
+fi
+[[ -s "$work/rejected.json" ]] || {
+  echo 'Rejected destination unexpectedly deleted its synthetic ping' >&2
+  exit 1
+}
+kill -0 "$server" 2>/dev/null || {
+  echo 'Rejected destination unexpectedly contacted the synthetic server' >&2
+  exit 1
+}
+# Now the single permitted literal-host request must reach the same
+# original listener and delete only its own successful synthetic payload.
 timeout --signal=TERM --kill-after=3s 25s \
   env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy \
     HOME="$work/home" NO_PROXY="localhost,127.0.0.1" \
