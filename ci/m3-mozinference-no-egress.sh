@@ -19,6 +19,13 @@ grep -qw avx2 /proc/cpuinfo || {
   echo 'Original mozinference x86-64 build requires AVX2 on the test host' >&2
   exit 1
 }
+# Optional source-pinned native binding-only replay, distinct from the normal
+# ABI version report. Its only output is a sanitized provider/count JSON.
+debug_modes=versions
+if [[ -n "${M3_NATIVE_BINDINGS_REPORT:-}" ]]; then
+  [[ -x "${M3_NATIVE_BINDINGS_PARSER:-}" && ! -e "$M3_NATIVE_BINDINGS_REPORT" ]] || exit 2
+  debug_modes=versions,bindings
+fi
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 mkdir -m 0700 "$work/home"
@@ -26,7 +33,7 @@ umask 077
 timeout --signal=TERM --kill-after=3s 25s \
   env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy \
   HOME="$work/home" LD_LIBRARY_PATH="$package" \
-  LD_DEBUG=versions LD_DEBUG_OUTPUT="$work/mozinference-loader" \
+  LD_DEBUG="$debug_modes" LD_DEBUG_OUTPUT="$work/mozinference-loader" \
   MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
   "$probe" "$package/libmozinference.so" >"$work/probe.out" 2>"$work/probe.err" || {
     echo 'Original packaged mozinference C API activation failed' >&2
@@ -36,8 +43,13 @@ timeout --signal=TERM --kill-after=3s 25s \
 grep -Fxq 'PASS: original packaged mozinference production-linked llama C API invoked' \
   "$work/probe.out" || exit 1
 repo="$(cd -- "$(dirname -- "$0")/.." && pwd -P)"
-python3 "$repo/ci/m3-mozinference-version-checks.py" \
-  --traces "$work" --static "$static" --output "$out"
+if [[ -z "${M3_NATIVE_BINDINGS_REPORT:-}" ]]; then
+  python3 "$repo/ci/m3-mozinference-version-checks.py" \
+    --traces "$work" --static "$static" --output "$out"
+  chmod 0644 "$out"
+else
+  "$M3_NATIVE_BINDINGS_PARSER" "$work" "$M3_NATIVE_BINDINGS_REPORT" "libmozinference.so"
+  chmod 0644 "$M3_NATIVE_BINDINGS_REPORT"
+fi
 [[ ! -e "$work/home/.mozilla" ]] || exit 1
-chmod 0644 "$out"
 echo 'PASS: pinned native mozinference API and ABI version checks in isolated network namespace'
