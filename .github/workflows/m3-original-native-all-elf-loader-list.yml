@@ -1,0 +1,103 @@
+# No application entrypoints: authenticated original ELF glibc loader --list.
+name: M3 Original All-ELF Read-Only Loader Resolution
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-native-all-elf-loader-list.yml
+      - ci/m3-original-native-elf-loader-list.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-all-28-elf-readonly-glibc-loader-list:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout only original read-only native loader verifier
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Authenticate original source and test bounded Rust parser
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-original-native-elf-loader-list.rs -o "$RUNNER_TEMP/elf-loader-unit-tests"
+          "$RUNNER_TEMP/elf-loader-unit-tests"
+          rustc --edition=2021 -O ci/m3-original-native-elf-loader-list.rs -o "$RUNNER_TEMP/elf-loader-list"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+      - name: Install no-egress/ELF prerequisites and native package system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends iproute2 binutils libstdc++6 libgomp1 \
+            libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1 libegl1
+          test -x /lib64/ld-linux-x86-64.so.2
+      - name: Authenticate and extract original native full-normal package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original" "$RUNNER_TEMP/package"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          test -f "$RUNNER_TEMP/package/vulpra/libxul.so"
+          test -x "$RUNNER_TEMP/package/vulpra/vulpra-bin"
+      - name: List native direct and transitive library paths without executing application mains
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          mkdir -m 0700 "$RUNNER_TEMP/m3-private-home"
+          sudo unshare --net -- env \
+            HOME="$RUNNER_TEMP/m3-private-home" \
+            MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            "$RUNNER_TEMP/elf-loader-list" "$RUNNER_TEMP/package/vulpra" \
+            "$RUNNER_TEMP/m3-original-all-elf-loader-list.json"
+          test ! -e "$RUNNER_TEMP/m3-private-home/.mozilla"
+          jq -e --arg sha "$ARCHIVE_SHA" --arg src "$SOURCE_SHA" '
+            .schema_version==1 and
+            .status=="source_pinned_original_all_28_elf_loader_list_resolution" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .original_elf_members_listed==28 and
+            (.original_elf_basenames|length)==28 and
+            .declared_direct_needed_edges==268 and
+            .direct_needed_sonames_present_in_loader_lists==268 and
+            .loader_listed_provider_name_occurrences>=268 and
+            .distinct_loader_listed_provider_basenames>0 and
+            (.loader_listed_provider_basenames|length)==.distinct_loader_listed_provider_basenames and
+            (.per_original_elf|keys)==.original_elf_basenames and
+            .glibc_linker_list_metadata_only==true and
+            .application_main_executed==false and .no_network_egress==true and
+            .actual_genuine_feature_workflows_proven==false and
+            .complete_lazy_or_future_dlopen_map_proven==false and
+            .arch_hyprland_runtime_tested==false and
+            .raw_loader_paths_or_pids_exported==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-all-elf-loader-list.json" >/dev/null
+          echo 'PASS: all 28 original ELF files have glibc --list metadata resolution of direct DT_NEEDED names'
+      - name: Upload sanitized per-ELF provider basenames and counts only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-all-28-elf-glibc-loader-list
+          path: ${{ runner.temp }}/m3-original-all-elf-loader-list.json
+          if-no-files-found: error
+          retention-days: 14
