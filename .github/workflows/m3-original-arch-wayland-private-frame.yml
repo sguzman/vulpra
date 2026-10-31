@@ -74,6 +74,9 @@ jobs:
           # executable permissions, and bind-mount it read-only. It never
           # replaces the original packaged native binary or any user launcher.
           mkdir -p "$RUNNER_TEMP/arch-wayland/shim"
+          # Intentionally defer the private XDG_DATA_HOME and "$@" expansions
+          # to the isolated container launcher, not the CI host.
+          # shellcheck disable=SC2016
           printf '%s\n' \
             '#!/usr/bin/env bash' \
             'set -euo pipefail' \
