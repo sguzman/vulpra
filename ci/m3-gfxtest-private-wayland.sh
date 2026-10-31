@@ -50,6 +50,13 @@ wayland-info >"$work/registry" 2>"$work/registry.err" || {
 grep -Fq 'wl_compositor' "$work/registry" || exit 1
 grep -Fq 'xdg_wm_base' "$work/registry" || exit 1
 umask 077
+# Opt-in runtime-binding mode does not alter the original native Wayland
+# probe, its disposable compositor, or its regular version-only test.
+debug_modes=versions
+if [[ -n "${M3_GFX_BINDINGS_REPORT:-}" ]]; then
+  [[ -x "${M3_NATIVE_BINDINGS_PARSER:-}" && ! -e "$M3_GFX_BINDINGS_REPORT" ]] || exit 2
+  debug_modes=versions,bindings
+fi
 # Real source in toolkit/xre/gfxtest/glxtest.cpp emits TEST_TYPE / EGL
 # *after* wl_display_connect, EGL attempt, roundtrip and disconnect.
 # A headless pixman renderer can return EGL test errors: never mislabel
@@ -60,7 +67,7 @@ if ! timeout --signal=TERM --kill-after=3s 20s \
     WAYLAND_DISPLAY="$WAYLAND_DISPLAY" XDG_SESSION_TYPE=wayland \
     GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
     MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
-    LD_DEBUG=versions LD_DEBUG_OUTPUT="$reportdir/gfxtest-loader" \
+    LD_DEBUG="$debug_modes" LD_DEBUG_OUTPUT="$reportdir/gfxtest-loader" \
     "$appdir/gfxtest" glx --wayland >"$work/gfxtest.out" 2>"$work/gfxtest.err"; then
   echo 'Original gfxtest Wayland probe exited unsuccessfully' >&2
   exit 1
@@ -80,4 +87,7 @@ PY
   echo 'Private gfx probe touched Firefox profile' >&2
   exit 1
 }
+if [[ -n "${M3_GFX_BINDINGS_REPORT:-}" ]]; then
+  "$M3_NATIVE_BINDINGS_PARSER" "$reportdir" "$M3_GFX_BINDINGS_REPORT" "gfxtest"
+fi
 echo 'LIMIT: entering EGL probe is not evidence of accelerated GPU initialization'
