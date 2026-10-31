@@ -10,7 +10,7 @@ use std::process::Command;
 type Symbols = BTreeMap<String, usize>;
 type Inventory = BTreeMap<String, Symbols>;
 
-fn exported_symbols(output: &str) -> Result<Symbols, String> {
+fn dynamic_symbols(output: &str, undefined: bool) -> Result<Symbols, String> {
     let mut symbols = Symbols::new();
     for line in output.lines() {
         let fields: Vec<_> = line.split_whitespace().collect();
@@ -22,7 +22,7 @@ fn exported_symbols(output: &str) -> Result<Symbols, String> {
         }
         let (kind, binding, visibility, ndx, name) =
             (fields[3], fields[4], fields[5], fields[6], fields[7]);
-        if ndx == "UND" || binding == "LOCAL" || name.is_empty() {
+        if (ndx == "UND") != undefined || binding == "LOCAL" || name.is_empty() {
             continue;
         }
         if !["GLOBAL", "WEAK", "UNIQUE"].contains(&binding) {
@@ -34,6 +34,14 @@ fn exported_symbols(output: &str) -> Result<Symbols, String> {
         *symbols.entry(record).or_default() += 1;
     }
     Ok(symbols)
+}
+
+fn exported_symbols(output: &str) -> Result<Symbols, String> {
+    dynamic_symbols(output, false)
+}
+
+fn imported_symbols(output: &str) -> Result<Symbols, String> {
+    dynamic_symbols(output, true)
 }
 
 fn paths(root: &Path) -> Result<Vec<PathBuf>, String> {
@@ -64,8 +72,9 @@ fn paths(root: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(found)
 }
 
-fn inventory(root: &Path) -> Result<Inventory, String> {
+fn inventory(root: &Path) -> Result<(Inventory, Inventory), String> {
     let mut data = Inventory::new();
+    let mut imports = Inventory::new();
     for file in paths(root)? {
         let rel = file.strip_prefix(root).map_err(|e| e.to_string())?
             .to_str().ok_or("Non-UTF8 ELF path")?.to_string();
@@ -76,14 +85,16 @@ fn inventory(root: &Path) -> Result<Inventory, String> {
         }
         let stdout = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
         let syms = exported_symbols(&stdout)?;
+        let undefined = imported_symbols(&stdout)?;
         // Nonempty symbol tables for packaged binaries/libraries are expected.
         // Empty is allowed on an ELF with no exports, but not as a global result.
+        imports.insert(rel.clone(), undefined);
         data.insert(rel, syms);
     }
     if data.values().all(|v| v.is_empty()) {
         return Err("No exported dynamic symbols seen in any packaged ELF".into());
     }
-    Ok(data)
+    Ok((data, imports))
 }
 
 fn json_quote(s: &str) -> String {
@@ -158,12 +169,47 @@ fn compare(full: &Inventory, lean: &Inventory) -> Result<String, String> {
     ))
 }
 
+fn compare_undefined_imports(full: &Inventory, lean: &Inventory)
+    -> Result<(usize, usize, usize, Vec<String>), String> {
+    if full.keys().collect::<Vec<_>>() != lean.keys().collect::<Vec<_>>() {
+        return Err("ELF paths mismatch during undefined import comparison".into());
+    }
+    let (mut n, mut m, mut different) = (0usize, 0usize, 0usize);
+    let mut samples = Vec::new();
+    for (path, normal) in full {
+        let other = lean.get(path).ok_or("Missing lean ELF import inventory")?;
+        n += normal.values().sum::<usize>();
+        m += other.values().sum::<usize>();
+        for name in normal.keys().chain(other.keys()).collect::<BTreeSet<_>>() {
+            let a = normal.get(name).copied().unwrap_or_default();
+            let b = other.get(name).copied().unwrap_or_default();
+            if a != b {
+                different += 1;
+                if samples.len() < 20 {
+                    samples.push(format!("{path}: {name} full={a} lean={b}"));
+                }
+            }
+        }
+    }
+    Ok((n, m, different, samples))
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 4 { return Err("usage: elf-dynsym-abi FULL_EXTRACTED LEAN_EXTRACTED REPORT_JSON".into()); }
-    let full = inventory(Path::new(&args[1]))?;
-    let lean = inventory(Path::new(&args[2]))?;
-    let result = compare(&full, &lean)?;
+    let (full, full_imports) = inventory(Path::new(&args[1]))?;
+    let (lean, lean_imports) = inventory(Path::new(&args[2]))?;
+    let exported = compare(&full, &lean)?;
+    let (normal_undefined, lean_undefined, differing_undefined, samples) =
+        compare_undefined_imports(&full_imports, &lean_imports)?;
+    if normal_undefined == 0 || lean_undefined == 0 {
+        return Err("No undefined dynamic symbol imports observed".into());
+    }
+    let sample_json = samples.iter().map(|s| json_quote(s))
+        .collect::<Vec<_>>().join(",");
+    let start = exported.trim().strip_suffix('}')
+        .ok_or("Invalid internal exported report")?;
+    let result = format!("{start},\"full_undefined_import_symbol_occurrences\":{normal_undefined},\"lean_undefined_import_symbol_occurrences\":{lean_undefined},\"differing_undefined_import_records\":{differing_undefined},\"exact_undefined_dynamic_import_parity\":{},\"bounded_undefined_import_difference_samples\":[{sample_json}]}}\n", differing_undefined == 0);
     fs::write(&args[3], result).map_err(|e| e.to_string())?;
     println!("PASS: compared exported dynamic symbols for 28 exact-path compiled ELF files");
     Ok(())
@@ -185,6 +231,8 @@ mod tests {
         assert_eq!(x.len(), 2);
         assert_eq!(x.get("FUNC|GLOBAL|DEFAULT|foo@@LIB_1"), Some(&1));
         assert_eq!(x.get("OBJECT|WEAK|DEFAULT|bar"), Some(&1));
+        let imports = imported_symbols(sample).unwrap();
+        assert_eq!(imports.get("FUNC|GLOBAL|DEFAULT|printf@GLIBC_2"), Some(&1));
     }
     #[test]
     fn capture_differences_without_suppressing_them() {
