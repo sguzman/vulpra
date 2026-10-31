@@ -205,6 +205,18 @@ The new lean-only `install_dist_bin_moz-src_toolkit_components_nimbus` contains 
 
 **Interpretation boundary:** An exact serialized record can differ even if its **destination is unchanged** (for example preprocessing inputs or manifest content), and a wildcard can account for many concrete resources without explicit one-to-one records. The full-only and lean-only counts must therefore **not** be presented as physical package file additions/removals. This proves bounded generated installer rule differences, not final installed package bytes or browser runtime resource behavior. No new source deletion or package-size saving. M3 **5/6 (83%)**, overall **61%**, delta **+0pp**.
 
+## Evaluated Mozilla Rust static-library Cargo ownership and feature parity
+
+[**Original pinned source Rust `BaseRustLibrary` source-ownership inventory 41249357750 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41249357750). The unchanged Firefox 159 source was separately configured for full-normal and combined lean. After all original `BuildReader`/`TreeMetadataEmitter` objects were emitted, the observer enumerated each actual Rust static-library target identity, source-relative `Cargo.toml`, Cargo crate/profile options, target/host kind, direct Cargo dependency **names**, and explicitly requested Rust features. I inspected the archived `full-normal-evaluated.json` and `combined-four-evaluated.json` record sets directly, not only the CI status.
+
+| Actual evaluated Rust static-library declarations | Full normal | Combined lean | One-sided records |
+| --- | ---: | ---: | ---: |
+| Emitted Rust static-library target identities | **4** | **4** | **0** |
+| Explicit Rust feature declarations | **18** | **18** | **0** |
+| Direct Cargo dependency-name declarations | **39** | **39** | **0** |
+
+The four source-root libraries are `toolkit/library/rust` (`gkrust`), `toolkit/crashreporter/crash_helper_server`, `toolkit/components/uniffi-bindgen-gecko-js/components`, and `toolkit/components/uniffi-bindgen-gecko-js/test-fixtures`. This is an **exact evaluated frontend root-and-direct-declaration parity** check, **not** Cargo's resolved transitive package graph, activated feature graph, actual `rustc` invocations, combined native linker inputs, compiled crate artifacts, Rust/C++ FFI linkage or conditional runtime `dlopen`. No browser or profile changes and no new source removal or binary savings. **M3 5/6 (83%), overall 61%, Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
