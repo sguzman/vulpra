@@ -56,6 +56,9 @@ def version_blocks(text):
     needs = defaultdict(set)
     defined = set()
     for line in text.splitlines():
+        if line.startswith("Version ") and " section " in line:
+            if mode == "needs" and file is not None and count != len(needs[file]):
+                raise ValueError("VERNEED count inconsistent at section boundary")
         if line.startswith("Version needs section "):
             mode, file, count = "needs", None, 0
         elif line.startswith("Version definition section "):
