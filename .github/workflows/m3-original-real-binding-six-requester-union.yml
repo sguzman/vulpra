@@ -1,0 +1,106 @@
+# Independent source-pinned reconciliation of sanitized glibc binding reports.
+name: M3 Original Six-Native-Requester Binding Reconciliation
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-real-binding-six-requester-union.yml
+      - ci/m3-original-real-binding-six-requester-union.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-original-six-elf-requester-bindings:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      SRC: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      LIB_RUN: '41162866013'
+      LIB_HEAD: 4c2354a5f83b7f678854d5193e7bff16e072e37e
+      AUX_RUN: '41164023607'
+      AUX_HEAD: eaea87f05d0abe79dd685c204c1876a3d5ed44a7
+      MODULE_RUN: '41164244090'
+      MODULE_HEAD: 6ccc20528ea8573a37b455cea0ad8d1389927f9a
+    steps:
+      - name: Checkout only sanitized jq reconciliation
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Verify three successful original native source-run commitments
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          command -v jq
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LIB_RUN" |
+            jq -e --arg sha "$LIB_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$AUX_RUN" |
+            jq -e --arg sha "$AUX_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$MODULE_RUN" |
+            jq -e --arg sha "$MODULE_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+      - name: Download only three small sanitized loader-binding artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          get_artifact() {
+            local run="$1" name="$2" folder="$3"
+            mkdir -p "$folder"
+            for attempt in 1 2 3; do
+              if gh run download "$run" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "$folder"; then return 0; fi
+              sleep 2
+            done
+            return 1
+          }
+          get_artifact "$LIB_RUN" m3-original-libxul-runtime-symbol-bindings-sanitized "$RUNNER_TEMP/lib"
+          get_artifact "$AUX_RUN" m3-original-auxiliary-actual-symbol-bindings "$RUNNER_TEMP/aux"
+          get_artifact "$MODULE_RUN" m3-original-feature-module-actual-bindings "$RUNNER_TEMP/modules"
+          test -s "$RUNNER_TEMP/lib/m3-original-libxul-symbol-bindings.json"
+          test -s "$RUNNER_TEMP/aux/m3-auxiliary-native-actual-bindings.json"
+          test -s "$RUNNER_TEMP/modules/mozinference-actual-bindings.json"
+          test -s "$RUNNER_TEMP/modules/clearkey-actual-bindings.json"
+      - name: Check exact bounded original six-ELF cross-workload totals
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg src "$SRC" --arg sha "$ARCHIVE" \
+            --slurpfile lib "$RUNNER_TEMP/lib/m3-original-libxul-symbol-bindings.json" \
+            --slurpfile aux "$RUNNER_TEMP/aux/m3-auxiliary-native-actual-bindings.json" \
+            --slurpfile moz "$RUNNER_TEMP/modules/mozinference-actual-bindings.json" \
+            --slurpfile cdm "$RUNNER_TEMP/modules/clearkey-actual-bindings.json" \
+            -f ci/m3-original-real-binding-six-requester-union.jq \
+            > "$RUNNER_TEMP/m3-original-six-native-binding-reconciliation.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_native_six_requester_real_binding_observation_reconciled" and
+            .original_elf_requester_count==6 and
+            (.original_elf_requester_basenames|length)==6 and
+            .sum_normal_symbol_binding_events==7380 and
+            .sum_per_requester_distinct_symbol_provider_pairs==3874 and
+            .observed_provider_basename_count==48 and
+            .observed_provider_basename_count==(.observed_provider_basenames|length) and
+            .separate_native_workloads_reconciled==4 and
+            .raw_traces_or_symbol_names_exported==false and
+            .complete_dependency_or_lazy_binding_map_proven==false and
+            .production_browser_rebuilt==false and
+            .new_source_removals_authorized==false and
+            .new_package_savings_bytes==null and
+            .m3_final_dependency_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-six-native-binding-reconciliation.json" >/dev/null
+          echo 'PASS: six original ELF requesters; 7,380 runtime events; 3,874 distinct requester/symbol/provider tuples; 48 provider basenames'
+      - name: Upload only sanitized independent reconciliation
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-six-requester-binding-reconciliation
+          path: ${{ runner.temp }}/m3-original-six-native-binding-reconciliation.json
+          if-no-files-found: error
+          retention-days: 14
