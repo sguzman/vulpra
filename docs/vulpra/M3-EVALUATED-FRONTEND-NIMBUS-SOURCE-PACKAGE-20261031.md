@@ -270,6 +270,19 @@ Together with [the independently verified `gkrust` root (747 reachable nodes, 17
 
 The raw `cargo metadata` files, full environment paths and Rust build invocations were not archived. No `build.rs` execution, compiled `rustc` artifacts, actual native link command/objects, Rust/C++ FFI or dynamic `dlopen` closure is established. No source pruning or new binary/package savings. **M3 remains 5/6 (83%), Vulpra overall 61%, milestone delta +0pp.**
 
+## Actual emitted native-link-target ownership of Rust staticlibs
+
+[**Pinned original-source typed Rust-to-native `Linkable.linked_libraries` inventory 41251904637 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41251904637). After the full original Mozilla BuildReader/emitter traversal, the observer walked actual library object identities in each `Linkable.linked_libraries` set, isolating links whose target is an emitted `BaseRustLibrary`, with source-relative consumer identity and Rust static-library target identity, both independently configured variants.
+
+| Native target (emitted `Linkable`) | Directly linked emitted Rust static library | Full vs. combined lean |
+| --- | --- | --- |
+| `toolkit/library/build` / `libxul.so` | `toolkit/library/rust` / `libgkrust.a` | **Identical** |
+| `toolkit/crashreporter/crash_helper` / `crashhelper` | `toolkit/crashreporter/crash_helper_server` / `libcrash_helper_server.a` | **Identical** |
+
+Both original full and combined lean emitted **2 exact Rust-staticlib-to-native-consumer edges** and **0** library-link edges originating at the Rust static-library `Linkable` objects themselves; the two consumer-edge sets are **exactly identical**. The two separately enumerated UniFFI static-library targets had no direct link consumers in this narrowed set, which does **not** imply these crates are unused: their generated code and target-specific linkage can exist outside this exact direct `linked_libraries` relation.
+
+**Scope is precisely source-evaluated linking ownership.** No actual compiler command/link invocation, archive members, ELF symbol lookup or Rust/C++ FFI call sites were checked here; neither runtime conditional loading nor `dlopen` is closed. This does not authorize deleting a Rust root or claim compiled binary savings. **M3 stays 5/6 (83%), overall 61%, delta +0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
