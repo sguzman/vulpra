@@ -328,6 +328,7 @@ jobs:
              .differing_normalized_backend_mk_files) ==
                .shared_generated_backend_mk_files and
             .actual_recursive_make_backend_files_read==true and
+            .exactly_two_expected_backend_define_deltas_exhaust_all_differences==true and
             .generated_makefile_or_link_command_fully_compared==false and
             .native_compile_or_link_executed==false and
             .source_pruning_authorized==false and
