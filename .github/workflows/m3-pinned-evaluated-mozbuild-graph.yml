@@ -131,6 +131,14 @@ jobs:
               $b.actual_evaluated_rust_library_targets) as $full_only_rust_targets |
              ($b.actual_evaluated_rust_library_targets -
               $a.actual_evaluated_rust_library_targets) as $lean_only_rust_targets |
+             ($a.actual_evaluated_rust_program_targets -
+              $b.actual_evaluated_rust_program_targets) as $full_only_rust_programs |
+             ($b.actual_evaluated_rust_program_targets -
+              $a.actual_evaluated_rust_program_targets) as $lean_only_rust_programs |
+             ($a.actual_evaluated_rust_program_features -
+              $b.actual_evaluated_rust_program_features) as $full_only_rust_program_features |
+             ($b.actual_evaluated_rust_program_features -
+              $a.actual_evaluated_rust_program_features) as $lean_only_rust_program_features |
              ($a.actual_evaluated_rust_library_features -
               $b.actual_evaluated_rust_library_features) as $full_only_rust_features |
              ($b.actual_evaluated_rust_library_features -
@@ -190,6 +198,14 @@ jobs:
               combined_evaluated_compile_source_count:$b.actual_evaluated_compile_source_input_count,
               full_only_evaluated_compile_sources:$full_only_compile_sources,
               combined_only_evaluated_compile_sources:$lean_only_compile_sources,
+              full_evaluated_rust_program_target_count:$a.actual_evaluated_rust_program_target_count,
+              combined_evaluated_rust_program_target_count:$b.actual_evaluated_rust_program_target_count,
+              full_evaluated_rust_program_feature_count:$a.actual_evaluated_rust_program_feature_count,
+              combined_evaluated_rust_program_feature_count:$b.actual_evaluated_rust_program_feature_count,
+              full_only_evaluated_rust_program_targets:$full_only_rust_programs,
+              combined_only_evaluated_rust_program_targets:$lean_only_rust_programs,
+              full_only_evaluated_rust_program_features:$full_only_rust_program_features,
+              combined_only_evaluated_rust_program_features:$lean_only_rust_program_features,
               full_evaluated_rust_library_target_count:$a.actual_evaluated_rust_library_target_count,
               combined_evaluated_rust_library_target_count:$b.actual_evaluated_rust_library_target_count,
               full_evaluated_rust_library_feature_count:$a.actual_evaluated_rust_library_feature_count,
@@ -328,6 +344,9 @@ jobs:
           jq -c '{
             emitted_compile_sources:[.full_evaluated_compile_source_count,.combined_evaluated_compile_source_count],
             declared_link_nodes:[.full_evaluated_linkable_node_count,.combined_evaluated_linkable_node_count],
+            rust_program_targets:[.full_evaluated_rust_program_target_count,.combined_evaluated_rust_program_target_count],
+            differing_rust_programs:[(.full_only_evaluated_rust_program_targets|length),(.combined_only_evaluated_rust_program_targets|length)],
+            differing_rust_program_features:[(.full_only_evaluated_rust_program_features|length),(.combined_only_evaluated_rust_program_features|length)],
             rust_library_targets:[.full_evaluated_rust_library_target_count,.combined_evaluated_rust_library_target_count],
             rust_direct_cargo_deps:[.full_evaluated_rust_library_dependency_count,.combined_evaluated_rust_library_dependency_count],
             differing_rust_targets:[(.full_only_evaluated_rust_library_targets|length),(.combined_only_evaluated_rust_library_targets|length)],
