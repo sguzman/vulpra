@@ -1,5 +1,5 @@
-# Only original compiled ML/ClearKey C API diagnostic paths, with no egress.
-name: M3 Original Native Inference and ClearKey Actual Bindings
+# Only original compiled ONNX, llama and ClearKey C API diagnostic paths, no egress.
+name: M3 Original Native ML and ClearKey Actual Bindings
 on:
   push:
     branches: [main]
@@ -8,6 +8,8 @@ on:
       - ci/m3-native-original-feature-module-bindings.rs
       - ci/m3-mozinference-no-egress.sh
       - ci/m3-clearkey-no-egress.sh
+      - ci/m3-onnxruntime-no-egress.sh
+      - ci/m3-onnxruntime-capi-probe.rs
       - ci/m3-mozinference-capi-probe.rs
       - ci/m3-clearkey-negative-capi-probe.rs
   workflow_dispatch:
@@ -15,7 +17,7 @@ permissions:
   contents: read
   actions: read
 jobs:
-  two-original-no-egress-capi-module-bindings:
+  three-original-no-egress-capi-module-bindings:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -38,11 +40,13 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash -n ci/m3-mozinference-no-egress.sh
           bash -n ci/m3-clearkey-no-egress.sh
+          bash -n ci/m3-onnxruntime-no-egress.sh
           rustc --edition=2021 --test ci/m3-native-original-feature-module-bindings.rs -o "$RUNNER_TEMP/module-binding-tests"
           "$RUNNER_TEMP/module-binding-tests"
           rustc --edition=2021 -O ci/m3-native-original-feature-module-bindings.rs -o "$RUNNER_TEMP/module-binding-parser"
           rustc --edition=2021 -C opt-level=1 ci/m3-mozinference-capi-probe.rs -o "$RUNNER_TEMP/moz-original-probe"
           rustc --edition=2021 -C opt-level=1 ci/m3-clearkey-negative-capi-probe.rs -o "$RUNNER_TEMP/clearkey-original-probe"
+          rustc --edition=2021 -C opt-level=1 ci/m3-onnxruntime-capi-probe.rs -o "$RUNNER_TEMP/onnx-original-probe"
       - name: Install no-egress and ELF loader prerequisites
         shell: bash
         run: |
@@ -50,7 +54,7 @@ jobs:
           sudo apt-get -o Acquire::Retries=3 update
           sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
             --no-install-recommends iproute2 libstdc++6 libgomp1 libnss3 libnspr4 binutils
-      - name: Authenticate original source, archive and two compiled exports
+      - name: Authenticate original source, archive and three compiled C API exports
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -65,11 +69,14 @@ jobs:
           test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
           tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
           test -f "$RUNNER_TEMP/package/vulpra/libmozinference.so"
+          test -f "$RUNNER_TEMP/package/vulpra/libonnxruntime.so"
           test -f "$RUNNER_TEMP/package/vulpra/gmp-clearkey/0.1/libclearkey.so"
           readelf -Ws "$RUNNER_TEMP/package/vulpra/libmozinference.so" >"$RUNNER_TEMP/moz-exports.txt"
           grep -E ' llama_log_set(@|$)' "$RUNNER_TEMP/moz-exports.txt" >/dev/null
           readelf -Ws "$RUNNER_TEMP/package/vulpra/gmp-clearkey/0.1/libclearkey.so" >"$RUNNER_TEMP/clearkey-exports.txt"
           grep -E ' CreateCdmInstance(@|$)' "$RUNNER_TEMP/clearkey-exports.txt" >/dev/null
+          readelf -Ws "$RUNNER_TEMP/package/vulpra/libonnxruntime.so" >"$RUNNER_TEMP/onnx-exports.txt"
+          grep -E ' OrtGetApiBase(@|$)' "$RUNNER_TEMP/onnx-exports.txt" >/dev/null
       - name: Run only diagnostic original C API bindings under isolated network
         shell: bash
         timeout-minutes: 5
@@ -89,6 +96,13 @@ jobs:
               "$RUNNER_TEMP/package/vulpra" "$RUNNER_TEMP/clearkey-original-probe" \
               "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz.sha256" \
               "$RUNNER_TEMP/unused-clearkey-abi-report.json"
+          sudo unshare --net -- env \
+            M3_NATIVE_BINDINGS_PARSER="$RUNNER_TEMP/module-binding-parser" \
+            M3_NATIVE_BINDINGS_REPORT="$RUNNER_TEMP/onnx-actual-bindings.json" \
+            bash ci/m3-onnxruntime-no-egress.sh \
+              "$RUNNER_TEMP/package/vulpra" "$RUNNER_TEMP/onnx-original-probe" \
+              "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz.sha256" \
+              "$RUNNER_TEMP/unused-onnx-abi-report.json"
           jq -e --arg sha "$ARCHIVE_SHA" --arg source "$SOURCE_SHA" '
             .schema_version==1 and
             .status=="original_native_feature_module_actual_symbol_bindings" and
@@ -111,7 +125,20 @@ jobs:
             .symbol_names_exported==false and .model_inference_or_drm_decryption_proven==false and
             .all_lazy_or_transitive_bindings_proven==false and
             .new_source_pruning_authorized==false' "$RUNNER_TEMP/clearkey-actual-bindings.json" >/dev/null
-          echo 'PASS: original compiled inference/ClearKey actual bindings; diagnostic routes only'
+          jq -e --arg sha "$ARCHIVE_SHA" --arg source "$SOURCE_SHA" '
+            .schema_version==1 and
+            .status=="original_native_feature_module_actual_symbol_bindings" and
+            .original_source_commit==$source and .original_archive_sha256==$sha and
+            .original_requester_basename=="libonnxruntime.so" and
+            .normal_symbol_binding_events>0 and .distinct_symbol_provider_pairs>0 and
+            .pid_traces_with_original_requester_bindings>=1 and
+            .observed_provider_basename_count==(.observed_provider_basenames|length) and
+            .actual_normal_symbol_bindings_observed==true and
+            .no_network_egress==true and .raw_loader_logs_exported==false and
+            .symbol_names_exported==false and .model_inference_or_drm_decryption_proven==false and
+            .all_lazy_or_transitive_bindings_proven==false and
+            .new_source_pruning_authorized==false' "$RUNNER_TEMP/onnx-actual-bindings.json" >/dev/null
+          echo 'PASS: original compiled ONNX, llama, ClearKey actual bindings; diagnostic routes only'
       - name: Upload sanitized provider names and counts only
         uses: actions/upload-artifact@v4
         with:
@@ -119,5 +146,6 @@ jobs:
           path: |
             ${{ runner.temp }}/mozinference-actual-bindings.json
             ${{ runner.temp }}/clearkey-actual-bindings.json
+            ${{ runner.temp }}/onnx-actual-bindings.json
           if-no-files-found: error
           retention-days: 14
