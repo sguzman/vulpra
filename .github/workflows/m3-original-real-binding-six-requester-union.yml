@@ -57,6 +57,7 @@ jobs:
             mkdir -p "$folder"
             for attempt in 1 2 3; do
               if gh run download "$run" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "$folder"; then return 0; fi
+              if test "$attempt" = 3; then break; fi
               sleep 2
             done
             return 1
