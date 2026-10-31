@@ -149,7 +149,7 @@ def main():
     from mozbuild.backend.configenvironment import BuildConfig, ConfigEnvironment
     from mozbuild.frontend.reader import BuildReader
     from mozbuild.frontend.emitter import TreeMetadataEmitter
-    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, Linkable, BaseLibrary
+    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, UnifiedSources, Linkable, BaseLibrary
 
     status = Path(status_path).resolve(strict=True)
     cfg = BuildConfig.from_config_status(str(status))
@@ -175,6 +175,7 @@ def main():
     visited_traversal = set()
     moz_src_members = set()
     evaluated_compile_source_inputs = set()
+    evaluated_unified_source_members = set()
     emitted_linkables = []
     jar_manifest_inputs = set()
     installed_resource_inputs = set()
@@ -199,6 +200,17 @@ def main():
             emitted_linkables.append(obj)
             if len(emitted_linkables) > 10000:
                 raise ValueError("Unexpectedly many emitted native linkables")
+        if isinstance(obj, UnifiedSources) and obj.have_unified_mapping:
+            # Actual Mozilla group_unified_files membership, not a
+            # name-based guess about generated Unified_* translation units.
+            for generated_unit, members in obj.unified_source_mapping:
+                unit = portable_member(str(generated_unit))
+                for member_item in members:
+                    origin, member = source_identity(member_item, root, object_root)
+                    evaluated_unified_source_members.add(
+                        (rel, unit, origin, member))
+                    if len(evaluated_unified_source_members) > 100000:
+                        raise ValueError("Unexpected unified source expansion")
         if isinstance(obj, BaseSources):
             # Source-file members produced by the real frontend. This is
             # not the compiled linker command or final object-file census.
@@ -319,6 +331,19 @@ def main():
                 len(declared_system_library_links) > 100000):
             raise ValueError("Unexpectedly large declared native link map")
 
+    unified_generated_unit_keys = {
+        (owner, unit) for owner, unit, _, _ in evaluated_unified_source_members
+    }
+    unresolved_unified_linkable_units = {
+        (record[0], record[-1])
+        for record in declared_linkable_compile_units
+        if record[-2] == "unresolved_relative" and
+        record[-1].startswith("Unified_")
+    }
+    unmatched_unified_linkable_units = (
+        unresolved_unified_linkable_units - unified_generated_unit_keys
+    )
+
     flags = {}
     for flag in FLAGS:
         flags[flag] = {"present": flag in cfg.substs}
@@ -343,6 +368,13 @@ def main():
         "actual_evaluated_system_library_links": sorted(
             [list(x) for x in declared_system_library_links]),
         "actual_evaluated_system_library_link_count": len(declared_system_library_links),
+        "actual_evaluated_unified_source_members": sorted(
+            [list(x) for x in evaluated_unified_source_members]),
+        "actual_evaluated_unified_source_member_count": len(evaluated_unified_source_members),
+        "actual_evaluated_unified_generated_unit_count": len(unified_generated_unit_keys),
+        "unresolved_unified_linkable_unit_count": len(unresolved_unified_linkable_units),
+        "unmatched_unified_linkable_units": sorted(
+            [list(x) for x in unmatched_unified_linkable_units]),
         "actual_evaluated_linkable_compile_units": sorted(
             [list(x) for x in declared_linkable_compile_units]),
         "actual_evaluated_linkable_compile_unit_count": len(declared_linkable_compile_units),
