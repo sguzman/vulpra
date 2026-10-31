@@ -43,3 +43,7 @@ All six remain retained and cannot be inferred removable from non-activation und
 None of the original Vulpra source, normal compiled archive, installed Firefox Developer Edition profiles, launch defaults or production networking were changed. No new binary savings, source deletions or additional product M3 acceptance gate were earned.
 
 **M3 5/6 (83%), overall project 61%, this session Δ0 percentage points.**
+
+## Additional real original compiled `vulpra-bin` Wayland executable (2026-10-31)
+
+The alternative native original-compiled `vulpra-bin` executable passed [CI 41160038198](https://github.com/sguzman/vulpra/actions/runs/41160038198) **SUCCESS**, two separate real 10s private Weston graphical frame/liveness checks (untraced and traced) under an ephemeral private-profile shim. All **21/21** original alternate-executable ELF version triples observed; no installed Vulpra/Firefox launcher/profile/default changes. [Five-run original compiled source-version union 41160181649](https://github.com/sguzman/vulpra/actions/runs/41160181649) **SUCCESS** extends this four-workload record to **407/519** original version triples observed and **112** still unexercised in five modules. This supersedes only the earlier narrower total; [final current source ABI evidence](M3-ORIGINAL-NATIVE-FIVE-WORKLOAD-ABI-20261031.md). M3 5/6 (83%), overall 61%, Δ0pp.
