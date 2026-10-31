@@ -1,0 +1,146 @@
+# Original immutable compiled Vulpra package, read-only ELF resolution inside
+# official Arch Linux userspace; not a host Arch or Hyprland browser test.
+name: M3 Original All-ELF Arch Linux Userspace Loader Resolution
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-native-arch-loader-list.yml
+      - ci/m3-original-native-elf-loader-list.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-all-28-elf-arch-userspace-loader-list:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout only bounded source-pinned native loader observer
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Authenticate original source and compile bounded read-only ELF observer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          rustc --edition=2021 --test ci/m3-original-native-elf-loader-list.rs -o "$RUNNER_TEMP/elf-tests"
+          "$RUNNER_TEMP/elf-tests"
+          rustc --edition=2021 -O ci/m3-original-native-elf-loader-list.rs -o "$RUNNER_TEMP/elf-list"
+      - name: SHA-authenticate and unpack original compiled browser into disposable directory
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/arch-results"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          test -f "$RUNNER_TEMP/package/vulpra/libxul.so"
+      - name: Prepare disposable official Arch Linux userspace with native dependencies
+        shell: bash
+        timeout-minutes: 14
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-build-context"
+          cat >"$RUNNER_TEMP/arch-build-context/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            binutils coreutils gtk3 dbus-glib alsa-lib nss mesa libglvnd \
+            && test -x /lib64/ld-linux-x86-64.so.2 \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t m3-original-arch-loader:ci \
+            "$RUNNER_TEMP/arch-build-context"
+      - name: Read original ELF direct and transitive loader lists inside offline Arch container
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,nosuid,nodev,size=16m \
+            --mount type=bind,src="$RUNNER_TEMP/package/vulpra",dst=/original,readonly \
+            --mount type=bind,src="$RUNNER_TEMP/elf-list",dst=/usr/local/bin/elf-list,readonly \
+            --mount type=bind,src="$RUNNER_TEMP/arch-results",dst=/reports \
+            m3-original-arch-loader:ci \
+            /usr/local/bin/elf-list /original /reports/original-arch-elf-list.json
+          image_id="$(docker image inspect m3-original-arch-loader:ci --format '{{.Id}}')"
+          printf '%s' "$image_id" | grep -Eq '^sha256:[a-f0-9]{64}$'
+          glibc_version="$(docker run --rm --network none --read-only --cap-drop ALL \
+            m3-original-arch-loader:ci pacman -Q glibc | awk '{print $2}')"
+          printf '%s' "$glibc_version" | grep -Eq '^[0-9][0-9A-Za-z.+_:-]*$'
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --arg image "$image_id" --arg glibc "$glibc_version" \
+            --slurpfile sample "$RUNNER_TEMP/arch-results/original-arch-elf-list.json" '
+             ($sample[0]) as $s |
+             if ($s.schema_version==1 and
+                 $s.status=="source_pinned_original_all_28_elf_loader_list_resolution" and
+                 $s.original_source_commit==$src and $s.original_archive_sha256==$sha and
+                 $s.original_elf_members_listed==28 and
+                 ($s.original_elf_basenames|length)==28 and
+                 $s.declared_direct_needed_edges==268 and
+                 $s.direct_needed_sonames_present_in_loader_lists==268 and
+                 $s.loader_listed_provider_name_occurrences>=268 and
+                 $s.distinct_loader_listed_provider_basenames>=1 and
+                 $s.glibc_linker_list_metadata_only==true and
+                 $s.application_main_executed==false and
+                 $s.no_network_egress==true and
+                 $s.complete_lazy_or_future_dlopen_map_proven==false and
+                 $s.source_pruning_authorized==false and
+                 $s.m3_sixth_gate_closed==false)
+             then {
+               schema_version:1,
+               status:"original_archlinux_userspace_all_28_elf_loader_list_resolved",
+               original_source_commit:$src,
+               original_archive_sha256:$sha,
+               arch_container_image_id:$image,
+               arch_userspace_glibc_version:$glibc,
+               original_elf_count:$s.original_elf_members_listed,
+               original_direct_needed_edges:$s.declared_direct_needed_edges,
+               direct_needed_names_listed_in_arch:$s.direct_needed_sonames_present_in_loader_lists,
+               arch_loader_provider_name_occurrences:$s.loader_listed_provider_name_occurrences,
+               distinct_arch_loader_provider_basenames:$s.distinct_loader_listed_provider_basenames,
+               arch_loader_provider_basenames:$s.loader_listed_provider_basenames,
+               original_requester_basenames:$s.original_elf_basenames,
+               arch_userspace_container_only:true,
+               runtime_network_disabled:true,
+               application_main_executed:false,
+               actual_arch_host_or_hyprland_tested:false,
+               complete_lazy_transitive_feature_map_proven:false,
+               generated_build_feature_ownership_complete:false,
+               installed_browser_or_profile_changed:false,
+               source_removal_authorized:false,
+               m3_sixth_gate_closed:false
+             } else error("Arch loader evidence incomplete") end' \
+            > "$RUNNER_TEMP/arch-results/original-arch-platform-audit.json"
+          jq -e '.status=="original_archlinux_userspace_all_28_elf_loader_list_resolved" and
+            .original_elf_count==28 and .original_direct_needed_edges==268 and
+            .direct_needed_names_listed_in_arch==268 and
+            .arch_userspace_container_only==true and
+            .runtime_network_disabled==true and
+            .actual_arch_host_or_hyprland_tested==false and
+            .source_removal_authorized==false and .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/arch-results/original-arch-platform-audit.json" >/dev/null
+          echo 'PASS: Arch Linux glibc userspace lists each direct dependency for all 28 original compiled ELF files'
+      - name: Preserve only sanitized Arch-userspace loader audit data
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-archlinux-all-28-elf-loader-list
+          path: ${{ runner.temp }}/arch-results/original-arch-platform-audit.json
+          if-no-files-found: error
+          retention-days: 14
