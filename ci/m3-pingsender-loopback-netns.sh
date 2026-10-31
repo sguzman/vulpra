@@ -23,6 +23,13 @@ ip link set lo up
 [[ "$(ip -o link show | wc -l)" == 1 ]] || {
   echo 'Network namespace unexpectedly has a non-loopback interface' >&2; exit 1;
 }
+# The independent actual-binding replay opts in, retaining the same synthetic
+# loopback request and forbidden-host negative test as the ABI-only path.
+debug_modes=versions
+if [[ -n "${M3_NATIVE_BINDINGS_REPORT:-}" ]]; then
+  [[ -x "${M3_NATIVE_BINDINGS_PARSER:-}" && ! -e "$M3_NATIVE_BINDINGS_REPORT" ]] || exit 2
+  debug_modes=versions,bindings
+fi
 work="$(mktemp -d)"
 server=''
 cleanup() {
@@ -77,7 +84,7 @@ kill -0 "$server" 2>/dev/null || {
 timeout --signal=TERM --kill-after=3s 25s \
   env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy \
     HOME="$work/home" NO_PROXY="localhost,127.0.0.1" \
-    LD_DEBUG=versions LD_DEBUG_OUTPUT="$work/pingsender-loader" \
+    LD_DEBUG="$debug_modes" LD_DEBUG_OUTPUT="$work/pingsender-loader" \
     MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
     "$package/pingsender" "http://localhost:$port/pingsender-fixture" "$work/ping.json" \
     >"$work/sender.out" 2>"$work/sender.err" || {
@@ -92,10 +99,15 @@ jq -e '.schema_version==1 and .synthetic_loopback_request_received==true and
        .synthetic_gzip_payload_and_fixed_headers_verified==true and
        .network_namespace_has_no_external_interface==true and
        .real_user_ping_payloads_sent==false' "$work/response.json" >/dev/null
-python3 "$repository/ci/m3-pingsender-version-reconcile.py" \
-  --traces "$work" --static "$static" --output "$output"
+if [[ -z "${M3_NATIVE_BINDINGS_REPORT:-}" ]]; then
+  python3 "$repository/ci/m3-pingsender-version-reconcile.py" \
+    --traces "$work" --static "$static" --output "$output"
+  chmod 0644 -- "$output"
+else
+  "$M3_NATIVE_BINDINGS_PARSER" "$work" "$M3_NATIVE_BINDINGS_REPORT" "pingsender"
+  chmod 0644 "$M3_NATIVE_BINDINGS_REPORT"
+fi
 [[ ! -e "$work/home/.mozilla" ]] || {
   echo 'Local-only helper created a browser/user profile' >&2; exit 1;
 }
-chmod 0644 -- "$output"
 echo 'PASS: original pingsender posted only synthetic gzip to no-egress loopback and removed temporary input'
