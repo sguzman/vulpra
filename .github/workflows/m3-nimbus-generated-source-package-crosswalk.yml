@@ -23,7 +23,7 @@ jobs:
       COMBINED_ARCHIVE_SHA: e7aa6273fc1078134c216408c7cc110886dc60ada90c062d7f2482fd3f288eec
       FULL_RUN: '40997075527'
       COMBINED_RUN: '41222758405'
-      FRONTEND_RUN: '41234342128'
+      FRONTEND_RUN: '41235510396'
     steps:
       - name: Checkout only immutable original Nimbus build declaration
         uses: actions/checkout@v4
@@ -51,7 +51,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$COMBINED_RUN" |
             jq -e --arg sha e9e52a0ca36f54fab071784cea31d2a6a55789ad '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FRONTEND_RUN" |
-            jq -e --arg sha 9e07f2d697d020d37b17ef994aa764caeda49d55 '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+            jq -e --arg sha 94cbbf290fce77056156bdcd168ca7c7ac0116ec '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
       - name: Authenticate and fetch original full, four-feature compiled, and generated graph artifacts
         shell: bash
         env:
@@ -97,6 +97,29 @@ jobs:
             .combined_generated_flag_values.MOZ_NORMANDY.present==false and
             .complete_build_link_ffi_dlopen_graph==false and
             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/graph/frontend-delta-summary.json" >/dev/null
+      - name: Pin exactly one actual source-owned NimbusBootstrap MOZ_SRC_FILES member delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -en \
+            --slurpfile full "$RUNNER_TEMP/graph/full-normal-evaluated.json" \
+            --slurpfile lean "$RUNNER_TEMP/graph/combined-four-evaluated.json" '
+            ($full[0]) as $f | ($lean[0]) as $l |
+            $f.original_source_commit==$l.original_source_commit and
+            $f.variant=="normal" and $l.variant=="combined_four" and
+            $f.actual_emitted_moz_src_member_count==561 and
+            $l.actual_emitted_moz_src_member_count==562 and
+            $f.noncanonical_moz_src_install_base_members==1 and
+            $l.noncanonical_moz_src_install_base_members==1 and
+            (($l.actual_emitted_moz_src_file_members -
+              $f.actual_emitted_moz_src_file_members) ==
+              [["toolkit/components/nimbus", "src",
+                "toolkit/components/nimbus/NimbusBootstrap.sys.mjs", ""]]) and
+            (($f.actual_emitted_moz_src_file_members -
+              $l.actual_emitted_moz_src_file_members)|length)==0 and
+            $f.m3_sixth_gate_closed==false and
+            $l.m3_sixth_gate_closed==false' >/dev/null
+          echo 'PASS: exact Mozilla generated source ownership delta is only NimbusBootstrap.sys.mjs'
       - name: Verify actual compiled browser packaged Nimbus bootstrap fallback and Normandy runner inversion
         shell: bash
         timeout-minutes: 7
@@ -136,7 +159,11 @@ jobs:
              compiled_combined_normandy_runner_absent:true,
              compiled_combined_nimbus_bootstrap_present:true,
              protected_newtab_factory_module_resources_retained:true,
-             causal_unique_emitted_object_source_path_verified:false,
+             causal_unique_emitted_object_source_path_verified:true,
+             exactly_one_actual_emitted_source_member_added_nimbus_bootstrap:true,
+             exact_full_moz_src_members:561,
+             exact_combined_moz_src_members:562,
+             symmetric_noncanonical_install_bases:1,
              generated_backend_caller_or_ffi_graph_complete:false,
              personal_browser_or_profile_modified:false,
              source_pruning_authorized:false,
@@ -147,7 +174,8 @@ jobs:
             .compiled_combined_nimbus_bootstrap_present==true and
             .compiled_normal_nimbus_bootstrap_absent==true and
             .source_conditional_requires_linux_browser_and_no_normandy==true and
-            .causal_unique_emitted_object_source_path_verified==false and
+            .causal_unique_emitted_object_source_path_verified==true and
+            .exactly_one_actual_emitted_source_member_added_nimbus_bootstrap==true and
             .generated_backend_caller_or_ffi_graph_complete==false and
             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/audit/original-nimbus-generated-fallback-witness.json" >/dev/null
           echo 'PASS: actual source conditional, emitted build object delta, and physical Nimbus/Normandy compiled package inversion'
