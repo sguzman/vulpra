@@ -65,7 +65,7 @@ jobs:
                 ([.steps[]|select(
                   .name=="Package original Normandy and produce source-pinned evidence" and
                   .conclusion=="success")]|length)==1
-               )]|length)==1' >/dev/null
+               )]|length==1' >/dev/null
           rustc --edition=2021 --test ci/m3-original-compiled-config-status-evidence.rs \
             -o "$RUNNER_TEMP/original-config-tests"
           "$RUNNER_TEMP/original-config-tests"
