@@ -1,0 +1,102 @@
+
+# Original-package non-executing audit of unversioned .dynsym imports, name hints only.
+name: M3 Original Native ELF Unversioned Symbol Name Candidate Audit
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-elf-unversioned-import-census.py
+      - .github/workflows/m3-native-elf-unversioned-import-census.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-undefined-plain-dynsym-census:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout only original ELF metadata parsers
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Validate original metadata parsers and no-execution fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-native-elf-unversioned-import-census.py \
+            ci/m3-native-elf-version-contract.py ci/m3-native-elf-symbol-provider-candidates.py
+          python3 ci/m3-native-elf-version-contract.py --self-test
+          python3 ci/m3-native-elf-symbol-provider-candidates.py --self-test
+          python3 ci/m3-native-elf-unversioned-import-census.py --self-test
+      - name: Install bounded readelf native host-candidate metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends binutils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          command -v readelf
+          test -x /sbin/ldconfig
+      - name: Authenticate untouched full-normal compiled source archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/native"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/native"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/native/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+      - name: Audit original package weak/global unversioned import name candidates
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-elf-unversioned-import-census.py \
+            --archive "$RUNNER_TEMP/native/full-normandy-baseline.tar.xz" \
+            --output "$RUNNER_TEMP/m3-original-unversioned-dynsym-imports.json"
+          jq -e --arg sha "$ARCHIVE_SHA" --arg src "$SOURCE_SHA" '
+            .schema_version==1 and .original_archive_sha256==$sha and
+            .original_native_source_commit==$src and
+            .original_compiled_ELF_members_examined==28 and
+            .unversioned_undefined_dynamic_symbol_import_occurrences>0 and
+            .unversioned_undefined_dynamic_symbol_import_occurrences==
+              (.symbol_name_candidates|length) and
+            .unversioned_undefined_dynamic_symbol_import_occurrences==
+              (.unversioned_undefined_dynamic_symbol_imports_global+
+               .unversioned_undefined_dynamic_symbol_imports_weak) and
+            .unversioned_undefined_dynamic_symbol_import_occurrences==
+              (.at_least_one_direct_needed_name_candidate+
+               .glibc_consolidation_name_candidate+
+               .optional_weak_no_direct_name_candidate+
+               .no_direct_provider_name_candidate) and
+            .versioned_imports_in_this_report==false and
+            .direct_DT_NEEDED_only_not_transitive_or_lazy_dlopen==true and
+            .runtime_symbol_relocations_proven==false and
+            .missing_direct_symbol_candidate_implies_failure==false and
+            .host_ldconfig_candidate_is_actual_loader_provider_proven==false and
+            .upstream_binaries_executed==false and
+            .source_deletion_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-unversioned-dynsym-imports.json" >/dev/null
+          echo 'PASS: original ELF plain unversioned symbol name metadata; no actual binding claims'
+      - name: Upload sanitized source symbol names and candidate bounds
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-elf-unversioned-undefined-symbol-census
+          path: ${{ runner.temp }}/m3-original-unversioned-dynsym-imports.json
+          if-no-files-found: error
+          retention-days: 14
