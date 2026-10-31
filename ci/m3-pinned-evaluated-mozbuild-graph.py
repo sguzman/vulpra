@@ -86,6 +86,30 @@ def assert_flags(substs, variant):
             raise ValueError(f"Normal build unexpectedly omits protected {key}")
 
 
+def source_identity(item, root, object_root):
+    """Label a frontend file by its *actual* source/obj origin, never host paths."""
+    raw = str(getattr(item, "full_path", item)).replace("\\", "/")
+    if not os.path.isabs(raw):
+        raise ValueError("Frontend ownership input lacks an absolute full_path")
+    physical = os.path.realpath(raw).replace("\\", "/")
+    for label, directory in (("src", root), ("obj", object_root)):
+        prefix = str(directory).replace("\\", "/").rstrip("/") + "/"
+        if physical.startswith(prefix):
+            return (label, normalized(physical[len(prefix):]))
+    return ("other", normalized(os.path.basename(physical)))
+
+
+def install_component(value):
+    """Do not silently mistake absolute or noncanonical targets for dist paths."""
+    raw = str(value) if value is not None else ""
+    if raw.startswith("/") or raw.startswith("\\"):
+        return "@noncanonical-install-component"
+    try:
+        return normalized(raw)
+    except ValueError:
+        return "@noncanonical-install-component"
+
+
 def main():
     if len(sys.argv) != 4 or sys.argv[1] not in ("normal", "combined_four"):
         raise ValueError("usage: EVALUATED_VARIANT CONFIG_STATUS_PATH OUTPUT_JSON")
@@ -93,7 +117,7 @@ def main():
     from mozbuild.backend.configenvironment import BuildConfig, ConfigEnvironment
     from mozbuild.frontend.reader import BuildReader
     from mozbuild.frontend.emitter import TreeMetadataEmitter
-    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles
+    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest
 
     status = Path(status_path).resolve(strict=True)
     cfg = BuildConfig.from_config_status(str(status))
@@ -118,7 +142,10 @@ def main():
     visited = set()
     visited_traversal = set()
     moz_src_members = set()
+    jar_manifest_inputs = set()
+    installed_resource_inputs = set()
     noncanonical_install_base_members = 0
+    noncanonical_install_resource_members = 0
     emitted = 0
     reader = BuildReader(env)
     emitter = TreeMetadataEmitter(env)
@@ -133,6 +160,36 @@ def main():
         for key in TARGETS:
             if rel.startswith(key):
                 scope_types[key][kind] += 1
+        if isinstance(obj, JARManifest):
+            # This is an evaluated jar.mn *input*, not a parsed entry or
+            # proof of final omni.ja ownership.
+            origin, member = source_identity(obj.path, root, object_root)
+            jar_manifest_inputs.add((rel, origin, member))
+            if len(jar_manifest_inputs) > 5000:
+                raise ValueError("Unexpectedly many evaluated JAR manifests")
+        if kind in ("FinalTargetFiles", "FinalTargetPreprocessedFiles",
+                    "LocalizedFiles", "LocalizedPreprocessedFiles"):
+            # Real frontend installer inputs. Destination roots and hierarchy
+            # are metadata, not a claim that the resource reached the archive.
+            target = install_component(getattr(obj, "install_target", None))
+            for base, files in obj.files.walk():
+                subdir = install_component(base)
+                for item in files:
+                    origin, member = source_identity(item, root, object_root)
+                    name = getattr(item, "target_basename", None)
+                    if kind in ("FinalTargetPreprocessedFiles",
+                                "LocalizedPreprocessedFiles"):
+                        name = obj.get_obj_basename(item)
+                    if name is None:
+                        name = os.path.basename(member)
+                    basename = install_component(name)
+                    installed_resource_inputs.add(
+                        (rel, kind, origin, member, target, subdir, basename))
+                    if "@noncanonical-install-component" in (
+                            target, subdir, basename):
+                        noncanonical_install_resource_members += 1
+                    if len(installed_resource_inputs) > 100000:
+                        raise ValueError("Unexpectedly many installer inputs")
         if isinstance(obj, MozSrcFiles):
             # Exact evaluated MOZ_SRC_FILES entries, not just object totals.
             # Strip all absolute host paths before emitting the audit artifact.
@@ -195,6 +252,15 @@ def main():
             [list(x) for x in moz_src_members]),
         "actual_emitted_moz_src_member_count": len(moz_src_members),
         "noncanonical_moz_src_install_base_members": noncanonical_install_base_members,
+        "actual_evaluated_jar_manifest_inputs": sorted(
+            [list(x) for x in jar_manifest_inputs]),
+        "actual_evaluated_jar_manifest_count": len(jar_manifest_inputs),
+        "actual_evaluated_install_resource_inputs": sorted(
+            [list(x) for x in installed_resource_inputs]),
+        "actual_evaluated_install_resource_input_count": len(installed_resource_inputs),
+        "noncanonical_install_resource_members": noncanonical_install_resource_members,
+        "jar_manifest_entries_parsed": False,
+        "compiled_resource_installation_proven": False,
         "complete_compile_or_link_graph": False,
         "ffi_and_runtime_dlopen_graph_proven": False,
         "profile_or_browser_executable_accessed": False,
