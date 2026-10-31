@@ -87,7 +87,7 @@ grep -Fq 'xdg_wm_base' "$work/compositor-info" || {
 loader_env=()
 trace_kind="${VULPRA_M3_LOADER_TRACE_KIND:-libs,files}"
 case "$trace_kind" in
-  libs,files|versions) ;;
+  libs,files|versions|versions,bindings) ;;
   *) echo 'Invalid browser-only GNU loader trace kind' >&2; exit 2 ;;
 esac
 if [[ -n "${VULPRA_M3_LOADER_TRACE_KIND:-}" &&
