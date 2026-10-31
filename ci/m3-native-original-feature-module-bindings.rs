@@ -13,6 +13,7 @@ fn target(module:&str)->Option<&'static str>{
     match module{
         "libmozinference.so"=>Some("mozinference-loader."),
         "libclearkey.so"=>Some("clearkey-loader."),
+        "libonnxruntime.so"=>Some("onnx-loader."),
         _=>None
     }
 }
@@ -103,6 +104,7 @@ mod tests{
         assert_eq!(normal_binding(line,"libclearkey.so"),None);
         assert_eq!(normal_binding(&line.replace("malloc","../../secret"),"libmozinference.so"),None);
         assert_eq!(normal_binding(&line.replace("normal symbol","not symbol"),"libmozinference.so"),None);
+        assert_eq!(target("libonnxruntime.so"),Some("onnx-loader."));
         assert_eq!(target("libxul.so"),None);
     }
 }
