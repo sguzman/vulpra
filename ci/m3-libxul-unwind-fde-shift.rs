@@ -8,7 +8,8 @@ use std::process::{Command, Stdio};
 type Range = (usize, usize);
 const MAX_TEXT: u64 = 256 * 1024 * 1024;
 const MAX_FDES: usize = 500_000;
-const MAX_LINES: usize = 2_000_000;
+// readelf emits many CFA instruction rows per FDE; stream with a hard cap.
+const MAX_LINES: usize = 16_000_000;
 
 fn text_section(file: &Path) -> Result<(u64, Vec<u8>), String> {
     let output = Command::new("readelf").args(["--wide", "--section-headers", "--"])
