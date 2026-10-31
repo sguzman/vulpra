@@ -7,6 +7,12 @@ on:
     workflows:
       - M3 Original Native Combined Four-Opt-In Build
     types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-four-optin-newtab-native.yml
+      - ci/smoke-newtab-four-optin-retained-runtime.py
+  workflow_dispatch:
 permissions:
   contents: read
   actions: read
@@ -14,20 +20,21 @@ jobs:
   actual-original-signed-four-variant-newtab-protected-factory-test:
     if: >-
       github.repository == 'sguzman/vulpra' &&
-      github.event.workflow_run.conclusion == 'success' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'))
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
       ORIGINAL_SOURCE_COMMIT: b1482404dfb8b01342990ee99ea3df0f9756b5f7
-      BUILD_RUN: ${{ github.event.workflow_run.id }}
+      BUILD_RUN: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || 41222758405 }}
       MOZ_HEADLESS: '1'
     steps:
-      - name: Checkout just original exact compiled native browser's New Tab test scripts
+      - name: Checkout isolated four-opt-in validation script and unchanged native WebDriver helper
         uses: actions/checkout@v4
         with:
-          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          ref: ${{ github.sha }}
           fetch-depth: 1
           filter: blob:none
           sparse-checkout: |
@@ -38,14 +45,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$ORIGINAL_SOURCE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" |
             jq -e '.status=="completed" and .conclusion=="success" and
               .head_repository.full_name=="sguzman/vulpra" and
               .head_branch=="main" and
               .path==".github/workflows/m3-original-four-optin-native-build.yml"' >/dev/null
-          python3 -m py_compile ci/smoke-webextension-package-local.py ci/smoke-newtab-pocket-retained-runtime.py
-          python3 ci/smoke-newtab-pocket-retained-runtime.py --self-test
+          test "$(git rev-parse HEAD:ci/smoke-webextension-package-local.py)" = caf643f7f6c959d26da1f816822b171a34652a44
+          python3 -m py_compile ci/smoke-webextension-package-local.py ci/smoke-newtab-four-optin-retained-runtime.py
+          python3 ci/smoke-newtab-four-optin-retained-runtime.py --self-test
       - name: Download SHA-verified original-source compiled four-opt-in candidate
         shell: bash
         env:
@@ -82,13 +90,13 @@ jobs:
             https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
           tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
           chmod 0755 "$RUNNER_TEMP/geckodriver"
-      - name: Verify combined four-opt-in real browser protects 26 New Tab factories and fallbacks
+      - name: Verify 24 retained behaviors and both deliberate AdsFeed omission assertions in real native browser
         shell: bash
         timeout-minutes: 8
         run: |
           set -euo pipefail
           PATH="$RUNNER_TEMP:$PATH" \
-            python3 ci/smoke-newtab-pocket-retained-runtime.py "$GITHUB_WORKSPACE" --variant normandy-free
+            python3 ci/smoke-newtab-four-optin-retained-runtime.py "$GITHUB_WORKSPACE" --variant normandy-free
           jq -e '.schema_version==1 and
             .variant=="normandy-free" and
             .status=="real_normandy_free_native_newtab_feed_factories_retained" and
@@ -99,18 +107,21 @@ jobs:
             .newtab_document_loaded==true and
             (.protected_newtab_factories_and_registry|length)==26 and
             (.protected_newtab_factories_and_registry|all(.==true)) and
+            .protected_newtab_factories_and_registry.sponsored_adsfeed_omitted==true and
+            .protected_newtab_factories_and_registry.newtab_adsfeed_omission_enabled==true and
+            (.protected_newtab_factories_and_registry|has("sponsored_adsfeed_retained")|not) and
             .actual_legacy_fallback_invoked==false and
             .actual_modern_content_fetch_invoked==false and
             .runtime_signed_in_user_data_used==false and
             .source_removal_authorized==false and
             .new_m3_whole_gate_passed==false' \
             .git/vulpra-native-build/m3-newtab-pocket-preservation.json >/dev/null
-          echo 'PASS: real combined-four compiled browser preserves 26 protected New Tab factories and methods'
+          echo 'PASS: actual four-opt-in browser preserves 24 New Tab conditions and omits AdsFeed by exactly two checks'
       - name: Retain only safe protected native New Tab import/fallback result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: m3-four-optin-original-protected-newtab-26-runtime
+          name: m3-four-optin-native-24-retained-and-2-omitted-newtab-runtime
           path: .git/vulpra-native-build/m3-newtab-pocket-preservation.json
           include-hidden-files: true
           if-no-files-found: warn
