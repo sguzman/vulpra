@@ -123,6 +123,14 @@ def install_component(value):
         return "@noncanonical-install-component"
 
 
+def declared_link_source(item, root, object_root):
+    """Classify each linkable compile unit without guessing relative ownership."""
+    raw = str(getattr(item, "full_path", item)).replace("\\\\", "/")
+    if os.path.isabs(raw):
+        return source_identity(item, root, object_root)
+    return ("unresolved_relative", portable_member(raw))
+
+
 def linkable_identity(obj):
     """Stable declared link-target identity independent of source/obj directory."""
     owner = normalized(getattr(obj, "relsrcdir", "") or "")
@@ -281,9 +289,20 @@ def main():
     declared_library_link_edges = set()
     declared_system_library_links = set()
     declared_static_link_into = set()
+    declared_linkable_compile_units = set()
+    unresolved_relative_compile_units = 0
     for obj in emitted_linkables:
         consumer = linkable_identity(obj)
         declared_link_target_nodes.add(consumer)
+        for suffix, members in obj.sources.items():
+            for item in members:
+                origin, member = declared_link_source(item, root, object_root)
+                declared_linkable_compile_units.add(
+                    consumer + (portable_member(str(suffix)), origin, member))
+                if origin == "unresolved_relative":
+                    unresolved_relative_compile_units += 1
+                if len(declared_linkable_compile_units) > 100000:
+                    raise ValueError("Unexpectedly many linkable compile units")
         for lib in obj.linked_libraries:
             if not isinstance(lib, BaseLibrary):
                 raise ValueError("Non-library in emitted linked_libraries")
@@ -324,6 +343,11 @@ def main():
         "actual_evaluated_system_library_links": sorted(
             [list(x) for x in declared_system_library_links]),
         "actual_evaluated_system_library_link_count": len(declared_system_library_links),
+        "actual_evaluated_linkable_compile_units": sorted(
+            [list(x) for x in declared_linkable_compile_units]),
+        "actual_evaluated_linkable_compile_unit_count": len(declared_linkable_compile_units),
+        "unresolved_relative_linkable_compile_unit_count": unresolved_relative_compile_units,
+        "declared_compile_owner_is_linker_object_proof": False,
         "actual_evaluated_static_link_into": sorted(
             [list(x) for x in declared_static_link_into]),
         "actual_evaluated_static_link_into_count": len(declared_static_link_into),
