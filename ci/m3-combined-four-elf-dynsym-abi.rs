@@ -194,6 +194,46 @@ fn compare_undefined_imports(full: &Inventory, lean: &Inventory)
     Ok((n, m, different, samples))
 }
 
+// Compare actual .text bytes after discarding differing ELF headers/metadata.
+// No browser or library is executed.
+fn compare_text_sections(full_root: &Path, lean_root: &Path, files: &Inventory)
+    -> Result<(usize, usize, Vec<String>), String> {
+    let scratch = std::env::temp_dir().join(format!("vulpra-m3-text-{}", std::process::id()));
+    fs::create_dir(&scratch).map_err(|e| format!("Temporary section directory: {e}"))?;
+    let result = (|| -> Result<(usize, usize, Vec<String>), String> {
+        let (mut equal, mut different) = (0usize, 0usize);
+        let mut samples = Vec::new();
+        for (index, name) in files.keys().enumerate() {
+            let a = scratch.join(format!("full-{index}.text"));
+            let b = scratch.join(format!("lean-{index}.text"));
+            for (source, dest) in [(full_root.join(name), &a), (lean_root.join(name), &b)] {
+                let output = Command::new("objcopy")
+                    .arg(format!("--dump-section=.text={}", dest.display()))
+                    .arg(&source)
+                    .output().map_err(|e| e.to_string())?;
+                if !output.status.success() || !dest.is_file() {
+                    return Err(format!("Unable to extract .text from {name}; status {:?}", output.status.code()));
+                }
+            }
+            let status = Command::new("cmp").arg("-s").arg(&a).arg(&b)
+                .status().map_err(|e| e.to_string())?;
+            match status.code() {
+                Some(0) => equal += 1,
+                Some(1) => {
+                    different += 1;
+                    if samples.len() < 20 { samples.push(name.clone()); }
+                },
+                other => return Err(format!("Cannot compare .text of {name}: {other:?}")),
+            }
+            fs::remove_file(a).map_err(|e| e.to_string())?;
+            fs::remove_file(b).map_err(|e| e.to_string())?;
+        }
+        Ok((equal, different, samples))
+    })();
+    fs::remove_dir_all(&scratch).map_err(|e| e.to_string())?;
+    result
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 4 { return Err("usage: elf-dynsym-abi FULL_EXTRACTED LEAN_EXTRACTED REPORT_JSON".into()); }
@@ -210,6 +250,14 @@ fn run() -> Result<(), String> {
     let start = exported.trim().strip_suffix('}')
         .ok_or("Invalid internal exported report")?;
     let result = format!("{start},\"full_undefined_import_symbol_occurrences\":{normal_undefined},\"lean_undefined_import_symbol_occurrences\":{lean_undefined},\"differing_undefined_import_records\":{differing_undefined},\"exact_undefined_dynamic_import_parity\":{},\"bounded_undefined_import_difference_samples\":[{sample_json}]}}\n", differing_undefined == 0);
+    let (equal_text, different_text, changed_text_names) =
+        compare_text_sections(Path::new(&args[1]), Path::new(&args[2]), &full)?;
+    if equal_text + different_text != 28 { return Err("Incomplete .text comparison".into()); }
+    let changed_text_json = changed_text_names.iter().map(|s| json_quote(s))
+        .collect::<Vec<_>>().join(",");
+    let base = result.trim().strip_suffix('}')
+        .ok_or("Invalid generated dynamic ABI report")?;
+    let result = format!("{base},\"text_sections_compared\":28,\"text_sections_equal\":{equal_text},\"text_sections_different\":{different_text},\"changed_text_elf_paths\":[{changed_text_json}],\"only_text_section_bytes_examined\":true}\n");
     fs::write(&args[3], result).map_err(|e| e.to_string())?;
     println!("PASS: compared exported dynamic symbols for 28 exact-path compiled ELF files");
     Ok(())
