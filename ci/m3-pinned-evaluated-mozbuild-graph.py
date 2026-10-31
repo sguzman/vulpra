@@ -149,7 +149,7 @@ def main():
     from mozbuild.backend.configenvironment import BuildConfig, ConfigEnvironment
     from mozbuild.frontend.reader import BuildReader
     from mozbuild.frontend.emitter import TreeMetadataEmitter
-    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, UnifiedSources, WebIDLCollection, Linkable, BaseLibrary
+    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, UnifiedSources, WebIDLCollection, Linkable, BaseLibrary, BaseRustLibrary
 
     status = Path(status_path).resolve(strict=True)
     cfg = BuildConfig.from_config_status(str(status))
@@ -318,9 +318,34 @@ def main():
     declared_system_library_links = set()
     declared_static_link_into = set()
     declared_linkable_compile_units = set()
+    evaluated_rust_library_targets = set()
+    evaluated_rust_library_features = set()
+    evaluated_rust_library_dependencies = set()
     unresolved_relative_compile_units = 0
     for obj in emitted_linkables:
         consumer = linkable_identity(obj)
+        if isinstance(obj, BaseRustLibrary):
+            cargo_origin, cargo_member = source_identity(
+                obj.cargo_file, root, object_root)
+            # This covers the actual Mozilla-emitted staticlib frontend
+            # declarations, not Cargo's resolved transitive dependency graph
+            # or a generated rustc invocation.
+            evaluated_rust_library_targets.add(
+                consumer + (
+                    cargo_origin, cargo_member,
+                    portable_member(str(obj.crate_type or "")),
+                    portable_member(str(obj.cargo_crate_type or "")),
+                    portable_member(str(obj.cargo_profile_suffix or "")),
+                    portable_member(str(obj.output_category or "")),
+                    bool(obj.is_gkrust), bool(obj.no_lto)))
+            for feature in obj.features:
+                evaluated_rust_library_features.add(
+                    consumer + (portable_member(str(feature)),))
+            for dependency in obj.dependencies:
+                evaluated_rust_library_dependencies.add(
+                    consumer + (portable_member(str(dependency)),))
+            if len(evaluated_rust_library_dependencies) > 15000:
+                raise ValueError("Unexpectedly many declared Rust dependencies")
         declared_link_target_nodes.add(consumer)
         for suffix, members in obj.sources.items():
             for item in members:
@@ -385,6 +410,17 @@ def main():
         "variant": variant,
         "evaluated_mozbuild_emission": True,
         "native_linker_or_binary_executed": False,
+        "actual_evaluated_rust_library_targets": sorted(
+            [list(x) for x in evaluated_rust_library_targets]),
+        "actual_evaluated_rust_library_target_count": len(evaluated_rust_library_targets),
+        "actual_evaluated_rust_library_features": sorted(
+            [list(x) for x in evaluated_rust_library_features]),
+        "actual_evaluated_rust_library_feature_count": len(evaluated_rust_library_features),
+        "actual_evaluated_rust_library_dependencies": sorted(
+            [list(x) for x in evaluated_rust_library_dependencies]),
+        "actual_evaluated_rust_library_dependency_count": len(evaluated_rust_library_dependencies),
+        "cargo_resolved_dependency_graph_proven": False,
+        "rustc_invocation_or_rust_linker_executed": False,
         "actual_evaluated_linkable_nodes": sorted(
             [list(x) for x in declared_link_target_nodes]),
         "actual_evaluated_linkable_node_count": len(declared_link_target_nodes),
