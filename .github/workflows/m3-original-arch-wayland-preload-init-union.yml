@@ -1,0 +1,101 @@
+# Read-only independently pinned two original compiled source-matched CI reports.
+name: M3 Original Arch Wayland All 14 Generated Preloads Initialized
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-arch-wayland-preload-init-union.yml
+      - ci/m3-original-arch-wayland-generated-preload-init-union.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  all-14-original-compiled-preloads-real-arch-wayland-init-witnesses:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      PRELOAD_RUN: '41210245353'
+      PRELOAD_HEAD: 35ee1a6cf77751b6260cd9b6073cfa6602879e36
+      ARCH_RUN: '41212665605'
+      ARCH_HEAD: c513a59fbc18ffa34e4f82b1f824fb5904afbb64
+    steps:
+      - name: Checkout only source-pinned safe-provider union verifier
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Authenticate exact successful original archive and Arch GUI run commitments
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PRELOAD_RUN" |
+            jq -e --arg sha "$PRELOAD_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ARCH_RUN" |
+            jq -e --arg sha "$ARCH_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+      - name: Download only original generated preload order and actual safe Arch loader providers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          fetch() {
+            local run="$1" name="$2" dest="$3"
+            mkdir -p "$dest"
+            for attempt in 1 2 3; do
+              if gh run download "$run" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "$dest"; then return 0; fi
+              if test "$attempt" = 3; then break; fi
+              sleep 2
+            done
+            return 1
+          }
+          fetch "$PRELOAD_RUN" m3-original-compiled-generated-dependentlibs-order "$RUNNER_TEMP/order"
+          fetch "$ARCH_RUN" m3-original-archlinux-weston-real-native-loader-initializers "$RUNNER_TEMP/arch"
+          test -s "$RUNNER_TEMP/order/m3-original-generated-dependentlibs-order.json"
+          test -s "$RUNNER_TEMP/arch/original-arch-loader-witness.json"
+          test -s "$RUNNER_TEMP/arch/original-arch-wayland-frame.json"
+      - name: Verify 14 exact compiled preloads were actually initialized by original browser on Arch
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --slurpfile order "$RUNNER_TEMP/order/m3-original-generated-dependentlibs-order.json" \
+            --slurpfile runtime "$RUNNER_TEMP/arch/original-arch-loader-witness.json" \
+            --slurpfile frame "$RUNNER_TEMP/arch/original-arch-wayland-frame.json" \
+            -f ci/m3-original-arch-wayland-generated-preload-init-union.jq \
+            > "$RUNNER_TEMP/m3-original-arch-all-14-native-preloads-initialized.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_all_14_generated_preloads_initialized_in_arch_wayland" and
+            .generated_native_preload_count==14 and
+            .generated_native_preload_init_witness_count==14 and
+            (.generated_native_preload_order|length)==14 and
+            (.not_initialized_compiled_preload_basenames|length)==0 and
+            .original_arch_wayland_native_initializer_basename_count==103 and
+            .original_arch_wayland_dynamic_request_basename_count==40 and
+            .original_arch_wayland_direct_needed_request_basename_count==84 and
+            .original_arch_wayland_process_traces_with_initializers==7 and
+            .actual_private_weston_real_wayland_frame_observed==true and
+            .actual_source_built_glibc_native_initializers_observed==true and
+            .generated_preload_order_matches_init_order_not_proven==true and
+            .full_future_dlopen_or_all_features_tested==false and
+            .arch_container_not_hyprland_host==true and
+            .raw_paths_process_ids_symbols_and_browser_profiles_not_exported==true and
+            .no_source_or_package_removals_authorized==true and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-arch-all-14-native-preloads-initialized.json" >/dev/null
+          echo 'PASS: all 14 original generated native preload libraries actually initialized during original Arch Weston graphical frame'
+      - name: Upload only bounded compiled library names, actual initialization flags, and counts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-arch-wayland-14-compiled-preload-initializers
+          path: ${{ runner.temp }}/m3-original-arch-all-14-native-preloads-initialized.json
+          if-no-files-found: error
+          retention-days: 14
