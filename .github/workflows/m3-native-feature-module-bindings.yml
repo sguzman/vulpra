@@ -66,10 +66,10 @@ jobs:
           tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
           test -f "$RUNNER_TEMP/package/vulpra/libmozinference.so"
           test -f "$RUNNER_TEMP/package/vulpra/gmp-clearkey/0.1/libclearkey.so"
-          readelf -Ws "$RUNNER_TEMP/package/vulpra/libmozinference.so" |
-            grep -E ' llama_log_set(@|$)' >/dev/null
-          readelf -Ws "$RUNNER_TEMP/package/vulpra/gmp-clearkey/0.1/libclearkey.so" |
-            grep -E ' CreateCdmInstance(@|$)' >/dev/null
+          readelf -Ws "$RUNNER_TEMP/package/vulpra/libmozinference.so" >"$RUNNER_TEMP/moz-exports.txt"
+          grep -E ' llama_log_set(@|$)' "$RUNNER_TEMP/moz-exports.txt" >/dev/null
+          readelf -Ws "$RUNNER_TEMP/package/vulpra/gmp-clearkey/0.1/libclearkey.so" >"$RUNNER_TEMP/clearkey-exports.txt"
+          grep -E ' CreateCdmInstance(@|$)' "$RUNNER_TEMP/clearkey-exports.txt" >/dev/null
       - name: Run only diagnostic original C API bindings under isolated network
         shell: bash
         timeout-minutes: 5
