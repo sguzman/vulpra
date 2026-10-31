@@ -70,14 +70,26 @@ jobs:
         timeout-minutes: 5
         run: |
           set -euo pipefail
-          # The shim is written into the container private tmpfs. The actual
-          # source-pinned browser binary is executed directly with a unique
-          # private profile. No real user launcher/configuration is replaced.
+          # Create the compatibility shim on the ephemeral CI runner, check
+          # executable permissions, and bind-mount it read-only. It never
+          # replaces the original packaged native binary or any user launcher.
+          mkdir -p "$RUNNER_TEMP/arch-wayland/shim"
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'set -euo pipefail' \
+            'umask 077' \
+            'mkdir -p -m 0700 "$XDG_DATA_HOME/vulpra/default"' \
+            'exec /original/vulpra --no-remote --new-instance --profile "$XDG_DATA_HOME/vulpra/default" "$@"' \
+            >"$RUNNER_TEMP/arch-wayland/shim/vulpra-launch"
+          chmod 0755 "$RUNNER_TEMP/arch-wayland/shim/vulpra-launch"
+          test -x "$RUNNER_TEMP/arch-wayland/shim/vulpra-launch"
+          bash -n "$RUNNER_TEMP/arch-wayland/shim/vulpra-launch"
           docker run --rm --network none --read-only --shm-size 256m \
             --user "$(id -u):$(id -g)" --cap-drop ALL \
             --security-opt no-new-privileges \
             --tmpfs /tmp:rw,nosuid,nodev,size=512m \
             --mount type=bind,src="$RUNNER_TEMP/package/vulpra",dst=/original,readonly \
+            --mount type=bind,src="$RUNNER_TEMP/arch-wayland/shim",dst=/shim,readonly \
             --mount type=bind,src="$GITHUB_WORKSPACE/packaging/test-wayland.sh",dst=/audit/test-wayland.sh,readonly \
             --env HOME=/tmp/isolated-private-home \
             --env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
@@ -85,18 +97,11 @@ jobs:
             --env VULPRA_WAYLAND_TEST_SECONDS=10 \
             m3-original-arch-weston:ci /bin/bash -c '
               set -euo pipefail
-              mkdir -m 0700 /tmp/isolated-private-home /tmp/private-shim
-              cat > /tmp/private-shim/vulpra-launch << "EOF"
-          #!/usr/bin/env bash
-          set -euo pipefail
-          umask 077
-          mkdir -p -m 0700 "$XDG_DATA_HOME/vulpra/default"
-          exec /original/vulpra --no-remote --new-instance --profile "$XDG_DATA_HOME/vulpra/default" "$@"
-          EOF
-              chmod 0700 /tmp/private-shim/vulpra-launch
-              bash /audit/test-wayland.sh /tmp/private-shim
+              mkdir -m 0700 /tmp/isolated-private-home
+              test -x /shim/vulpra-launch
+              bash /audit/test-wayland.sh /shim
               test ! -e /tmp/isolated-private-home/.mozilla
-              echo "PASS: original native Vulpra private Weston real attached-and-committed Wayland surface in Arch userspace"
+              echo "PASS: original Vulpra private Weston real attached-and-committed Wayland surface in Arch userspace"
             '
           image_id="$(docker image inspect m3-original-arch-weston:ci --format '{{.Id}}')"
           printf '%s' "$image_id" | grep -Eq '^sha256:[a-f0-9]{64}$'
