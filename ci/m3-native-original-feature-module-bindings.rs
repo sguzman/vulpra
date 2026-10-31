@@ -14,6 +14,7 @@ fn target(module:&str)->Option<&'static str>{
         "libmozinference.so"=>Some("mozinference-loader."),
         "libclearkey.so"=>Some("clearkey-loader."),
         "libonnxruntime.so"=>Some("onnx-loader."),
+        "pingsender"=>Some("pingsender-loader."),
         _=>None
     }
 }
@@ -82,13 +83,13 @@ fn run()->Result<(),String>{
         " \"original_requester_basename\":\"{}\",\n \"pid_traces_with_original_requester_bindings\":{},\n",
         " \"normal_symbol_binding_events\":{},\n \"distinct_symbol_provider_pairs\":{},\n",
         " \"observed_provider_basename_count\":{},\n \"observed_provider_basenames\":[{}],\n",
-        " \"original_c_api_diagnostic_only\":true,\n \"no_network_egress\":true,\n",
+        " \"original_c_api_diagnostic_only\":{},\n \"synthetic_loopback_telemetry_only\":{},\n \"no_network_egress\":true,\n",
         " \"actual_normal_symbol_bindings_observed\":true,\n",
         " \"raw_loader_logs_exported\":false,\n \"symbol_names_exported\":false,\n",
         " \"model_inference_or_drm_decryption_proven\":false,\n",
         " \"all_lazy_or_transitive_bindings_proven\":false,\n",
         " \"new_source_pruning_authorized\":false\n}}\n"
-    ),SOURCE,ARCHIVE,module,traces,events,pairs,providers.len(),providers_json);
+    ),SOURCE,ARCHIVE,module,traces,events,pairs,providers.len(),providers_json,module!="pingsender",module=="pingsender");
     let mut file=File::create(&args[2]).map_err(|e|e.to_string())?;
     file.write_all(report.as_bytes()).map_err(|e|e.to_string())?;
     println!("PASS: actual original native feature-module bindings observed; sanitized module/provider counts");
@@ -105,6 +106,7 @@ mod tests{
         assert_eq!(normal_binding(&line.replace("malloc","../../secret"),"libmozinference.so"),None);
         assert_eq!(normal_binding(&line.replace("normal symbol","not symbol"),"libmozinference.so"),None);
         assert_eq!(target("libonnxruntime.so"),Some("onnx-loader."));
+        assert_eq!(target("pingsender"),Some("pingsender-loader."));
         assert_eq!(target("libxul.so"),None);
     }
 }
