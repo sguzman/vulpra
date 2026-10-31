@@ -108,6 +108,22 @@ jobs:
              $b.actual_evaluated_compile_source_inputs) as $full_only_compile_sources |
             ($b.actual_evaluated_compile_source_inputs -
              $a.actual_evaluated_compile_source_inputs) as $lean_only_compile_sources |
+             ($a.actual_evaluated_linkable_nodes -
+              $b.actual_evaluated_linkable_nodes) as $full_only_linkable_nodes |
+             ($b.actual_evaluated_linkable_nodes -
+              $a.actual_evaluated_linkable_nodes) as $lean_only_linkable_nodes |
+             ($a.actual_evaluated_library_link_edges -
+              $b.actual_evaluated_library_link_edges) as $full_only_link_edges |
+             ($b.actual_evaluated_library_link_edges -
+              $a.actual_evaluated_library_link_edges) as $lean_only_link_edges |
+             ($a.actual_evaluated_system_library_links -
+              $b.actual_evaluated_system_library_links) as $full_only_system_links |
+             ($b.actual_evaluated_system_library_links -
+              $a.actual_evaluated_system_library_links) as $lean_only_system_links |
+             ($a.actual_evaluated_static_link_into -
+              $b.actual_evaluated_static_link_into) as $full_only_static_link_into |
+             ($b.actual_evaluated_static_link_into -
+              $a.actual_evaluated_static_link_into) as $lean_only_static_link_into |
             ($a.actual_evaluated_jar_manifest_inputs -
              $b.actual_evaluated_jar_manifest_inputs) as $full_only_jars |
             ($b.actual_evaluated_jar_manifest_inputs -
@@ -131,6 +147,24 @@ jobs:
               combined_evaluated_compile_source_count:$b.actual_evaluated_compile_source_input_count,
               full_only_evaluated_compile_sources:$full_only_compile_sources,
               combined_only_evaluated_compile_sources:$lean_only_compile_sources,
+              full_evaluated_linkable_node_count:$a.actual_evaluated_linkable_node_count,
+              combined_evaluated_linkable_node_count:$b.actual_evaluated_linkable_node_count,
+              full_only_evaluated_linkable_nodes:$full_only_linkable_nodes,
+              combined_only_evaluated_linkable_nodes:$lean_only_linkable_nodes,
+              full_evaluated_library_link_edge_count:$a.actual_evaluated_library_link_edge_count,
+              combined_evaluated_library_link_edge_count:$b.actual_evaluated_library_link_edge_count,
+              full_only_evaluated_library_link_edges:$full_only_link_edges,
+              combined_only_evaluated_library_link_edges:$lean_only_link_edges,
+              full_evaluated_system_library_link_count:$a.actual_evaluated_system_library_link_count,
+              combined_evaluated_system_library_link_count:$b.actual_evaluated_system_library_link_count,
+              full_only_evaluated_system_library_links:$full_only_system_links,
+              combined_only_evaluated_system_library_links:$lean_only_system_links,
+              full_evaluated_static_link_into_count:$a.actual_evaluated_static_link_into_count,
+              combined_evaluated_static_link_into_count:$b.actual_evaluated_static_link_into_count,
+              full_only_evaluated_static_link_into:$full_only_static_link_into,
+              combined_only_evaluated_static_link_into:$lean_only_static_link_into,
+              actual_linker_commands_executed:false,
+              actual_linker_flag_and_object_equivalence_proven:false,
               compiled_linker_input_closure_proven:false,
               full_evaluated_jar_manifest_count:$a.actual_evaluated_jar_manifest_count,
               combined_evaluated_jar_manifest_count:$b.actual_evaluated_jar_manifest_count,
@@ -167,6 +201,12 @@ jobs:
              .full_directory_edges>200 and .combined_directory_edges>200 and
              .full_evaluated_compile_source_count>500 and
              .combined_evaluated_compile_source_count>500 and
+             .full_evaluated_linkable_node_count>500 and
+             .combined_evaluated_linkable_node_count>500 and
+             .full_evaluated_library_link_edge_count>0 and
+             .combined_evaluated_library_link_edge_count>0 and
+             .actual_linker_commands_executed==false and
+             .actual_linker_flag_and_object_equivalence_proven==false and
              .compiled_linker_input_closure_proven==false and
              .full_evaluated_jar_manifest_count>0 and
              .combined_evaluated_jar_manifest_count>0 and
@@ -186,6 +226,9 @@ jobs:
              "$RUNNER_TEMP/m3-generated-frontend/frontend-delta-summary.json" >/dev/null
           jq -c '{
             emitted_compile_sources:[.full_evaluated_compile_source_count,.combined_evaluated_compile_source_count],
+            declared_link_nodes:[.full_evaluated_linkable_node_count,.combined_evaluated_linkable_node_count],
+            declared_link_edges:[.full_evaluated_library_link_edge_count,.combined_evaluated_library_link_edge_count],
+            differing_link_edges:[(.full_only_evaluated_library_link_edges|length),(.combined_only_evaluated_library_link_edges|length)],
             differing_compile_sources:[(.full_only_evaluated_compile_sources|length),(.combined_only_evaluated_compile_sources|length)],
             jar_manifests:[.full_evaluated_jar_manifest_count,.combined_evaluated_jar_manifest_count],
             installer_inputs:[.full_evaluated_install_resource_input_count,.combined_evaluated_install_resource_input_count],
