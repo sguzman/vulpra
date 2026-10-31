@@ -72,6 +72,29 @@ different_count=$(wc -l < "$tmp/different")
 [ "$full_count" -eq "$((shared_count + $(wc -l < "$tmp/full_only")))" ]
 [ "$lean_count" -eq "$((shared_count + $(wc -l < "$tmp/lean_only")))" ]
 
+# Fail closed if any generated Make backend rule differs beyond the exact
+# four opt-in configure tokens and the one intended Normandy boolean.
+printf '%s\n' toolkit/content/backend.mk toolkit/modules/backend.mk > "$tmp/expected_changes"
+cmp -s "$tmp/expected_changes" "$tmp/different"
+[ ! -s "$tmp/full_only" ] && [ ! -s "$tmp/lean_only" ]
+opts='VULPRA_EXPERIMENT_NO_NORMANDY=1 VULPRA_EXPERIMENT_NO_ASROUTER_PROMOS=1 VULPRA_EXPERIMENT_NO_NEWTAB_ADSFEED=1 VULPRA_EXPERIMENT_NO_NEWTAB_PROMOCARD=1'
+grep -Fq -- "$opts" "$lean/toolkit/content/backend.mk"
+if grep -Fq -- "VULPRA_EXPERIMENT_NO_NORMANDY=1" "$full/toolkit/content/backend.mk"; then
+  echo 'FAIL: the original full backend unexpectedly contains the opt-in flags' >&2
+  exit 1
+fi
+grep -Fq -- '-DMOZ_NORMANDY_BOOL=true' "$full/toolkit/modules/backend.mk"
+grep -Fq -- '-DMOZ_NORMANDY_BOOL=false' "$lean/toolkit/modules/backend.mk"
+normalize_backend "$full" toolkit/content/backend.mk > "$tmp/expected-full"
+normalize_backend "$lean" toolkit/content/backend.mk |
+  sed -e "s| $opts | |g" > "$tmp/lean-intended-only"
+cmp -s "$tmp/expected-full" "$tmp/lean-intended-only"
+normalize_backend "$full" toolkit/modules/backend.mk > "$tmp/expected-full"
+normalize_backend "$lean" toolkit/modules/backend.mk |
+  sed -e 's/-DMOZ_NORMANDY_BOOL=false/-DMOZ_NORMANDY_BOOL=true/g' \
+  > "$tmp/lean-intended-only"
+cmp -s "$tmp/expected-full" "$tmp/lean-intended-only"
+
 # Keep only small source-scoped snippets from two real generated Make backend
 # files. This is diagnostic evidence, not a complete full-file comparison log.
 : > "$tmp/scoped_diff"
@@ -117,6 +140,7 @@ jq -n --arg source "$SOURCE_SHA" \
     scoped_normalized_backend_diff_excerpt: $scoped_witness,
     scoped_diff_excerpt_is_bounded_not_full_output: true,
     normalized_only_configured_objdir_absolute_path_and_name: true,
+    exactly_two_expected_backend_define_deltas_exhaust_all_differences: true,
     actual_recursive_make_backend_files_read: true,
     generated_makefile_or_link_command_fully_compared: false,
     native_compile_or_link_executed: false,
@@ -133,6 +157,7 @@ jq -e '.normal_generated_backend_mk_files > 500 and
    .differing_normalized_backend_mk_files == .shared_generated_backend_mk_files) and
   ((.differing_normalized_backend_mk | length) ==
    .differing_normalized_backend_mk_files) and
+  .exactly_two_expected_backend_define_deltas_exhaust_all_differences == true and
   .native_compile_or_link_executed == false and
   .m3_sixth_gate_closed == false' "$out" >/dev/null
 jq -c '{backend_files:[.normal_generated_backend_mk_files,.combined_generated_backend_mk_files],
