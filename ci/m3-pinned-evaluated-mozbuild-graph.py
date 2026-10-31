@@ -149,7 +149,7 @@ def main():
     from mozbuild.backend.configenvironment import BuildConfig, ConfigEnvironment
     from mozbuild.frontend.reader import BuildReader
     from mozbuild.frontend.emitter import TreeMetadataEmitter
-    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, UnifiedSources, Linkable, BaseLibrary
+    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, UnifiedSources, WebIDLCollection, Linkable, BaseLibrary
 
     status = Path(status_path).resolve(strict=True)
     cfg = BuildConfig.from_config_status(str(status))
@@ -176,6 +176,8 @@ def main():
     moz_src_members = set()
     evaluated_compile_source_inputs = set()
     evaluated_unified_source_members = set()
+    evaluated_webidl_binding_units = set()
+    evaluated_webidl_unified_members = set()
     emitted_linkables = []
     jar_manifest_inputs = set()
     installed_resource_inputs = set()
@@ -200,6 +202,20 @@ def main():
             emitted_linkables.append(obj)
             if len(emitted_linkables) > 10000:
                 raise ValueError("Unexpectedly many emitted native linkables")
+        if isinstance(obj, WebIDLCollection):
+            # Exact upstream WebIDLCollection.all_source_files() list:
+            # generated binding units, including global bindings and
+            # generated UnifiedBindings cpp groups.
+            for generated_name in obj.all_source_files():
+                evaluated_webidl_binding_units.add(
+                    (rel, portable_member(str(generated_name))))
+            for generated_unit, member_names in obj.unified_source_mapping:
+                generated = portable_member(str(generated_unit))
+                for member in member_names:
+                    evaluated_webidl_unified_members.add(
+                        (rel, generated, portable_member(str(member))))
+            if len(evaluated_webidl_unified_members) > 100000:
+                raise ValueError("Unexpectedly many WebIDL binding members")
         if isinstance(obj, UnifiedSources) and obj.have_unified_mapping:
             # Actual Mozilla group_unified_files membership, not a
             # name-based guess about generated Unified_* translation units.
@@ -344,6 +360,16 @@ def main():
         unresolved_unified_linkable_units - unified_generated_unit_keys
     )
 
+    unresolved_nonunified_linkable_units = {
+        (record[0], record[-1])
+        for record in declared_linkable_compile_units
+        if record[-2] == "unresolved_relative" and
+        not record[-1].startswith("Unified_")
+    }
+    unmatched_webidl_linkable_units = (
+        unresolved_nonunified_linkable_units - evaluated_webidl_binding_units
+    )
+
     flags = {}
     for flag in FLAGS:
         flags[flag] = {"present": flag in cfg.substs}
@@ -368,6 +394,16 @@ def main():
         "actual_evaluated_system_library_links": sorted(
             [list(x) for x in declared_system_library_links]),
         "actual_evaluated_system_library_link_count": len(declared_system_library_links),
+        "actual_evaluated_webidl_binding_units": sorted(
+            [list(x) for x in evaluated_webidl_binding_units]),
+        "actual_evaluated_webidl_binding_unit_count": len(evaluated_webidl_binding_units),
+        "actual_evaluated_webidl_unified_members": sorted(
+            [list(x) for x in evaluated_webidl_unified_members]),
+        "actual_evaluated_webidl_unified_member_count": len(evaluated_webidl_unified_members),
+        "unresolved_nonunified_linkable_unit_count": len(unresolved_nonunified_linkable_units),
+        "unmatched_webidl_linkable_units": sorted(
+            [list(x) for x in unmatched_webidl_linkable_units]),
+        "webidl_codegen_executed": False,
         "actual_evaluated_unified_source_members": sorted(
             [list(x) for x in evaluated_unified_source_members]),
         "actual_evaluated_unified_source_member_count": len(evaluated_unified_source_members),
