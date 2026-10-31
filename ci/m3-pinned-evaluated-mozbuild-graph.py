@@ -142,6 +142,63 @@ def linkable_identity(obj):
     return (owner, kind, build_kind, portable_member(str(name or kind)))
 
 
+
+def rust_reverse_reachability(nodes, edges, rust_target_records):
+    """Shortest declared Linkable consumer paths from each emitted Rust library.
+
+    Edges are consumer -> library. This is source-evaluated graph reachability,
+    not proof that rustc, a native linker, or FFI calls executed.
+    """
+    roots = {tuple(record[:4]) for record in rust_target_records}
+    if not roots or not roots.issubset(nodes):
+        raise ValueError("Rust static-library roots missing from Linkable graph")
+    consumers_by_library = collections.defaultdict(set)
+    for edge in edges:
+        consumer, library = tuple(edge[:4]), tuple(edge[4:])
+        if consumer not in nodes:
+            raise ValueError("Link consumer absent from emitted graph")
+        consumers_by_library[library].add(consumer)
+
+    reachable = set()
+    without_direct_consumers = set()
+    for root in roots:
+        if not consumers_by_library[root]:
+            without_direct_consumers.add(root)
+        distances = {root: 0}
+        queue = collections.deque([root])
+        while queue:
+            library = queue.popleft()
+            for consumer in sorted(consumers_by_library[library]):
+                if consumer in distances:
+                    continue
+                depth = distances[library] + 1
+                distances[consumer] = depth
+                queue.append(consumer)
+                reachable.add(root + consumer + (depth,))
+    return reachable, without_direct_consumers
+
+
+def test_rust_reverse_reachability():
+    rust = ("rust", "BaseRustLibrary", "target", "librust.a")
+    other = ("other", "BaseRustLibrary", "target", "unused.a")
+    lib = ("native", "SharedLibrary", "target", "libnative.so")
+    exe = ("app", "Program", "target", "app")
+    nodes = {rust, other, lib, exe}
+    edges = {lib + rust, exe + lib, lib + exe}
+    found, unused = rust_reverse_reachability(
+        nodes, edges, {rust + ("cargo",), other + ("cargo",)})
+    if found != {rust + lib + (1,), rust + exe + (2,)}:
+        raise ValueError("Rust reverse reachability or shortest-distance regression")
+    if unused != {other}:
+        raise ValueError("Rust root without direct consumers regression")
+    try:
+        rust_reverse_reachability(nodes, {("unknown",) * 4 + rust}, {rust})
+    except ValueError:
+        pass
+    else:
+        raise ValueError("Unowned native link consumer not rejected")
+
+
 def main():
     if len(sys.argv) != 4 or sys.argv[1] not in ("normal", "combined_four"):
         raise ValueError("usage: EVALUATED_VARIANT CONFIG_STATUS_PATH OUTPUT_JSON")
@@ -394,6 +451,13 @@ def main():
                 len(declared_system_library_links) > 100000):
             raise ValueError("Unexpectedly large declared native link map")
 
+    rust_reverse_consumers, rust_without_direct_consumers = rust_reverse_reachability(
+        declared_link_target_nodes, declared_library_link_edges,
+        evaluated_rust_library_targets)
+    for edge in declared_rust_staticlib_native_consumer_edges:
+        if edge[4:] + edge[:4] + (1,) not in rust_reverse_consumers:
+            raise ValueError("Direct Rust static-library edge absent from reverse closure")
+
     unified_generated_unit_keys = {
         (owner, unit) for owner, unit, _, _ in evaluated_unified_source_members
     }
@@ -440,6 +504,13 @@ def main():
             [list(x) for x in declared_rust_staticlib_outgoing_library_edges]),
         "actual_evaluated_rust_staticlib_outgoing_library_edge_count":
             len(declared_rust_staticlib_outgoing_library_edges),
+        "actual_evaluated_rust_staticlib_reverse_reachability": sorted(
+            [list(x) for x in rust_reverse_consumers]),
+        "actual_evaluated_rust_staticlib_reverse_reachability_count":
+            len(rust_reverse_consumers),
+        "actual_evaluated_rust_staticlibs_without_direct_consumers": sorted(
+            [list(x) for x in rust_without_direct_consumers]),
+        "rust_reverse_reachability_is_declared_graph_only": True,
         "rust_native_linker_flags_and_object_archive_proven": False,
         "rust_cpp_ffi_symbols_and_call_graph_proven": False,
         "actual_evaluated_rust_program_targets": sorted(
@@ -538,7 +609,11 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        if sys.argv[1:] == ["--self-test"]:
+            test_rust_reverse_reachability()
+            print("PASS: typed Rust reverse-linkable reachability fixtures")
+        else:
+            main()
     except (OSError, ValueError, ImportError) as exc:
         print("FAIL: bounded evaluated Mozilla build graph:", exc, file=sys.stderr)
         raise SystemExit(1)
