@@ -34,11 +34,23 @@ env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_WAYLAND_TEST_OFFLINE=1 \
   VULPRA_WAYLAND_TEST_SECONDS=10 \
   bash "$repo/packaging/test-wayland.sh" "$work/shim"
 echo 'PASS: real original alternate Vulpra binary 10s graphical frame/liveness uninstrumented'
+# Binding replay is opt-in only; normal source-pinned version ABI test is
+# unchanged and uses the same real temporary graphical browser launch.
+trace_mode=versions
+if [[ -n "${M3_ALT_BINDINGS_REPORT:-}" ]]; then
+  [[ -x "${M3_NATIVE_BINDINGS_PARSER:-}" && ! -e "$M3_ALT_BINDINGS_REPORT" ]] || exit 2
+  trace_mode=versions,bindings
+fi
 env MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_WAYLAND_TEST_OFFLINE=1 \
   VULPRA_WAYLAND_TEST_SECONDS=10 \
-  VULPRA_M3_LOADER_TRACE_KIND=versions \
+  VULPRA_M3_LOADER_TRACE_KIND="$trace_mode" \
   VULPRA_M3_LOADER_TRACE_PREFIX="$work/traces/vulpra-bin-loader" \
   bash "$repo/packaging/test-wayland.sh" "$work/shim"
-python3 "$repo/ci/m3-vulpra-bin-version-reconcile.py" \
-  --traces "$work/traces" --static "$static" --output "$report"
-echo 'PASS: alternate exact-source compiled Vulpra ELF graphical startup version checks verified'
+if [[ -n "${M3_ALT_BINDINGS_REPORT:-}" ]]; then
+  "$M3_NATIVE_BINDINGS_PARSER" "$work/traces" "$M3_ALT_BINDINGS_REPORT" "vulpra-bin"
+  echo 'PASS: original graphical alternate Vulpra executable runtime bindings observed'
+else
+  python3 "$repo/ci/m3-vulpra-bin-version-reconcile.py" \
+    --traces "$work/traces" --static "$static" --output "$report"
+  echo 'PASS: alternate exact-source compiled Vulpra ELF graphical startup version checks verified'
+fi
