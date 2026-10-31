@@ -132,6 +132,21 @@ The **only differing generated paths** are `toolkit/content/backend.mk` and `too
 
 This is a bounded generated recursive-Make output invariant, not proof of identical `Makefile` bodies, environment-dependent final compiler invocations, built object bytes, link command/FFI, actual dynamic loads or full safety of deleting source. The diff witness contains configuration text, not secrets from the user workstation. The original browser/user profiles were untouched. No new compiled package size or source-removal claim; M3 remains **5/6 (83%)**, overall **61%**, Δ0pp.
 
+## Source-matched actual generated Makefile file-content comparison
+
+[**Pinned original full/lean generated Makefile inventory 41245140514 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41245140514); [**workflow lint 41245140493 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41245140493). The bounded observer enumerated genuine regular files named `Makefile` under each independently configured original-source object tree, compared exact relative path sets, and SHA-256-hashed complete contents after normalizing only the configured object-directory absolute path and basename.
+
+| Generated Makefile evidence | Normal | Combined lean |
+| --- | ---: | ---: |
+| Generated `Makefile` relative paths | **2,028** | **2,028** |
+| Unique file paths | **0** | **0** |
+| Identical normalized full-file hashes | **2,027** | **2,027** |
+| Differing normalized full-file hashes | **1** | **1** |
+
+The **only differing generated Makefile path is `faster/Makefile`**. A separate, narrowly scoped line-level diff is required to identify its precise cause; equal file counts and all other hash matches must not be substituted for this. Together with the **2,024/2,024 existing `backend.mk` files** already reconciled under the exact opt-in configure delta, this covers both known generated recursive-Make file classes, **not** the generated Ninja/rustc/Clang commands that an actual full build might invoke.
+
+No native compiler or linker was invoked by this new comparison, nor were generated code bytes, feature-specific link objects, FFI or late `dlopen` closure established. No new pruning, browser/profile modifications, package-size savings or M3 gate credit. **M3 remains 5/6 (83%), overall 61%, Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
