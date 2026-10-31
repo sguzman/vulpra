@@ -406,6 +406,55 @@ jobs:
             package_proven:.compiled_resource_installation_proven
           }' "$RUNNER_TEMP/m3-generated-frontend/frontend-delta-summary.json"
           echo 'PASS: both pinned configured original Mozilla frontend object/DirectoryTraversal and resource-input graphs emitted'
+      - name: Prove declared Rust staticlib reverse Linkable reachability parity
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          python3 -m py_compile controls/ci/m3-pinned-evaluated-mozbuild-graph.py
+          python3 controls/ci/m3-pinned-evaluated-mozbuild-graph.py --self-test
+          jq -n --slurpfile f "$RUNNER_TEMP/m3-generated-frontend/full-normal-evaluated.json" \
+                --slurpfile l "$RUNNER_TEMP/m3-generated-frontend/combined-four-evaluated.json" '
+            ($f[0]) as $a | ($l[0]) as $b |
+            {
+              status:"pinned_original_rust_reverse_linkable_reachability",
+              original_source_commit:$a.original_source_commit,
+              full_rust_static_library_roots:$a.actual_evaluated_rust_library_target_count,
+              lean_rust_static_library_roots:$b.actual_evaluated_rust_library_target_count,
+              full_direct_rust_consumer_edges:$a.actual_evaluated_rust_staticlib_native_consumer_edge_count,
+              lean_direct_rust_consumer_edges:$b.actual_evaluated_rust_staticlib_native_consumer_edge_count,
+              full_reverse_reachable_consumers:$a.actual_evaluated_rust_staticlib_reverse_reachability_count,
+              lean_reverse_reachable_consumers:$b.actual_evaluated_rust_staticlib_reverse_reachability_count,
+              full_only_reachable:($a.actual_evaluated_rust_staticlib_reverse_reachability -
+                                   $b.actual_evaluated_rust_staticlib_reverse_reachability),
+              lean_only_reachable:($b.actual_evaluated_rust_staticlib_reverse_reachability -
+                                   $a.actual_evaluated_rust_staticlib_reverse_reachability),
+              full_roots_without_direct_consumers:$a.actual_evaluated_rust_staticlibs_without_direct_consumers,
+              lean_roots_without_direct_consumers:$b.actual_evaluated_rust_staticlibs_without_direct_consumers,
+              declared_graph_only:true,
+              actual_rustc_or_native_linker_proven:false,
+              ffi_or_runtime_dlopen_closure_proven:false,
+              m3_sixth_gate_closed:false
+            }' > "$RUNNER_TEMP/m3-generated-frontend/rust-reverse-linkable-reachability.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .status=="pinned_original_rust_reverse_linkable_reachability" and
+            .original_source_commit==$sha and
+            .full_rust_static_library_roots==4 and
+            .lean_rust_static_library_roots==4 and
+            .full_direct_rust_consumer_edges>0 and
+            .full_direct_rust_consumer_edges==.lean_direct_rust_consumer_edges and
+            .full_reverse_reachable_consumers>=.full_direct_rust_consumer_edges and
+            .lean_reverse_reachable_consumers>=.lean_direct_rust_consumer_edges and
+            .full_reverse_reachable_consumers==.lean_reverse_reachable_consumers and
+            (.full_only_reachable|length)==0 and
+            (.lean_only_reachable|length)==0 and
+            .full_roots_without_direct_consumers==.lean_roots_without_direct_consumers and
+            .declared_graph_only==true and
+            .actual_rustc_or_native_linker_proven==false and
+            .ffi_or_runtime_dlopen_closure_proven==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-generated-frontend/rust-reverse-linkable-reachability.json" >/dev/null
+          jq -c '{rust_roots:[.full_rust_static_library_roots,.lean_rust_static_library_roots],direct_edges:[.full_direct_rust_consumer_edges,.lean_direct_rust_consumer_edges],reverse_consumer_records:[.full_reverse_reachable_consumers,.lean_reverse_reachable_consumers],unexplained_differences:[(.full_only_reachable|length),(.lean_only_reachable|length)]}' "$RUNNER_TEMP/m3-generated-frontend/rust-reverse-linkable-reachability.json"
       - name: Compare actual original-source generated RecursiveMake backend.mk files
         shell: bash
         working-directory: original
@@ -608,6 +657,7 @@ jobs:
             ${{ runner.temp }}/m3-generated-frontend/faster-manifest-entry-delta.json
             ${{ runner.temp }}/m3-generated-frontend/gkrust-cargo-resolved.json
             ${{ runner.temp }}/m3-generated-frontend/other-rust-root-cargo-closures.json
+            ${{ runner.temp }}/m3-generated-frontend/rust-reverse-linkable-reachability.json
             ${{ runner.temp }}/m3-generated-frontend/generated-faster-install-manifests.json
           if-no-files-found: error
           retention-days: 14
