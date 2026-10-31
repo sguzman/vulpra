@@ -25,6 +25,9 @@ VERSIONED=importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VERSIONED)
 ELF=VERSIONED.BASE
 MAX_SYMS=16000000
+# C++ template instantiations in original libxul have mangled names >254 bytes.
+# Preserve them without weakening pathname, control-char or output size bounds.
+PLAIN_SYMBOL=re.compile(r"[A-Za-z_$?][A-Za-z0-9_.$?+:~%-]{0,8191}\\Z")
 GROUPS={"libpthread.so.0","libdl.so.2","librt.so.1","libresolv.so.2"}
 
 
@@ -44,7 +47,7 @@ def all_dynsym(path):
             continue
         decorated=f[7]
         name=decorated.split("@",1)[0]
-        if not VERSIONED.SYMBOL.fullmatch(name):
+        if not PLAIN_SYMBOL.fullmatch(name):
             raise ValueError("Unsupported ELF dynsym spelling: "+repr(decorated[:90]))
         if index=="UND":
             if "@" not in decorated:
@@ -173,8 +176,8 @@ def selftest():
     assert len(parsed)==4
     assert [p[7] for p in parsed]==[
         "fake_unversioned","optional_weak","printf@GLIBC_2.2.5","fake_export@@V1"]
-    assert VERSIONED.SYMBOL.fullmatch("fake_unversioned")
-    assert not VERSIONED.SYMBOL.fullmatch("../bad")
+    assert PLAIN_SYMBOL.fullmatch("fake_unversioned")
+    assert not PLAIN_SYMBOL.fullmatch("../bad")
     return 4
 
 
