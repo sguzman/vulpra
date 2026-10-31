@@ -76,6 +76,8 @@ jobs:
           set -euo pipefail
           app="$RUNNER_TEMP/experiment/vulpra"
           mkdir -m 0700 "$RUNNER_TEMP/experiment/private-headless-home" "$RUNNER_TEMP/experiment/private-headless-profile"
+          # Redirected screenshot test logs are intentionally private runner-owned files.
+          # shellcheck disable=SC2024
           sudo unshare --net -- env \
             HOME="$RUNNER_TEMP/experiment/private-headless-home" \
             MOZ_HEADLESS=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
