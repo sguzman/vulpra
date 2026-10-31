@@ -104,6 +104,14 @@ jobs:
              ($b.directory_edges|map(join(" -> ")))) as $full_only |
             (($b.directory_edges|map(join(" -> "))) -
              ($a.directory_edges|map(join(" -> ")))) as $lean_only |
+            ($a.actual_evaluated_jar_manifest_inputs -
+             $b.actual_evaluated_jar_manifest_inputs) as $full_only_jars |
+            ($b.actual_evaluated_jar_manifest_inputs -
+             $a.actual_evaluated_jar_manifest_inputs) as $lean_only_jars |
+            ($a.actual_evaluated_install_resource_inputs -
+             $b.actual_evaluated_install_resource_inputs) as $full_only_install_inputs |
+            ($b.actual_evaluated_install_resource_inputs -
+             $a.actual_evaluated_install_resource_inputs) as $lean_only_install_inputs |
             {
               schema_version:1,
               status:"exact_original_source_generated_full_vs_four_optin_frontend_evaluated",
@@ -115,6 +123,18 @@ jobs:
               combined_directory_edges:$b.evaluated_directory_edges,
               full_only_evaluated_directory_edges:$full_only,
               combined_only_evaluated_directory_edges:$lean_only,
+              full_evaluated_jar_manifest_count:$a.actual_evaluated_jar_manifest_count,
+              combined_evaluated_jar_manifest_count:$b.actual_evaluated_jar_manifest_count,
+              full_only_evaluated_jar_manifests:$full_only_jars,
+              combined_only_evaluated_jar_manifests:$lean_only_jars,
+              full_evaluated_install_resource_input_count:$a.actual_evaluated_install_resource_input_count,
+              combined_evaluated_install_resource_input_count:$b.actual_evaluated_install_resource_input_count,
+              full_only_evaluated_install_resource_inputs:$full_only_install_inputs,
+              combined_only_evaluated_install_resource_inputs:$lean_only_install_inputs,
+              full_noncanonical_install_resource_members:$a.noncanonical_install_resource_members,
+              combined_noncanonical_install_resource_members:$b.noncanonical_install_resource_members,
+              jar_manifest_entries_parsed:false,
+              compiled_resource_installation_proven:false,
               normal_generated_flag_values:$a.generated_configure_flag_values,
               combined_generated_flag_values:$b.generated_configure_flag_values,
               full_object_type_counts:$a.all_emitted_object_type_counts,
@@ -133,6 +153,12 @@ jobs:
              .actual_mozilla_BuildReader_and_TreeMetadataEmitter_executed==true and
              .normal_evaluated_objects>500 and .combined_evaluated_objects>500 and
              .full_directory_edges>200 and .combined_directory_edges>200 and
+             .full_evaluated_jar_manifest_count>0 and
+             .combined_evaluated_jar_manifest_count>0 and
+             .full_evaluated_install_resource_input_count>0 and
+             .combined_evaluated_install_resource_input_count>0 and
+             .jar_manifest_entries_parsed==false and
+             .compiled_resource_installation_proven==false and
              .normal_generated_flag_values.MOZ_NORMANDY.value=="1" and
              .combined_generated_flag_values.VULPRA_NO_ASROUTER_PROMOS.value=="1" and
              .combined_generated_flag_values.VULPRA_NO_NEWTAB_ADSFEED.value=="1" and
