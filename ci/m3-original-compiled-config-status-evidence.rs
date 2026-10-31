@@ -53,8 +53,8 @@ fn inspect(workflow:&str,mozconfig:&str)->Result<String,String>{
 fn main(){
  let a:Vec<String>=env::args().collect();
  if a.len()!=4{eprintln!("expected PINNED_WORKFLOW PINNED_MOZCONFIG SANITIZED_REPORT");std::process::exit(2)}
- let result=fs::read_to_string(&a[1]).map_err(|_|"missing pinned source workflow")
-  .and_then(|w|fs::read_to_string(&a[2]).map_err(|_|"missing pinned original mozconfig")
+ let result=fs::read_to_string(&a[1]).map_err(|_|"missing pinned source workflow".to_owned())
+  .and_then(|w|fs::read_to_string(&a[2]).map_err(|_|"missing pinned original mozconfig".to_owned())
    .and_then(|c|inspect(&w,&c)));
  match result{
   Ok(v)=>{if fs::write(&a[3],v).is_err(){eprintln!("cannot write report");std::process::exit(1)}
