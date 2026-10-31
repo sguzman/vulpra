@@ -162,6 +162,22 @@ No native compiler or linker was invoked by this new comparison, nor were genera
 
 `FasterMakeBackend.consume_finished` in the pinned original Mozilla source constructs both `ACDEFINES` from generated configure substitutions and `INSTALL_MANIFESTS` from actual frontend resource targets. The Nimbus target matches the separately compiled/runtime-checked fallback crosswalk. A separate stricter check also reconciles **all 2,024 generated `backend.mk` files** after exactly the expected opt-in arguments and Normandy boolean. This closes *the generated recursive-Make file-content parity subtask*, not code generation execution, full Clang/Rust compilation commands or object/linker/FFI/`dlopen` closure. No user workstation files/profiles, browser source or installed binary were touched; no new source removal or package-size saving. **M3 5/6 (83%), overall 61%, Δ0pp.**
 
+## Actual generated FasterMake installation-manifest file parity
+
+[**Original-source generated manifest CI 41247694163 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41247694163) read actual `faster/install_*` and `faster/unified_install_dist_bin` files from the two independently configured pinned Firefox 159 object directories. Its read-only comparison hashed complete generated file contents after normalizing only the corresponding configured objdir paths and basenames. The archived artifact `generated-faster-install-manifests.json` was inspected.
+
+| Actual FasterMake generated manifest files | Full normal | Four-opt-in lean |
+| --- | ---: | ---: |
+| Total manifest files | **93** | **94** |
+| Shared paths | **93** | **93** |
+| Identical normalized shared files | **90** | **90** |
+| Differing normalized shared files | **3** | **3** |
+| Unique files | **0** | **1** |
+
+The **only lean-only generated manifest file** is `install_dist_bin_moz-src_toolkit_components_nimbus`, consistent with the separately verified Normandy-disabled Nimbus bootstrap fallback. The three differing existing generated manifest files are precisely `install_dist_bin`, `install_dist_bin_browser`, and `unified_install_dist_bin`. Counts and complete file hashes have been checked; **individual entries of those three manifest files have not yet been parsed and reconciled**, nor have package installation or runtime resource resolution been executed by this check.
+
+This narrows original-source **generated installer declaration ownership** but is not proof of installed final package contents, generated resource bytes, actual native compiler/linker invocation, FFI or conditional `dlopen` closure. It provides **no permission to prune further source**. M3 remains **5/6 (83%)**, overall Vulpra **61%**, and accepted milestone delta **+0pp**.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
