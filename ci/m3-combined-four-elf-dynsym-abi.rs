@@ -196,13 +196,34 @@ fn compare_undefined_imports(full: &Inventory, lean: &Inventory)
 
 // Compare actual .text bytes after discarding differing ELF headers/metadata.
 // No browser or library is executed.
+fn text_overlap_diff(a: &Path, b: &Path) -> Result<(u64, u64, u64), String> {
+    let na = fs::metadata(a).map_err(|e| e.to_string())?.len();
+    let nb = fs::metadata(b).map_err(|e| e.to_string())?.len();
+    let mut fa = File::open(a).map_err(|e| e.to_string())?;
+    let mut fb = File::open(b).map_err(|e| e.to_string())?;
+    let mut aa = [0u8; 65536];
+    let mut bb = [0u8; 65536];
+    let mut left = na.min(nb);
+    let mut mismatches = 0u64;
+    while left > 0 {
+        let size = left.min(aa.len() as u64) as usize;
+        fa.read_exact(&mut aa[..size]).map_err(|e| e.to_string())?;
+        fb.read_exact(&mut bb[..size]).map_err(|e| e.to_string())?;
+        mismatches += aa[..size].iter().zip(&bb[..size])
+            .filter(|(a,b)| a != b).count() as u64;
+        left -= size as u64;
+    }
+    Ok((na, nb, mismatches))
+}
+
 fn compare_text_sections(full_root: &Path, lean_root: &Path, files: &Inventory)
-    -> Result<(usize, usize, Vec<String>), String> {
+    -> Result<(usize, usize, Vec<String>, Vec<String>), String> {
     let scratch = std::env::temp_dir().join(format!("vulpra-m3-text-{}", std::process::id()));
     fs::create_dir(&scratch).map_err(|e| format!("Temporary section directory: {e}"))?;
     let result = (|| -> Result<(usize, usize, Vec<String>), String> {
         let (mut equal, mut different) = (0usize, 0usize);
         let mut samples = Vec::new();
+        let mut byte_details = Vec::new();
         for (index, name) in files.keys().enumerate() {
             let a = scratch.join(format!("full-{index}.text"));
             let b = scratch.join(format!("lean-{index}.text"));
@@ -221,14 +242,16 @@ fn compare_text_sections(full_root: &Path, lean_root: &Path, files: &Inventory)
                 Some(0) => equal += 1,
                 Some(1) => {
                     different += 1;
-                    if samples.len() < 20 { samples.push(name.clone()); }
+                    samples.push(name.clone());
+                    let (full_bytes, lean_bytes, changed_overlap_bytes) = text_overlap_diff(&a, &b)?;
+                    byte_details.push(format!("{name}: full_bytes={full_bytes} lean_bytes={lean_bytes} changed_byte_offsets_in_common_prefix={changed_overlap_bytes}"));
                 },
                 other => return Err(format!("Cannot compare .text of {name}: {other:?}")),
             }
             fs::remove_file(a).map_err(|e| e.to_string())?;
             fs::remove_file(b).map_err(|e| e.to_string())?;
         }
-        Ok((equal, different, samples))
+        Ok((equal, different, samples, byte_details))
     })();
     fs::remove_dir_all(&scratch).map_err(|e| e.to_string())?;
     result
@@ -250,14 +273,16 @@ fn run() -> Result<(), String> {
     let start = exported.trim().strip_suffix('}')
         .ok_or("Invalid internal exported report")?;
     let result = format!("{start},\"full_undefined_import_symbol_occurrences\":{normal_undefined},\"lean_undefined_import_symbol_occurrences\":{lean_undefined},\"differing_undefined_import_records\":{differing_undefined},\"exact_undefined_dynamic_import_parity\":{},\"bounded_undefined_import_difference_samples\":[{sample_json}]}}\n", differing_undefined == 0);
-    let (equal_text, different_text, changed_text_names) =
+    let (equal_text, different_text, changed_text_names, changed_text_details) =
         compare_text_sections(Path::new(&args[1]), Path::new(&args[2]), &full)?;
     if equal_text + different_text != 28 { return Err("Incomplete .text comparison".into()); }
     let changed_text_json = changed_text_names.iter().map(|s| json_quote(s))
         .collect::<Vec<_>>().join(",");
+    let changed_text_details_json = changed_text_details.iter().map(|s| json_quote(s))
+        .collect::<Vec<_>>().join(",");
     let base = result.trim().strip_suffix('}')
         .ok_or("Invalid generated dynamic ABI report")?;
-    let result = format!("{base},\"text_sections_compared\":28,\"text_sections_equal\":{equal_text},\"text_sections_different\":{different_text},\"changed_text_elf_paths\":[{changed_text_json}],\"only_text_section_bytes_examined\":true}}\n");
+    let result = format!("{base},\"text_sections_compared\":28,\"text_sections_equal\":{equal_text},\"text_sections_different\":{different_text},\"changed_text_elf_paths\":[{changed_text_json}],\"differing_text_section_byte_metrics\":[{changed_text_details_json}],\"only_text_section_bytes_examined\":true}}\n");
     fs::write(&args[3], result).map_err(|e| e.to_string())?;
     println!("PASS: compared exported dynamic symbols for 28 exact-path compiled ELF files");
     Ok(())
