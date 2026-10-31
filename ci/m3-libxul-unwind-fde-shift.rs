@@ -30,7 +30,8 @@ fn text_section(file: &Path) -> Result<(u64, Vec<u8>), String> {
     let (base,offset,size) = location.ok_or("No compiled libxul .text header")?;
     if size == 0 || size > MAX_TEXT { return Err("Out of bounds native text".into()); }
     let mut handle = File::open(file).map_err(|e| e.to_string())?;
-    if offset.checked_add(size).is_none_or(|end| end > handle.metadata().map_err(|e| e.to_string())?.len()) {
+    let file_len = handle.metadata().map_err(|e| e.to_string())?.len();
+    if offset.checked_add(size).is_none_or(|end| end > file_len) {
         return Err("Original ELF .text declared outside packaged file".into());
     }
     handle.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
