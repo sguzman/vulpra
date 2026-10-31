@@ -105,7 +105,7 @@ def source_identity(item, root, object_root):
     if not os.path.isabs(raw):
         raise ValueError("Frontend ownership input lacks an absolute full_path")
     physical = os.path.realpath(raw).replace("\\", "/")
-    for label, directory in (("src", root), ("obj", object_root)):
+    for label, directory in (("obj", object_root), ("src", root)):
         prefix = str(directory).replace("\\", "/").rstrip("/") + "/"
         if physical.startswith(prefix):
             return (label, portable_member(physical[len(prefix):]))
@@ -159,6 +159,7 @@ def main():
     installed_resource_inputs = set()
     noncanonical_install_base_members = 0
     noncanonical_install_resource_members = 0
+    unexpanded_glob_install_inputs = 0
     emitted = 0
     reader = BuildReader(env)
     emitter = TreeMetadataEmitter(env)
@@ -189,6 +190,14 @@ def main():
                 subdir = install_component(base)
                 for item in files:
                     origin, member = source_identity(item, root, object_root)
+                    # Glob declarations are inputs, not enumerated installed
+                    # files; do not infer one declared pattern == one payload.
+                    raw_item = str(getattr(item, "full_path", item))
+                    declaration = (
+                        "unexpanded_glob" if any(c in raw_item for c in "*?[")
+                        else "path")
+                    if declaration == "unexpanded_glob":
+                        unexpanded_glob_install_inputs += 1
                     name = getattr(item, "target_basename", None)
                     if kind in ("FinalTargetPreprocessedFiles",
                                 "LocalizedPreprocessedFiles"):
@@ -197,7 +206,7 @@ def main():
                         name = os.path.basename(member)
                     basename = install_component(name)
                     installed_resource_inputs.add(
-                        (rel, kind, origin, member, target, subdir, basename))
+                        (rel, kind, origin, member, target, subdir, basename, declaration))
                     if "@noncanonical-install-component" in (
                             target, subdir, basename):
                         noncanonical_install_resource_members += 1
@@ -272,6 +281,8 @@ def main():
             [list(x) for x in installed_resource_inputs]),
         "actual_evaluated_install_resource_input_count": len(installed_resource_inputs),
         "noncanonical_install_resource_members": noncanonical_install_resource_members,
+        "unexpanded_glob_install_input_count": unexpanded_glob_install_inputs,
+        "source_objdir_subtree_matched_before_topsrcdir": True,
         "jar_manifest_entries_parsed": False,
         "compiled_resource_installation_proven": False,
         "complete_compile_or_link_graph": False,
