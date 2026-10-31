@@ -1,0 +1,141 @@
+
+name: M3 Original Protected Auxiliary Actual Symbol Bindings
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-auxiliary-runtime-bindings.yml
+      - ci/m3-auxiliary-guarded-cli-no-egress.sh
+      - ci/m3-auxiliary-guarded-cli-version-checks.py
+      - ci/m3-native-original-auxiliary-bindings.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-diagnostic-only-auxiliary-actual-symbol-bindings:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+      STATIC_RUN: '41157293087'
+      STATIC_HEAD: 184d5b33678152c1bd28b0c35cecc450e49c93f1
+    steps:
+      - name: Checkout test-only native helper diagnostics
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Check parser provenance fixtures and safe CLI syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 ci/m3-auxiliary-guarded-cli-version-checks.py --self-test
+          python3 -m py_compile ci/m3-auxiliary-guarded-cli-version-checks.py
+          bash -n ci/m3-auxiliary-guarded-cli-no-egress.sh
+          rustc --edition=2021 --test ci/m3-native-original-auxiliary-bindings.rs -o "$RUNNER_TEMP/m3-aux-bindings-tests"
+          "$RUNNER_TEMP/m3-aux-bindings-tests"
+          rustc --edition=2021 -O ci/m3-native-original-auxiliary-bindings.rs -o "$RUNNER_TEMP/m3-aux-bindings-parser"
+      - name: Install native package ELF and namespace prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends iproute2 libstdc++6 libnss3 libnspr4 libgtk-3-0t64 jq
+      - name: Authenticate compiled original package and declared version needs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$STATIC_RUN" |
+            jq -e --arg sha "$STATIC_HEAD" '
+              .status=="completed" and .conclusion=="success" and .head_sha==$sha and
+              .name=="M3 Source-Pinned Native ELF Version-Name Inventory"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/static"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          gh run download "$STATIC_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-version-name-contract --dir "$RUNNER_TEMP/static"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          for tool in crashhelper crashreporter updater; do
+            test -x "$RUNNER_TEMP/package/vulpra/$tool"
+          done
+      - name: Exercise only safe source-defined auxiliary CLI paths in no-egress
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          sudo unshare --net -- env \
+            M3_AUX_BINDINGS_PARSER="$RUNNER_TEMP/m3-aux-bindings-parser" \
+            M3_AUX_BINDINGS_REPORT="$RUNNER_TEMP/m3-auxiliary-native-actual-bindings.json" \
+            bash ci/m3-auxiliary-guarded-cli-no-egress.sh \
+            "$RUNNER_TEMP/package/vulpra" \
+            "$RUNNER_TEMP/static/m3-native-elf-version-contract.json" \
+            "$RUNNER_TEMP/m3-auxiliary-guarded-cli-version-contracts.json"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and .original_native_compiled_source==$src and
+            .original_native_archive_sha256==$sha and
+            .original_compiled_auxiliary_elf_members==3 and
+            .protected_native_version_checks_observed==74 and
+            .per_member_observed_version_contracts.crashhelper==27 and
+            .per_member_observed_version_contracts.updater==27 and
+            .per_member_observed_version_contracts.crashreporter==20 and
+            (.observed_original_version_contracts|length)==74 and
+            .crashhelper_invalid_argv_rejected_before_minidump==true and
+            .crashreporter_synthetic_only_memtest_completed==true and
+            .updater_read_only_channel_query_only==true and
+            .real_crash_minidump_handler_tested==false and
+            .real_crash_report_sent==false and
+            .real_update_applied_or_installed==false and
+            .user_data_or_network_egress_allowed==false and
+            .native_feature_integration_proven==false and
+            .new_source_removal_authorized==false and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-auxiliary-guarded-cli-version-contracts.json" >/dev/null
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_protected_auxiliary_normal_symbol_bindings" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .original_auxiliary_elf_member_count==3 and
+            .pid_traces_with_member_bindings>=3 and
+            .normal_symbol_binding_events>=3 and
+            .sum_per_member_distinct_symbol_provider_pairs>=3 and
+            (.observed_provider_basename_count==(.observed_provider_basenames|length)) and
+            (.per_member|keys)==["crashhelper","crashreporter","updater"] and
+            ([.per_member[] |
+              (.pid_traces_with_bindings>=1 and
+               .normal_symbol_binding_events>=1 and
+               .distinct_symbol_provider_pairs>=1)]|all) and
+            .diagnostic_paths_only==true and .no_network_egress==true and
+            .actual_runtime_bindings_witnessed==true and
+            .raw_loader_logs_exported==false and
+            .symbol_names_exported==false and
+            .actual_crash_or_update_pipeline_proven==false and
+            .complete_transitive_or_lazy_binding_coverage==false and
+            .all_28_native_elf_members_covered==false and
+            .new_source_pruning_authorized==false'             "$RUNNER_TEMP/m3-auxiliary-native-actual-bindings.json" >/dev/null
+          echo 'PASS: actual original protected auxiliary symbol bindings and original version identities'
+      - name: Upload bounded scrubbed ELF identity report only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-guarded-auxiliary-symbol-versions
+          path: ${{ runner.temp }}/m3-auxiliary-guarded-cli-version-contracts.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload sanitized original auxiliary symbol binding counts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-auxiliary-actual-symbol-bindings
+          path: ${{ runner.temp }}/m3-auxiliary-native-actual-bindings.json
+          if-no-files-found: error
+          retention-days: 14
