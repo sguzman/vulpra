@@ -1,0 +1,105 @@
+# Real source-pinned alternate Vulpra ELF's graphical startup under isolated
+# disposable launcher shim; the original normal packaged launcher is unchanged.
+name: M3 Original Native Alternate vulpra-bin Wayland Frame and ABI
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-vulpra-bin-wayland.yml
+      - ci/m3-vulpra-bin-wayland.sh
+      - ci/m3-vulpra-bin-version-reconcile.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-alternate-native-wayland-browser:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+      STATIC_RUN: '41157293087'
+      STATIC_HEAD: 184d5b33678152c1bd28b0c35cecc450e49c93f1
+    steps:
+      - name: Checkout exact native acceptance harness and temporary alternate source helper
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            packaging
+            ci
+      - name: Reject synthetic version spoofing and authenticate original source archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n packaging/test-wayland.sh ci/m3-vulpra-bin-wayland.sh
+          python3 ci/m3-vulpra-bin-version-reconcile.py --self-test
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$STATIC_RUN" |
+            jq -e --arg sha "$STATIC_HEAD" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha and
+              .name=="M3 Source-Pinned Native ELF Version-Name Inventory"' >/dev/null
+      - name: Install real Weston pixman and full-original Wayland native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends weston wayland-utils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+      - name: Retrieve only immutable original normal compiled native package and static ABI
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/static"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          gh run download "$STATIC_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-version-name-contract --dir "$RUNNER_TEMP/static"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          test -x "$RUNNER_TEMP/package/vulpra/vulpra-bin"
+      - name: Run original alternate executable with real same-surface native Wayland frames
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          bash ci/m3-vulpra-bin-wayland.sh \
+            "$RUNNER_TEMP/package/vulpra" \
+            "$RUNNER_TEMP/static/m3-native-elf-version-contract.json" \
+            "$RUNNER_TEMP/m3-vulpra-bin-native-wayland.json" "$GITHUB_WORKSPACE"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and .original_compiled_native_source==$src and
+            .original_compiled_native_archive_sha256==$sha and
+            .real_original_alt_elf_native_graphical_wayland_frame_proven==true and
+            .original_alternate_native_elf_version_contracts==21 and
+            .original_alternate_native_elf_version_contracts_observed>0 and
+            (.original_alternate_native_elf_version_contracts_observed+
+             .original_alternate_native_elf_version_contracts_not_observed)==21 and
+            .installed_default_launcher_changed==false and
+            .installed_user_browser_profile_changed==false and
+            .raw_loader_paths_or_process_ids_retained==false and
+            .actual_individual_symbol_bindings_proven==false and
+            .new_source_removal_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-vulpra-bin-native-wayland.json" >/dev/null
+          echo 'PASS: original compiled alternate native Firefox ELF Wayland graphical frame and source ABI'
+      - name: Preserve bounded alternate original executable evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-alternate-vulpra-bin-wayland
+          path: ${{ runner.temp }}/m3-vulpra-bin-native-wayland.json
+          if-no-files-found: error
+          retention-days: 14
