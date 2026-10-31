@@ -133,6 +133,9 @@ jobs:
               combined_only_evaluated_install_resource_inputs:$lean_only_install_inputs,
               full_noncanonical_install_resource_members:$a.noncanonical_install_resource_members,
               combined_noncanonical_install_resource_members:$b.noncanonical_install_resource_members,
+              full_unexpanded_install_glob_inputs:$a.unexpanded_glob_install_input_count,
+              combined_unexpanded_install_glob_inputs:$b.unexpanded_glob_install_input_count,
+              objdir_nested_source_reconciliation:true,
               jar_manifest_entries_parsed:false,
               compiled_resource_installation_proven:false,
               normal_generated_flag_values:$a.generated_configure_flag_values,
@@ -157,6 +160,9 @@ jobs:
              .combined_evaluated_jar_manifest_count>0 and
              .full_evaluated_install_resource_input_count>0 and
              .combined_evaluated_install_resource_input_count>0 and
+             .full_unexpanded_install_glob_inputs>=0 and
+             .combined_unexpanded_install_glob_inputs>=0 and
+             .objdir_nested_source_reconciliation==true and
              .jar_manifest_entries_parsed==false and
              .compiled_resource_installation_proven==false and
              .normal_generated_flag_values.MOZ_NORMANDY.value=="1" and
@@ -166,7 +172,15 @@ jobs:
              .complete_build_link_ffi_dlopen_graph==false and
              .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
              "$RUNNER_TEMP/m3-generated-frontend/frontend-delta-summary.json" >/dev/null
-          echo 'PASS: both pinned configured original Mozilla frontend object/DirectoryTraversal graphs independently emitted'
+          jq -c '{
+            jar_manifests:[.full_evaluated_jar_manifest_count,.combined_evaluated_jar_manifest_count],
+            installer_inputs:[.full_evaluated_install_resource_input_count,.combined_evaluated_install_resource_input_count],
+            differing_jar_inputs:[(.full_only_evaluated_jar_manifests|length),(.combined_only_evaluated_jar_manifests|length)],
+            differing_installer_inputs:[(.full_only_evaluated_install_resource_inputs|length),(.combined_only_evaluated_install_resource_inputs|length)],
+            unexpanded_globs:[.full_unexpanded_install_glob_inputs,.combined_unexpanded_install_glob_inputs],
+            package_proven:.compiled_resource_installation_proven
+          }' "$RUNNER_TEMP/m3-generated-frontend/frontend-delta-summary.json"
+          echo 'PASS: both pinned configured original Mozilla frontend object/DirectoryTraversal and resource-input graphs emitted'
       - name: Archive bounded generated relative build graphs and exact comparison
         if: success()
         uses: actions/upload-artifact@v4
