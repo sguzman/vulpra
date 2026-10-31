@@ -53,6 +53,19 @@ The three full-only input records consist of the two deliberately omitted ASRout
 
 The established compiled full/lean package crosswalk for Normandy/Nimbus remains the physical packaged-resource witness. The new broad frontend inventory must not be substituted for that independently validated native acceptance. No extra source removal, browser modification or M3 gate credit is authorized by this comparison.
 
+## Actual emitted native compilation-source membership
+
+[**Original compiled-source membership inventory 41237964186 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41237964186) collected each real Mozilla `BaseSources` member (including `Sources`, `UnifiedSources`, `WasmSources` and `HostSources`) from the two configured source-matched frontend evaluations. [**Independent full-versus-lean reconciliation 41237976826 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41237976826), with [**workflow lint 41237976864 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41237976864), checked exact structured source-member records, not just emitted object-class counts.
+
+| Evaluated native source membership | Normal | Four opt-ins combined |
+| --- | ---: | ---: |
+| Exact `BaseSources` member tuples | **11,104** | **11,104** |
+| Source-tree file records | **10,402** | **10,402** |
+| Object-tree/generated input records | **702** | **702** |
+| Source members unique to each variant | **0** | **0** |
+
+Each tuple retains owning build directory, frontend source class, static/generated declaration phase, source/object origin, and path relative to the corresponding source or object root. This proves **the emitted native compilation-source membership is unchanged** between the two *original-source configured* variants. It does **not** establish identical generated file contents, compile defines/flags, compilation commands, actual object-file binaries, linker input lists, FFI relationships, or conditional runtime loading. The compiled 28-ELF DT_NEEDED parity remains separate native-package evidence; neither result closes the full M3 build/FFI/dlopen gate.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
