@@ -1,0 +1,113 @@
+# Exact-original compiled ELF DT_NEEDED declarations vs sampled glibc binding providers.
+name: M3 Original Native Direct Needed vs Runtime Bindings
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-native-needed-binding-crosswalk.yml
+      - ci/m3-original-native-needed-vs-binding-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare-pinned-original-native-needed-and-binding-provider-basenames:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+      BIND_RUN: '41206627659'
+      BIND_HEAD: 62fc0e4a25c329856c904e22fe744fb6345ea364
+    steps:
+      - name: Checkout only exact-source jq verifier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Authenticate successful original source archive and real bindings run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BIND_RUN" |
+            jq -e --arg sha "$BIND_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          command -v readelf
+      - name: Recover original native ELF archive and sanitized existing bindings only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/observed"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          gh run download "$BIND_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-package-elf-runtime-bindings-sanitized --dir "$RUNNER_TEMP/observed"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          test -s "$RUNNER_TEMP/observed/m3-original-package-elf-runtime-binding-census.json"
+      - name: Extract exact 28-file original DT_NEEDED declarations without native execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            if readelf -h "$file" >/dev/null 2>&1; then
+              readelf -Wd "$file" |
+                sed -n 's/.*(NEEDED).*Shared library: \[\([^]]*\)\].*/\1/p' |
+                while IFS= read -r needed; do
+                  printf '%s\t%s\n' "$(basename "$file")" "$needed"
+                done
+            fi
+          done < <(find "$RUNNER_TEMP/package/vulpra" -type f -print0) |
+            sort -u > "$RUNNER_TEMP/native-needed-edges.tsv"
+          test "$(wc -l < "$RUNNER_TEMP/native-needed-edges.tsv")" -gt 100
+          jq -Rn --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            [inputs | select(length>0) | split("\t") |
+              if length==2 then {requester_basename:.[0],needed_basename:.[1]}
+              else error("invalid original ELF needed metadata") end] as $edges |
+            {schema_version:1,original_source_commit:$src,
+             original_archive_sha256:$sha,original_elf_count:28,edges:$edges}' \
+             "$RUNNER_TEMP/native-needed-edges.tsv" > "$RUNNER_TEMP/native-needed-edges.json"
+      - name: Crosswalk original direct needed names and observed normal binding providers
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --slurpfile native "$RUNNER_TEMP/observed/m3-original-package-elf-runtime-binding-census.json" \
+            --slurpfile direct "$RUNNER_TEMP/native-needed-edges.json" \
+            -f ci/m3-original-native-needed-vs-binding-crosswalk.jq \
+            > "$RUNNER_TEMP/m3-original-needed-vs-binding-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_elf_direct_needed_vs_sampled_normal_binding_provider_crosswalk" and
+            .original_package_elf_count==28 and
+            .original_elf_requesters_with_sampled_bindings==21 and
+            .declared_dt_needed_edges>100 and
+            (.direct_needed_edges|length)==.declared_dt_needed_edges and
+            .edges_with_requester_observed_in_workload>0 and
+            .edges_with_same_provider_normal_binding_witnessed>0 and
+            .no_raw_symbols_pids_or_paths_exported==true and
+            .does_not_claim_each_needed_library_resolved==true and
+            .no_binding_does_not_imply_unneeded==true and
+            .complete_lazy_or_transitive_coverage_proven==false and
+            .removal_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-needed-vs-binding-crosswalk.json" >/dev/null
+          echo 'PASS: original DT_NEEDED vs sampled glibc normal binding provider-name crosswalk'
+      - name: Upload only bounded sanitized source-pinned ELF edge crosswalk
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-needed-vs-normal-bindings-sanitized
+          path: ${{ runner.temp }}/m3-original-needed-vs-binding-crosswalk.json
+          if-no-files-found: error
+          retention-days: 14
