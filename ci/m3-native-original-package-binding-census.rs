@@ -101,10 +101,13 @@ fn run()->Result<(),String>{
     let (traces,rows,providers)=inspect(Path::new(&args[1]),&inventory)?;
     let events:usize=rows.values().map(|r|r.events).sum();
     let pairs:usize=rows.values().map(|r|r.pairs.len()).sum();
-    let per=rows.iter().map(|(n,r)|format!(
-      "    \"{n}\":{{\"normal_symbol_binding_events\":{},\"distinct_symbol_provider_pairs\":{},\"provider_basename_count\":{}}}",
-       r.events,r.pairs.len(),r.providers.len()
-    )).collect::<Vec<_>>().join(",\n");
+    let per=rows.iter().map(|(n,r)|{
+      let provider_names=r.providers.iter().map(|x|format!("\"{x}\"")).collect::<Vec<_>>().join(",");
+      format!(
+       "    \"{n}\":{{\"normal_symbol_binding_events\":{},\"distinct_symbol_provider_pairs\":{},\"provider_basename_count\":{},\"observed_provider_basenames\":[{}]}}",
+       r.events,r.pairs.len(),r.providers.len(),provider_names
+      )
+    }).collect::<Vec<_>>().join(",\n");
     let names=rows.keys().map(|x|format!("\"{x}\"")).collect::<Vec<_>>().join(",");
     let not_seen=inventory.difference(&rows.keys().cloned().collect()).map(|x|format!("\"{x}\"")).collect::<Vec<_>>().join(",");
     let provider_names=providers.iter().map(|x|format!("\"{x}\"")).collect::<Vec<_>>().join(",");
