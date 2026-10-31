@@ -118,6 +118,7 @@ def main():
     visited = set()
     visited_traversal = set()
     moz_src_members = set()
+    noncanonical_install_base_members = 0
     emitted = 0
     reader = BuildReader(env)
     emitter = TreeMetadataEmitter(env)
@@ -146,7 +147,13 @@ def main():
                         origin, member = "obj", normalized(physical[len(object_prefix):])
                     else:
                         origin, member = "other", normalized(os.path.basename(physical))
-                    install_base = normalized(str(base) if base else "")
+                    try:
+                        install_base = normalized(str(base) if base else "")
+                    except ValueError:
+                        # Some installation paths are not source-root-relative.
+                        # Label their limits rather than inventing ownership.
+                        install_base = "@noncanonical-install-base"
+                        noncanonical_install_base_members += 1
                     moz_src_members.add((rel, origin, member, install_base))
                     if len(moz_src_members) > 20000:
                         raise ValueError("Unexpectedly large source ownership map")
@@ -187,6 +194,7 @@ def main():
         "actual_emitted_moz_src_file_members": sorted(
             [list(x) for x in moz_src_members]),
         "actual_emitted_moz_src_member_count": len(moz_src_members),
+        "noncanonical_moz_src_install_base_members": noncanonical_install_base_members,
         "complete_compile_or_link_graph": False,
         "ffi_and_runtime_dlopen_graph_proven": False,
         "profile_or_browser_executable_accessed": False,
