@@ -178,6 +178,19 @@ The **only lean-only generated manifest file** is `install_dist_bin_moz-src_tool
 
 This narrows original-source **generated installer declaration ownership** but is not proof of installed final package contents, generated resource bytes, actual native compiler/linker invocation, FFI or conditional `dlopen` closure. It provides **no permission to prune further source**. M3 remains **5/6 (83%)**, overall Vulpra **61%**, and accepted milestone delta **+0pp**.
 
+## Actual Mozilla CompileDB declared native compiler command parity
+
+[**Original-source full-vs-lean CompileDB generation 41247908462 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41247908462) ran the pinned original Firefox 159 `./mach build-backend -b CompileDB` against **each independently configured** Linux objdir, **without invoking a compiler or linker**. A bounded verifier compared exact `[file, directory, command]` tuples after normalizing only each variant's configured object-directory path and name, preserving all declared flag and argument strings. The full `compile_commands.json` contents were **not archived**; only reconciliation counts and bounded differing file identities were preserved in `compile-command-declarations.json`.
+
+| Actual generated CompileDB records | Normal | Four-opt-in lean | Unique to either |
+| --- | ---: | ---: | ---: |
+| Emitted compiler command entries | **12,028** | **12,028** | — |
+| Distinct normalized complete command tuples | **12,028** | **12,028** | **0** |
+| Identical normalized complete command tuples | **12,028** | **12,028** | — |
+| Differing source-file identities | **0** | **0** | **0** |
+
+This is *stronger than emitted `BaseSources` membership parity* because it includes generated C/C++ compiler command strings, arguments, and flags from the actual Mozilla CompileDB backend. It does **not** prove the commands were executed, what generated source bytes contain, the actual native object outputs or their equality, Cargo/`rustc` commands, linker command-line/archives, FFI edges, dynamic `dlopen` use or installed browser behavior. The earlier compiled native smoke tests remain separate evidence. No new source pruning or package-size savings are authorized. **M3 remains 5/6 (83%); overall 61%; accepted delta +0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
