@@ -196,6 +196,47 @@ fn compare_undefined_imports(full: &Inventory, lean: &Inventory)
 
 // Compare actual .text bytes after discarding differing ELF headers/metadata.
 // No browser or library is executed.
+// Diagnose byte layout only; this is not semantic instruction equivalence.
+// Bound in-memory work to one extracted native .text pair at a time.
+fn text_resynchronization(a: &Path, b: &Path) -> Result<String, String> {
+    const MAX_SECTION: u64 = 256 * 1024 * 1024;
+    let size_a = fs::metadata(a).map_err(|e| e.to_string())?.len();
+    let size_b = fs::metadata(b).map_err(|e| e.to_string())?.len();
+    if size_a == 0 || size_b == 0 || size_a > MAX_SECTION || size_b > MAX_SECTION {
+        return Err("Unexpected .text section size for bounded alignment audit".into());
+    }
+    let first = fs::read(a).map_err(|e| e.to_string())?;
+    let second = fs::read(b).map_err(|e| e.to_string())?;
+    let common = first.len().min(second.len());
+    let prefix = first.iter().zip(second.iter())
+        .take_while(|(a, b)| a == b).count();
+    // Avoid overlap between the matching prefix and matching suffix.
+    let suffix = first.iter().rev().zip(second.iter().rev())
+        .take(common - prefix).take_while(|(a, b)| a == b).count();
+    let delta = second.len() as i64 - first.len() as i64;
+    let shifted_equal = if delta > 0 && delta <= 4096 {
+        let n = delta as usize;
+        Some(first.iter().zip(second[n..].iter()).filter(|(a, b)| a == b).count())
+    } else if delta < 0 && delta >= -4096 {
+        let n = (-delta) as usize;
+        Some(first[n..].iter().zip(second.iter()).filter(|(a, b)| a == b).count())
+    } else {
+        None
+    };
+    let full_shift_match = shifted_equal.map(|n| n == common).unwrap_or(false);
+    let one_contiguous_insertion_or_deletion =
+        delta != 0 && prefix + suffix == common;
+    let shifted = shifted_equal.map_or("null".to_owned(), |v| v.to_string());
+    Ok(format!(
+        "{{\"full_text_bytes\":{size_a},\"lean_text_bytes\":{size_b},\
+        \"lean_minus_full_bytes\":{delta},\"identical_prefix_bytes\":{prefix},\
+        \"identical_suffix_bytes_without_prefix_overlap\":{suffix},\
+        \"same_delta_shift_equal_byte_positions\":{shifted},\
+        \"whole_section_matches_after_global_length_shift\":{full_shift_match},\
+        \"single_contiguous_length_change_exactly_explains_drift\":{one_contiguous_insertion_or_deletion}}}"
+    ))
+}
+
 fn text_overlap_diff(a: &Path, b: &Path) -> Result<(u64, u64, u64), String> {
     let na = fs::metadata(a).map_err(|e| e.to_string())?.len();
     let nb = fs::metadata(b).map_err(|e| e.to_string())?.len();
@@ -217,13 +258,14 @@ fn text_overlap_diff(a: &Path, b: &Path) -> Result<(u64, u64, u64), String> {
 }
 
 fn compare_text_sections(full_root: &Path, lean_root: &Path, files: &Inventory)
-    -> Result<(usize, usize, Vec<String>, Vec<String>), String> {
+    -> Result<(usize, usize, Vec<String>, Vec<String>, Vec<String>), String> {
     let scratch = std::env::temp_dir().join(format!("vulpra-m3-text-{}", std::process::id()));
     fs::create_dir(&scratch).map_err(|e| format!("Temporary section directory: {e}"))?;
-    let result = (|| -> Result<(usize, usize, Vec<String>, Vec<String>), String> {
+    let result = (|| -> Result<(usize, usize, Vec<String>, Vec<String>, Vec<String>), String> {
         let (mut equal, mut different) = (0usize, 0usize);
         let mut samples = Vec::new();
         let mut byte_details = Vec::new();
+        let mut resynchronization = Vec::new();
         for (index, name) in files.keys().enumerate() {
             let a = scratch.join(format!("full-{index}.text"));
             let b = scratch.join(format!("lean-{index}.text"));
@@ -245,13 +287,14 @@ fn compare_text_sections(full_root: &Path, lean_root: &Path, files: &Inventory)
                     samples.push(name.clone());
                     let (full_bytes, lean_bytes, changed_overlap_bytes) = text_overlap_diff(&a, &b)?;
                     byte_details.push(format!("{name}: full_bytes={full_bytes} lean_bytes={lean_bytes} changed_byte_offsets_in_common_prefix={changed_overlap_bytes}"));
+                    resynchronization.push(format!("{{\"path\":{},\"alignment\":{}}}", json_quote(name), text_resynchronization(&a, &b)?));
                 },
                 other => return Err(format!("Cannot compare .text of {name}: {other:?}")),
             }
             fs::remove_file(a).map_err(|e| e.to_string())?;
             fs::remove_file(b).map_err(|e| e.to_string())?;
         }
-        Ok((equal, different, samples, byte_details))
+        Ok((equal, different, samples, byte_details, resynchronization))
     })();
     fs::remove_dir_all(&scratch).map_err(|e| e.to_string())?;
     result
@@ -273,16 +316,17 @@ fn run() -> Result<(), String> {
     let start = exported.trim().strip_suffix('}')
         .ok_or("Invalid internal exported report")?;
     let result = format!("{start},\"full_undefined_import_symbol_occurrences\":{normal_undefined},\"lean_undefined_import_symbol_occurrences\":{lean_undefined},\"differing_undefined_import_records\":{differing_undefined},\"exact_undefined_dynamic_import_parity\":{},\"bounded_undefined_import_difference_samples\":[{sample_json}]}}\n", differing_undefined == 0);
-    let (equal_text, different_text, changed_text_names, changed_text_details) =
+    let (equal_text, different_text, changed_text_names, changed_text_details, text_alignment) =
         compare_text_sections(Path::new(&args[1]), Path::new(&args[2]), &full)?;
     if equal_text + different_text != 28 { return Err("Incomplete .text comparison".into()); }
     let changed_text_json = changed_text_names.iter().map(|s| json_quote(s))
         .collect::<Vec<_>>().join(",");
     let changed_text_details_json = changed_text_details.iter().map(|s| json_quote(s))
         .collect::<Vec<_>>().join(",");
+    let text_alignment_json = text_alignment.join(",");
     let base = result.trim().strip_suffix('}')
         .ok_or("Invalid generated dynamic ABI report")?;
-    let result = format!("{base},\"text_sections_compared\":28,\"text_sections_equal\":{equal_text},\"text_sections_different\":{different_text},\"changed_text_elf_paths\":[{changed_text_json}],\"differing_text_section_byte_metrics\":[{changed_text_details_json}],\"only_text_section_bytes_examined\":true}}\n");
+    let result = format!("{base},\"text_sections_compared\":28,\"text_sections_equal\":{equal_text},\"text_sections_different\":{different_text},\"changed_text_elf_paths\":[{changed_text_json}],\"differing_text_section_byte_metrics\":[{changed_text_details_json}],\"differing_text_section_alignment\":[{text_alignment_json}],\"only_text_section_bytes_examined\":true}}\n");
     fs::write(&args[3], result).map_err(|e| e.to_string())?;
     println!("PASS: compared exported dynamic symbols for 28 exact-path compiled ELF files");
     Ok(())
@@ -292,6 +336,23 @@ fn main() { if let Err(e) = run() { eprintln!("FAIL: {e}"); std::process::exit(1
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn section_shift_metrics_identify_one_insertion_but_not_rewrites() {
+        let base = std::env::temp_dir().join(format!("vulpra-m3-test-{}", std::process::id()));
+        fs::create_dir_all(&base).unwrap();
+        let a = base.join("a");
+        let b = base.join("b");
+        fs::write(&a, b"abcDEFGxyz").unwrap();
+        fs::write(&b, b"abc12DEFGxyz").unwrap();
+        let metrics = text_resynchronization(&a, &b).unwrap();
+        assert!(metrics.contains("\"identical_prefix_bytes\":3"));
+        assert!(metrics.contains("\"identical_suffix_bytes_without_prefix_overlap\":7"));
+        assert!(metrics.contains("\"single_contiguous_length_change_exactly_explains_drift\":true"));
+        fs::write(&b, b"abX12DEFGxyz").unwrap();
+        let metrics = text_resynchronization(&a, &b).unwrap();
+        assert!(metrics.contains("\"single_contiguous_length_change_exactly_explains_drift\":false"));
+        fs::remove_dir_all(base).unwrap();
+    }
     #[test]
     fn decode_binding_and_versions() {
         let sample = "Num: Value Size Type Bind Vis Ndx Name\n\
