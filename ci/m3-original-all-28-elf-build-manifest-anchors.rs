@@ -68,7 +68,7 @@ fn analyze(source_root:&Path,package:&Path)->Result<String,String>{
  let mut declared=BTreeSet::new();
  let mut rows=BTreeMap::new();
  for o in ORIGINS{
-  if !valid_name(o.elf)||!declared.insert(o.elf)||!files.contains(o.elf){return Err("an ELF source declaration is missing/duplicated".into())}
+  if !valid_name(o.elf)||!declared.insert(o.elf.to_owned())||!files.contains(o.elf){return Err("an ELF source declaration is missing/duplicated".into())}
   let p=source_root.join(o.source);
   let content=fs::read_to_string(&p).map_err(|_|format!("pinned source build manifest missing: {}",o.source))?;
   let matches=content.match_indices(o.anchor).collect::<Vec<_>>();
