@@ -51,13 +51,21 @@ jobs:
           set -euo pipefail
           test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
           test "${WAYLAND_DEBUG:-}" = client
+          # Region lookup is preseeded inside the ephemeral smoke profile.
+          # The network guard must remain enabled, not silently disabled.
+          test "${MOZ_DISABLE_NONLOCAL_CONNECTIONS:-}" = 1
+          profile="${XDG_DATA_HOME}/vulpra/default"
+          test -f "$profile/user.js"
+          grep -Fxq 'user_pref("browser.search.region", "ZZ");' "$profile/user.js"
+          test "$(stat -c '%a' "$profile")" = 700
+          test "$(stat -c '%a' "$profile/user.js")" = 600
           # Synthetic protocol trace validates parser only, not live painting.
           printf '%s\n' '-> wl_surface#13.attach(wl_buffer#45, 0, 0)' >&2
           printf '%s\n' '-> wl_surface#13.commit()' >&2
           sleep 30
           MOCK
           chmod +x "$temp/package/firefox"
-          VULPRA_WAYLAND_TEST_SECONDS=2 bash packaging/test-wayland.sh "$temp/package"
+          MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_WAYLAND_TEST_SECONDS=2 bash packaging/test-wayland.sh "$temp/package"
       - name: Reject a live process that never draws a Wayland frame
         shell: bash
         run: |

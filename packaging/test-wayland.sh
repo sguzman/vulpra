@@ -37,6 +37,15 @@ cleanup() {
 }
 trap cleanup EXIT
 mkdir -m 0700 -p "$work/runtime" "$work/home"
+# The GUI smoke checks rendering, not internet-based region discovery. Firefox
+# reads this test-only preference before Region.sys.mjs starts a background
+# lookup of location.services.mozilla.com. Its startup request deliberately
+# triggers the MOZ_DISABLE_NONLOCAL_CONNECTIONS fatal guard in CI. Never
+# disable that guard or affect installed/user profiles to get a green test.
+test_profile="$work/home/.local/share/vulpra/default"
+mkdir -p -m 0700 -- "$test_profile"
+printf '%s\n' 'user_pref("browser.search.region", "ZZ");' > "$test_profile/user.js"
+chmod 0600 -- "$test_profile/user.js"
 export XDG_RUNTIME_DIR="$work/runtime"
 export WAYLAND_DISPLAY="wayland-vulpra"
 unset DISPLAY
