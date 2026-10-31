@@ -53,3 +53,7 @@ Observed GNU loader-version checks are *not actual resolved dynamic-symbol reloc
 No original source files, compiled packages, installed Firefox Developer Edition profiles, production networking or default browser features were modified. No source pruning, feature removal, or new package savings were accepted.
 
 **Overall 61%, M3 5/6 = 83%, round delta +0 percentage points.** The last broad M3 feature/build/ABI dependency-mapping gate remains open.
+
+## Fourth actual native source-triggered feature path (2026-10-31)
+
+[Original packaged `libonnxruntime.so` activation 41159617600 PASS](https://github.com/sguzman/vulpra/actions/runs/41159617600), verified by a minimal Rust ABI probe inside a no-egress network namespace, invoked original `OrtGetApiBase` and C-API version string, and observed **20/20** original ONNX version contracts. It did **not** run ML inference or integrate a model into the browser. [Authenticated four-way ELF version-check union 41159795580 PASS](https://github.com/sguzman/vulpra/actions/runs/41159795580) now measures **386/519** original compiled version-name checks observed across four *different* native feature workloads, **133** not exercised in six retained source-origin modules. This replaces only the three-workload count above, not its original exact source/runtime evidence; [current report](M3-NATIVE-ONNX-C-API-AND-FOUR-WORKLOAD-UNION-20261031.md). Still M3 5/6 (83%), overall 61%, Δ0pp, no source-removal credit.
