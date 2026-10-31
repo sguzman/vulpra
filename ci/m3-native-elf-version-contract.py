@@ -53,25 +53,27 @@ def version_blocks(text):
     mode = None
     file = None
     count = 0
+    actual_entries = 0
     needs = defaultdict(set)
     defined = set()
     for line in text.splitlines():
         if line.startswith("Version ") and " section " in line:
-            if mode == "needs" and file is not None and count != len(needs[file]):
+            if mode == "needs" and file is not None and count != actual_entries:
                 raise ValueError("VERNEED count inconsistent at section boundary")
         if line.startswith("Version needs section "):
-            mode, file, count = "needs", None, 0
+            mode, file, count, actual_entries = "needs", None, 0, 0
         elif line.startswith("Version definition section "):
-            mode, file, count = "defs", None, 0
+            mode, file, count, actual_entries = "defs", None, 0, 0
         elif line.startswith("Version symbols section "):
-            mode, file, count = None, None, 0
+            mode, file, count, actual_entries = None, None, 0, 0
         if mode == "needs":
             m = VERFILE.search(line)
             if m:
-                if file is not None and count != len(needs[file]):
+                if file is not None and count != actual_entries:
                     raise ValueError("VERNEED file count inconsistent")
                 file = safe_name(m.group(1))
                 count = int(m.group(2))
+                actual_entries = 0
                 if not 0 <= count <= 1024:
                     raise ValueError("Unbounded VERNEED count")
             m = VERNEED.search(line)
@@ -79,14 +81,16 @@ def version_blocks(text):
                 if file is None:
                     raise ValueError("Version need without provider")
                 ver = safe_name(m.group(1))
-                if ver in needs[file]:
-                    raise ValueError("Duplicate version requirement")
+                # Real Firefox/NSS ELF metadata can repeat one version label
+                # in the same provider group; Cnt counts Vernaux entries,
+                # while the report is a deduplicated set of name contracts.
+                actual_entries += 1
                 needs[file].add(ver)
         elif mode == "defs":
             m = VERDEF.search(line)
             if m:
                 defined.add(safe_name(m.group(1)))
-    if mode == "needs" and file is not None and count != len(needs[file]):
+    if mode == "needs" and file is not None and count != actual_entries:
         raise ValueError("Last VERNEED file count inconsistent")
     return {k: sorted(v) for k, v in sorted(needs.items())}, sorted(defined)
 
@@ -259,11 +263,19 @@ Version definition section '.gnu.version_d' contains 2 entries:
     needs, defs = version_blocks(good)
     assert needs == {"libc.so.6": ["GLIBC_2.2.5", "GLIBC_2.34"]}
     assert defs == ["SOME_1.0", "libxul.so"]
+    duplicate_elf_aux = good.replace(
+        "Cnt: 2", "Cnt: 3", 1
+    ).replace(
+        "  0x0030:   Name: GLIBC_2.2.5  Flags: none  Version: 2",
+        "  0x0030:   Name: GLIBC_2.2.5  Flags: none  Version: 2\\n"
+        "  0x0040:   Name: GLIBC_2.34  Flags: none  Version: 4"
+    )
+    assert version_blocks(duplicate_elf_aux)[0] == needs
     for fake in (
         good.replace("Cnt: 2", "Cnt: 3", 1),
         good.replace("File: libc.so.6", "File: ../../secret"),
         good.replace("Name: GLIBC_2.34", "Name: ../../private"),
-        good.replace("Name: GLIBC_2.34", "Name: GLIBC_2.2.5"),
+        good.replace("Name: GLIBC_2.34", "Name: ../../hidden"),
         "Version needs section '.gnu.version_r'\n  Name: GLIBC_2.2.5  Flags: none  Version: 3",
     ):
         try:
