@@ -9,6 +9,7 @@ on:
       - .github/workflows/m3-pinned-evaluated-mozbuild-graph.yml
       - ci/m3-pinned-evaluated-mozbuild-graph.py
       - ci/m3-compare-generated-backend.sh
+      - ci/m3-compare-generated-makefiles.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -42,6 +43,7 @@ jobs:
           sparse-checkout: |
             ci/m3-pinned-evaluated-mozbuild-graph.py
             ci/m3-compare-generated-backend.sh
+            ci/m3-compare-generated-makefiles.sh
             ci/mozconfig-linux-m3-baseline
             ci/mozconfig-linux-m3-combined-lean
             browser/moz.configure
@@ -56,6 +58,7 @@ jobs:
           test "$(git hash-object ci/mozconfig-linux-m3-baseline)" = "$(git -C ../controls hash-object ci/mozconfig-linux-m3-baseline)"
           python3 -m py_compile ../controls/ci/m3-pinned-evaluated-mozbuild-graph.py
           bash -n ../controls/ci/m3-compare-generated-backend.sh
+          bash -n ../controls/ci/m3-compare-generated-makefiles.sh
           # No user's computer nor browser profile is in this CI workflow.
           mkdir -p "$RUNNER_TEMP/m3-generated-frontend"
       - name: Bootstrap same pinned Firefox 159 Linux native configure toolchain
@@ -334,6 +337,31 @@ jobs:
             .source_pruning_authorized==false and
             .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/m3-generated-frontend/generated-backend-mk-delta.json" >/dev/null
+      - name: Compare actual original-source generated RecursiveMake Makefile contents
+        shell: bash
+        working-directory: original
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          bash ../controls/ci/m3-compare-generated-makefiles.sh \
+            obj-vulpra-linux-m3-baseline \
+            obj-vulpra-linux-m3-combined-lean \
+            "$RUNNER_TEMP/m3-generated-frontend/generated-makefile-delta.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .status=="original_source_actual_generated_makefile_comparison" and
+            .original_source_commit==$sha and
+            .normal_generated_makefile_count>500 and
+            .combined_generated_makefile_count>500 and
+            .shared_generated_makefile_count>500 and
+            (.identical_normalized_makefile_count +
+              .differing_normalized_makefile_count ==
+              .shared_generated_makefile_count) and
+            .actual_generated_makefile_contents_hashed==true and
+            .make_recipe_execution_or_expansion_proven==false and
+            .native_compiler_or_linker_executed==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-generated-frontend/generated-makefile-delta.json" >/dev/null
       - name: Archive bounded generated relative build graphs and exact comparison
         if: success()
         uses: actions/upload-artifact@v4
@@ -344,5 +372,6 @@ jobs:
             ${{ runner.temp }}/m3-generated-frontend/combined-four-evaluated.json
             ${{ runner.temp }}/m3-generated-frontend/frontend-delta-summary.json
             ${{ runner.temp }}/m3-generated-frontend/generated-backend-mk-delta.json
+            ${{ runner.temp }}/m3-generated-frontend/generated-makefile-delta.json
           if-no-files-found: error
           retention-days: 14
