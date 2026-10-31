@@ -166,12 +166,12 @@ fn run() -> Result<(), String> {
         \"plus_32_shift_matching_fde_ranges\":{},\"plus_32_shift_identical_code_ranges\":{},\
         \"plus_32_shift_different_code_ranges\":{},\"plus_32_shift_equal_code_span_bytes\":{},\
         \"unwind_fde_both_alignments\":{},\
-        "unwind_fde_zero_only\":{},\
-        "unwind_fde_plus_32_only\":{},\
-        "unwind_fde_neither_alignment\":{},\
-        "unwind_fde_identical_under_either\":{},\
-        "unwind_fde_eighth_bins\":[{buckets}],\
-        "sum_of_fde_span_bytes_not_unique_code_coverage\":true,\
+        \"unwind_fde_zero_only\":{},\
+        \"unwind_fde_plus_32_only\":{},\
+        \"unwind_fde_neither_alignment\":{},\
+        \"unwind_fde_identical_under_either\":{},\
+        \"unwind_fde_eighth_bins\":[{buckets}],\
+        \"sum_of_fde_span_bytes_not_unique_code_coverage\":true,\
         \"only_unwind_described_code_ranges_examined\":true,\
         \"all_compiled_functions_or_rust_ffi_proven\":false,\
         \"runtime_dlopen_closure_proven\":false,\"source_pruning_authorized\":false,\
