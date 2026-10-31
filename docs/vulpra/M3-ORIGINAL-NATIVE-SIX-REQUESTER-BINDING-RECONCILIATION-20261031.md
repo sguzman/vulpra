@@ -8,6 +8,8 @@
 - Protected crashhelper, crashreporter and updater diagnostic-only binding run [41164023607](https://github.com/sguzman/vulpra/actions/runs/41164023607).
 - `libmozinference.so` and `libclearkey.so` original C API negative/synthetic-only binding run [41164244090](https://github.com/sguzman/vulpra/actions/runs/41164244090).
 
+The follow-up run on corrected workflow commit `dad4d754` also [reconciled successfully (41164506186)](https://github.com/sguzman/vulpra/actions/runs/41164506186), and [global workflow lint passed (41164506173)](https://github.com/sguzman/vulpra/actions/runs/41164506173). The first lint run 41164427047 had detected a ShellCheck warning for an unused retry-loop counter; the fix used the counter to bound download retries and did not alter the reconciliation inputs, parser logic or results.
+
 Their four strictly parsed sanitized JSON reports share the authenticated original compiled source `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and original archived binary SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`. The new `ci/m3-original-real-binding-six-requester-union.jq` independently validates source fingerprint, schema, exact requester identities, original scope/negative-evidence flags, complete per-member count arithmetic and sanitized provider basename spelling; CI fails closed on any unexpected total or provider set.
 
 | Independent original compiled requester category | Normal-symbol binding events | Distinct requester/symbol/provider combinations |
