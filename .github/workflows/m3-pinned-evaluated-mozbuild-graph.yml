@@ -127,6 +127,18 @@ jobs:
               $b.actual_evaluated_linkable_nodes) as $full_only_linkable_nodes |
              ($b.actual_evaluated_linkable_nodes -
               $a.actual_evaluated_linkable_nodes) as $lean_only_linkable_nodes |
+             ($a.actual_evaluated_rust_library_targets -
+              $b.actual_evaluated_rust_library_targets) as $full_only_rust_targets |
+             ($b.actual_evaluated_rust_library_targets -
+              $a.actual_evaluated_rust_library_targets) as $lean_only_rust_targets |
+             ($a.actual_evaluated_rust_library_features -
+              $b.actual_evaluated_rust_library_features) as $full_only_rust_features |
+             ($b.actual_evaluated_rust_library_features -
+              $a.actual_evaluated_rust_library_features) as $lean_only_rust_features |
+             ($a.actual_evaluated_rust_library_dependencies -
+              $b.actual_evaluated_rust_library_dependencies) as $full_only_rust_dependencies |
+             ($b.actual_evaluated_rust_library_dependencies -
+              $a.actual_evaluated_rust_library_dependencies) as $lean_only_rust_dependencies |
              ($a.actual_evaluated_linkable_compile_units -
               $b.actual_evaluated_linkable_compile_units) as $full_only_compile_owners |
              ($b.actual_evaluated_linkable_compile_units -
@@ -178,6 +190,20 @@ jobs:
               combined_evaluated_compile_source_count:$b.actual_evaluated_compile_source_input_count,
               full_only_evaluated_compile_sources:$full_only_compile_sources,
               combined_only_evaluated_compile_sources:$lean_only_compile_sources,
+              full_evaluated_rust_library_target_count:$a.actual_evaluated_rust_library_target_count,
+              combined_evaluated_rust_library_target_count:$b.actual_evaluated_rust_library_target_count,
+              full_evaluated_rust_library_feature_count:$a.actual_evaluated_rust_library_feature_count,
+              combined_evaluated_rust_library_feature_count:$b.actual_evaluated_rust_library_feature_count,
+              full_evaluated_rust_library_dependency_count:$a.actual_evaluated_rust_library_dependency_count,
+              combined_evaluated_rust_library_dependency_count:$b.actual_evaluated_rust_library_dependency_count,
+              full_only_evaluated_rust_library_targets:$full_only_rust_targets,
+              combined_only_evaluated_rust_library_targets:$lean_only_rust_targets,
+              full_only_evaluated_rust_library_features:$full_only_rust_features,
+              combined_only_evaluated_rust_library_features:$lean_only_rust_features,
+              full_only_evaluated_rust_library_dependencies:$full_only_rust_dependencies,
+              combined_only_evaluated_rust_library_dependencies:$lean_only_rust_dependencies,
+              cargo_resolved_dependency_graph_proven:false,
+              rustc_invocation_or_rust_linker_executed:false,
               full_evaluated_linkable_node_count:$a.actual_evaluated_linkable_node_count,
               combined_evaluated_linkable_node_count:$b.actual_evaluated_linkable_node_count,
               full_only_evaluated_linkable_nodes:$full_only_linkable_nodes,
@@ -262,6 +288,10 @@ jobs:
              .full_directory_edges>200 and .combined_directory_edges>200 and
              .full_evaluated_compile_source_count>500 and
              .combined_evaluated_compile_source_count>500 and
+             .full_evaluated_rust_library_target_count>0 and
+             .combined_evaluated_rust_library_target_count>0 and
+             .cargo_resolved_dependency_graph_proven==false and
+             .rustc_invocation_or_rust_linker_executed==false and
              .full_evaluated_linkable_node_count>500 and
              .combined_evaluated_linkable_node_count>500 and
              .full_evaluated_webidl_binding_unit_count>0 and
@@ -298,6 +328,11 @@ jobs:
           jq -c '{
             emitted_compile_sources:[.full_evaluated_compile_source_count,.combined_evaluated_compile_source_count],
             declared_link_nodes:[.full_evaluated_linkable_node_count,.combined_evaluated_linkable_node_count],
+            rust_library_targets:[.full_evaluated_rust_library_target_count,.combined_evaluated_rust_library_target_count],
+            rust_direct_cargo_deps:[.full_evaluated_rust_library_dependency_count,.combined_evaluated_rust_library_dependency_count],
+            differing_rust_targets:[(.full_only_evaluated_rust_library_targets|length),(.combined_only_evaluated_rust_library_targets|length)],
+            differing_rust_features:[(.full_only_evaluated_rust_library_features|length),(.combined_only_evaluated_rust_library_features|length)],
+            differing_rust_deps:[(.full_only_evaluated_rust_library_dependencies|length),(.combined_only_evaluated_rust_library_dependencies|length)],
             webidl_binding_units:[.full_evaluated_webidl_binding_unit_count,.combined_evaluated_webidl_binding_unit_count],
             webidl_unified_members:[.full_evaluated_webidl_unified_member_count,.combined_evaluated_webidl_unified_member_count],
             unmatched_webidl_units:[(.full_unmatched_webidl_linkable_units|length),(.combined_unmatched_webidl_linkable_units|length)],
