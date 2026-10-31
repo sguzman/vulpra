@@ -345,6 +345,25 @@ For `libxul.so`, **17,699,655 / 128,073,093 positions (13.82%)** are equal at th
 
 There were **exactly 2 eligible named defined exported `FUNC` symbols** in each `libxul.so`; both matched across the variants with equal function lengths and **exactly +32 bytes** of lean relative `.text` offset displacement. **1 function body was byte-identical; 1 differed**, the retained exported symbol `XRE_GetBootstrap@@libxul.so`. The absence of additional defined dynamic exported functions in this specific native ELF is a **severe coverage limit**, not evidence that the other compiled code, stripped/internal symbols, Rust/C++ FFI, or runtime dynamic loading is unchanged. No pruning, compiled size savings, or M3 sixth-gate credit; **M3 5/6 (83%), overall 61%, Δ0pp**.
 
+### Compiled `libxul.so` unwind-described code-range comparison
+
+[**Pinned actual source-matched native `.eh_frame` FDE code-range comparison 41254586276 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41254586276). Rust std-only source `ci/m3-libxul-unwind-fde-shift.rs` streamed the actual compiled original full and combined-four lean ELF unwind FDE records (without uploading raw FDE paths or executing browser code), bounded records and output lines, checked each range against actual `.text` boundaries, then compared code bytes at matching native offsets, with and without the observed +32-byte lean displacement. The workflow and fixtures passed and its archived JSON was inspected.
+
+| Native compiled FDE and code-range metric | Normal | Combined lean |
+| --- | ---: | ---: |
+| Raw FDE records | **282,697** | **282,697** |
+| FDE records outside `.text` | 3 | 3 |
+| Unique in-`.text` unwind-described ranges | **282,694** | **282,694** |
+
+| Tested original → lean alignment | Zero offset | Lean +32 B |
+| --- | ---: | ---: |
+| Matching declared FDE-range boundaries | **37,740** | **253,073** |
+| Corresponding ranges with identical `.text` bytes | **11,396** | **87,913** |
+| Corresponding ranges with differing `.text` bytes | 26,344 | **165,160** |
+| Sum of byte-identical range spans (not unique coverage) | 992,474 | **14,717,219** |
+
+**253,073 / 282,694 (89.5%)** of original unwind ranges have a same-length, exact FDE boundary witness **at the +32-byte position** in lean. This gives strong, function-like (unwind-described) structural evidence for the widespread linker/code-layout displacement, far beyond the **two** defined dynamic exported `FUNC` symbols. The 165,160 shifted-boundary matched but byte-different FDE code spans prevent claiming native bit identity; byte changes may include address-relative instructions, but their meaning is **not established**. FDE ranges need not cover every machine-code function, can overlap, and identical span byte totals cannot be treated as unique verified code coverage. No full executable linker/reproducibility or static Rust/C++ FFI graph, conditional `dlopen` closure, source pruning or further package savings; M3 stays **5/6 (83%)**, overall **61%**, Δ0pp.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
