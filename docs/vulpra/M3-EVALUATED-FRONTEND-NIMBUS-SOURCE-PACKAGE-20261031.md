@@ -254,6 +254,22 @@ No profile/browser modified and no new source pruning or packaged savings. **M3 
 
 This provides a concrete, bounded `gkrust` **transitive resolved dependency closure** within the pinned workspace activation context, rather than equating the entire 889-node workspace to the `gkrust` subtree. It still does **not** independently resolve each of the other Mozilla Rust root libraries/programs with its own requested features or establish feature unification during an actual full native build, `build.rs` products, final compiled crate objects, linker/FFI/dlopen closure or runtime behavior. This is a source/configure-time equivalence result, not a reduction in compiled Rust. **M3 remains 5/6 (83%), overall 61%, accepted milestone delta +0pp.**
 
+## Remaining five Mozilla Rust roots: independent offline feature-resolved closures
+
+[**Pinned original-source other-five-root Cargo resolution 41251318660 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41251318660), [**workflow lint 41251318658 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41251318658). The bounded resolver read the actual `BaseRustLibrary` and `BaseRustProgram` frontend target/manifest identities, independently invoked offline locked Cargo metadata with **each root's own emitted feature list**, followed resolved package-ID dependencies from the root and compared the reachable package, activated feature and edge records across independently configured full-normal and combined-four-lean builds.
+
+| Rust root manifest (source-relative) | Requested features (each) | Reachable resolved nodes (each) | Full/lean mismatches |
+| --- | ---: | ---: | ---: |
+| `toolkit/components/uniffi-bindgen-gecko-js/Cargo.toml` | **0** | **90** | **0** |
+| `toolkit/components/uniffi-bindgen-gecko-js/components/Cargo.toml` | **1** | **278** | **0** |
+| `toolkit/components/uniffi-bindgen-gecko-js/test-fixtures/Cargo.toml` | **0** | **125** | **0** |
+| `toolkit/crashreporter/client/app/Cargo.toml` | **0** | **325** | **0** |
+| `toolkit/crashreporter/crash_helper_server/Cargo.toml` | **0** | **102** | **0** |
+
+Together with [the independently verified `gkrust` root (747 reachable nodes, 17 requested features, zero full/lean mismatches)](https://github.com/sguzman/vulpra/actions/runs/41250793026), **all six emitted Rust library/program roots** now have individually compared offline lockfile-pinned, feature-resolved reachable dependency graphs. These per-root closure sizes **overlap** and cannot be summed into unique crates. Each invocation uses Cargo workspace resolution, so activated feature sets are contextual to its selected manifest and requested features and are not proof of the exact unification in a full build invoking multiple targets together.
+
+The raw `cargo metadata` files, full environment paths and Rust build invocations were not archived. No `build.rs` execution, compiled `rustc` artifacts, actual native link command/objects, Rust/C++ FFI or dynamic `dlopen` closure is established. No source pruning or new binary/package savings. **M3 remains 5/6 (83%), Vulpra overall 61%, milestone delta +0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
