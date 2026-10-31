@@ -1,0 +1,107 @@
+# Independent source/run-authenticated overlap-aware original ELF runtime coverage.
+# Inputs contain only counts and sanitized basenames, never symbols or raw traces.
+name: M3 All 28 Original ELF Requester Binding Witnesses
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-all-28-runtime-requester-union.yml
+      - ci/m3-original-all-28-runtime-requester-union.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  all-original-28-native-elf-requester-binding-witnesses:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SRC: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      PACKAGE_RUN: '41206231047'
+      PACKAGE_HEAD: b4cd113f6c6e0fac8160813f6503a6362ff94620
+      TEN_RUN: '41206028051'
+      TEN_HEAD: 1c5dc963a43c220d14dbee2f25ca1d6f8032a0b9
+    steps:
+      - name: Checkout only source-pinned jq verifier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Authenticate both independent successful native source-run commitments
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          command -v jq
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN" |
+            jq -e --arg sha "$PACKAGE_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TEN_RUN" |
+            jq -e --arg sha "$TEN_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+      - name: Fetch only two small sanitized native evidence reports
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          get_artifact() {
+            local run="$1" name="$2" dir="$3"
+            mkdir -p "$dir"
+            for attempt in 1 2 3; do
+              if gh run download "$run" --repo "$GITHUB_REPOSITORY" --name "$name" --dir "$dir"; then return 0; fi
+              if test "$attempt" = 3; then break; fi
+              sleep 2
+            done
+            return 1
+          }
+          get_artifact "$PACKAGE_RUN" m3-original-package-elf-runtime-bindings-sanitized "$RUNNER_TEMP/pkg"
+          get_artifact "$TEN_RUN" m3-original-ten-requester-binding-reconciliation "$RUNNER_TEMP/ten"
+          test -s "$RUNNER_TEMP/pkg/m3-original-package-elf-runtime-binding-census.json"
+          test -s "$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json"
+      - name: Fail-closed exact complete 28-original-ELF requester observation crosswalk
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg src "$SRC" --arg sha "$ARCHIVE" \
+            --slurpfile native "$RUNNER_TEMP/pkg/m3-original-package-elf-runtime-binding-census.json" \
+            --slurpfile ten "$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json" \
+            -f ci/m3-original-all-28-runtime-requester-union.jq \
+            > "$RUNNER_TEMP/m3-original-all-28-elf-requester-binding-witnesses.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="all_original_28_elf_requesters_have_bounded_runtime_binding_evidence" and
+            .original_elf_requester_count==28 and
+            (.original_elf_requester_basenames|length)==28 and
+            .original_requesters_seen_during_headless_startup==21 and
+            .original_requesters_seen_in_selected_feature_workloads==10 and
+            .overlapping_requester_count==3 and
+            (.startup_unobserved_requesters_exercised_in_other_workloads|length)==7 and
+            .package_wide_startup_binding_events==13501 and
+            .package_wide_startup_distinct_requester_symbol_provider_pairs==6463 and
+            .separate_feature_binding_events==8394 and
+            .separate_feature_distinct_requester_symbol_provider_pairs==4520 and
+            .total_observed_provider_basename_union_count==56 and
+            (.observed_provider_basenames|length)==56 and
+            .every_original_elf_requester_witnessed_in_at_least_one_bounded_workload==true and
+            .events_across_overlapping_workloads_not_summed==true and
+            .all_elf_relocations_or_features_proven==false and
+            .complete_lazy_transitive_dependencies_proven==false and
+            .source_build_ownership_gate_closed==false and
+            .installed_browser_or_profiles_modified==false and
+            .source_removal_authorized==false and
+            .package_savings_bytes==null and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-all-28-elf-requester-binding-witnesses.json" >/dev/null
+          echo 'PASS: actual normal-symbol binding evidence for every one of 28 original compiled ELF requester basenames; only bounded workloads'
+      - name: Upload sanitized original 28-requester evidence union only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-all-28-elf-requester-binding-witnesses
+          path: ${{ runner.temp }}/m3-original-all-28-elf-requester-binding-witnesses.json
+          if-no-files-found: error
+          retention-days: 14
