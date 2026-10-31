@@ -1,0 +1,81 @@
+# Contrast TWO authenticated successful original-native Wayland jobs.
+# Host runs offline to protect its strict nonlocal guard; netns runs online
+# but has no network egress. Equal counts alone cannot prove equal libraries.
+name: M3 Native Host Offline Netns Online Loader Contrast
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-wayland-offline-online-loader-contrast.yml
+      - ci/m3-wayland-offline-online-loader-contrast.sh
+      - ci/tests/m3-wayland-offline-online-loader-contrast-test.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare-original-source-graphical-modes:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      REPORT_RUN_SHA: f39403ce50bd550b0123a9d68e45b3be947b38d7
+      HOST_OFFLINE_RUN: '41149955223'
+      NETNS_ONLINE_RUN: '41149955004'
+    steps:
+      - name: Checkout strict source-sha and loader evidence parser
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Reject synthetic spoofed and incomplete loader reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-wayland-offline-online-loader-contrast.sh
+          bash ci/tests/m3-wayland-offline-online-loader-contrast-test.sh
+      - name: Authenticate separate successful full-normal native runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$HOST_OFFLINE_RUN" |
+            jq -e --arg sha "$REPORT_RUN_SHA" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha and
+              .name=="M3 Actual Wayland Native Loader Observation"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NETNS_ONLINE_RUN" |
+            jq -e --arg sha "$REPORT_RUN_SHA" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha and
+              .name=="M3 Actual Netns Wayland Native Loader Mapping"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/host" "$RUNNER_TEMP/netns"
+          gh run download "$HOST_OFFLINE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-private-weston-wayland-loader-observed --dir "$RUNNER_TEMP/host"
+          gh run download "$NETNS_ONLINE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-netns-wayland-native-loader-observed --dir "$RUNNER_TEMP/netns"
+          test -s "$RUNNER_TEMP/host/m3-wayland-native-loader-observed.json"
+          test -s "$RUNNER_TEMP/netns/m3-netns-wayland-native-loader-observed.json"
+      - name: Compare exact basename and request edge sets by mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/m3-wayland-offline-online-loader-contrast.sh \
+            "$RUNNER_TEMP/host/m3-wayland-native-loader-observed.json" \
+            "$RUNNER_TEMP/netns/m3-netns-wayland-native-loader-observed.json" \
+            "$RUNNER_TEMP/m3-wayland-offline-online-loader-contrast.json"
+          jq -e '.m3_sixth_gate_closed==false and
+                 .complete_feature_graph_proven==false and
+                 .complete_symbol_abi_resolution_proven==false and
+                 .new_source_removal_authorized==false' \
+            "$RUNNER_TEMP/m3-wayland-offline-online-loader-contrast.json" >/dev/null
+          echo 'PASS: authenticated real host-offline vs disconnected-netns-online graphical loader sets; no source-removal authorization'
+      - name: Upload only sanitized source-pinned comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-wayland-host-offline-netns-online-contrast
+          path: ${{ runner.temp }}/m3-wayland-offline-online-loader-contrast.json
+          if-no-files-found: error
+          retention-days: 14
