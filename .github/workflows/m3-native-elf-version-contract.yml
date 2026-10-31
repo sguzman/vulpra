@@ -1,0 +1,96 @@
+# Read-only VERNEED / VERDEF candidate coverage for the immutable native Vulpra.
+# Compiler source and package SHA must match, no ldd, dlopen or native execution.
+name: M3 Source-Pinned Native ELF Version-Name Inventory
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-elf-version-contract.py
+      - .github/workflows/m3-native-elf-version-contract.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect-original-package-elf-version-needs:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout bounded metadata-only inspector
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ci
+      - name: Reject forged ELF symbol versions and verify source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/m3-native-elf-version-contract.py
+          python3 ci/m3-native-elf-version-contract.py --self-test
+      - name: Install Ubuntu host ELF runtime candidates for metadata inspection
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends binutils libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          command -v readelf
+          test -x /sbin/ldconfig
+      - name: Authenticate original compilation and source-pinned package archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/original"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline \
+            --dir "$RUNNER_TEMP/original"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+      - name: Audit ELF library-version declarations without executing Firefox
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          python3 ci/m3-native-elf-version-contract.py \
+            --archive "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" \
+            --output "$RUNNER_TEMP/m3-native-elf-version-contract.json"
+          jq -e --arg sha "$ARCHIVE_SHA" --arg src "$SOURCE_SHA" '
+            .schema_version==1 and
+            .source_commit==$src and
+            .original_archive_sha256==$sha and
+            .scanned_native_elf_files==28 and
+            .native_elf_declared_version_requirements>0 and
+            .native_elf_declared_version_requirements==(.requirements|length) and
+            .candidate_version_name_present_count+
+              .candidate_version_name_absent_count+
+              .candidate_version_name_unavailable_count==
+              .native_elf_declared_version_requirements and
+            .native_binaries_executed==false and
+            .ldd_or_dynamic_loader_executed==false and
+            .actual_symbol_resolution_proven==false and
+            .host_provider_is_runtime_selected_proven==false and
+            .target_arch_hyprland_abi_proven==false and
+            .safe_source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-native-elf-version-contract.json" >/dev/null
+          echo 'PASS: source-pinned native version-name contracts only; no complete ABI gate'
+      - name: Upload only bounded library/version names and scope flags
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-version-name-contract
+          path: ${{ runner.temp }}/m3-native-elf-version-contract.json
+          if-no-files-found: error
+          retention-days: 14
