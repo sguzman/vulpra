@@ -91,10 +91,10 @@ def portable_member(value):
     """Reversibly percent-encode unusual upstream filenames, not discard them."""
     if not isinstance(value, str):
         raise ValueError("Expected source or installation member")
-    value = value.replace("\\\\", "/").strip("/")
+    value = value.replace("\\", "/").strip("/")
     if ".." in value.split("/"):
         raise ValueError("Unsafe parent traversal in ownership member")
-    if "\\x00" in value:
+    if "\x00" in value:
         raise ValueError("NUL in ownership member")
     return quote(value, safe="/._-+@")
 
