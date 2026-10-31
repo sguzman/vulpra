@@ -104,7 +104,7 @@ jq -e '.normal_generated_backend_mk_files > 500 and
   .shared_generated_backend_mk_files > 500 and
   (.identical_normalized_backend_mk_files +
    .differing_normalized_backend_mk_files == .shared_generated_backend_mk_files) and
-  (.differing_normalized_backend_mk|length ==
+  ((.differing_normalized_backend_mk | length) ==
    .differing_normalized_backend_mk_files) and
   .native_compile_or_link_executed == false and
   .m3_sixth_gate_closed == false' "$out" >/dev/null
