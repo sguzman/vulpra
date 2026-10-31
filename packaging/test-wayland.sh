@@ -37,25 +37,11 @@ cleanup() {
 }
 trap cleanup EXIT
 mkdir -m 0700 -p "$work/runtime" "$work/home"
-# The GUI smoke checks frame submission, not the browser's live internet
-# endpoints. Startup may contact region, Remote Settings and other background
-# services; when MOZ_DISABLE_NONLOCAL_CONNECTIONS=1, a rejected HTTP request
-# intentionally crashes Gecko. Put ALL normal HTTP(S) traffic through a
-# nonexistent loopback-only SOCKS5 endpoint inside this throwaway profile.
-# This is not a proxy for a real user session and cannot reach the internet.
-# Keep the non-local guard active and do not touch installed Firefox profiles.
-test_profile="$work/home/.local/share/vulpra/default"
-mkdir -p -m 0700 -- "$test_profile"
-printf '%s\n' \
-  'user_pref("browser.search.region", "ZZ");' \
-  'user_pref("network.proxy.type", 1);' \
-  'user_pref("network.proxy.socks", "127.0.0.1");' \
-  'user_pref("network.proxy.socks_port", 9);' \
-  'user_pref("network.proxy.socks_version", 5);' \
-  'user_pref("network.proxy.socks5_remote_dns", true);' \
-  'user_pref("network.proxy.socks_remote_dns", true);' \
-  > "$test_profile/user.js"
-chmod 0600 -- "$test_profile/user.js"
+# The Firefox native XRE startup explicitly honors XRE_START_OFFLINE=1 and
+# calls nsIIOService::SetOffline(true) before normal browser services start.
+# Keep this *CI smoke only*, confined to the browser process, because the
+# host-runner also enforces MOZ_DISABLE_NONLOCAL_CONNECTIONS=1. Never modify
+# real user profiles, allow non-local egress or weaken frame/liveness checks.
 export XDG_RUNTIME_DIR="$work/runtime"
 export WAYLAND_DISPLAY="wayland-vulpra"
 unset DISPLAY
@@ -109,6 +95,7 @@ fi
 env -u MOZ_HEADLESS "${loader_env[@]}" \
   HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
   XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
+  XRE_START_OFFLINE=1 \
   WAYLAND_DEBUG=client \
   "$launcher" about:blank >"$work/browser.log" 2>&1 &
 browser_pid="$!"
@@ -122,10 +109,9 @@ if ! kill -0 "$browser_pid" 2>/dev/null; then
   tail -n 80 "$work/browser.log" >&2 || true
   exit 1
 fi
-# The harness precreates the profile only to seed a local region preference.
-# Do not mistake that directory for evidence of actual browser initialization:
-# Gecko writes compatibility.ini while loading a new profile (nsAppRunner.cpp).
-[[ -s "$test_profile/compatibility.ini" ]] || {
+# Gecko writes compatibility.ini while actually initializing a new profile.
+# This is stronger than testing directory existence or merely surviving.
+[[ -s "$work/home/.local/share/vulpra/default/compatibility.ini" ]] || {
   echo 'Wayland startup did not initialize its isolated Vulpra profile' >&2
   exit 1
 }

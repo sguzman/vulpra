@@ -51,26 +51,13 @@ jobs:
           set -euo pipefail
           test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
           test "${WAYLAND_DEBUG:-}" = client
-          # Region lookup is preseeded inside the ephemeral smoke profile.
-          # The network guard must remain enabled, not silently disabled.
+          # The browser itself, not the compositor or harness, is put offline.
+          # The fatal non-local-connection restriction remains active.
           test "${MOZ_DISABLE_NONLOCAL_CONNECTIONS:-}" = 1
-          # The throwaway profile routes browser HTTP(S) requests to a
-          # nonexistent local SOCKS service; never permit external egress.
+          test "${XRE_START_OFFLINE:-}" = 1
           profile="${XDG_DATA_HOME}/vulpra/default"
-          test -f "$profile/user.js"
-          grep -Fxq 'user_pref("browser.search.region", "ZZ");' "$profile/user.js"
-          grep -Fxq 'user_pref("network.proxy.type", 1);' "$profile/user.js"
-          grep -Fxq 'user_pref("network.proxy.socks", "127.0.0.1");' "$profile/user.js"
-          grep -Fxq 'user_pref("network.proxy.socks_port", 9);' "$profile/user.js"
-          grep -Fxq 'user_pref("network.proxy.socks_version", 5);' "$profile/user.js"
-          grep -Fxq 'user_pref("network.proxy.socks5_remote_dns", true);' "$profile/user.js"
-          grep -Fxq 'user_pref("network.proxy.socks_remote_dns", true);' "$profile/user.js"
-          if grep -Fq 'services.settings.server' "$profile/user.js"; then
-            echo 'FAIL: smoke profile must not need Remote Settings devtools override' >&2
-            exit 1
-          fi
-          test "$(stat -c '%a' "$profile")" = 700
-          test "$(stat -c '%a' "$profile/user.js")" = 600
+          test -d "$profile"
+          test ! -e "$profile/user.js"
           # Fake only Gecko's profile-initialization marker in this mock test.
           # The real native CI must create this file itself.
           printf '[Compatibility]\\nLastVersion=synthetic\\n' > "$profile/compatibility.ini"
