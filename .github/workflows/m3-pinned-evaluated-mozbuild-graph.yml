@@ -11,6 +11,7 @@ on:
       - ci/m3-compare-generated-backend.sh
       - ci/m3-compare-generated-makefiles.sh
       - ci/m3-compare-faster-install-manifests.sh
+      - ci/m3-compare-compile-db.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -46,6 +47,7 @@ jobs:
             ci/m3-compare-generated-backend.sh
             ci/m3-compare-generated-makefiles.sh
             ci/m3-compare-faster-install-manifests.sh
+            ci/m3-compare-compile-db.sh
             ci/mozconfig-linux-m3-baseline
             ci/mozconfig-linux-m3-combined-lean
             browser/moz.configure
@@ -62,6 +64,7 @@ jobs:
           bash -n ../controls/ci/m3-compare-generated-backend.sh
           bash -n ../controls/ci/m3-compare-generated-makefiles.sh
           bash -n ../controls/ci/m3-compare-faster-install-manifests.sh
+          bash -n ../controls/ci/m3-compare-compile-db.sh
           # No user's computer nor browser profile is in this CI workflow.
           mkdir -p "$RUNNER_TEMP/m3-generated-frontend"
       - name: Bootstrap same pinned Firefox 159 Linux native configure toolchain
@@ -394,6 +397,34 @@ jobs:
             .source_pruning_authorized==false and
             .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/m3-generated-frontend/generated-faster-install-manifests.json" >/dev/null
+      - name: Generate and compare Mozilla declared C/C++ compiler commands without compiling
+        shell: bash
+        working-directory: original
+        timeout-minutes: 22
+        run: |
+          set -euo pipefail
+          MOZCONFIG="$GITHUB_WORKSPACE/controls/ci/mozconfig-linux-m3-baseline" \
+            ./mach build-backend -b CompileDB
+          test -s obj-vulpra-linux-m3-baseline/compile_commands.json
+          MOZCONFIG="$GITHUB_WORKSPACE/controls/ci/mozconfig-linux-m3-combined-lean" \
+            ./mach build-backend -b CompileDB
+          test -s obj-vulpra-linux-m3-combined-lean/compile_commands.json
+          bash ../controls/ci/m3-compare-compile-db.sh \
+            obj-vulpra-linux-m3-baseline \
+            obj-vulpra-linux-m3-combined-lean \
+            "$RUNNER_TEMP/m3-generated-frontend/compile-command-declarations.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .status=="pinned_configured_mozilla_compiledb_command_declarations_compared" and
+            .source_commit==$sha and
+            .normal_compiler_command_entries>500 and
+            .combined_compiler_command_entries>500 and
+            .compiler_commands_generated_but_not_executed==true and
+            .complete_raw_compile_commands_archived==false and
+            .actual_compiler_or_linker_executed==false and
+            .rustc_and_linker_command_closure_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-generated-frontend/compile-command-declarations.json" >/dev/null
       - name: Archive bounded generated relative build graphs and exact comparison
         if: success()
         uses: actions/upload-artifact@v4
@@ -405,6 +436,7 @@ jobs:
             ${{ runner.temp }}/m3-generated-frontend/frontend-delta-summary.json
             ${{ runner.temp }}/m3-generated-frontend/generated-backend-mk-delta.json
             ${{ runner.temp }}/m3-generated-frontend/generated-makefile-delta.json
+            ${{ runner.temp }}/m3-generated-frontend/compile-command-declarations.json
             ${{ runner.temp }}/m3-generated-frontend/generated-faster-install-manifests.json
           if-no-files-found: error
           retention-days: 14
