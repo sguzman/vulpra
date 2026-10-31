@@ -45,6 +45,7 @@ normalized_makefile() {
 }
 normalized_sha() {
   normalized_makefile "$1" "$2" | sha256sum | cut -d ' ' -f 1
+}
 
 while IFS= read -r rel; do
   [ -f "$full/$rel" ] && [ -f "$lean/$rel" ]
