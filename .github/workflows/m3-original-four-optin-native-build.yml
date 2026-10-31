@@ -1,0 +1,163 @@
+# Isolated original-source-matched native four-flag experiment. Its "full"
+# control was already compiled from the same exact source commit; no normal
+# Vulpra installation, user profiles or default build options are touched.
+name: M3 Original Native Combined Four-Opt-In Build
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-four-optin-native-build.yml
+      - ci/m3-combined-four-native-package.sh
+      - ci/m3-combined-optin-source-guard.rs
+      - ci/mozconfig-linux-m3-combined-lean
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: vulpra-original-combined-four-optin-native-build
+  cancel-in-progress: false
+jobs:
+  original-exact-source-four-experiment-native-package:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      FULL_ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      FULL_RUN: '40997075527'
+      DEBIAN_FRONTEND: noninteractive
+      MOZ_HEADLESS: '1'
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_GHA_VERSION: vulpra-1590b5-m3-normandy-v1
+      CARGO_BUILD_JOBS: '1'
+    steps:
+      - name: Checkout original successfully compiled immutable full-browser source
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: original
+          fetch-depth: 1
+      - name: Checkout only current opt-in configuration and guarded test/packaging scripts
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: controls
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/mozconfig-linux-m3-baseline
+            ci/mozconfig-linux-m3-combined-lean
+            ci/m3-combined-optin-source-guard.rs
+            ci/m3-combined-four-native-package.sh
+            browser/moz.configure
+      - name: Authenticate original source and exact default versus opt-in compiler settings
+        working-directory: original
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git -C ../controls rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git hash-object browser/moz.configure)" = "$(git -C ../controls hash-object browser/moz.configure)"
+          test "$(git hash-object ci/mozconfig-linux-m3-baseline)" = "$(git -C ../controls hash-object ci/mozconfig-linux-m3-baseline)"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FULL_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          rustc --edition=2021 --test ../controls/ci/m3-combined-optin-source-guard.rs -o "$RUNNER_TEMP/combined-source-test"
+          "$RUNNER_TEMP/combined-source-test"
+          rustc --edition=2021 -O ../controls/ci/m3-combined-optin-source-guard.rs -o "$RUNNER_TEMP/combined-source-check"
+          "$RUNNER_TEMP/combined-source-check" ci/mozconfig-linux-m3-baseline \
+            ../controls/ci/mozconfig-linux-m3-combined-lean browser/moz.configure \
+            "$RUNNER_TEMP/combined-source.json"
+          bash -n ../controls/ci/m3-combined-four-native-package.sh
+          echo "MOZCONFIG=$GITHUB_WORKSPACE/controls/ci/mozconfig-linux-m3-combined-lean" >> "$GITHUB_ENV"
+      - name: Match native Firefox compiler cache toolchain
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: v0.16.0
+      - name: Export Actions compiler cache credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      - name: Bootstrap original native browser Linux dependencies
+        working-directory: original
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends python3 python3-venv python3-dev git curl make jq unzip
+          ./mach --no-interactive bootstrap --application-choice browser
+      - name: Evaluate all four source configurations and require preserved critical desktop features
+        working-directory: original
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach configure
+          dir=obj-vulpra-linux-m3-combined-lean/config.statusd/substs
+          read_field() { jq -r . "$dir/$1" 2>/dev/null || true; }
+          enabled() {
+            local v
+            v="$(read_field "$1")"
+            test "$v" = 1 || test "$v" = true
+          }
+          disabled() {
+            local v
+            v="$(read_field "$1")"
+            test "$v" = 0 || test "$v" = false || test "$v" = null || test -z "$v"
+          }
+          disabled MOZ_NORMANDY
+          enabled VULPRA_NO_ASROUTER_PROMOS
+          enabled VULPRA_NO_NEWTAB_ADSFEED
+          enabled VULPRA_NO_NEWTAB_PROMOCARD
+          test "$(read_field MOZ_WIDGET_TOOLKIT)" = gtk
+          test "$(read_field MOZ_APP_BASENAME)" = Vulpra
+          test "$(read_field MOZ_DEVTOOLS)" = all
+          enabled MOZ_SANDBOX
+          enabled MOZ_WAYLAND
+          enabled MOZ_SERVICES_SYNC
+          echo 'PASS: combined four opt-ins and protected Gecko/Sync/DevTools/Wayland native config'
+      - name: Match original native build swap and predictable Cargo concurrency
+        working-directory: original
+        shell: bash
+        run: |
+          set -euo pipefail
+          needed=$((24 * 1024 * 1024 * 1024))
+          available="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          (( available > needed + 8 * 1024 * 1024 * 1024 ))
+          sudo fallocate -l 24G /mnt/vulpra-m3-four-candidate.swap
+          sudo chmod 0600 /mnt/vulpra-m3-four-candidate.swap
+          sudo mkswap /mnt/vulpra-m3-four-candidate.swap
+          sudo swapon /mnt/vulpra-m3-four-candidate.swap
+          test "$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo)" -ge 25165824
+      - name: Compile real native browser with the four combined isolated omissions
+        working-directory: original
+        shell: bash
+        timeout-minutes: 260
+        run: |
+          set -euo pipefail
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-native-four-build.log"
+      - name: Package compiled native candidate and compare source-pinned original full browser
+        working-directory: original
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          bash ../controls/ci/m3-combined-four-native-package.sh "$PWD" "$RUNNER_TEMP"
+      - name: Preserve actual compiled variant and bounded matched package-size evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-native-combined-four-optin-candidate
+          path: |
+            ${{ runner.temp }}/four/vulpra-four-lean.tar.xz
+            ${{ runner.temp }}/four/vulpra-four-lean.tar.xz.sha256
+            ${{ runner.temp }}/four/m3-original-four-native-size.json
+          if-no-files-found: error
+          retention-days: 14
