@@ -37,16 +37,23 @@ cleanup() {
 }
 trap cleanup EXIT
 mkdir -m 0700 -p "$work/runtime" "$work/home"
-# The GUI smoke checks rendering, not internet-based region discovery. Firefox
-# reads this test-only preference before Region.sys.mjs starts a background
-# lookup of location.services.mozilla.com. Its startup request deliberately
-# triggers the MOZ_DISABLE_NONLOCAL_CONNECTIONS fatal guard in CI. Never
-# disable that guard or affect installed/user profiles to get a green test.
+# The GUI smoke checks frame submission, not the browser's live internet
+# endpoints. Startup may contact region, Remote Settings and other background
+# services; when MOZ_DISABLE_NONLOCAL_CONNECTIONS=1, a rejected HTTP request
+# intentionally crashes Gecko. Put ALL normal HTTP(S) traffic through a
+# nonexistent loopback-only SOCKS5 endpoint inside this throwaway profile.
+# This is not a proxy for a real user session and cannot reach the internet.
+# Keep the non-local guard active and do not touch installed Firefox profiles.
 test_profile="$work/home/.local/share/vulpra/default"
 mkdir -p -m 0700 -- "$test_profile"
 printf '%s\n' \
   'user_pref("browser.search.region", "ZZ");' \
-  'user_pref("services.settings.server", "http://127.0.0.1:9/v1");' \
+  'user_pref("network.proxy.type", 1);' \
+  'user_pref("network.proxy.socks", "127.0.0.1");' \
+  'user_pref("network.proxy.socks_port", 9);' \
+  'user_pref("network.proxy.socks_version", 5);' \
+  'user_pref("network.proxy.socks5_remote_dns", true);' \
+  'user_pref("network.proxy.socks_remote_dns", true);' \
   > "$test_profile/user.js"
 chmod 0600 -- "$test_profile/user.js"
 export XDG_RUNTIME_DIR="$work/runtime"
@@ -102,7 +109,6 @@ fi
 env -u MOZ_HEADLESS "${loader_env[@]}" \
   HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
   XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
-  MOZ_REMOTE_SETTINGS_DEVTOOLS=1 \
   WAYLAND_DEBUG=client \
   "$launcher" about:blank >"$work/browser.log" 2>&1 &
 browser_pid="$!"
