@@ -85,12 +85,22 @@ grep -Fq 'xdg_wm_base' "$work/compositor-info" || {
 # Optional CI loader observation applies ONLY to browser processes, never the
 # Weston compositor, wayland-info or Python QA helper. No default behavior change.
 loader_env=()
+trace_kind="${VULPRA_M3_LOADER_TRACE_KIND:-libs,files}"
+case "$trace_kind" in
+  libs,files|versions) ;;
+  *) echo 'Invalid browser-only GNU loader trace kind' >&2; exit 2 ;;
+esac
+if [[ -n "${VULPRA_M3_LOADER_TRACE_KIND:-}" &&
+      -z "${VULPRA_M3_LOADER_TRACE_PREFIX:-}" ]]; then
+  echo 'GNU loader trace kind requires disposable trace prefix' >&2
+  exit 2
+fi
 if [[ -n "${VULPRA_M3_LOADER_TRACE_PREFIX:-}" ]]; then
   [[ "$VULPRA_M3_LOADER_TRACE_PREFIX" == /* ]] || {
     echo 'Native loader trace prefix must be an absolute disposable path' >&2
     exit 2
   }
-  loader_env=("LD_DEBUG=libs,files" "LD_DEBUG_OUTPUT=$VULPRA_M3_LOADER_TRACE_PREFIX")
+  loader_env=("LD_DEBUG=$trace_kind" "LD_DEBUG_OUTPUT=$VULPRA_M3_LOADER_TRACE_PREFIX")
 fi
 # Opt in only on the specific ordinary-host CI that intentionally forbids
 # non-local connections. Existing disconnected-netns and other graphical
