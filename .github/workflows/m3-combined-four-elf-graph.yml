@@ -1,0 +1,97 @@
+# Compare real compiled direct ELF dependency tuples, not source declarations
+# and not a dynamic/dlopen closure. Both archives from original b1482404.
+name: M3 Compiled Four-Opt-In Exact 28-ELF Import Crosswalk
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-combined-four-elf-graph.yml
+      - ci/m3-combined-four-elf-direct-graph.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-full-versus-real-combined-native-import-map:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ORIGINAL_FULL_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      COMBINED_LEAN_SHA: e7aa6273fc1078134c216408c7cc110886dc60ada90c062d7f2482fd3f288eec
+      FULL_RUN: '40997075527'
+      COMBINED_RUN: '41222758405'
+    steps:
+      - name: Checkout only independent Rust direct ELF graph inspector
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-combined-four-elf-direct-graph.rs
+      - name: Compile Rust std-only inspector and deliberate negative fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-combined-four-elf-direct-graph.rs -o "$RUNNER_TEMP/m3-elf-graph-test"
+          "$RUNNER_TEMP/m3-elf-graph-test"
+          rustc --edition=2021 -O ci/m3-combined-four-elf-direct-graph.rs -o "$RUNNER_TEMP/m3-elf-graph"
+          command -v readelf
+      - name: Authenticate both independent successful source-matched full and opt-in native browser builds
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$FULL_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.conclusion=="success" and .head_sha==$sha' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$COMBINED_RUN" |
+            jq -e --arg sha "e9e52a0ca36f54fab071784cea31d2a6a55789ad" '.conclusion=="success" and .head_sha==$sha and .path==".github/workflows/m3-original-four-optin-native-build.yml"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/packages/full" "$RUNNER_TEMP/packages/lean" "$RUNNER_TEMP/audit"
+          gh run download "$FULL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/packages/full"
+          gh run download "$COMBINED_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-native-combined-four-optin-candidate --dir "$RUNNER_TEMP/packages/lean"
+          (cd "$RUNNER_TEMP/packages/full" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          (cd "$RUNNER_TEMP/packages/lean" && sha256sum -c vulpra-four-lean.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/packages/full/full-normandy-baseline.tar.xz" | awk '{print $1}')" = "$ORIGINAL_FULL_SHA"
+          test "$(sha256sum "$RUNNER_TEMP/packages/lean/vulpra-four-lean.tar.xz" | awk '{print $1}')" = "$COMBINED_LEAN_SHA"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$COMBINED_LEAN_SHA" '
+             .original_source_commit==$src and
+             .combined_native_archive_sha256==$sha and
+             .all_four_generated_config_guards_verified==true and
+             .source_pruning_authorized==false and
+             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/packages/lean/m3-original-four-native-size.json" >/dev/null
+      - name: Compare exact packaged ELF path and every ordered DT_NEEDED name without executing browser
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/packages/full/extracted" "$RUNNER_TEMP/packages/lean/extracted"
+          tar -xf "$RUNNER_TEMP/packages/full/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/packages/full/extracted"
+          tar -xf "$RUNNER_TEMP/packages/lean/vulpra-four-lean.tar.xz" -C "$RUNNER_TEMP/packages/lean/extracted"
+          "$RUNNER_TEMP/m3-elf-graph" \
+            "$RUNNER_TEMP/packages/full/extracted" \
+            "$RUNNER_TEMP/packages/lean/extracted" \
+            "$RUNNER_TEMP/audit/combined-four-exact-elf-direct-dependency-graph.json"
+          jq -e '.status=="compiled_source_matched_combined_four_native_elf_imports_unchanged" and
+            .original_full_elf_count==28 and .combined_lean_elf_count==28 and
+            .original_full_direct_needed_edges==268 and
+            .combined_lean_direct_needed_edges==268 and
+            .original_full_unique_needed_names==50 and
+            .combined_lean_unique_needed_names==50 and
+            .per_file_exact_needed_order_identical==true and
+            .all_twenty_eight_elf_paths_unchanged==true and
+            .runtime_dynamic_or_transitive_dependency_closure_proven==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/audit/combined-four-exact-elf-direct-dependency-graph.json" >/dev/null
+      - name: Retain only bounded 28-ELF manifest comparison, never native binaries
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-four-combined-versus-full-exact-native-elf-direct-imports
+          path: ${{ runner.temp }}/audit/combined-four-exact-elf-direct-dependency-graph.json
+          if-no-files-found: error
+          retention-days: 14
