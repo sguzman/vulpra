@@ -15,6 +15,13 @@ out="$4"
 ip link set lo up
 [[ -z "$(ip -4 route show default)" && -z "$(ip -6 route show default)" ]] || exit 1
 [[ "$(ip -o link show | wc -l)" == 1 ]] || exit 1
+# Separate opt-in actual binding observation; normal original GNU version
+# contract mode remains unchanged and independently testable.
+debug_modes=versions
+if [[ -n "${M3_NATIVE_BINDINGS_REPORT:-}" ]]; then
+  [[ -x "${M3_NATIVE_BINDINGS_PARSER:-}" && ! -e "$M3_NATIVE_BINDINGS_REPORT" ]] || exit 2
+  debug_modes=versions,bindings
+fi
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 mkdir -m 0700 "$work/home"
@@ -22,7 +29,7 @@ umask 077
 timeout --signal=TERM --kill-after=3s 25s \
   env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy \
     HOME="$work/home" LD_LIBRARY_PATH="$pkg" \
-    LD_DEBUG=versions LD_DEBUG_OUTPUT="$work/onnx-loader" \
+    LD_DEBUG="$debug_modes" LD_DEBUG_OUTPUT="$work/onnx-loader" \
     MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
     "$probe" "$pkg/libonnxruntime.so" >"$work/probe.out" 2>"$work/probe.err" || {
       echo 'Original packaged ONNX Runtime C ABI activation failed' >&2
@@ -33,11 +40,16 @@ grep -Fxq 'PASS: original packaged ONNX Runtime C API base and nonempty version 
   exit 1
 }
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-python3 "$repo/ci/m3-onnxruntime-version-checks.py" \
-  --traces "$work" --static "$static" --output "$out"
+if [[ -z "${M3_NATIVE_BINDINGS_REPORT:-}" ]]; then
+  python3 "$repo/ci/m3-onnxruntime-version-checks.py" \
+    --traces "$work" --static "$static" --output "$out"
+  chmod 0644 "$out"
+else
+  "$M3_NATIVE_BINDINGS_PARSER" "$work" "$M3_NATIVE_BINDINGS_REPORT" "libonnxruntime.so"
+  chmod 0644 "$M3_NATIVE_BINDINGS_REPORT"
+fi
 [[ ! -e "$work/home/.mozilla" ]] || {
   echo 'No-egress ONNX library probe created browser user profile' >&2
   exit 1
 }
-chmod 0644 "$out"
 echo 'PASS: original native ONNX API entrypoint reached under no-egress namespace'
