@@ -220,7 +220,7 @@ fn compare_text_sections(full_root: &Path, lean_root: &Path, files: &Inventory)
     -> Result<(usize, usize, Vec<String>, Vec<String>), String> {
     let scratch = std::env::temp_dir().join(format!("vulpra-m3-text-{}", std::process::id()));
     fs::create_dir(&scratch).map_err(|e| format!("Temporary section directory: {e}"))?;
-    let result = (|| -> Result<(usize, usize, Vec<String>), String> {
+    let result = (|| -> Result<(usize, usize, Vec<String>, Vec<String>), String> {
         let (mut equal, mut different) = (0usize, 0usize);
         let mut samples = Vec::new();
         let mut byte_details = Vec::new();
