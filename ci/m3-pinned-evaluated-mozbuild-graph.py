@@ -137,7 +137,7 @@ def main():
             # Strip all absolute host paths before emitting the audit artifact.
             for base, files in obj.files.walk():
                 for item in files:
-                    physical = str(getattr(item, "full_path", "")).replace("\\", "/")
+                    physical = os.path.realpath(str(getattr(item, "full_path", ""))).replace("\\", "/")
                     source_prefix = str(root).replace("\\", "/").rstrip("/") + "/"
                     object_prefix = str(object_root).replace("\\", "/").rstrip("/") + "/"
                     if physical.startswith(source_prefix):
