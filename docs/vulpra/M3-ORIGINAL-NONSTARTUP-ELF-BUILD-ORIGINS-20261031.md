@@ -28,3 +28,7 @@ The validator checks literal pinned historical source paths/anchors and authenti
 The next practical M3 gap is **feature-triggered workload coverage for these nine auxiliary modules**, plus outstanding unversioned symbols, runtime `dlopen`, cross-platform build/source graph and actual compiled ABI closure. This report does not permit disabling crash handling, DRM, updating, inference or telemetry based on an about:blank launch.
 
 **M3 remains 5/6 (83%), overall 61%, current round Δ0 percentage points.**
+
+## Two feature-triggered native helper experiments (2026-10-31)
+
+The nine binaries unexercised during the original about:blank graphical version-check test were **not** assumed removable. Instead, independently verified source-pinned native tests activated two real feature-specific binaries under constrained CI: [`gfxtest` private Weston Wayland EGL roundtrip 41158839352 PASS](https://github.com/sguzman/vulpra/actions/runs/41158839352) (8/8 original version needs checked) and [`pingsender` synthetic-only gzip localhost POST, no-egress netns 41159158976 PASS](https://github.com/sguzman/vulpra/actions/runs/41159158976) (22/22 checked, deletion and forbidden-host negative check verified). The [authenticated three-workload ABI version tuple union 41159289264 PASS](https://github.com/sguzman/vulpra/actions/runs/41159289264) found **366/519 observed** and **153 unobserved**, now localized to seven modules with separate conditions. [Scope and caveats](M3-NATIVE-FEATURE-ACTIVATION-WORKLOAD-UNION-20261031.md). No source removal, no product gate credit.
