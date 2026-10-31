@@ -65,7 +65,8 @@ fn analyze(source_root:&Path,package:&Path)->Result<String,String>{
   let n=p.file_name().and_then(|s|s.to_str()).ok_or("unrepresentable ELF name")?;
   if !valid_name(n)||!files.insert(n.to_owned()){return Err("duplicate or unsafe packaged ELF basename".into())}
  }
- let mut declared=BTreeSet::new(),rows=BTreeMap::new();
+ let mut declared=BTreeSet::new();
+ let mut rows=BTreeMap::new();
  for o in ORIGINS{
   if !valid_name(o.elf)||!declared.insert(o.elf)||!files.contains(o.elf){return Err("an ELF source declaration is missing/duplicated".into())}
   let p=source_root.join(o.source);
