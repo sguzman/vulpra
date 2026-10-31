@@ -326,6 +326,19 @@ This extends the previously verified 28-ELF identical ordered `DT_NEEDED` invent
 
 These are **byte-position differences**, **not** counts of changed functions, semantic code differences, missing dependencies, or broken behavior. The 32-byte `libxul.so` section length difference can shift downstream byte offsets, so its large mismatch count must **not** be interpreted as 110 million independently changed instructions. Build and link layout, symbolized disassembly and code provenance are not reconciled here. Dynamic symbol names and multiplicities nevertheless remain identical in all 28 ELF paths. This specifically prevents claiming bit-for-bit complete native code identity merely from ABI parity. No new compiled size savings, source pruning or M3 sixth-gate credit. Overall **61%**, M3 **5/6 (83%)**, Δ0pp.
 
+### Source-matched compiled `.text` layout resynchronization
+
+[**Pinned actual ELF code-section alignment audit 41254104883 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41254104883), [**workflow lint 41254104846 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41254104846). The read-only Rust inspector measured exact same-offset and size-difference-shifted byte positions, longest identical prefix and nonoverlapping suffix for the five previously established nonidentical compiled `.text` pairs. It audited the **same two SHA-256-authenticated original full and combined-four native packages** without executing them. Its archived JSON was inspected.
+
+| Compiled code section | Full vs lean length difference | Exact common prefix | Nonoverlapping identical suffix | Conclusion allowed |
+| --- | ---: | ---: | ---: | --- |
+| `libxul.so` | lean **+32 bytes** | 17 B | 148 B | Large layout shift; not a single perfectly identical inserted block |
+| `crashhelper` | 0 B | 162 B | 236 B | Some byte differences within equal-size section |
+| `crashreporter` | 0 B | 995 B | 241 B | Some byte differences within equal-size section |
+| `vulpra`, `vulpra-bin` (each) | 0 B | 410 B | 6,830 B | Some byte differences within equal-size section |
+
+For `libxul.so`, **17,699,655 / 128,073,093 positions (13.82%)** are equal at their same index, but **115,507,445 / 128,073,093 (90.19%)** match if the lean section is read **32 bytes ahead**. This is strong evidence that code layout displacement accounts for much of the previously observed 110,373,438 same-index mismatches. However, the full shifted streams do **not** match perfectly, and neither the exact contiguous-insertion nor complete code identity condition passed. It does **not** count equal functions, prove semantic equivalence, identify the cause of layout drift, or verify static Rust/C++ FFI and late `dlopen`. No new source pruning, compiled savings, or final M3 gate credit. **M3 5/6 (83%), overall 61%, Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
