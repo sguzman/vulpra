@@ -45,7 +45,7 @@ def all_dynsym(path):
         decorated=f[7]
         name=decorated.split("@",1)[0]
         if not VERSIONED.SYMBOL.fullmatch(name):
-            raise ValueError("Unsupported original ELF exported/imported symbol spelling")
+            raise ValueError("Unsupported ELF dynsym spelling: "+repr(decorated[:90]))
         if index=="UND":
             if "@" not in decorated:
                 undefined.append((name,kind))
