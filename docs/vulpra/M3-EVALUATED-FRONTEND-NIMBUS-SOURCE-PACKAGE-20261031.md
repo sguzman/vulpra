@@ -310,6 +310,22 @@ Both variants have **4 Rust roots, 2 direct Rust-to-native link edges, 4 reachab
 
 This extends the previously verified 28-ELF identical ordered `DT_NEEDED` inventory to an **actual compiled imported-and-exported dynamic ABI surface comparison**, not identical file bytes, internal/static Rust/C++ FFI symbols, linker arguments, runtime symbol binding, or late `dlopen`. It does not authorize deleting any Rust root, protected browser feature, or native library. No new compressed-byte savings or M3 gate credit. **M3 remains 5/6 (83%), overall 61%, Δ0 percentage points.**
 
+### Actual compiled ELF `.text` section byte identity and limits
+
+[**Read-only original compiled full vs combined-four `.text` comparison 41253658309 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253658309), with [**per-differing-file exact byte metrics 41253791286 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253791286). The same two independent original-source SHA-256-authenticated packaged native builds were read without execution. `objcopy` extracted each actual ELF `.text` section into ephemeral CI files; `cmp` checked exact byte identity. The follow-up streamed and counted mismatched byte positions over the shared prefix of each differing pair.
+
+**23/28 compiled ELF `.text` sections are byte-identical; 5/28 differ.**
+
+| Differing compiled ELF | Full `.text` bytes | Lean `.text` bytes | Mismatched byte offsets in common prefix |
+| --- | ---: | ---: | ---: |
+| `crashhelper` | 1,221,487 | 1,221,487 | 10,693 |
+| `crashreporter` | 2,738,341 | 2,738,341 | 15,658 |
+| `libxul.so` | 128,073,093 | 128,073,125 | 110,373,438 |
+| `vulpra` | 414,754 | 414,754 | 1,462 |
+| `vulpra-bin` | 414,754 | 414,754 | 1,462 |
+
+These are **byte-position differences**, **not** counts of changed functions, semantic code differences, missing dependencies, or broken behavior. The 32-byte `libxul.so` section length difference can shift downstream byte offsets, so its large mismatch count must **not** be interpreted as 110 million independently changed instructions. Build and link layout, symbolized disassembly and code provenance are not reconciled here. Dynamic symbol names and multiplicities nevertheless remain identical in all 28 ELF paths. This specifically prevents claiming bit-for-bit complete native code identity merely from ABI parity. No new compiled size savings, source pruning or M3 sixth-gate credit. Overall **61%**, M3 **5/6 (83%)**, Δ0pp.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
