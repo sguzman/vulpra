@@ -48,7 +48,7 @@ These native Arch startup tests exercise a useful portion of the target platform
 
 ## Limits, especially for the actual user's EndeavourOS + Hyprland workstation
 
-The container's **Arch userspace** ran on an **Ubuntu GitHub Actions host**. It does not test the user's actual Arch-derived EndeavourOS kernel, graphics hardware, driver stack, Hyprland compositor, normal browser startup, existing Firefox profile, remote/DRM media, updates, crash reporting or every future `dlopen` feature path. This read-only loader audit does not check ABI symbol relocation completion nor the generated Ninja/FFI feature graph. Its Arch base image was unpinned by tag but the resulting image ID and glibc version are recorded for audit; these findings are for that recorded snapshot, not all future Arch releases.
+The container's **Arch userspace** ran on an **Ubuntu GitHub Actions host**. It does not test the user's actual Arch-derived EndeavourOS kernel, graphics hardware, driver stack, Hyprland compositor, existing Firefox profile, remote/DRM media, updates, crash reporting or every future `dlopen` feature path. The read-only loader audit itself does not execute the browser; the separate successful Arch native headless and Weston startup tests above cover bounded real startup paths. This read-only loader audit does not check ABI symbol relocation completion nor the generated Ninja/FFI feature graph. Its Arch base image was unpinned by tag but the resulting image ID and glibc version are recorded for audit; these findings are for that recorded snapshot, not all future Arch releases.
 
 No installed browser, launchers, user data or profiles were touched; no source removal, bytes saved, new performance claim or complete M3 closure was inferred.
 
