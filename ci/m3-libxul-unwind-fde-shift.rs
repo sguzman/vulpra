@@ -104,6 +104,38 @@ fn compare_ranges(
     (eligible,identical,different,identical_bytes)
 }
 
+
+fn alignment_union(full: &BTreeSet<Range>, lean: &BTreeSet<Range>,
+                   a: &[u8], b: &[u8], delta: usize)
+    -> (usize,usize,usize,usize,usize,[[usize;5];8]) {
+    let (mut both,mut zero_only,mut shifted_only,mut neither,mut identical_any)=
+        (0usize,0usize,0usize,0usize,0usize);
+    // Eighth bins: original FDEs, zero matches, shifted matches,
+    // no matches, byte identity under either possible placement.
+    let mut bins=[[0usize;5];8];
+    for &(start,end) in full {
+        let bucket=(start.saturating_mul(8)/a.len()).min(7);
+        bins[bucket][0]+=1;
+        let z=end<=b.len() && lean.contains(&(start,end));
+        let t=match(start.checked_add(delta),end.checked_add(delta)){
+            (Some(p),Some(q)) if q<=b.len()=>lean.contains(&(p,q)),
+            _=>false,
+        };
+        if z {bins[bucket][1]+=1;}
+        if t {bins[bucket][2]+=1;}
+        match (z,t) {
+            (true,true)=>both+=1,
+            (true,false)=>zero_only+=1,
+            (false,true)=>shifted_only+=1,
+            (false,false)=>{neither+=1;bins[bucket][3]+=1;},
+        }
+        let identical=z && a[start..end]==b[start..end] ||
+            t && a[start..end]==b[start+delta..end+delta];
+        if identical {identical_any+=1;bins[bucket][4]+=1;}
+    }
+    (both,zero_only,shifted_only,neither,identical_any,bins)
+}
+
 fn run() -> Result<(), String> {
     let args:Vec<_>=std::env::args().collect();
     if args.len()!=4 {return Err("usage: m3-ehframe FULL_LIBXUL LEAN_LIBXUL REPORT".into());}
@@ -115,6 +147,14 @@ fn run() -> Result<(), String> {
     let (fdes_b,total_b,excluded_b)=fde_ranges(b,base_b,code_b.len())?;
     let same=compare_ranges(&fdes_a,&fdes_b,&code_a,&code_b,0);
     let shifted=compare_ranges(&fdes_a,&fdes_b,&code_a,&code_b,32);
+    let union=alignment_union(&fdes_a,&fdes_b,&code_a,&code_b,32);
+    if union.0+union.1+union.2+union.3 != fdes_a.len() {
+        return Err("Incomplete exclusive FDE layout classification".into());
+    }
+    let buckets = union.5.iter().enumerate().map(|(i,c)| {
+        format!("{{\"eighth\":{i},\"full_fde_ranges\":{},\"zero_offset\":{},\"plus_32_offset\":{},\"neither\":{},\"identical_under_either\":{}}}",c[0],c[1],c[2],c[3],c[4])
+    }).collect::<Vec<_>>().join(",");
+
     let json=format!(
        "{{\"schema_version\":1,\"status\":\"original_compiled_libxul_unwind_fde_shift_comparison\",\
         \"full_text_bytes\":{},\"lean_text_bytes\":{},\
@@ -125,14 +165,21 @@ fn run() -> Result<(), String> {
         \"zero_shift_different_code_ranges\":{},\"zero_shift_equal_code_span_bytes\":{},\
         \"plus_32_shift_matching_fde_ranges\":{},\"plus_32_shift_identical_code_ranges\":{},\
         \"plus_32_shift_different_code_ranges\":{},\"plus_32_shift_equal_code_span_bytes\":{},\
-        \"sum_of_fde_span_bytes_not_unique_code_coverage\":true,\
+        \"unwind_fde_both_alignments\":{},\
+        "unwind_fde_zero_only\":{},\
+        "unwind_fde_plus_32_only\":{},\
+        "unwind_fde_neither_alignment\":{},\
+        "unwind_fde_identical_under_either\":{},\
+        "unwind_fde_eighth_bins\":[{buckets}],\
+        "sum_of_fde_span_bytes_not_unique_code_coverage\":true,\
         \"only_unwind_described_code_ranges_examined\":true,\
         \"all_compiled_functions_or_rust_ffi_proven\":false,\
         \"runtime_dlopen_closure_proven\":false,\"source_pruning_authorized\":false,\
         \"m3_sixth_gate_closed\":false}}\n",
        code_a.len(),code_b.len(),fdes_a.len(),fdes_b.len(),
        same.0,same.1,same.2,same.3,
-       shifted.0,shifted.1,shifted.2,shifted.3);
+       shifted.0,shifted.1,shifted.2,shifted.3,
+       union.0,union.1,union.2,union.3,union.4);
     fs::write(&args[3],json).map_err(|e| e.to_string())?;
     println!("PASS: compared bounded compiled unwind-described libxul native .text ranges");
     Ok(())
@@ -142,6 +189,14 @@ fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn exclusive_alignment_fixture() {
+        let a:BTreeSet<_>=[(1,4),(4,7),(7,9)].into_iter().collect();
+        let b:BTreeSet<_>=[(1,4),(6,9)].into_iter().collect();
+        let x=alignment_union(&a,&b,b"Zabcdefgh",b"ZZZabcdefgh",2);
+        assert_eq!((x.0,x.1,x.2,x.3),(0,1,1,1));
+        assert_eq!(x.5.iter().map(|v|v[0]).sum::<usize>(),3);
+    }
     #[test]
     fn fde_address_parser() {
         assert_eq!(parse_fde_line("0001 001c 0000 FDE cie=00000000 pc=00001003..00001008").unwrap(),Some((4099,4104)));
