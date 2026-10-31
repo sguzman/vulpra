@@ -1,0 +1,170 @@
+# Compare exactly 27 original native ELF declaration sources plus 14
+# protected feature boundary sources against current main, without rebuilding.
+name: M3 Current vs Original Native Feature Source Drift
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-to-current-native-feature-drift.yml
+      - ci/m3-original-to-current-native-feature-source-drift.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-pinned-original-versus-current-native-source-boundaries:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      SOURCE_RUN: '40997075527'
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout current bounded verifier and 41 original ELF/feature source files
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-to-current-native-feature-source-drift.rs
+            toolkit/crashreporter/crash_helper/moz.build
+            toolkit/crashreporter/client/app/moz.build
+            toolkit/xre/gfxtest/moz.build
+            media/gmp-clearkey/0.1/moz.build
+            security/nss/lib/freebl/manifest.mn
+            config/external/gkcodecs/moz.build
+            config/external/lgpllibs/moz.build
+            media/ffvpx/libavcodec/moz.build
+            media/ffvpx/libavutil/moz.build
+            widget/gtk/mozgtk/moz.build
+            config/external/mozinference/moz.build
+            security/sandbox/linux/moz.build
+            config/external/sqlite/moz.build
+            widget/gtk/mozwayland/moz.build
+            config/external/nspr/pr/moz.build
+            security/nss/lib/nss/manifest.mn
+            security/nss/lib/util/manifest.mn
+            toolkit/components/ml/moz.build
+            config/external/nspr/libc/moz.build
+            config/external/nspr/ds/moz.build
+            security/nss/lib/smime/manifest.mn
+            security/nss/lib/softoken/manifest.mn
+            security/nss/lib/ssl/manifest.mn
+            toolkit/library/moz.build
+            toolkit/components/telemetry/pingsender/moz.build
+            toolkit/mozapps/update/updater/moz.build
+            browser/app/moz.build
+            browser/app.mozbuild
+            browser/moz.configure
+            toolkit/toolkit.mozbuild
+            widget/moz.build
+            toolkit/library/rust/moz.build
+            toolkit/library/rust/gkrust-features.mozbuild
+            toolkit/components/moz.build
+            toolkit/components/telemetry/moz.build
+            services/moz.build
+            devtools/moz.build
+            browser/components/moz.build
+            browser/components/newtab/moz.build
+            browser/extensions/newtab/moz.build
+            browser/components/genai/moz.build
+      - name: Checkout same source file paths from exact authenticated historical build
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: original-source
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/crashreporter/crash_helper/moz.build
+            toolkit/crashreporter/client/app/moz.build
+            toolkit/xre/gfxtest/moz.build
+            media/gmp-clearkey/0.1/moz.build
+            security/nss/lib/freebl/manifest.mn
+            config/external/gkcodecs/moz.build
+            config/external/lgpllibs/moz.build
+            media/ffvpx/libavcodec/moz.build
+            media/ffvpx/libavutil/moz.build
+            widget/gtk/mozgtk/moz.build
+            config/external/mozinference/moz.build
+            security/sandbox/linux/moz.build
+            config/external/sqlite/moz.build
+            widget/gtk/mozwayland/moz.build
+            config/external/nspr/pr/moz.build
+            security/nss/lib/nss/manifest.mn
+            security/nss/lib/util/manifest.mn
+            toolkit/components/ml/moz.build
+            config/external/nspr/libc/moz.build
+            config/external/nspr/ds/moz.build
+            security/nss/lib/smime/manifest.mn
+            security/nss/lib/softoken/manifest.mn
+            security/nss/lib/ssl/manifest.mn
+            toolkit/library/moz.build
+            toolkit/components/telemetry/pingsender/moz.build
+            toolkit/mozapps/update/updater/moz.build
+            browser/app/moz.build
+            browser/app.mozbuild
+            browser/moz.configure
+            toolkit/toolkit.mozbuild
+            widget/moz.build
+            toolkit/library/rust/moz.build
+            toolkit/library/rust/gkrust-features.mozbuild
+            toolkit/components/moz.build
+            toolkit/components/telemetry/moz.build
+            services/moz.build
+            devtools/moz.build
+            browser/components/moz.build
+            browser/components/newtab/moz.build
+            browser/extensions/newtab/moz.build
+            browser/components/genai/moz.build
+      - name: Authenticate original compiled job identity and build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          rustc --edition=2021 --test ci/m3-original-to-current-native-feature-source-drift.rs \
+            -o "$RUNNER_TEMP/m3-native-drift-tests"
+          "$RUNNER_TEMP/m3-native-drift-tests"
+          rustc --edition=2021 -O ci/m3-original-to-current-native-feature-source-drift.rs \
+            -o "$RUNNER_TEMP/m3-native-drift"
+      - name: Evaluate 41 exact byte-level original-current source boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/m3-native-drift" \
+            "$GITHUB_WORKSPACE/original-source" "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/m3-original-current-native-feature-source-drift.json"
+          jq -e --arg sha "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="source_pinned_original_to_current_native_feature_manifest_drift" and
+            .original_compiled_source_commit==$sha and
+            .original_compiled_archive_sha256==$archive and
+            .checked_original_elf_ownership_manifest_paths==27 and
+            .checked_protected_feature_boundary_paths==14 and
+            .unique_source_paths_compared==41 and
+            (.changed_original_elf_ownership_manifest_paths|length)==.modified_original_elf_ownership_manifests and
+            (.changed_feature_boundary_paths|length)==.modified_feature_boundary_files and
+            (.current_source_paths_missing|length)==.missing_current_source_paths and
+            .byte_identical_only_not_a_generated_build_graph==true and
+            .original_binary_not_rebuilt_from_current_source==true and
+            .current_config_status_or_feature_runtimes_not_proven==true and
+            .safe_source_removal_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-original-current-native-feature-source-drift.json" >/dev/null
+          echo 'PASS: all 41 original/current bounded source ownership and feature boundary paths independently compared'
+      - name: Upload sanitized original-to-current source drift paths and counts only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-current-41-native-feature-source-drift
+          path: ${{ runner.temp }}/m3-original-current-native-feature-source-drift.json
+          if-no-files-found: error
+          retention-days: 14
