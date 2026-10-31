@@ -71,7 +71,10 @@ jobs:
         timeout-minutes: 8
         run: |
           set -euo pipefail
+          # Bind mount is owned by the GitHub runner; run as that non-root UID
+          # rather than root with capabilities removed (which cannot write 0755).
           docker run --rm --network none --read-only \
+            --user "$(id -u):$(id -g)" \
             --cap-drop ALL --security-opt no-new-privileges \
             --tmpfs /tmp:rw,nosuid,nodev,size=16m \
             --mount type=bind,src="$RUNNER_TEMP/package/vulpra",dst=/original,readonly \
