@@ -125,7 +125,7 @@ def install_component(value):
 
 def declared_link_source(item, root, object_root):
     """Classify each linkable compile unit without guessing relative ownership."""
-    raw = str(getattr(item, "full_path", item)).replace("\\\\", "/")
+    raw = str(getattr(item, "full_path", item)).replace("\\", "/")
     if os.path.isabs(raw):
         return source_identity(item, root, object_root)
     return ("unresolved_relative", portable_member(raw))
