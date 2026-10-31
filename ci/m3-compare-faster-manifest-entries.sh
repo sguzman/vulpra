@@ -67,9 +67,9 @@ for manifest in install_dist_bin install_dist_bin_browser unified_install_dist_b
   [ "$full_entries" -gt 0 ] && [ "$lean_entries" -gt 0 ]
   [ "$full_only" -gt 0 ] || [ "$lean_only" -gt 0 ]
   awk -F '\037' '{print $2}' "$tmp/full-only-records" |
-    sort -u | head -n 8 > "$tmp/full-sample"
+    sort -u | sed -n '1,8p' > "$tmp/full-sample"
   awk -F '\037' '{print $2}' "$tmp/lean-only-records" |
-    sort -u | head -n 8 > "$tmp/lean-sample"
+    sort -u | sed -n '1,8p' > "$tmp/lean-sample"
   jq -nc --arg manifest "$manifest" \
     --argjson full "$full_entries" --argjson lean "$lean_entries" \
     --argjson full_only "$full_only" --argjson lean_only "$lean_only" \
@@ -94,7 +94,7 @@ validate_records "$tmp/new-manifest-records"
 new_entries=$(wc -l < "$tmp/new-manifest-records")
 [ "$new_entries" -gt 0 ]
 awk -F '\037' '{print $2}' "$tmp/new-manifest-records" |
-  sort -u | head -n 8 > "$tmp/new-sample"
+  sort -u | sed -n '1,8p' > "$tmp/new-sample"
 
 jq -s --arg source "$SOURCE_SHA" --argjson new_entries "$new_entries" \
   --rawfile new_sample "$tmp/new-sample" '
