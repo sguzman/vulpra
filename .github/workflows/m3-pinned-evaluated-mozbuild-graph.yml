@@ -10,6 +10,7 @@ on:
       - ci/m3-pinned-evaluated-mozbuild-graph.py
       - ci/m3-compare-generated-backend.sh
       - ci/m3-compare-generated-makefiles.sh
+      - ci/m3-compare-faster-install-manifests.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -44,6 +45,7 @@ jobs:
             ci/m3-pinned-evaluated-mozbuild-graph.py
             ci/m3-compare-generated-backend.sh
             ci/m3-compare-generated-makefiles.sh
+            ci/m3-compare-faster-install-manifests.sh
             ci/mozconfig-linux-m3-baseline
             ci/mozconfig-linux-m3-combined-lean
             browser/moz.configure
@@ -59,6 +61,7 @@ jobs:
           python3 -m py_compile ../controls/ci/m3-pinned-evaluated-mozbuild-graph.py
           bash -n ../controls/ci/m3-compare-generated-backend.sh
           bash -n ../controls/ci/m3-compare-generated-makefiles.sh
+          bash -n ../controls/ci/m3-compare-faster-install-manifests.sh
           # No user's computer nor browser profile is in this CI workflow.
           mkdir -p "$RUNNER_TEMP/m3-generated-frontend"
       - name: Bootstrap same pinned Firefox 159 Linux native configure toolchain
@@ -369,6 +372,28 @@ jobs:
             .source_pruning_authorized==false and
             .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/m3-generated-frontend/generated-makefile-delta.json" >/dev/null
+      - name: Compare actual FasterMake generated install manifests with no packaging claims
+        shell: bash
+        working-directory: original
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          bash ../controls/ci/m3-compare-faster-install-manifests.sh \
+            obj-vulpra-linux-m3-baseline \
+            obj-vulpra-linux-m3-combined-lean \
+            "$RUNNER_TEMP/m3-generated-frontend/generated-faster-install-manifests.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .status=="actual_source_matched_faster_generated_install_manifests" and
+            .source_commit==$sha and
+            .full_generated_install_manifest_count>0 and
+            .combined_generated_install_manifest_count>0 and
+            .manifest_files_are_actual_generated_files==true and
+            .manifest_entry_semantics_parsed==false and
+            .installed_package_contents_proven==false and
+            .actual_compiler_or_linker_executed==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-generated-frontend/generated-faster-install-manifests.json" >/dev/null
       - name: Archive bounded generated relative build graphs and exact comparison
         if: success()
         uses: actions/upload-artifact@v4
@@ -380,5 +405,6 @@ jobs:
             ${{ runner.temp }}/m3-generated-frontend/frontend-delta-summary.json
             ${{ runner.temp }}/m3-generated-frontend/generated-backend-mk-delta.json
             ${{ runner.temp }}/m3-generated-frontend/generated-makefile-delta.json
+            ${{ runner.temp }}/m3-generated-frontend/generated-faster-install-manifests.json
           if-no-files-found: error
           retention-days: 14
