@@ -24,6 +24,7 @@ jobs:
       SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
       ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
       SOURCE_RUN: '40997075527'
+      VULPRA_WAYLAND_TEST_OFFLINE: '1'
     steps:
       - name: Checkout exact current test harness and source-safe loader parser
         uses: actions/checkout@v4
@@ -210,6 +211,7 @@ jobs:
             HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
             XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
             MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 MOZ_CRASHREPORTER_DISABLE=1 \
+            XRE_START_OFFLINE=1 \
             timeout --signal=TERM --kill-after=3s 28s \
             gdb -q -nx -batch \
               -ex 'set pagination off' \

@@ -54,7 +54,11 @@ jobs:
           # The browser itself, not the compositor or harness, is put offline.
           # The fatal non-local-connection restriction remains active.
           test "${MOZ_DISABLE_NONLOCAL_CONNECTIONS:-}" = 1
-          test "${XRE_START_OFFLINE:-}" = 1
+          if [[ "${VULPRA_TEST_EXPECT_OFFLINE:-0}" = 1 ]]; then
+            test "${XRE_START_OFFLINE:-}" = 1
+          else
+            test -z "${XRE_START_OFFLINE:-}"
+          fi
           profile="${XDG_DATA_HOME}/vulpra/default"
           test -d "$profile"
           test ! -e "$profile/user.js"
@@ -67,7 +71,14 @@ jobs:
           sleep 30
           MOCK
           chmod +x "$temp/package/firefox"
-          MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_WAYLAND_TEST_SECONDS=2 bash packaging/test-wayland.sh "$temp/package"
+          MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_TEST_EXPECT_OFFLINE=1 \
+            VULPRA_WAYLAND_TEST_OFFLINE=1 VULPRA_WAYLAND_TEST_SECONDS=2 \
+            bash packaging/test-wayland.sh "$temp/package"
+          # The default must not inadvertently turn offline mode on in other
+          # browser workloads (especially no-egress online netns mapping).
+          MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_TEST_EXPECT_OFFLINE=0 \
+            VULPRA_WAYLAND_TEST_SECONDS=2 \
+            bash packaging/test-wayland.sh "$temp/package"
       - name: Reject a live process that never draws a Wayland frame
         shell: bash
         run: |

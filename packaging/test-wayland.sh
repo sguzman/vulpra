@@ -92,10 +92,18 @@ if [[ -n "${VULPRA_M3_LOADER_TRACE_PREFIX:-}" ]]; then
   }
   loader_env=("LD_DEBUG=libs,files" "LD_DEBUG_OUTPUT=$VULPRA_M3_LOADER_TRACE_PREFIX")
 fi
-env -u MOZ_HEADLESS "${loader_env[@]}" \
+# Opt in only on the specific ordinary-host CI that intentionally forbids
+# non-local connections. Existing disconnected-netns and other graphical
+# workloads retain their normal online browser startup semantics.
+offline_env=()
+case "${VULPRA_WAYLAND_TEST_OFFLINE:-0}" in
+  0) ;;
+  1) offline_env=(XRE_START_OFFLINE=1) ;;
+  *) echo 'VULPRA_WAYLAND_TEST_OFFLINE must be 0 or 1' >&2; exit 2 ;;
+esac
+env -u MOZ_HEADLESS -u XRE_START_OFFLINE "${loader_env[@]}" "${offline_env[@]}" \
   HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
   XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 \
-  XRE_START_OFFLINE=1 \
   WAYLAND_DEBUG=client \
   "$launcher" about:blank >"$work/browser.log" 2>&1 &
 browser_pid="$!"
