@@ -123,6 +123,17 @@ def install_component(value):
         return "@noncanonical-install-component"
 
 
+def linkable_identity(obj):
+    """Stable declared link-target identity independent of source/obj directory."""
+    owner = normalized(getattr(obj, "relsrcdir", "") or "")
+    kind = type(obj).__name__
+    build_kind = portable_member(str(getattr(obj, "KIND", "unspecified")))
+    name = getattr(obj, "name", None)
+    if name is None:
+        name = getattr(obj, "program", None)
+    return (owner, kind, build_kind, portable_member(str(name or kind)))
+
+
 def main():
     if len(sys.argv) != 4 or sys.argv[1] not in ("normal", "combined_four"):
         raise ValueError("usage: EVALUATED_VARIANT CONFIG_STATUS_PATH OUTPUT_JSON")
@@ -130,7 +141,7 @@ def main():
     from mozbuild.backend.configenvironment import BuildConfig, ConfigEnvironment
     from mozbuild.frontend.reader import BuildReader
     from mozbuild.frontend.emitter import TreeMetadataEmitter
-    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources
+    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources, Linkable, BaseLibrary
 
     status = Path(status_path).resolve(strict=True)
     cfg = BuildConfig.from_config_status(str(status))
@@ -156,6 +167,7 @@ def main():
     visited_traversal = set()
     moz_src_members = set()
     evaluated_compile_source_inputs = set()
+    emitted_linkables = []
     jar_manifest_inputs = set()
     installed_resource_inputs = set()
     noncanonical_install_base_members = 0
@@ -175,6 +187,10 @@ def main():
         for key in TARGETS:
             if rel.startswith(key):
                 scope_types[key][kind] += 1
+        if isinstance(obj, Linkable):
+            emitted_linkables.append(obj)
+            if len(emitted_linkables) > 10000:
+                raise ValueError("Unexpectedly many emitted native linkables")
         if isinstance(obj, BaseSources):
             # Source-file members produced by the real frontend. This is
             # not the compiled linker command or final object-file census.
@@ -259,6 +275,31 @@ def main():
                 if len(edges) > 150000:
                     raise ValueError("Unexpectedly large evaluated graph")
 
+    # Link edges can be populated by the emitter after individual target
+    # objects appear, so inspect them only after the complete emission.
+    declared_link_target_nodes = set()
+    declared_library_link_edges = set()
+    declared_system_library_links = set()
+    declared_static_link_into = set()
+    for obj in emitted_linkables:
+        consumer = linkable_identity(obj)
+        declared_link_target_nodes.add(consumer)
+        for lib in obj.linked_libraries:
+            if not isinstance(lib, BaseLibrary):
+                raise ValueError("Non-library in emitted linked_libraries")
+            declared_library_link_edges.add(consumer + linkable_identity(lib))
+        for system_lib in obj.linked_system_libs:
+            if not isinstance(system_lib, str):
+                raise ValueError("Unexpected system library link token")
+            declared_system_library_links.add(
+                consumer + (portable_member(system_lib),))
+        into = getattr(obj, "link_into", None)
+        if into:
+            declared_static_link_into.add(consumer + (portable_member(str(into)),))
+        if (len(declared_library_link_edges) > 100000 or
+                len(declared_system_library_links) > 100000):
+            raise ValueError("Unexpectedly large declared native link map")
+
     flags = {}
     for flag in FLAGS:
         flags[flag] = {"present": flag in cfg.substs}
@@ -274,6 +315,20 @@ def main():
         "variant": variant,
         "evaluated_mozbuild_emission": True,
         "native_linker_or_binary_executed": False,
+        "actual_evaluated_linkable_nodes": sorted(
+            [list(x) for x in declared_link_target_nodes]),
+        "actual_evaluated_linkable_node_count": len(declared_link_target_nodes),
+        "actual_evaluated_library_link_edges": sorted(
+            [list(x) for x in declared_library_link_edges]),
+        "actual_evaluated_library_link_edge_count": len(declared_library_link_edges),
+        "actual_evaluated_system_library_links": sorted(
+            [list(x) for x in declared_system_library_links]),
+        "actual_evaluated_system_library_link_count": len(declared_system_library_links),
+        "actual_evaluated_static_link_into": sorted(
+            [list(x) for x in declared_static_link_into]),
+        "actual_evaluated_static_link_into_count": len(declared_static_link_into),
+        "actual_linker_commands_executed": False,
+        "actual_linker_flag_and_object_equivalence_proven": False,
         "generated_configure_flag_values": flags,
         "emitted_object_count": emitted,
         "source_directories_with_objects": len(visited),
