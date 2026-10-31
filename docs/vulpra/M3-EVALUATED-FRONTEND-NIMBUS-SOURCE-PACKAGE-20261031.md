@@ -242,6 +242,18 @@ Every complete normalized `[package-ID, enabled-feature-set, dependency-kind/tar
 
 No profile/browser modified and no new source pruning or packaged savings. **M3 remains 5/6 (83%); Vulpra overall 61%, milestone delta +0pp.**
 
+## Isolated actual `gkrust`-reachable Cargo closure
+
+[**Pinned offline `gkrust` reachable resolved dependency graph 41250793026 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41250793026). The bounded verifier took the same 17 original Mozilla frontend feature requests, invoked `cargo metadata --offline --locked`, then followed each actual `resolve.nodes[].deps[].pkg` edge starting at the metadata package ID for `gkrust`. A visited-ID set handled cycles/repeated dependencies, and each reachable node's complete activated feature set, dependency package IDs, kind and platform target was compared across the two separately configured original full/lean runs. Raw Cargo metadata and host paths were never uploaded.
+
+| Exact Cargo metadata graph | Full normal | Combined lean | One-sided |
+| --- | ---: | ---: | ---: |
+| Workspace-wide resolved node records | **889** | **889** | **0** |
+| **`gkrust`-reachable resolved node records** | **747** | **747** | **0** |
+| Identical reachable node/feature/dependency-edge records | **747** | **747** | — |
+
+This provides a concrete, bounded `gkrust` **transitive resolved dependency closure** within the pinned workspace activation context, rather than equating the entire 889-node workspace to the `gkrust` subtree. It still does **not** independently resolve each of the other Mozilla Rust root libraries/programs with its own requested features or establish feature unification during an actual full native build, `build.rs` products, final compiled crate objects, linker/FFI/dlopen closure or runtime behavior. This is a source/configure-time equivalence result, not a reduction in compiled Rust. **M3 remains 5/6 (83%), overall 61%, accepted milestone delta +0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
