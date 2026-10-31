@@ -217,6 +217,17 @@ The new lean-only `install_dist_bin_moz-src_toolkit_components_nimbus` contains 
 
 The four source-root libraries are `toolkit/library/rust` (`gkrust`), `toolkit/crashreporter/crash_helper_server`, `toolkit/components/uniffi-bindgen-gecko-js/components`, and `toolkit/components/uniffi-bindgen-gecko-js/test-fixtures`. This is an **exact evaluated frontend root-and-direct-declaration parity** check, **not** Cargo's resolved transitive package graph, activated feature graph, actual `rustc` invocations, combined native linker inputs, compiled crate artifacts, Rust/C++ FFI linkage or conditional runtime `dlopen`. No browser or profile changes and no new source removal or binary savings. **M3 5/6 (83%), overall 61%, Δ0pp.**
 
+## Emitted Rust program Cargo root ownership
+
+[**Pinned original-source full/lean Rust executable target inventory 41249591785 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41249591785). The expanded real `BuildReader`/`TreeMetadataEmitter` inventory also enumerates `BaseRustProgram` target and host program records with original source-relative `Cargo.toml` roots, target kind and explicitly requested program features.
+
+| Actual evaluated Rust program declarations | Full normal | Combined lean | One-sided |
+| --- | ---: | ---: | ---: |
+| Rust program target identities | **2** | **2** | **0** |
+| Explicit program feature records | **0** | **0** | **0** |
+
+The two emitted programs are `toolkit/components/uniffi-bindgen-gecko-js` (`uniffi-bindgen-gecko-js`) and `toolkit/crashreporter/client/app` (`crashreporter`). The same archived run reverified **4/4** Rust static-library targets, **18/18** static-library features, and **39/39** direct Cargo dependency declarations with **zero one-sided records**. This closes the **bounded evaluated Mozilla Rust executable/static-library roots** inventory, not Cargo's full transitive feature-resolved package graph, `build.rs` outputs, `rustc` commands, dynamic linking, native/Cargo FFI, or runtime `dlopen` closure. No removal, new size saving, or M3 gate credit: **M3 5/6 (83%), overall 61%, Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
