@@ -130,7 +130,7 @@ def main():
     from mozbuild.backend.configenvironment import BuildConfig, ConfigEnvironment
     from mozbuild.frontend.reader import BuildReader
     from mozbuild.frontend.emitter import TreeMetadataEmitter
-    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest
+    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles, JARManifest, BaseSources
 
     status = Path(status_path).resolve(strict=True)
     cfg = BuildConfig.from_config_status(str(status))
@@ -155,6 +155,7 @@ def main():
     visited = set()
     visited_traversal = set()
     moz_src_members = set()
+    evaluated_compile_source_inputs = set()
     jar_manifest_inputs = set()
     installed_resource_inputs = set()
     noncanonical_install_base_members = 0
@@ -174,6 +175,18 @@ def main():
         for key in TARGETS:
             if rel.startswith(key):
                 scope_types[key][kind] += 1
+        if isinstance(obj, BaseSources):
+            # Source-file members produced by the real frontend. This is
+            # not the compiled linker command or final object-file census.
+            for phase, members in (
+                    ("static", obj.static_files),
+                    ("generated", obj.generated_files)):
+                for item in members:
+                    origin, member = source_identity(item, root, object_root)
+                    evaluated_compile_source_inputs.add(
+                        (rel, kind, phase, origin, member))
+                    if len(evaluated_compile_source_inputs) > 100000:
+                        raise ValueError("Unexpectedly large compile source map")
         if isinstance(obj, JARManifest):
             # This is an evaluated jar.mn *input*, not a parsed entry or
             # proof of final omni.ja ownership.
@@ -274,6 +287,10 @@ def main():
             [list(x) for x in moz_src_members]),
         "actual_emitted_moz_src_member_count": len(moz_src_members),
         "noncanonical_moz_src_install_base_members": noncanonical_install_base_members,
+        "actual_evaluated_compile_source_inputs": sorted(
+            [list(x) for x in evaluated_compile_source_inputs]),
+        "actual_evaluated_compile_source_input_count": len(evaluated_compile_source_inputs),
+        "compiled_linker_input_closure_proven": False,
         "actual_evaluated_jar_manifest_inputs": sorted(
             [list(x) for x in jar_manifest_inputs]),
         "actual_evaluated_jar_manifest_count": len(jar_manifest_inputs),
