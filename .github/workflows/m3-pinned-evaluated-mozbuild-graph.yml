@@ -525,6 +525,15 @@ jobs:
             .cargo_invocation_offline==true and
             .normal_resolve_node_records>100 and
             .lean_resolve_node_records>100 and
+            .gkrust_reachable_root_only_graph_extracted==true and
+            .normal_gkrust_reachable_resolved_node_records>100 and
+            .lean_gkrust_reachable_resolved_node_records>100 and
+            (.identical_gkrust_reachable_node_feature_edge_records +
+             .normal_only_gkrust_reachable_node_records ==
+             .normal_gkrust_reachable_resolved_node_records) and
+            (.identical_gkrust_reachable_node_feature_edge_records +
+             .lean_only_gkrust_reachable_node_records ==
+             .lean_gkrust_reachable_resolved_node_records) and
             .commands_resolved_not_executed==true and
             .resolved_other_rust_roots_with_specific_features==false and
             .native_linker_invoked==false and
