@@ -70,8 +70,17 @@ jobs:
           (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
           test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
           tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
-          test -f "$RUNNER_TEMP/package/vulpra/libmozinference.so"
-          readelf -Ws "$RUNNER_TEMP/package/vulpra/libmozinference.so" | grep -q ' llama_backend_init$'
+          if ! test -f "$RUNNER_TEMP/package/vulpra/libmozinference.so"; then
+            echo 'Original archive does not contain libmozinference.so at package root' >&2
+            find "$RUNNER_TEMP/package" -type f -name 'libmozinference.so' -print >&2
+            exit 1
+          fi
+          readelf -Ws "$RUNNER_TEMP/package/vulpra/libmozinference.so" >"$RUNNER_TEMP/mozinference-symbols.txt"
+          if ! grep -E ' llama_backend_init(@|$)' "$RUNNER_TEMP/mozinference-symbols.txt" >/dev/null; then
+            echo 'Pinned llama_backend_init C export missing in compiled package' >&2
+            grep -E 'llama_(backend|time_us|supports_mmap)' "$RUNNER_TEMP/mozinference-symbols.txt" | head -n 12 >&2 || :
+            exit 1
+          fi
       - name: Invoke original llama backend and reconcile real native GNU loader checks
         shell: bash
         timeout-minutes: 5
