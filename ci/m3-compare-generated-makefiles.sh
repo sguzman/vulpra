@@ -91,6 +91,17 @@ grep '^ACDEFINES = ' "$tmp/faster-full" | tr ' ' '\n' | grep '^-D' | sort -u > "
 grep '^ACDEFINES = ' "$tmp/faster-lean" | tr ' ' '\n' | grep '^-D' | sort -u > "$tmp/defines-lean"
 comm -23 "$tmp/defines-full" "$tmp/defines-lean" > "$tmp/defines-full-only"
 comm -13 "$tmp/defines-full" "$tmp/defines-lean" > "$tmp/defines-lean-only"
+# The other changing Makefile variable is a generated installer-manifest
+# declaration. Record only exact manifest tokens, not large rule bodies.
+sed -n -E 's/^INSTALL_MANIFESTS[[:space:]]*[:+?]?=[[:space:]]*//p' "$tmp/faster-full" |
+  tr ' ' '\n' | sed '/^$/d' | sort -u > "$tmp/manifests-full"
+sed -n -E 's/^INSTALL_MANIFESTS[[:space:]]*[:+?]?=[[:space:]]*//p' "$tmp/faster-lean" |
+  tr ' ' '\n' | sed '/^$/d' | sort -u > "$tmp/manifests-lean"
+[ -s "$tmp/manifests-full" ] && [ -s "$tmp/manifests-lean" ]
+comm -23 "$tmp/manifests-full" "$tmp/manifests-lean" > "$tmp/manifests-full-only"
+comm -13 "$tmp/manifests-full" "$tmp/manifests-lean" > "$tmp/manifests-lean-only"
+[ "$(wc -l < "$tmp/manifests-full")" -lt 200 ] &&
+  [ "$(wc -l < "$tmp/manifests-lean")" -lt 200 ]
 if diff -U 0 "$tmp/faster-full" "$tmp/faster-lean" > "$tmp/faster-diff"; then
   echo 'FAIL: faster/Makefile differs in hashes but has no line differences' >&2
   exit 1
@@ -112,6 +123,8 @@ jq -n --arg sha "$SOURCE_SHA" \
   --rawfile full_only_defines "$tmp/defines-full-only" \
   --rawfile lean_only_defines "$tmp/defines-lean-only" \
   --rawfile variable_names "$tmp/changed-variable-names" \
+  --rawfile full_only_manifests "$tmp/manifests-full-only" \
+  --rawfile lean_only_manifests "$tmp/manifests-lean-only" \
   --argjson only_normandy "$only_normandy_define" '
     def lines: split("\n") | map(select(length > 0));
     {
@@ -133,6 +146,8 @@ jq -n --arg sha "$SOURCE_SHA" \
       differing_makefile_variable_names:($variable_names|lines),
       full_only_acdefines:($full_only_defines|lines),
       combined_only_acdefines:($lean_only_defines|lines),
+      normal_only_install_manifests:($full_only_manifests|lines),
+      combined_only_install_manifests:($lean_only_manifests|lines),
       normalized_configured_objdir_path_and_basename_only:true,
       actual_generated_makefile_contents_hashed:true,
       all_generated_makefile_rules_equal:false,
