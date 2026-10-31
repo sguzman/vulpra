@@ -34,15 +34,18 @@ comm -13 "$tmp/full" "$tmp/lean" > "$tmp/only-lean"
 
 # Normalize only explicitly configured objdir path and basename. Do not
 # strip arbitrary lines or imply that Make's expanded commands were compared.
-normalized_sha() {
+normalized_makefile() {
   local root=$1
   local rel=$2
   local name
   name=$(basename "$root")
   sed -e "s|$root|@CONFIGURED_OBJDIR@|g" \
       -e "s|$name|@CONFIGURED_OBJDIR_NAME@|g" \
-      "$root/$rel" | sha256sum | cut -d ' ' -f 1
+      "$root/$rel"
 }
+normalized_sha() {
+  normalized_makefile "$1" "$2" | sha256sum | cut -d ' ' -f 1
+
 while IFS= read -r rel; do
   [ -f "$full/$rel" ] && [ -f "$lean/$rel" ]
   if [ "$(normalized_sha "$full" "$rel")" = "$(normalized_sha "$lean" "$rel")" ]; then
@@ -61,13 +64,30 @@ lean_only_count=$(wc -l < "$tmp/only-lean")
 [ "$lean_count" -eq "$((common_count + lean_only_count))" ]
 [ "$common_count" -eq "$((same_count + different_count))" ]
 
+# The pinned current source yields exactly one differing generated Makefile.
+# Capture a bounded diagnostic excerpt, not the full file or temporary host paths.
+[ "$different_count" -eq 1 ]
+[ ! -s "$tmp/only-full" ] && [ ! -s "$tmp/only-lean" ]
+grep -Fxq 'faster/Makefile' "$tmp/different"
+normalized_makefile "$full" faster/Makefile > "$tmp/faster-full"
+normalized_makefile "$lean" faster/Makefile > "$tmp/faster-lean"
+if diff -U 0 "$tmp/faster-full" "$tmp/faster-lean" > "$tmp/faster-diff"; then
+  echo 'FAIL: faster/Makefile differs in hashes but has no line differences' >&2
+  exit 1
+else
+  diff_rc=$?
+  [ "$diff_rc" -eq 1 ]
+fi
+sed -n '3,55p' "$tmp/faster-diff" | head -c 9000 > "$tmp/faster-diff-bounded"
+
 jq -n --arg sha "$SOURCE_SHA" \
   --argjson normal "$normal_count" --argjson lean "$lean_count" \
   --argjson shared "$common_count" --argjson same "$same_count" \
   --argjson different "$different_count" \
   --rawfile full_only "$tmp/only-full" \
   --rawfile lean_only "$tmp/only-lean" \
-  --rawfile changed "$tmp/different" '
+  --rawfile changed "$tmp/different" \
+  --rawfile scoped_diff "$tmp/faster-diff-bounded" '
     def lines: split("\n") | map(select(length > 0));
     {
       schema_version:1,
@@ -81,6 +101,9 @@ jq -n --arg sha "$SOURCE_SHA" \
       normal_only_generated_makefiles:($full_only|lines),
       combined_only_generated_makefiles:($lean_only|lines),
       differing_generated_makefiles:($changed|lines),
+      faster_makefile_normalized_diff_excerpt:$scoped_diff,
+      faster_makefile_diff_bounded:true,
+      only_faster_makefile_differs:true,
       normalized_configured_objdir_path_and_basename_only:true,
       actual_generated_makefile_contents_hashed:true,
       all_generated_makefile_rules_equal:false,
@@ -100,6 +123,8 @@ jq -e '
   (.identical_normalized_makefile_count + .differing_normalized_makefile_count ==
    .shared_generated_makefile_count) and
   ((.differing_generated_makefiles|length) == .differing_normalized_makefile_count) and
+  .only_faster_makefile_differs==true and
+  ((.faster_makefile_normalized_diff_excerpt|length)>0) and
   .native_compiler_or_linker_executed==false and .m3_sixth_gate_closed==false
 ' "$out" >/dev/null
 jq -c '{
