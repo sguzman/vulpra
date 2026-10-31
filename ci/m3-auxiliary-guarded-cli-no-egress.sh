@@ -63,12 +63,17 @@ else
   echo 'Original read-only updater channel query took unexpected route' >&2
   exit 1
 fi
-python3 "$repo/ci/m3-auxiliary-guarded-cli-version-checks.py" \
-  --traces "$work" --static "$static" --output "$out"
+# The normal ABI verification path must retain its signed/static report.
+# Only the separate binding-specific workflow opts out of this redundant
+# replay and independently authenticates the original package archive.
+if [[ -z "${M3_AUX_BINDINGS_REPORT:-}" ]]; then
+  python3 "$repo/ci/m3-auxiliary-guarded-cli-version-checks.py" \
+    --traces "$work" --static "$static" --output "$out"
+  chmod 0644 "$out"
+fi
 if [[ -n "${M3_AUX_BINDINGS_REPORT:-}" ]]; then
   "$M3_AUX_BINDINGS_PARSER" "$work" "$M3_AUX_BINDINGS_REPORT"
   chmod 0644 "$M3_AUX_BINDINGS_REPORT"
 fi
 [[ ! -e "$work/home/.mozilla" ]] || exit 1
-chmod 0644 "$out"
-echo 'PASS: no-egress original protected auxiliary diagnostic-only ELF ABI'
+echo 'PASS: no-egress original protected auxiliary diagnostic-only routes'
