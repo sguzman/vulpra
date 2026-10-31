@@ -42,14 +42,17 @@ comm -13 "$tmp/full" "$tmp/lean" > "$tmp/lean_only"
 # Normalize ONLY the configured absolute object directory and its basename.
 # All other emitted backend content remains byte-exact. This is intentionally
 # conservative and makes differences visible rather than inventing equality.
-backend_hash() {
+normalize_backend() {
   local root=$1
   local rel=$2
   local name
   name=$(basename "$root")
   sed -e "s|$root|@CONFIGURED_OBJDIR@|g" \
       -e "s|$name|@CONFIGURED_OBJDIR_NAME@|g" \
-      "$root/$rel" | sha256sum | cut -d ' ' -f 1
+      "$root/$rel"
+}
+backend_hash() {
+  normalize_backend "$1" "$2" | sha256sum | cut -d ' ' -f 1
 }
 while IFS= read -r rel; do
   [ -f "$full/$rel" ] && [ -f "$lean/$rel" ]
@@ -69,6 +72,27 @@ different_count=$(wc -l < "$tmp/different")
 [ "$full_count" -eq "$((shared_count + $(wc -l < "$tmp/full_only")))" ]
 [ "$lean_count" -eq "$((shared_count + $(wc -l < "$tmp/lean_only")))" ]
 
+# Keep only small source-scoped snippets from two real generated Make backend
+# files. This is diagnostic evidence, not a complete full-file comparison log.
+: > "$tmp/scoped_diff"
+for rel in toolkit/content/backend.mk toolkit/modules/backend.mk; do
+  if grep -Fxq "$rel" "$tmp/different"; then
+    normalize_backend "$full" "$rel" > "$tmp/diff-full"
+    normalize_backend "$lean" "$rel" > "$tmp/diff-lean"
+    if diff -U 0 "$tmp/diff-full" "$tmp/diff-lean" > "$tmp/diff-output"; then
+      echo "FAIL: changed backend file unexpectedly has no normalized diff" >&2
+      exit 1
+    else
+      diff_result=$?
+      [ "$diff_result" -eq 1 ]
+    fi
+    printf 'FILE %s\n' "$rel" >> "$tmp/scoped_diff"
+    # Omit diff headers with temporary host paths. Cap each file to 40 lines.
+    sed -n '3,42p' "$tmp/diff-output" >> "$tmp/scoped_diff"
+  fi
+done
+head -c 10000 "$tmp/scoped_diff" > "$tmp/scoped_diff_bounded"
+
 jq -n --arg source "$SOURCE_SHA" \
   --argjson full "$full_count" --argjson lean "$lean_count" \
   --argjson common "$shared_count" \
@@ -76,6 +100,7 @@ jq -n --arg source "$SOURCE_SHA" \
   --rawfile only_full "$tmp/full_only" \
   --rawfile only_lean "$tmp/lean_only" \
   --rawfile changed "$tmp/different" \
+  --rawfile scoped_witness "$tmp/scoped_diff_bounded" \
   'def paths: split("\n") | map(select(length > 0));
   {
     schema_version: 1,
@@ -89,6 +114,8 @@ jq -n --arg source "$SOURCE_SHA" \
     normal_only_backend_mk: ($only_full | paths),
     combined_only_backend_mk: ($only_lean | paths),
     differing_normalized_backend_mk: ($changed | paths),
+    scoped_normalized_backend_diff_excerpt: $scoped_witness,
+    scoped_diff_excerpt_is_bounded_not_full_output: true,
     normalized_only_configured_objdir_absolute_path_and_name: true,
     actual_recursive_make_backend_files_read: true,
     generated_makefile_or_link_command_fully_compared: false,
