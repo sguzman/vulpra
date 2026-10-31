@@ -22,7 +22,7 @@ fn parse(content:&str)->Result<Vec<String>,String>{
  }
  Ok(libs)
 }
-fn run()->Result<(),String>{
+fn run()->Result<String,String>{
  let args:Vec<String>=env::args().collect();
  if args.len()!=5{return Err("expected PACKAGE_ROOT ORIGINAL_LIBRARY_MOZ_BUILD ORIGINAL_LIBRARY_BUILD_MOZ_BUILD OUTPUT_JSON".into());}
  let root=Path::new(&args[1]);
