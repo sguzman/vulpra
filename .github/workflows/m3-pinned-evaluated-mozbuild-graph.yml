@@ -104,6 +104,10 @@ jobs:
              ($b.directory_edges|map(join(" -> ")))) as $full_only |
             (($b.directory_edges|map(join(" -> "))) -
              ($a.directory_edges|map(join(" -> ")))) as $lean_only |
+            ($a.actual_evaluated_compile_source_inputs -
+             $b.actual_evaluated_compile_source_inputs) as $full_only_compile_sources |
+            ($b.actual_evaluated_compile_source_inputs -
+             $a.actual_evaluated_compile_source_inputs) as $lean_only_compile_sources |
             ($a.actual_evaluated_jar_manifest_inputs -
              $b.actual_evaluated_jar_manifest_inputs) as $full_only_jars |
             ($b.actual_evaluated_jar_manifest_inputs -
@@ -123,6 +127,11 @@ jobs:
               combined_directory_edges:$b.evaluated_directory_edges,
               full_only_evaluated_directory_edges:$full_only,
               combined_only_evaluated_directory_edges:$lean_only,
+              full_evaluated_compile_source_count:$a.actual_evaluated_compile_source_input_count,
+              combined_evaluated_compile_source_count:$b.actual_evaluated_compile_source_input_count,
+              full_only_evaluated_compile_sources:$full_only_compile_sources,
+              combined_only_evaluated_compile_sources:$lean_only_compile_sources,
+              compiled_linker_input_closure_proven:false,
               full_evaluated_jar_manifest_count:$a.actual_evaluated_jar_manifest_count,
               combined_evaluated_jar_manifest_count:$b.actual_evaluated_jar_manifest_count,
               full_only_evaluated_jar_manifests:$full_only_jars,
@@ -156,6 +165,9 @@ jobs:
              .actual_mozilla_BuildReader_and_TreeMetadataEmitter_executed==true and
              .normal_evaluated_objects>500 and .combined_evaluated_objects>500 and
              .full_directory_edges>200 and .combined_directory_edges>200 and
+             .full_evaluated_compile_source_count>500 and
+             .combined_evaluated_compile_source_count>500 and
+             .compiled_linker_input_closure_proven==false and
              .full_evaluated_jar_manifest_count>0 and
              .combined_evaluated_jar_manifest_count>0 and
              .full_evaluated_install_resource_input_count>0 and
@@ -173,6 +185,8 @@ jobs:
              .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
              "$RUNNER_TEMP/m3-generated-frontend/frontend-delta-summary.json" >/dev/null
           jq -c '{
+            emitted_compile_sources:[.full_evaluated_compile_source_count,.combined_evaluated_compile_source_count],
+            differing_compile_sources:[(.full_only_evaluated_compile_sources|length),(.combined_only_evaluated_compile_sources|length)],
             jar_manifests:[.full_evaluated_jar_manifest_count,.combined_evaluated_jar_manifest_count],
             installer_inputs:[.full_evaluated_install_resource_input_count,.combined_evaluated_install_resource_input_count],
             differing_jar_inputs:[(.full_only_evaluated_jar_manifests|length),(.combined_only_evaluated_jar_manifests|length)],
