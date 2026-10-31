@@ -1,0 +1,136 @@
+# Automatically acceptance-test a *successful* source-matched four-opt-in
+# native browser build, not any default browser, user profile or host session.
+name: M3 Combined Four-Opt-In Native Browser Acceptance
+on:
+  workflow_run:
+    workflows:
+      - M3 Original Native Combined Four-Opt-In Build
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-isolated-headless-and-real-wayland-acceptance:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      BUILD_RUN: ${{ github.event.workflow_run.id }}
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+    steps:
+      - name: Checkout only existing strict graphical smoke harness
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            packaging/test-wayland.sh
+      - name: Verify authentic successful native build and staged archive checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_branch=="main" and
+              .head_repository.full_name=="sguzman/vulpra" and
+              .path==".github/workflows/m3-original-four-optin-native-build.yml"' >/dev/null
+          bash -n packaging/test-wayland.sh
+          mkdir -p "$RUNNER_TEMP/experiment" "$RUNNER_TEMP/audit"
+          gh run download "$BUILD_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-native-combined-four-optin-candidate --dir "$RUNNER_TEMP/experiment"
+          (cd "$RUNNER_TEMP/experiment" && sha256sum -c vulpra-four-lean.tar.xz.sha256)
+          jq -e --arg sha "$SOURCE_SHA" '
+            .status=="original_native_four_optin_combined_package_built" and
+            .original_source_commit==$sha and
+            .native_browser_compilation_verified==true and
+            .all_four_generated_config_guards_verified==true and
+            .protected_sync_wayland_sandbox_devtools_verified==true and
+            .actual_browser_runtime_or_feature_fallback_verified==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/experiment/m3-original-four-native-size.json" >/dev/null
+          tar -xf "$RUNNER_TEMP/experiment/vulpra-four-lean.tar.xz" \
+            -C "$RUNNER_TEMP/experiment"
+          test -x "$RUNNER_TEMP/experiment/vulpra/vulpra"
+          test -x "$RUNNER_TEMP/experiment/vulpra/vulpra-launch"
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/experiment/vulpra/application.ini"
+      - name: Prepare sealed native browser graphical test prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends iproute2 weston wayland-utils unzip \
+            libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1 libegl1
+          command -v weston
+          command -v wayland-info
+      - name: Check combined candidate native headless PNG with isolated temporary profile
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/experiment/vulpra"
+          mkdir -m 0700 "$RUNNER_TEMP/experiment/private-headless-home" "$RUNNER_TEMP/experiment/private-headless-profile"
+          sudo unshare --net -- env \
+            HOME="$RUNNER_TEMP/experiment/private-headless-home" \
+            MOZ_HEADLESS=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 100s "$app/vulpra" \
+              -headless -no-remote -profile "$RUNNER_TEMP/experiment/private-headless-profile" \
+              --window-size 320,200 \
+              --screenshot "$RUNNER_TEMP/experiment/private-headless.png" about:blank \
+              >"$RUNNER_TEMP/experiment/private-browser.log" 2>&1
+          test -s "$RUNNER_TEMP/experiment/private-headless.png"
+          test "$(head -c 8 "$RUNNER_TEMP/experiment/private-headless.png" | od -An -tx1 | tr -d ' \n')" = 89504e470d0a1a0a
+          test ! -e "$RUNNER_TEMP/experiment/private-headless-home/.mozilla/firefox/profiles.ini"
+          echo 'PASS: real four-opt-in compiled native Vulpra rendered PNG offline with disposable profile'
+      - name: Require actual Wayland frame, private profile, and ten-second native liveness
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          sudo unshare --net -- env \
+            MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 VULPRA_WAYLAND_TEST_OFFLINE=1 \
+            VULPRA_WAYLAND_TEST_SECONDS=10 \
+            bash packaging/test-wayland.sh "$RUNNER_TEMP/experiment/vulpra"
+          echo 'PASS: compiled four-opt-in real Wayland buffer attach/commit in private Weston'
+      - name: Preserve only safe accepted runtime flags, never images or profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg src "$SOURCE_SHA" --arg build "$BUILD_RUN" '{
+            schema_version:1,
+            status:"original_four_optin_real_native_headless_wayland_accepted",
+            original_source_commit:$src,
+            source_pinned_combined_native_build_run:($build|tonumber),
+            original_native_headless_png_verified:true,
+            original_native_private_weston_wayland_frame_committed:true,
+            isolated_browser_profile_initialized:true,
+            offline_network_namespace:true,
+            private_user_profiles_untouched:true,
+            sync_devtools_sandbox_wayland_compiled_config_preserved:true,
+            newtab_live_remote_features_verified:false,
+            full_feature_or_future_dlopen_graph_proven:false,
+            reproducible_compressed_byte_savings_proven:false,
+            default_browser_modified:false,
+            m3_sixth_gate_closed:false
+          }' > "$RUNNER_TEMP/audit/four-native-runtime-acceptance.json"
+          jq -e '.original_native_headless_png_verified==true and
+            .original_native_private_weston_wayland_frame_committed==true and
+            .isolated_browser_profile_initialized==true and
+            .offline_network_namespace==true and
+            .private_user_profiles_untouched==true and
+            .full_feature_or_future_dlopen_graph_proven==false and
+            .default_browser_modified==false and .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/audit/four-native-runtime-acceptance.json" >/dev/null
+      - name: Upload only sanitized source-pinned runtime check flags
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-four-optin-real-native-headless-wayland-acceptance
+          path: ${{ runner.temp }}/audit/four-native-runtime-acceptance.json
+          if-no-files-found: error
+          retention-days: 14
