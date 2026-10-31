@@ -92,7 +92,7 @@ fn run()->Result<(),String>{
         " \"model_inference_or_drm_decryption_proven\":false,\n",
         " \"all_lazy_or_transitive_bindings_proven\":false,\n",
         " \"new_source_pruning_authorized\":false\n}}\n"
-    ),SOURCE,ARCHIVE,module,traces,events,pairs,providers.len(),providers_json,!matches!(module,"pingsender"|"gfxtest"|"vulpra-bin"),module=="pingsender",module=="gfxtest",module=="vulpra-bin",!matches!(module,"gfxtest"|"vulpra-bin"));
+    ),SOURCE,ARCHIVE,module,traces,events,pairs,providers.len(),providers_json,!matches!(module.as_str(),"pingsender"|"gfxtest"|"vulpra-bin"),module=="pingsender",module=="gfxtest",module=="vulpra-bin",!matches!(module.as_str(),"gfxtest"|"vulpra-bin"));
     let mut file=File::create(&args[2]).map_err(|e|e.to_string())?;
     file.write_all(report.as_bytes()).map_err(|e|e.to_string())?;
     println!("PASS: actual original native feature-module bindings observed; sanitized module/provider counts");
