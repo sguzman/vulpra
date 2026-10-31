@@ -93,7 +93,7 @@ def main():
     from mozbuild.backend.configenvironment import BuildConfig, ConfigEnvironment
     from mozbuild.frontend.reader import BuildReader
     from mozbuild.frontend.emitter import TreeMetadataEmitter
-    from mozbuild.frontend.data import DirectoryTraversal
+    from mozbuild.frontend.data import DirectoryTraversal, MozSrcFiles
 
     status = Path(status_path).resolve(strict=True)
     cfg = BuildConfig.from_config_status(str(status))
@@ -117,6 +117,7 @@ def main():
     edges = set()
     visited = set()
     visited_traversal = set()
+    moz_src_members = set()
     emitted = 0
     reader = BuildReader(env)
     emitter = TreeMetadataEmitter(env)
@@ -131,6 +132,24 @@ def main():
         for key in TARGETS:
             if rel.startswith(key):
                 scope_types[key][kind] += 1
+        if isinstance(obj, MozSrcFiles):
+            # Exact evaluated MOZ_SRC_FILES entries, not just object totals.
+            # Strip all absolute host paths before emitting the audit artifact.
+            for base, files in obj.files.walk():
+                for item in files:
+                    physical = str(getattr(item, "full_path", "")).replace("\\", "/")
+                    source_prefix = str(root).replace("\\", "/").rstrip("/") + "/"
+                    object_prefix = str(object_root).replace("\\", "/").rstrip("/") + "/"
+                    if physical.startswith(source_prefix):
+                        origin, member = "src", normalized(physical[len(source_prefix):])
+                    elif physical.startswith(object_prefix):
+                        origin, member = "obj", normalized(physical[len(object_prefix):])
+                    else:
+                        origin, member = "other", normalized(os.path.basename(physical))
+                    install_base = normalized(str(base) if base else "")
+                    moz_src_members.add((rel, origin, member, install_base))
+                    if len(moz_src_members) > 20000:
+                        raise ValueError("Unexpectedly large source ownership map")
         if isinstance(obj, DirectoryTraversal):
             visited_traversal.add(rel)
             for item in obj.dirs:
@@ -165,6 +184,9 @@ def main():
         "scoped_emitted_type_counts": {
             k: dict(sorted(v.items())) for k, v in scope_types.items()},
         "directory_edges": sorted([list(x) for x in edges]),
+        "actual_emitted_moz_src_file_members": sorted(
+            [list(x) for x in moz_src_members]),
+        "actual_emitted_moz_src_member_count": len(moz_src_members),
         "complete_compile_or_link_graph": False,
         "ffi_and_runtime_dlopen_graph_proven": False,
         "profile_or_browser_executable_accessed": False,
