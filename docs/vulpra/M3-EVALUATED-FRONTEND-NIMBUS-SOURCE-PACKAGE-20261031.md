@@ -283,6 +283,31 @@ Both original full and combined lean emitted **2 exact Rust-staticlib-to-native-
 
 **Scope is precisely source-evaluated linking ownership.** No actual compiler command/link invocation, archive members, ELF symbol lookup or Rust/C++ FFI call sites were checked here; neither runtime conditional loading nor `dlopen` is closed. This does not authorize deleting a Rust root or claim compiled binary savings. **M3 stays 5/6 (83%), overall 61%, delta +0pp.**
 
+## Rust staticlib transitive native-consumer reachability
+
+[**Pinned original Mozilla emitted Rust staticlib reverse-Linkable inventory 41252792147 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41252792147). A read-only observer follows the **complete evaluated declared consumer → linked-library graph in reverse** from each of four emitted Rust static-library roots, recording the shortest native consumer distance. The archived original full/combined four-opt-in artifacts were independently inspected, not inferred from repository source.
+
+| Emitted Rust static library | Full and lean downstream consumers | Distance |
+| --- | --- | --- |
+| `libgkrust.a` | `libxul.so` | 1 |
+| `libgkrust.a` | `plugin-container`, `xpcshell` | 2 |
+| `libcrash_helper_server.a` | `crashhelper` | 1 |
+| Two UniFFI static-library roots | No native consumer within this **particular emitted relation** | Not applicable |
+
+Both variants have **4 Rust roots, 2 direct Rust-to-native link edges, 4 reachable native consumer records, 2 roots without directly emitted native consumers, and 0 full/lean differences**. Absence of a direct Mozilla `linked_libraries` edge does **not** prove the UniFFI crates unused; Cargo/integration relations and generated FFI can lie outside that relation. Cycles are bounded via shortest-path traversal. No compiler/rustc/linker execution, build artifact attribution, complete FFI call graph, or dynamic loader closure was proven.
+
+## Actual compiled full-versus-opt-in ELF dynamic export ABI surface
+
+[**Checksum-authenticated source-matched full vs combined-four native export audit 41253276903 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253276903), [**workflow lint 41253276916 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41253276916). The independent std-only Rust observer `ci/m3-combined-four-elf-dynsym-abi.rs` compiled and passed its fixtures, authenticated both separately built original-source browser packages using existing pinned SHA-256 and successful build-run identities, then examined the **actual ELF dynamic symbol tables** read-only with `readelf --wide --dyn-syms`, without invoking the browser executables.
+
+| Checked compiled ABI surface | Full normal | Combined opt-in | Difference |
+| --- | --- | --- | --- |
+| Identical relative ELF member paths | 28 | 28 | 0 |
+| Exported dynamic-symbol occurrences (name, type, binding, visibility, multiplicity; excluding relocation values and section-index layout) | **4,669** | **4,669** | **0** |
+| ELF paths with exported-symbol record drift | — | — | **0** |
+
+This extends the previously verified 28-ELF identical ordered `DT_NEEDED` inventory to an **actual compiled exported dynamic ABI surface comparison**, not identical file bytes, internal/static Rust/C++ FFI symbols, linker arguments, runtime symbol binding, or late `dlopen`. It does not authorize deleting any Rust root, protected browser feature, or native library. No new compressed-byte savings or M3 gate credit. **M3 remains 5/6 (83%), overall 61%, Δ0 percentage points.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
