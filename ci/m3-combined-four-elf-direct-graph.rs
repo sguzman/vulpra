@@ -60,7 +60,7 @@ fn run()->Result<(),String>{
   return Err(format!("combined compiled native imports changed: added_paths={added} removed_paths={removed} different_imports={modified}"))
  }
  let report=format!(concat!(
- "{\n",
+ "{{\n",
  " \"schema_version\":1,\n",
  " \"status\":\"compiled_source_matched_combined_four_native_elf_imports_unchanged\",\n",
  " \"original_full_elf_count\":{},\n",
@@ -77,7 +77,7 @@ fn run()->Result<(),String>{
  " \"default_browser_modified\":false,\n",
  " \"source_removal_authorized\":false,\n",
  " \"m3_sixth_gate_closed\":false\n",
- "}\n"
+ "}}\n"
  ),orig.0,candidate.0,orig.1,candidate.1,orig.2,candidate.2);
  fs::write(&a[3],report).map_err(|e|e.to_string())?;
  println!("PASS: 28 native ELF files, 268 direct needed edges, 50 unique names, exact per-ELF imports preserved");
