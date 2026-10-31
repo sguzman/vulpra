@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/m3-combined-four-elf-dynsym-abi.yml
       - ci/m3-combined-four-elf-dynsym-abi.rs
+      - ci/m3-libxul-exported-function-bodies.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +29,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-combined-four-elf-dynsym-abi.rs
+            ci/m3-libxul-exported-function-bodies.rs
       - name: Compile and run Rust negative fixtures
         shell: bash
         run: |
@@ -36,6 +38,9 @@ jobs:
           rustc --edition=2021 --test ci/m3-combined-four-elf-dynsym-abi.rs -o "$RUNNER_TEMP/abi-test"
           "$RUNNER_TEMP/abi-test"
           rustc --edition=2021 -O ci/m3-combined-four-elf-dynsym-abi.rs -o "$RUNNER_TEMP/abi-observer"
+          rustc --edition=2021 --test ci/m3-libxul-exported-function-bodies.rs -o "$RUNNER_TEMP/libxul-func-test"
+          "$RUNNER_TEMP/libxul-func-test"
+          rustc --edition=2021 -O ci/m3-libxul-exported-function-bodies.rs -o "$RUNNER_TEMP/libxul-func-observer"
           command -v readelf
           command -v objcopy
           command -v cmp
@@ -68,11 +73,42 @@ jobs:
           "$RUNNER_TEMP/abi-observer" "$RUNNER_TEMP/packages/full/extracted" "$RUNNER_TEMP/packages/lean/extracted" "$RUNNER_TEMP/audit/compiled-full-versus-lean-exported-dynsym.json"
           jq -e '.status=="compiled_full_vs_four_optin_elf_dynamic_exports_compared" and .original_full_elf_count==28 and .combined_lean_elf_count==28 and .full_exported_symbol_occurrences>0 and .lean_exported_symbol_occurrences>0 and .full_undefined_import_symbol_occurrences>0 and .lean_undefined_import_symbol_occurrences>0 and .text_sections_compared==28 and (.text_sections_equal + .text_sections_different)==28 and (.differing_text_section_byte_metrics|length)==.text_sections_different and (.differing_text_section_alignment|length)==.text_sections_different and .only_text_section_bytes_examined==true and (.per_elf|length)==28 and .actual_compiled_elf_dynamics_examined==true and .all_rust_cpp_ffi_and_static_symbols_proven==false and .runtime_dlopen_closure_proven==false and .binary_size_reduction_proven==false and .source_removal_authorized==false and .m3_sixth_gate_closed==false' "$RUNNER_TEMP/audit/compiled-full-versus-lean-exported-dynsym.json" >/dev/null
           jq -c '{exports:[.full_exported_symbol_occurrences,.lean_exported_symbol_occurrences],parity:.exact_exported_dynamic_abi_parity,differences:.changed_export_records,undefined_imports:[.full_undefined_import_symbol_occurrences,.lean_undefined_import_symbol_occurrences],import_parity:.exact_undefined_dynamic_import_parity,import_differences:.differing_undefined_import_records,text_sections_equal:.text_sections_equal,text_sections_different:.text_sections_different}' "$RUNNER_TEMP/audit/compiled-full-versus-lean-exported-dynsym.json"
+      - name: Compare compiled libxul named dynamic-exported function bytes by symbol address
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/libxul-func-observer" \
+            "$RUNNER_TEMP/packages/full/extracted/vulpra/libxul.so" \
+            "$RUNNER_TEMP/packages/lean/extracted/vulpra/libxul.so" \
+            "$RUNNER_TEMP/audit/compiled-libxul-exported-function-bodies.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="pinned_original_libxul_named_dynsym_function_code_comparison" and
+            .full_text_bytes==128073093 and
+            .lean_text_bytes==128073125 and
+            .shared_mappable_named_functions>0 and
+            (.byte_identical_named_functions +
+             .byte_different_equal_size_named_functions +
+             .changed_size_named_functions)==.shared_mappable_named_functions and
+            (.full_only_mappable_function_records +
+             .shared_mappable_named_functions)==.full_mappable_function_records and
+            (.lean_only_mappable_function_records +
+             .shared_mappable_named_functions)==.lean_mappable_function_records and
+            .scope_is_exported_dynsym_funcs_only==true and
+            .all_internal_or_static_ffi_functions_verified==false and
+            .runtime_dlopen_graph_verified==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/compiled-libxul-exported-function-bodies.json" >/dev/null
+          jq -c '{full_functions:.full_mappable_function_records,lean_functions:.lean_mappable_function_records,matched:.shared_mappable_named_functions,identical:.byte_identical_named_functions,changed:.byte_different_equal_size_named_functions,resized:.changed_size_named_functions}' "$RUNNER_TEMP/audit/compiled-libxul-exported-function-bodies.json"
       - name: Archive bounded comparison rather than compiled browser code
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: m3-source-matched-28-elf-dynamic-export-abi
-          path: ${{ runner.temp }}/audit/compiled-full-versus-lean-exported-dynsym.json
+          path: |
+            ${{ runner.temp }}/audit/compiled-full-versus-lean-exported-dynsym.json
+            ${{ runner.temp }}/audit/compiled-libxul-exported-function-bodies.json
           if-no-files-found: error
           retention-days: 14
