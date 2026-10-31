@@ -7,6 +7,7 @@ on:
       - .github/workflows/m3-combined-four-elf-dynsym-abi.yml
       - ci/m3-combined-four-elf-dynsym-abi.rs
       - ci/m3-libxul-exported-function-bodies.rs
+      - ci/m3-libxul-unwind-fde-shift.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,6 +31,7 @@ jobs:
           sparse-checkout: |
             ci/m3-combined-four-elf-dynsym-abi.rs
             ci/m3-libxul-exported-function-bodies.rs
+            ci/m3-libxul-unwind-fde-shift.rs
       - name: Compile and run Rust negative fixtures
         shell: bash
         run: |
@@ -41,6 +43,9 @@ jobs:
           rustc --edition=2021 --test ci/m3-libxul-exported-function-bodies.rs -o "$RUNNER_TEMP/libxul-func-test"
           "$RUNNER_TEMP/libxul-func-test"
           rustc --edition=2021 -O ci/m3-libxul-exported-function-bodies.rs -o "$RUNNER_TEMP/libxul-func-observer"
+          rustc --edition=2021 --test ci/m3-libxul-unwind-fde-shift.rs -o "$RUNNER_TEMP/unwind-fde-test"
+          "$RUNNER_TEMP/unwind-fde-test"
+          rustc --edition=2021 -O ci/m3-libxul-unwind-fde-shift.rs -o "$RUNNER_TEMP/unwind-fde-observer"
           command -v readelf
           command -v objcopy
           command -v cmp
@@ -102,6 +107,35 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/audit/compiled-libxul-exported-function-bodies.json" >/dev/null
           jq -c '{full_functions:.full_mappable_function_records,lean_functions:.lean_mappable_function_records,matched:.shared_mappable_named_functions,identical:.byte_identical_named_functions,changed:.byte_different_equal_size_named_functions,resized:.changed_size_named_functions}' "$RUNNER_TEMP/audit/compiled-libxul-exported-function-bodies.json"
+      - name: Compare compiled libxul unwind FDE ranges with and without 32-byte shift
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/unwind-fde-observer" \
+            "$RUNNER_TEMP/packages/full/extracted/vulpra/libxul.so" \
+            "$RUNNER_TEMP/packages/lean/extracted/vulpra/libxul.so" \
+            "$RUNNER_TEMP/audit/compiled-libxul-unwind-fde-shift.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_compiled_libxul_unwind_fde_shift_comparison" and
+            .full_text_bytes==128073093 and
+            .lean_text_bytes==128073125 and
+            .full_fde_records>10 and .lean_fde_records>10 and
+            .full_unique_in_text_fde_ranges>10 and
+            .lean_unique_in_text_fde_ranges>10 and
+            (.zero_shift_identical_code_ranges +
+             .zero_shift_different_code_ranges)==.zero_shift_matching_fde_ranges and
+            (.plus_32_shift_identical_code_ranges +
+             .plus_32_shift_different_code_ranges)==.plus_32_shift_matching_fde_ranges and
+            .sum_of_fde_span_bytes_not_unique_code_coverage==true and
+            .only_unwind_described_code_ranges_examined==true and
+            .all_compiled_functions_or_rust_ffi_proven==false and
+            .runtime_dlopen_closure_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/compiled-libxul-unwind-fde-shift.json" >/dev/null
+          jq -c '{fde_ranges:[.full_unique_in_text_fde_ranges,.lean_unique_in_text_fde_ranges],zero_offset:[.zero_shift_matching_fde_ranges,.zero_shift_identical_code_ranges],plus_32:[.plus_32_shift_matching_fde_ranges,.plus_32_shift_identical_code_ranges]}' "$RUNNER_TEMP/audit/compiled-libxul-unwind-fde-shift.json"
       - name: Archive bounded comparison rather than compiled browser code
         if: success()
         uses: actions/upload-artifact@v4
@@ -110,5 +144,6 @@ jobs:
           path: |
             ${{ runner.temp }}/audit/compiled-full-versus-lean-exported-dynsym.json
             ${{ runner.temp }}/audit/compiled-libxul-exported-function-bodies.json
+            ${{ runner.temp }}/audit/compiled-libxul-unwind-fde-shift.json
           if-no-files-found: error
           retention-days: 14
