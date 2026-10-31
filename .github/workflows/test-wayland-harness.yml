@@ -59,6 +59,9 @@ jobs:
           grep -Fxq 'user_pref("browser.search.region", "ZZ");' "$profile/user.js"
           test "$(stat -c '%a' "$profile")" = 700
           test "$(stat -c '%a' "$profile/user.js")" = 600
+          # Fake only Gecko's profile-initialization marker in this mock test.
+          # The real native CI must create this file itself.
+          printf '[Compatibility]\\nLastVersion=synthetic\\n' > "$profile/compatibility.ini"
           # Synthetic protocol trace validates parser only, not live painting.
           printf '%s\n' '-> wl_surface#13.attach(wl_buffer#45, 0, 0)' >&2
           printf '%s\n' '-> wl_surface#13.commit()' >&2

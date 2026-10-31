@@ -112,8 +112,11 @@ if ! kill -0 "$browser_pid" 2>/dev/null; then
   tail -n 80 "$work/browser.log" >&2 || true
   exit 1
 fi
-[[ -d "$work/home/.local/share/vulpra/default" ]] || {
-  echo 'Wayland startup did not establish isolated Vulpra profile' >&2
+# The harness precreates the profile only to seed a local region preference.
+# Do not mistake that directory for evidence of actual browser initialization:
+# Gecko writes compatibility.ini while loading a new profile (nsAppRunner.cpp).
+[[ -s "$test_profile/compatibility.ini" ]] || {
+  echo 'Wayland startup did not initialize its isolated Vulpra profile' >&2
   exit 1
 }
 [[ ! -e "$work/home/.mozilla" ]] || {
