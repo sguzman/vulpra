@@ -65,6 +65,7 @@ jobs:
             .host_exported_requested_functions==82 and
             .missing_requested_host_functions==0 and
             .single_host_library_abi_compatible==true and
+            .glibc_dlopen_and_dlsym_resolved_all_requested==true and
             .arch_host_abi_verified==false and
             .all_dlopen_dependencies_closed==false and
             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-pinned-pulse-host-abi.json" >/dev/null
