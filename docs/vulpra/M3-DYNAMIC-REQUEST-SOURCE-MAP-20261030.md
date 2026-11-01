@@ -19,11 +19,19 @@ These are three **glibc loader-reported dynamic-load requests** observed only in
 
 This crosswalk confirms the **original source contains candidate invocation routes and build declarations**. It does **not** assign a native crash or prove each library is required exclusively by Wayland; FFmpeg, audio and GPU paths may be exercised in other workloads and host environments.
 
+## Exact external Rust PulseAudio source closure (2026-10-31)
+
+[Two-revision, source-only CI 41262201541](https://github.com/sguzman/vulpra/actions/runs/41262201541) **PASSED** with bounded artifact **13065244306**; [workflow lint 41262201517](https://github.com/sguzman/vulpra/actions/runs/41262201517) **PASSED**. The verifier `ci/m3-pinned-pulse-dlopen-source.rs` checks two exact, separately authenticated Git trees and rejects missing source anchors. The original Gecko source `b1482404` pins `mozilla/cubeb-pulse-rs` at `88194f91c8778fa608a19af7b91306094525595d` with feature `pulse-dlopen`.
+
+The exact external source closes the previously uninspected *source candidate* chain: Gecko `USE_PULSE_RUST` / `cubeb.c` selects the C ABI `pulse_rust_init`; the external [`src/capi.rs`](https://github.com/mozilla/cubeb-pulse-rs/blob/88194f91c8778fa608a19af7b91306094525595d/src/capi.rs) dispatches to `PulseContext`. Its [`src/backend/context.rs`](https://github.com/mozilla/cubeb-pulse-rs/blob/88194f91c8778fa608a19af7b91306094525595d/src/backend/context.rs) feature-gates `open()` and has an explicit failure branch if libpulse is absent. The external root `pulse-dlopen` Cargo feature enables `pulse-ffi/dlopen`, whose [`pulse-ffi/src/lib.rs`](https://github.com/mozilla/cubeb-pulse-rs/blob/88194f91c8778fa608a19af7b91306094525595d/pulse-ffi/src/lib.rs) calls `LibLoader::open()`; [`pulse-ffi/src/ffi_funcs.rs`](https://github.com/mozilla/cubeb-pulse-rs/blob/88194f91c8778fa608a19af7b91306094525595d/pulse-ffi/src/ffi_funcs.rs) explicitly invokes `dlopen("libpulse.so.0", RTLD_LAZY)` and resolves PulseAudio functions with `dlsym`.
+
+This proves the *exact-revision source route*, not that the observed glibc request executed that specific call site. It does not verify the exact compiled `MOZ_PULSEAUDIO` value, native FFI/linker binding, runtime call stacks, Arch host compatibility, or the complete conditional dynamic-loading graph. It authorizes no source removal or new M3 gate credit.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
 - Complete `dlopen` relation graph, all transitive host dependencies, symbol-version/ABI resolution, Arch/Hyprland host parity.
-- Actual generated `MOZ_PULSEAUDIO` value or the source text at the pinned external `cubeb-pulse-rs` revision from **this source-candidate verifier**. Runtime observed the library, but that alone does not prove a feature flag or concrete call path.
+- Actual generated `MOZ_PULSEAUDIO` value and the compiled/runtime call stack. The separately accepted exact-revision external source audit above proves a conditional code route, not that the observed native request traversed it.
 - A fix for the [ordinary Ubuntu network-namespace-sensitive SIGSEGV](M3-WAYLAND-SIGSEGV-20261030.md).
 - Any additional feature exclusion, source deletion, package size saving, or full sixth M3 gate closure.
 
