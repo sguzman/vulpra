@@ -67,6 +67,7 @@ jobs:
             .matched_drm_exports==1 and
             .missing_requested_functions==0 and
             .direct_source_to_host_abi_proven==true and
+            .glibc_dlopen_dlsym_resolved_all_functions==true and
             .arch_host_abi_proven==false and
             .all_dynamic_loading_paths_proven==false and
             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-original-dmabuf-host-abi.json" >/dev/null
