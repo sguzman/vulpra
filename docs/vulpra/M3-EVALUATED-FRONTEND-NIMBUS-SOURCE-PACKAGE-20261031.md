@@ -509,6 +509,21 @@ Both `.relr.dyn` sections have **26** direct-base words and **478,592** sorted u
 
 This advances the earlier *source-only/retained-source-path* provenance into **actual original linked named definitions**, but it does not independently associate all **four original C++ callsites** with native relocation targets, prove all internal or generated FFI seams, demonstrate functional execution of the Rust exports, or establish unobserved runtime conditional loading. The original diagnostic report also retains the prior test-only `MOZ_Crash`/network-guard trace; that report is not a new graphical acceptance. The proof flags are explicitly `complete_static_callsite_resolution_proven=false`, `conditional_dlopen_closure_proven=false`, `source_pruning_authorized=false`, and `m3_sixth_gate_closed=false`. **M3 5/6 (83%), overall 61%, Δ0 pp**, no new source deletion or accepted package savings.
 
+### Original compiled C++ text relocations importing three Rust FFI functions (2026-11-01 UTC)
+
+[Real historical full-native CI 41311517542 **SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41311517542), artifact **13087494612** independently downloaded and inspected. Its `m3-original-ffi-object-relocations.json` identifies original source SHA `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, status `compiled_cxx_text_relocation_imports_observed`, and actual **GNU `readelf -Wr`** audit of three compiled ELF ET_REL objects under `xpcom/build` and one compiled ELF ET_REL object under `toolkit/crashreporter/crash_helper`. The bounded Rust verifier parses native x86-64 little-endian ELF relocation records, considers text-section relocations only and refuses missing, implausible or unexpected compiled object inputs. Its contract preflight, real compiled-object regression fixture, original native build, archive/linked-ELF `nm` proof and native relocation capture all passed.
+
+| Exact original compiled C++ → Rust FFI reference | Actual compiled C++ text relocation records | Original source-level calls |
+| --- | ---: | ---: |
+| `GkRust_Init` (XPCOM) | **2** | 2 |
+| `GkRust_Shutdown` (XPCOM) | **1** | 1 |
+| `crash_generator_logic_desktop` (crashhelper) | **1** | 1 |
+| **Total** | **4** | **4** |
+
+The same original native compile revalidated all three expected Rust archive-to-ELF named definitions in `m3-original-ffi-symbol-definitions.json`; those proof inputs were unstripped native `libgkrust.a`, `libxul.so`, `libcrash_helper_server.a`, and `crashhelper`. Thus **native compiled C++ textual relocation imports and independently compiled Rust/linker output definitions** are now verified for these three source-defined functions, a stronger assertion than either source search or symbol names alone.
+
+**Boundary:** the verifier intentionally does not establish exact assembly-level final ELF branch/call target resolution, semantic end-to-end execution, or enumeration of *every* generated/native/staticlib FFI route. It reported `exact_cpp_source_callsite_count_proven=false` and `resolved_final_elf_callsite_machine_targets_proven=false`; although measured text relocation counts match the separate pinned source count, the report must not be read as a final instruction-address crosswalk. It also explicitly preserves `all_rust_cpp_ffi_seams_proven=false`, `conditional_dlopen_closure_proven=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`. The concurrent diagnostic stack still reports the already-known, deliberate nonlocal-network test-guard `MOZ_Crash`; no new user-workstation/online graphical acceptance. **M3 remains 5/6 gates (83%); overall project 61%; accepted percentage delta +0 pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
