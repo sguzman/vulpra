@@ -190,6 +190,54 @@ fn rodata_index_witness(
     ),second_frequency))
 }
 
+// C++ StaticModule starts with nsID mCID; the code indexes the native
+// gStaticModules array with a 28-byte stride. Validate module ID 452 in
+// BOTH actual compiled original packages instead of inferring its identity.
+fn compiled_about_redirector_cid(elf:&Path, array_base:u64)
+    -> Result<String,String> {
+    const CID:[u8;16]=[
+        0xad,0xb6,0x4b,0x7e,0xc4,0x2f,0xc6,0x4d,
+        0x89,0xef,0x23,0xe8,0xe5,0xcc,0xf9,0x80,
+    ];
+    const INDEX:u64=452;
+    const STRIDE:u64=28;
+    let mut cmd=Command::new("readelf");
+    cmd.args(["--wide","--section-headers","--"]).arg(elf);
+    let report=tool_output(cmd)?;
+    let mut section=None;
+    for line in report.lines(){
+        let cols:Vec<_>=line.split_whitespace().collect();
+        let Some(i)=cols.iter().position(|x|*x==".rodata") else{continue};
+        if i+4>=cols.len()||cols[i+1]!="PROGBITS"||section.is_some(){
+            return Err("Ambiguous original source-matched compiled rodata".into());
+        }
+        let number=|j:usize|u64::from_str_radix(cols[i+j],16).map_err(|e|e.to_string());
+        section=Some((number(2)?,number(3)?,number(4)?));
+    }
+    let (vma,file_offset,size)=section.ok_or("No original compiled rodata".to_owned())?;
+    let cid_vma=array_base.checked_add(INDEX*STRIDE)
+        .ok_or("Native module offset overflow")?;
+    if cid_vma<vma||cid_vma.checked_add(CID.len() as u64).is_none_or(|x|x>vma+size){
+        return Err("Compiled AboutRedirector module CID outside rodata".into());
+    }
+    let mut file=File::open(elf).map_err(|e|e.to_string())?;
+    file.seek(SeekFrom::Start(file_offset+cid_vma-vma))
+        .map_err(|e|e.to_string())?;
+    let mut found=[0u8;16];
+    file.read_exact(&mut found).map_err(|e|e.to_string())?;
+    if found!=CID {
+        return Err("Real compiled module ID 452 CID differs from source-pinned AboutRedirector".into());
+    }
+    Ok(format!(
+      "{{\"module_id\":452,\"native_static_module_stride_bytes\":28,\
+      \"native_module_array_base_vma\":{array_base},\
+      \"about_redirector_cid_virtual_address\":{cid_vma},\
+      \"source_pinned_about_redirector_cid\":\"7e4bb6ad-2fc4-4dc6-89ef-23e8e5ccf980\",\
+      \"compiled_cid_bytes_exact_match\":true,\
+      \"debug_symbols_or_source_line_mapping_in_binary\":false}}"
+    ))
+}
+
 fn run()->Result<(),String>{
     let args:Vec<_>=std::env::args().collect();
     if args.len()!=4 {return Err("usage: m3-libxul-hinge-assembly FULL_LIBXUL LEAN_LIBXUL JSON".into());}
@@ -200,6 +248,8 @@ fn run()->Result<(),String>{
     if len_a!=EXPECTED_TEXT_FULL || len_b!=EXPECTED_TEXT_LEAN{
         return Err("Original source-pinned compiled libxul .text size drift".into());
     }
+    let full_cid=compiled_about_redirector_cid(a,0x11f6b00)?;
+    let lean_cid=compiled_about_redirector_cid(b,0x11f8980)?;
     let (full_table,full_frequency)=rodata_index_witness(a,0x11faa40,0x11fbea0,652)?;
     let (lean_table,lean_frequency)=rodata_index_witness(b,0x11fc8c0,0x11fdd20,651)?;
     let changed:Vec<_>=full_frequency.iter().filter(|(key,count)|lean_frequency.get(key)!=Some(count)).collect();
@@ -212,6 +262,15 @@ fn run()->Result<(),String>{
     for (idx,(of,lf,ol,ll)) in HINGES.iter().copied().enumerate(){
         let x=disassemble(a,addr_a,of,lf)?;
         let y=disassemble(b,addr_b,ol,ll)?;
+        if idx==0 && (
+           count_contains(&x,"# 11f6b00")!=1 ||
+           count_contains(&y,"# 11f8980")!=1 ||
+           count_contains(&x,"lea rax,[rcx+rcx*8]")!=1 ||
+           count_contains(&x,"lea rdx,[rax+rax*2]")!=1 ||
+           count_contains(&y,"lea rax,[rcx+rcx*8]")!=1 ||
+           count_contains(&y,"lea rdx,[rax+rax*2]")!=1
+        ) { return Err("Real compiled native gStaticModules base/28-byte index instructions absent".into()); }
+
         records.push(compare(&x,&y,idx+1,lf,ll)?);
     }
     let report=format!(
@@ -222,6 +281,9 @@ fn run()->Result<(),String>{
         \"runtime_dlopen_closure_proven\":false,\
         \"source_removal_authorized\":false,\"m3_sixth_gate_closed\":false,\
         \"indexed_native_table_full\":{full_table},\"indexed_native_table_lean\":{lean_table},\
+        \"binary_module_452_full_about_redirector_cid\":{full_cid},\
+        \"binary_module_452_lean_about_redirector_cid\":{lean_cid},\
+        \"compiled_module_id_452_is_about_redirector\":true,\
         \"single_changed_uninterpreted_second_field_value\":452,\
         \"full_occurrences_of_changed_field_value\":36,\
         \"lean_occurrences_of_changed_field_value\":35,\
