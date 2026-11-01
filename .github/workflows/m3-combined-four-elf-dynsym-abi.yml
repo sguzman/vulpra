@@ -152,6 +152,60 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/audit/compiled-libxul-unwind-fde-shift.json" >/dev/null
           jq -c '{fde_ranges:[.full_unique_in_text_fde_ranges,.lean_unique_in_text_fde_ranges],zero_offset:[.zero_shift_matching_fde_ranges,.zero_shift_identical_code_ranges],plus_32:[.plus_32_shift_matching_fde_ranges,.plus_32_shift_identical_code_ranges],exclusive_alignment:[.unwind_fde_both_alignments,.unwind_fde_zero_only,.unwind_fde_plus_32_only,.unwind_fde_neither_alignment],identical_under_either:.unwind_fde_identical_under_either}' "$RUNNER_TEMP/audit/compiled-libxul-unwind-fde-shift.json"
+      - name: Reconcile the two anonymous native FDE code-range and gap growth deltas
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          jq -c '
+            .unwind_fde_layout_transition as $h |
+            $h.unmatched_original_fde_offsets as $o |
+            $h.nearby_lean_fde_offsets as $l |
+            if ($o|length)!=2 or ($l|length)!=6
+            then error("Unexpected exact-source hinge interval count")
+            else
+              ($o[0].original_text_offset_end - $o[0].original_text_offset_start) as $f0 |
+              ($o[1].original_text_offset_end - $o[1].original_text_offset_start) as $f1 |
+              ($l[3].length - $f0) as $g0 |
+              (($l[4].lean_text_offset_start-$l[3].lean_text_offset_end) -
+               ($o[1].original_text_offset_start-$o[0].original_text_offset_end)) as $padding0 |
+              ($l[4].length - $f1) as $g1 |
+              (($l[5].lean_text_offset_start-$l[4].lean_text_offset_end) -
+               ($h.first_plus_32_only_original_start_offset-$o[1].original_text_offset_end)) as $padding1 |
+              {
+                schema_version:1,
+                status:"pinned_compiled_libxul_anonymous_two_range_layout_growth",
+                full_anonymous_range_lengths:[$f0,$f1],
+                lean_anonymous_range_lengths:[$l[3].length,$l[4].length],
+                code_range_length_growth:[$g0,$g1],
+                inter_range_gap_growth:[$padding0,$padding1],
+                total_accounted_delta:($g0+$padding0+$g1+$padding1),
+                original_start:$o[0].original_text_offset_start,
+                lean_start:$l[3].lean_text_offset_start,
+                next_full_shift_anchor:$h.first_plus_32_only_original_start_offset,
+                next_lean_shift_anchor:$l[5].lean_text_offset_start,
+                source_or_semantic_identity_established:false,
+                complete_linker_ffi_dlopen_closure:false,
+                m3_sixth_gate_closed:false
+              }
+            end
+          ' "$RUNNER_TEMP/audit/compiled-libxul-unwind-fde-shift.json" \
+            > "$RUNNER_TEMP/audit/compiled-libxul-two-range-delta.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="pinned_compiled_libxul_anonymous_two_range_layout_growth" and
+            .full_anonymous_range_lengths==[454,461] and
+            .lean_anonymous_range_lengths==[466,473] and
+            .code_range_length_growth==[12,12] and
+            .inter_range_gap_growth==[4,4] and
+            .total_accounted_delta==32 and
+            .original_start==.lean_start and
+            .next_lean_shift_anchor==(.next_full_shift_anchor+32) and
+            .source_or_semantic_identity_established==false and
+            .complete_linker_ffi_dlopen_closure==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/compiled-libxul-two-range-delta.json" >/dev/null
+          jq -c '{full:.full_anonymous_range_lengths,lean:.lean_anonymous_range_lengths,range_growth:.code_range_length_growth,gap_growth:.inter_range_gap_growth,total:.total_accounted_delta}' "$RUNNER_TEMP/audit/compiled-libxul-two-range-delta.json"
       - name: Archive bounded comparison rather than compiled browser code
         if: success()
         uses: actions/upload-artifact@v4
@@ -161,5 +215,6 @@ jobs:
             ${{ runner.temp }}/audit/compiled-full-versus-lean-exported-dynsym.json
             ${{ runner.temp }}/audit/compiled-libxul-exported-function-bodies.json
             ${{ runner.temp }}/audit/compiled-libxul-unwind-fde-shift.json
+            ${{ runner.temp }}/audit/compiled-libxul-two-range-delta.json
           if-no-files-found: error
           retention-days: 14
