@@ -142,7 +142,7 @@ mod tests {
         let linked = dir.join("libxul.so");
         fs::write(
             &source,
-            "void GkRust_Init(void){}\\nvoid GkRust_Shutdown(void){}\\n",
+            "void GkRust_Init(void){}\nvoid GkRust_Shutdown(void){}\n",
         ).unwrap();
         let status = Command::new("cc")
             .args(["-fPIC", "-c"])
