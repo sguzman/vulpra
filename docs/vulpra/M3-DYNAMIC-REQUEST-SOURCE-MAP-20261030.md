@@ -238,6 +238,28 @@ The two reports have **identical original six candidate names/order and 15 requi
 
 **Actual guarded application fallback ordering matters:** exact original `toolkit/crashreporter/client/app/src/net/http.rs` first attempts Firefox's `crashreporterNetworkBackend` background task, then the `curl` **executable**, then uses `super::libcurl::load()` only if the earlier approaches fail. The CI checks source anchors for this structure. The probe's **first loadable SONAME on the isolated host** must never be presented as an actually chosen `crashreporter` library in a production upload; the corresponding fallback code path was **not executed**. The test resolves source-declared symbols but does not prove functionality of each API, decode an actual report, capture real upload traffic, validate all libcurl transitives, or establish EndeavourOS/Hyprland workstation parity. Nothing is eligible for pruning: **M3 5/6 = 83%, overall 61%, Δ+0 pp, no new source deletion or package-byte savings**.
 
+## Original stripped `libxul.so` direct GOT and register-indirect loader callsites (2026-11-01 UTC)
+
+[**Exact original archived native binary CI 41356315092 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41356315092), [workflow lint 41356315171 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41356315171), artifact **13102344922 independently downloaded and inspected**. The std-only Rust `ci/m3-original-libxul-got-register-loader.rs` validates **only a bounded selected subset** of compiled GOT/indirect loader machine callsites; it does not execute the browser. Its input is the SHA-256-authenticated immutable source-pinned full-normal package run **40997075527**, original source `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, native archive SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`. Actual original *stripped packaged* `libxul.so` is **189,486,696 bytes**, independent SHA-256 `d6d1af9d377cab1f31bda6cfe05c52b945b21f0c37295636d0aca99fef4272cf`. **This is not the 2,590,405,472-byte transient unstripped linked ELF** from the previous 73 direct-branch study; don't sum the two studies' callsite numbers without reconciliation.
+
+Actual `readelf -Wr` verifies **five selected loader API dynamic relocations**, all at exact original native virtual addresses:
+
+| GOT slot | ELF relocation and imported name |
+| --- | --- |
+| `0xb3c33c8` | `R_X86_64_GLOB_DAT dlopen@GLIBC_2.2.5` |
+| `0xb3c3428` | `R_X86_64_GLOB_DAT PR_LoadLibrary` |
+| `0xb3c61a8` | `R_X86_64_JUMP_SLOT dlopen@GLIBC_2.2.5` |
+| `0xb3c6258` | `R_X86_64_JUMP_SLOT PR_LoadLibrary` |
+| `0xb3c6400` | `R_X86_64_JUMP_SLOT PR_LoadLibraryWithFlags` |
+
+The bounded `objdump -d --no-show-raw-insn` verification checks **four distinct non-PLT RIP-relative `call *(%rip)` instructions**, with instruction virtual addresses `0x8cd53d1` and `0xa983e4a` targeting `dlopen` slot `0xb3c33c8`, and `0x9cf277e`, `0x9cf2790` targeting `PR_LoadLibrary` slot `0xb3c3428`. It separately identifies **three PLT forwarding jumps** at `0xae4af70`, `0xae4b0d0`, `0xae4b420`; **do not treat these stub jumps as application-level library-loading calls**.
+
+**New register-indirect machine dependency proof:** original stripped `libxul.so` at `0x9936640` loads the actual `dlopen` function pointer from `0xb3c33c8` into `%r14`; the immediately bounded ten-instruction sequence contains **two `call *%r14` instructions** at `0x993664f` and `0x9936664`. The auditor verifies **all ten exact instruction addresses and their expected operands**, with no interposed register assignment that invalidates this local provenance. These two branches are not direct symbol-named calls or RIP-relative GOT call instructions. An exact numeric GOT offset is crucial: stripped ELF `objdump` comments can display **unrelated nearest symbols** rather than the relocation's actual `dlopen` owner. Rust unit fixtures explicitly reject mutated GOT destinations, opcodes and the register-call sequence.
+
+**Scope accepted:** **five selected relocation slots, four non-PLT GOT-indirect calls, two additional register-indirect `dlopen` calls and three PLT forwarding jumps**. This does **not** enumerate all indirect calls or establish source-level owner identity for each stripped instruction, library arguments, actual `dlopen` requests, successful SONAME selection, complete source/build/FFI graph, or target EndeavourOS/Hyprland behavior. The archived evidence retains `actual_runtime_dlopen_soname_arguments_proven=false`, `all_register_indirect_loader_routes_enumerated=false`, `complete_native_loader_dependency_graph_proven=false`, `target_user_workstation_verified=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`.
+
+**No new source removal or measured package savings. M3 remains 5/6 = 83%, Vulpra overall 61%, Δ+0 percentage points.**
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
