@@ -124,6 +124,73 @@ fn calls(path:&Path)->Result<BTreeMap<(String,String),u64>,String>{
     }
     Ok(counts)
 }
+// Resolve selected dynamic loader API relocations and exact GOT instruction
+// targets. PLT stub forwarding is labeled separately from application calls.
+fn loader_relocations(path:&Path)->Result<BTreeMap<u64,(String,String)>,String>{
+    let out=Command::new("readelf").args(["--wide","--relocs"]).arg(path)
+        .output().map_err(|e|format!("Missing readelf relocations: {e}"))?;
+    if !out.status.success()||out.stdout.len()>64*1024*1024{
+        return Err("Native dynamic relocation table invalid/too large".into());
+    }
+    let mut found=BTreeMap::new();
+    for line in String::from_utf8(out.stdout).map_err(|e|e.to_string())?.lines(){
+        let t:Vec<_>=line.split_whitespace().collect();
+        if t.len()<5 || t[0].len()>16 || !t[0].bytes().all(|b|b.is_ascii_hexdigit()){continue;}
+        let kind=match t[2]{
+            "R_X86_64_GLOB_DAT"=>"GLOB_DAT",
+            "R_X86_64_JUMP_SLOT"=>"JUMP_SLOT",
+            "R_X86_64_64"=>"ABS64",
+            _=>continue
+        };
+        let Some(api)=loader(t[4]) else {continue};
+        let offset=u64::from_str_radix(t[0],16).map_err(|e|e.to_string())?;
+        if found.insert(offset,(api.into(),kind.into())).is_some(){
+            return Err("Duplicate loader API relocation offset".into());
+        }
+    }
+    Ok(found)
+}
+fn got_indirect_insns(path:&Path,relocs:&BTreeMap<u64,(String,String)>)
+ ->Result<BTreeMap<(String,String,String,bool),u64>,String>{
+    let mut child=Command::new("objdump").args(["-d","--no-show-raw-insn"])
+        .arg(path).stdout(Stdio::piped()).stderr(Stdio::null())
+        .spawn().map_err(|e|format!("Missing native objdump: {e}"))?;
+    let stream=child.stdout.take().ok_or("No objdump stdout")?;
+    let mut counts=BTreeMap::new();
+    let mut plt=false;
+    for (n,line) in BufReader::new(stream).lines().enumerate(){
+        if n>=MAX_LINES_PER_ELF{
+            let _=child.kill();let _=child.wait();
+            return Err("GOT instruction count exceeded budget".into());
+        }
+        let line=line.map_err(|e|e.to_string())?;
+        if let Some(section)=line.strip_prefix("Disassembly of section "){
+            plt=section.starts_with(".plt")||section.starts_with(".iplt");
+            continue;
+        }
+        let Some((address,insn))=line.split_once(':') else {continue};
+        if address.trim().is_empty()||!address.trim().bytes().all(|b|b.is_ascii_hexdigit()){continue;}
+        let Some((left,comment))=insn.split_once('#') else {continue};
+        if !left.contains("(%rip)")||!left.contains('*'){continue;}
+        let branch_kind=match left.split_whitespace().next().unwrap_or(""){
+            "call"|"callq"=>"call","jmp"|"jmpq"=>"tail-jump",_=>continue
+        };
+        let Some((slot,symbol))=comment.trim().split_once(" <") else {continue};
+        let Some(name)=symbol.strip_suffix('>') else {continue};
+        let Some(api)=loader(name) else {continue};
+        if slot.len()>16||!slot.bytes().all(|b|b.is_ascii_hexdigit()){continue;}
+        let offset=u64::from_str_radix(slot,16).map_err(|e|e.to_string())?;
+        if let Some((rel_api,rel_kind))=relocs.get(&offset){
+            if rel_api!=api{return Err("Native instruction/relocation API mismatch".into());}
+            *counts.entry((api.into(),rel_kind.clone(),branch_kind.into(),plt)).or_insert(0)+=1;
+        }
+    }
+    if !child.wait().map_err(|e|e.to_string())?.success(){
+        return Err("Native GOT disassembly failed".into());
+    }
+    Ok(counts)
+}
+
 fn json(s:&str)->String {
     let mut a=String::from("\"");
     for c in s.chars() {
