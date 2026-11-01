@@ -78,6 +78,12 @@ The report deliberately retains `complete_ffmpeg_function_set_verified:false`: i
 
 The **Arch container is not the user's EndeavourOS workstation**. Successful symbol binding does not establish an actual Wayland/Hyprland GPU or audio device, source feature activation in the compiled Firefox, full dynamic load dependency coverage, Arch host package-version reproducibility, or entire M3 gate completion. Explicit artifact flags `arch_container_abi_verified=true`, `arch_host_abi_verified=false`, and `m3_sixth_gate_closed=false` preserve these boundaries. No code was pruned.
 
+## Original FFmpeg 63 ABI on disposable Arch Linux (2026-11-01 UTC)
+
+[Source-pinned real Arch x86-64 FFmpeg 63 CI 41266875131](https://github.com/sguzman/vulpra/actions/runs/41266875131) **PASSED**; [workflow lint 41266875168](https://github.com/sguzman/vulpra/actions/runs/41266875168) **PASSED**. The artifact **13068330122** was independently opened and checked. The exact original Gecko source commit `b1482404dfb8b01342990ee99ea3df0f9756b5f7` maps the Linux FFmpeg loader's generated `FFMPEG_MAX_MAJOR_VERSION=63` SONAME candidate to `libavcodec.so.63`. The native version-63 C++ `AV_FUNC` masks require **42** function names, with **28** `AV_FUNC_OPTION`/`AV_FUNC_OPTION_SILENT` names separately classified as optional. Using a disposable Arch x86-64 userland and an actual Arch `ffmpeg` package, the bounded Rust auditor used `dlopen(RTLD_NOW)`, invoked `avcodec_version` (major **63**, raw **4129126**), and resolved **42/42 mandatory and 28/28 optional names, 70/70 total, 0 missing**. Three Rust negative fixtures passed, as did the exact-source checkout checks. Arch base-image digest retained: `archlinux@sha256:e82623936fa1a69700b48e98b058df6eaab18b737c27473a7234a40fdecb9413`; rolling package versions were not frozen.
+
+The `arch_container_loader_verified=true` report explicitly leaves `user_arch_host_verified=false`, `compiled_browser_callsite_verified=false`, `real_video_decode_verified=false`, `full_dependency_graph_verified=false`, `m3_sixth_gate_closed=false` and `source_pruning_authorized=false`. This is **not** confirmation of the user's EndeavourOS/Hyprland installation, actual hardware decoding, native Firefox callstack execution, all FFmpeg versions, or a complete M3 dependency graph.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
