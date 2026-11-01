@@ -45,7 +45,7 @@ fn parse_nm_line(line: &str) -> Option<(&str, char)> {
 fn inspect(path: &Path, archive: bool) -> Result<BTreeMap<&'static str, usize>, String> {
     check_input(path, archive)?;
     let mut child = Command::new("nm")
-        .args(["--print-file-name", "--format=posix", "--extern-only", "--defined-only", "--no-demangle"])
+        .args(["--print-file-name", "--format=posix", "--defined-only", "--no-demangle"])
         .arg(path)
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -62,7 +62,7 @@ fn inspect(path: &Path, archive: bool) -> Result<BTreeMap<&'static str, usize>, 
             return Err("Refusing unexpectedly large nm symbol stream".into());
         }
         if let Some((name, kind)) = parse_nm_line(&line) {
-            if kind == 'T' || kind == 'W' {
+            if matches!(kind, 'T' | 't' | 'W' | 'w') {
                 for symbol in SYMBOLS {
                     if name == symbol { *found.entry(symbol).or_insert(0) += 1; }
                 }
