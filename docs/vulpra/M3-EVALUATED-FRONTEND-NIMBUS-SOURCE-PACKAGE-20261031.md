@@ -378,6 +378,17 @@ There were **exactly 2 eligible named defined exported `FUNC` symbols** in each 
 
 Therefore **282,692 / 282,694 (99.9993%)** of original unwind-described code-range boundaries have at least one exact corresponding lean range at these two placements. **99,201** original FDE ranges also have equal actual machine-code bytes under at least one of the two placements (not unique function/code coverage). The regional one-eighth census is particularly diagnostic: in the **last seven eighths**, all **236,819** original FDE ranges have a +32-byte lean counterpart and **zero** fail both alignments. The **first eighth** contains 45,875 FDE ranges with 32,375 zero-offset matches, 16,254 shifted matches and **two** unmatched FDE boundaries (the zero/shift matches can overlap). This strongly narrows the native compiled layout-boundary discrepancy to an early transition; it does **not** prove a single inserted 32-byte instruction block, source reason, full code equivalence, disassembly equivalence, Rust/C++ FFI, actual linker command parity or arbitrary runtime `dlopen` coverage. No new pruning, size savings or full M3 sixth gate credit; **M3 5/6 (83%), overall 61%, Δ0pp.**
 
+### Numeric native linker-layout hinge in original `libxul.so`
+
+[**Exact-source checksum-authenticated native FDE transition locator 41254941837 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41254941837), [**lint 41254941840 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41254941840). After proving the 282,692/282,694 two-offset boundary reconciliation, a separate bounded read-only `.text` code-address audit identified the monotonic transition region. Offsets here are measured **relative to the beginning of original compiled `.text`**, not source-code line numbers, function names, or ELF file offsets.
+
+- Last *zero-only* original FDE range starts at byte **11,654,880**.
+- First *+32-only* original FDE range starts at byte **11,655,824**.
+- The two original FDE intervals that fail both placements are **[11,654,896, 11,655,350)** (454 B) and **[11,655,360, 11,655,821)** (461 B).
+- **Zero** zero-only original FDEs occur after the first +32-only record, and **zero** +32-only original FDEs precede the last zero-only record.
+
+Thus the exclusive layout transition occurs within a tightly bounded **944-byte window between those start offsets**, surrounding exactly two original unmatched FDE ranges. The FDE scan still covers only unwind-described intervals; many ranges at matching offsets have differing machine-code bytes, so the evidence does **not** establish a single inserted code sequence, source-level cause, same runtime semantics, or full native FFI/dlopen dependency closure. There is no authorization to prune any code based solely on this mapping. **Overall 61%, M3 5/6 (83%), Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
