@@ -1,0 +1,149 @@
+# Match the exact original WebAuthn libudev lazy loader's 49 FFI symbols
+# against disposable Ubuntu and Arch userspaces, no network or USB key.
+name: M3 Original WebAuthn Isolated Libudev Host ABI
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-webauthn-libudev-host-abi.rs
+      - .github/workflows/m3-original-webauthn-libudev-host-abi.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-webauthn-libudev-host-abi:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      NATIVE_RUN: '41357321586'
+      NATIVE_HEAD: 5f7437f957e45201149ce42ecad6c662b16d19bf
+      NATIVE_ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout only current bounded Rust host ABI probe
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-webauthn-libudev-host-abi.rs
+      - name: Checkout immutable original WebAuthn libudev Rust FFI definition
+        uses: actions/checkout@v4
+        with:
+          path: source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/webauthn/libudev-sys/src/lib.rs
+            dom/webauthn/libudev-sys/Cargo.toml
+      - name: Authenticate previously verified original compiled libudev SONAME source bridge
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NATIVE_RUN" |
+            jq -e --arg head "$NATIVE_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$head' >/dev/null
+          mkdir -p "$RUNNER_TEMP/pinned"
+          gh run download "$NATIVE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-webauthn-libudev-source-machine --dir "$RUNNER_TEMP/pinned"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$NATIVE_ARCHIVE_SHA" '
+            .status=="original_webauthn_libudev_source_to_native_register_dlopen_candidate_verified" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .native_constructed_soname=="libudev.so.1" and
+            .native_dlopen_got_glibc_2_2_5_relocation_verified==true and
+            .native_compiled_candidate_argument_verified==true and
+            .actual_runtime_libudev_soname_loaded==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/pinned/m3-original-webauthn-libudev-source-native.json" >/dev/null
+      - name: Compile source-bound Rust probe and run negative fixtures without network
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends libudev1
+          rustc --edition=2021 --test diagnostics/ci/m3-original-webauthn-libudev-host-abi.rs \
+            -o "$RUNNER_TEMP/m3-original-webauthn-udev-abi-tests"
+          sudo unshare --net -- "$RUNNER_TEMP/m3-original-webauthn-udev-abi-tests"
+          rustc --edition=2021 -O diagnostics/ci/m3-original-webauthn-libudev-host-abi.rs \
+            -o "$RUNNER_TEMP/m3-original-webauthn-udev-abi"
+      - name: Probe Ubuntu libudev SONAME all source symbols and no-load semantics in no-egress
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo unshare --net -- "$RUNNER_TEMP/m3-original-webauthn-udev-abi" "$SOURCE_SHA" \
+            source/dom/webauthn/libudev-sys/src/lib.rs ubuntu-24.04 \
+            "$RUNNER_TEMP/m3-original-udev-ubuntu.json"
+      - name: Prepare isolated Arch userspace with libudev provider
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-udev"
+          cat >"$RUNNER_TEMP/arch-udev/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed systemd-libs && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t vulpra-m3-original-arch-udev:ci "$RUNNER_TEMP/arch-udev"
+      - name: Probe Arch libudev under no-egress read-only container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 64 --memory 512m \
+            --user "$(id -u):$(id -g)" \
+            -v "$RUNNER_TEMP/m3-original-webauthn-udev-abi:/audit/probe:ro" \
+            -v "$GITHUB_WORKSPACE/source/dom/webauthn/libudev-sys/src/lib.rs:/audit/source.rs:ro" \
+            -v "$RUNNER_TEMP:/reports:rw" \
+            vulpra-m3-original-arch-udev:ci \
+            /audit/probe "$SOURCE_SHA" /audit/source.rs archlinux-container \
+            /reports/m3-original-udev-arch.json
+      - name: Verify complete exact-original 49 source symbols and confined two-host results
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in ubuntu:ubuntu-24.04 arch:archlinux-container; do
+            suffix="${pair%%:*}"; profile="${pair#*:}"
+            jq -e --arg src "$SOURCE_SHA" --arg profile "$profile" '
+              .schema_version==1 and
+              .status=="pinned_webauthn_libudev_isolated_host_dynamic_abi" and
+              .original_source_commit==$src and .isolated_host==$profile and
+              .source_declared_udev_soname=="libudev.so.1" and
+              .source_declared_udev_symbol_count==49 and
+              .host_resolved_udev_symbol_count==49 and
+              (.source_declared_udev_symbols|length)==49 and
+              ([.source_declared_udev_symbols[]]|unique|length)==49 and
+              .warm_noload_double_lookup_succeeded==true and
+              .original_source_fallback_flags_reproduced==true and
+              .all_udev_handles_closed==true and
+              .real_host_dlopen_and_dlsym_executed==true and
+              .only_isolated_host_abi_proven==true and
+              .original_browser_executed==false and
+              .real_webauthn_usb_authenticator_exercised==false and
+              .libudev_function_called==false and
+              .network_egress_allowed==false and
+              .target_endeavouros_hyprland_verified==false and
+              .runtime_original_browser_libudev_load_observed==false and
+              .all_conditional_loader_routes_proven==false and
+              .source_pruning_authorized==false and
+              .m3_sixth_gate_closed==false
+            ' "$RUNNER_TEMP/m3-original-udev-${suffix}.json" >/dev/null
+          done
+          diff -u \
+            <(jq -c '.source_declared_udev_symbols' "$RUNNER_TEMP/m3-original-udev-ubuntu.json") \
+            <(jq -c '.source_declared_udev_symbols' "$RUNNER_TEMP/m3-original-udev-arch.json")
+          echo 'PASS: isolated Ubuntu+Arch WebAuthn source-declared 49/49 libudev symbols; never exercised original browser'
+      - name: Archive sanitized bounded two-host loader ABI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-webauthn-libudev-two-host-abi
+          path: |
+            ${{ runner.temp }}/m3-original-udev-ubuntu.json
+            ${{ runner.temp }}/m3-original-udev-arch.json
+          if-no-files-found: warn
+          retention-days: 14
