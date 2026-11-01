@@ -10,6 +10,7 @@ on:
       - ci/m3-wayland-gdb-sanitize.awk
       - ci/m3-original-linked-ffi-symbol-proof.rs
       - ci/m3-original-compiled-ffi-object-relocations.rs
+      - ci/m3-original-linked-ffi-direct-calls.rs
       - ci/tests/m3-wayland-gdb-sanitize-test.sh
   workflow_dispatch:
 permissions:
@@ -41,6 +42,8 @@ jobs:
           "$RUNNER_TEMP/m3-ffi-symbol-tests"
           rustc --edition=2021 --test ci/m3-original-compiled-ffi-object-relocations.rs -o "$RUNNER_TEMP/m3-ffi-object-relocation-tests"
           "$RUNNER_TEMP/m3-ffi-object-relocation-tests"
+          rustc --edition=2021 --test ci/m3-original-linked-ffi-direct-calls.rs -o "$RUNNER_TEMP/m3-ffi-final-link-call-tests"
+          "$RUNNER_TEMP/m3-ffi-final-link-call-tests"
           test -f packaging/test-wayland.sh
           echo 'PASS: diagnostic contract only, not browser acceptance'
   compile-source-pinned-with-debug-symbols:
@@ -200,6 +203,35 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/m3-original-ffi-object-relocations.json" >/dev/null
           echo 'PASS: original C++ object-level Rust FFI text imports observed; final ELF callsites and graph remain open'
+      - name: Verify exact original final ELF machine call targets
+        shell: bash
+        working-directory: source
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          objdir="$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline"
+          rustc --edition=2021 "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-linked-ffi-direct-calls.rs" \
+            -o "$RUNNER_TEMP/m3-ffi-final-link-calls"
+          "$RUNNER_TEMP/m3-ffi-final-link-calls" "$SOURCE_SHA" \
+            "$objdir/dist/bin/libxul.so" "$objdir/dist/bin/crashhelper" \
+            "$RUNNER_TEMP/m3-original-ffi-final-machine-call-targets.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .source_commit==$sha and
+            .status=="four_native_direct_caller_branches_to_linked_rust_ffi_definitions" and
+            .caller_functions_verified==4 and
+            .ns_init_xpcom_to_gkrust_init_branches==1 and
+            .ns_init_minimal_xpcom_to_gkrust_init_branches==1 and
+            .mozilla_shutdown_xpcom_to_gkrust_shutdown_branches==1 and
+            .crashhelper_main_to_crash_generator_logic_desktop_branches==1 and
+            .all_four_specific_native_branch_targets_verified==true and
+            .all_cpp_ffi_callers_enumerated==false and
+            .all_static_ffi_boundaries_verified==false and
+            .conditional_dlopen_closure_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-ffi-final-machine-call-targets.json" >/dev/null
+          echo 'PASS: four source-pinned native C++ functions directly branch to three compiled Rust symbols; whole gate open'
       - name: Stage fresh package and diagnose old and fresh on one runner
         shell: bash
         working-directory: source
@@ -229,6 +261,7 @@ jobs:
             ${{ runner.temp }}/symbolized-native-wayland-report.txt
             ${{ runner.temp }}/m3-original-ffi-symbol-definitions.json
             ${{ runner.temp }}/m3-original-ffi-object-relocations.json
+            ${{ runner.temp }}/m3-original-ffi-final-machine-call-targets.json
             ${{ runner.temp }}/fresh-native.tar.xz.sha256
           if-no-files-found: warn
           retention-days: 14
