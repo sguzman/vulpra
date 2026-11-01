@@ -106,6 +106,9 @@ jobs:
             .resolved_glibc_ldd_name_count>=.direct_elf_needed_count and
             .missing_direct_needed_count==0 and
             .all_observed_ldd_bindings_resolved==true and
+            .resolved_transitive_elf_file_count>=.resolved_glibc_ldd_name_count and
+            .resolved_transitive_direct_edge_count>=.direct_elf_needed_count and
+            .all_observed_transitive_direct_edges_resolved==true and
             .complete_conditional_dlopen_graph_proven==false and
             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-arch-ffmpeg63-transitive.json" >/dev/null
           jq -c '{major:.ffmpeg_major,required:.resolved_mandatory_functions,optional:.resolved_optional_functions,unavailable_optional:.missing_optional_functions}' "$RUNNER_TEMP/m3-arch-ffmpeg63-original.json"
