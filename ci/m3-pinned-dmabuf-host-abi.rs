@@ -10,7 +10,7 @@ fn symbols(src:&str)->Result<(BTreeSet<String>,BTreeSet<String>),String>{
        !src.contains("dlopen(DRMLIB_NAME, RTLD_LAZY | RTLD_LOCAL)"){
         return Err("Wrong pinned DMA-BUF runtime library source anchors".into());
     }
-    let mut gbm=BTreeSet::new();let mut drm=BTreeSet::new();
+    let mut gbm=BTreeSet::<String>::new();let mut drm=BTreeSet::<String>::new();
     for term in src.split("dlsym(").skip(1){
         let inner=term.split_once(')').ok_or("Malformed dlsym request")?.0;
         let (handle,name)=inner.split_once(',').ok_or("Missing dlsym handle")?;
