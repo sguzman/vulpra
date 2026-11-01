@@ -79,6 +79,23 @@ fn loader_resolves(needed:&BTreeSet<String>)->Result<usize,String>{
     }
     Ok(count)
 }
+// This CI userland is not the user's Arch/Hyprland installation.
+fn detect_userland()->Result<&'static str,String>{
+    if !cfg!(all(target_os="linux",target_arch="x86_64")){
+        return Err("Only Linux x86-64 native ABI supported".into());
+    }
+    let os=fs::read_to_string("/etc/os-release").map_err(|e|e.to_string())?;
+    let id=os.lines().find_map(|l|l.strip_prefix("ID="))
+        .ok_or("Missing os-release ID")?.trim_matches('"');
+    let version=os.lines().find_map(|l|l.strip_prefix("VERSION_ID="))
+        .unwrap_or("").trim_matches('"');
+    match (id,version){
+        ("ubuntu","24.04")=>Ok("ubuntu-24.04-x86_64"),
+        ("arch",_)=>Ok("archlinux-container-x86_64"),
+        _=>Err(format!("Unverified ABI userland: {id} {version}"))
+    }
+}
+
 fn run()->Result<(),String>{
     let args:Vec<_>=std::env::args().collect();
     if args.len()!=5||args[1]!=REV{return Err("usage: pulse-host-abi PINNED_CUBEB_SHA PINNED_FFI_SOURCE HOST_LIBPULSE_SO OUTPUT_JSON".into());}
@@ -92,10 +109,11 @@ fn run()->Result<(),String>{
     if !missing.is_empty(){return Err(format!("Host libpulse lacks {} requested dynamic functions: {}",missing.len(),missing.join(",")));}
     let dynamically_resolved=loader_resolves(&requested)?;
     if dynamically_resolved!=requested.len(){return Err("Incomplete real glibc symbol resolution".into());}
+    let platform=detect_userland()?;
     fs::write(&args[4],format!(
-        "{{\n  \"schema_version\": 1,\n  \"external_cubeb_source_commit\": \"{REV}\",\n  \"host_platform\": \"ubuntu-24.04-x86_64\",\n  \"requested_dlsym_function_count\": {},\n  \"host_exported_requested_functions\": {},\n  \"missing_requested_host_functions\": 0,\n  \"single_host_library_abi_compatible\": true,\n  \"glibc_dlopen_and_dlsym_resolved_all_requested\": true,\n  \"browser_compiled_feature_flag_verified\": false,\n  \"browser_native_callsite_verified\": false,\n  \"arch_host_abi_verified\": false,\n  \"all_dlopen_dependencies_closed\": false,\n  \"m3_sixth_gate_closed\": false,\n  \"source_removal_authorized\": false\n}}\n",requested.len(),requested.len()
+        "{{\n  \"schema_version\": 1,\n  \"external_cubeb_source_commit\": \"{REV}\",\n  \"host_platform\": \"{platform}\",\n  \"requested_dlsym_function_count\": {},\n  \"host_exported_requested_functions\": {},\n  \"missing_requested_host_functions\": 0,\n  \"single_host_library_abi_compatible\": true,\n  \"glibc_dlopen_and_dlsym_resolved_all_requested\": true,\n  \"browser_compiled_feature_flag_verified\": false,\n  \"browser_native_callsite_verified\": false,\n  \"arch_container_abi_verified\":{},\n  \"arch_host_abi_verified\": false,\n  \"all_dlopen_dependencies_closed\": false,\n  \"m3_sixth_gate_closed\": false,\n  \"source_removal_authorized\": false\n}}\n",requested.len(),requested.len(),platform=="archlinux-container-x86_64"
     )).map_err(|e|e.to_string())?;
-    println!("PASS: all {} pinned external cubeb PulseAudio dlsym requests exist in Ubuntu host ELF",requested.len());
+    println!("PASS: all {} pinned cubeb PulseAudio functions resolve on {platform} native host loader",requested.len());
     Ok(())
 }
 fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1)}}
