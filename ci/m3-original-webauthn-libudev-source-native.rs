@@ -193,6 +193,47 @@ fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
         assert!(relocation_witness(&line.replace("GLIBC_2.2.5","GLIBC_2.100")).is_err());
         assert!(relocation_witness(&(line.to_owned()+"\n"+line)).is_err());
     }
+    #[test]fn valid_compiled_libudev_window_detects_specific_mutations(){
+        // Literal machine-text fixture from the SHA-pinned original ELF.
+        // Do not substitute this for the separate real-binary CI proof.
+        let valid=r#"Disassembly of section .text:
+ 99365f4: mov $0xd,%edi
+ 9936608: movabs $0x2e7665647562696c,%rcx
+ 9936612: mov %rcx,(%rax)
+ 9936615: movl $0x312e6f73,0x8(%rax)
+ 993661c: movq $0xd,(%rsp)
+ 9936624: mov %rax,0x8(%rsp)
+ 9936629: movq $0xc,0x10(%rsp)
+ 9936632: mov %rsp,%rdi
+ 9936635: call 8a4c820 <XRE_GetBootstrap@@libxul.so+0xd09e30>
+ 993663a: mov %rax,%rbx
+ 993663d: mov %rdx,%r15
+ 9936640: mov 0x1a8cd81(%rip),%r14 # b3c33c8 <unrelated-label>
+ 9936647: mov %rax,%rdi
+ 993664a: mov $0x105,%esi
+ 993664f: call *%r14
+ 9936652: xor %ecx,%ecx
+ 9936654: test %rax,%rax
+ 9936657: setne %cl
+ 993665a: lea 0x101(,%rcx,4),%esi
+ 9936661: mov %rbx,%rdi
+ 9936664: call *%r14"#;
+        machine_witness(valid).unwrap();
+        for (old,new) in [
+            ("0x2e7665647562696c","0x2e7665647562696d"),
+            ("0x312e6f73","0x312e6f72"),
+            ("0x105,%esi","0x104,%esi"),
+            ("0x101(,%rcx,4)","0x103(,%rcx,4)"),
+            ("b3c33c8","b3c33d8"),
+            ("9936664: call *%r14","9936664: call *%r13"),
+            ("993664f: call *%r14","993664f: call *%r13"),
+        ]{
+            let mutated=valid.replace(old,new);
+            assert_ne!(mutated,valid);
+            assert!(machine_witness(&mutated).is_err(),
+                "Unexpectedly accepted mutation from {old} to {new}");
+        }
+    }
     #[test]fn wrong_machine_register_flow_fails_closed(){
         let mut fake=String::from("Disassembly of section .text:\n");
         for (addr,op,s) in [
