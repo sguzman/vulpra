@@ -84,6 +84,12 @@ The **Arch container is not the user's EndeavourOS workstation**. Successful sym
 
 The `arch_container_loader_verified=true` report explicitly leaves `user_arch_host_verified=false`, `compiled_browser_callsite_verified=false`, `real_video_decode_verified=false`, `full_dependency_graph_verified=false`, `m3_sixth_gate_closed=false` and `source_pruning_authorized=false`. This is **not** confirmation of the user's EndeavourOS/Hyprland installation, actual hardware decoding, native Firefox callstack execution, all FFmpeg versions, or a complete M3 dependency graph.
 
+## Real Arch FFmpeg 63 ELF direct and flattened transitive dependency reconciliation (2026-11-01 UTC)
+
+[Exact-source-adjacent CI 41267124562](https://github.com/sguzman/vulpra/actions/runs/41267124562) **PASSED**, [workflow lint 41267124409](https://github.com/sguzman/vulpra/actions/runs/41267124409) **PASSED**, artifact **13067890898** independently inspected. `ci/m3-arch-ffmpeg63-elf-needed-closure.rs` validates the same Arch x86-64 `libavcodec.so.63` file used for the original source-pinned 42 mandatory + 28 optional ABI test. Actual `readelf -d` yielded **37 distinct direct `DT_NEEDED` names**; the actual glibc `ldd` result resolved **93 unique flattened shared-library names**, and **all 37 direct names matched real existing loader-resolved files**; **0 directly required libraries missing**. The auditor bounds both tool outputs, rejects duplicate or malformed names and missing targets, verifies the Arch userland and rejects unsupported input shapes. The companion original FFmpeg 63 function ABI remained **42/42 mandatory + 28/28 optional** in the same run. A base image digest is retained in the artifact; rolling Arch packages are not version-frozen.
+
+These 93 names are a **flattened dynamic-loader resolution set**, not 93 independently proven direct `DT_NEEDED` edges, nor a complete edge-by-edge dependency graph. This is a single library's Arch container closure under `ldd`, not the compiled Vulpra browser process or all its `dlopen` targets. No workstation/Hyprland validation, hardware decode, complete feature map, new source deletions, or sixth M3 gate acceptance is claimed.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
