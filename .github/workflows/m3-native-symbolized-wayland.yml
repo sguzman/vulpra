@@ -9,6 +9,7 @@ on:
       - ci/m3-symbolized-wayland-compare.sh
       - ci/m3-wayland-gdb-sanitize.awk
       - ci/m3-original-linked-ffi-symbol-proof.rs
+      - ci/m3-original-compiled-ffi-object-relocations.rs
       - ci/tests/m3-wayland-gdb-sanitize-test.sh
   workflow_dispatch:
 permissions:
@@ -38,6 +39,8 @@ jobs:
           bash ci/tests/m3-wayland-gdb-sanitize-test.sh
           rustc --edition=2021 --test ci/m3-original-linked-ffi-symbol-proof.rs -o "$RUNNER_TEMP/m3-ffi-symbol-tests"
           "$RUNNER_TEMP/m3-ffi-symbol-tests"
+          rustc --edition=2021 --test ci/m3-original-compiled-ffi-object-relocations.rs -o "$RUNNER_TEMP/m3-ffi-object-relocation-tests"
+          "$RUNNER_TEMP/m3-ffi-object-relocation-tests"
           test -f packaging/test-wayland.sh
           echo 'PASS: diagnostic contract only, not browser acceptance'
   compile-source-pinned-with-debug-symbols:
@@ -170,6 +173,33 @@ jobs:
             "$RUNNER_TEMP/m3-original-ffi-symbol-definitions.json"
           test -s "$RUNNER_TEMP/m3-original-ffi-symbol-definitions.json"
           echo 'PASS: bounded FFI named-definition evidence; callsite and dlopen closure remain open'
+      - name: Check original compiled C++ FFI text relocations before package
+        shell: bash
+        working-directory: source
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          objdir="$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline"
+          rustc --edition=2021 "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-compiled-ffi-object-relocations.rs" \
+            -o "$RUNNER_TEMP/m3-ffi-object-relocations"
+          "$RUNNER_TEMP/m3-ffi-object-relocations" "$SOURCE_SHA" "$objdir" \
+            "$RUNNER_TEMP/m3-original-ffi-object-relocations.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .source_commit==$sha and
+            .status=="compiled_cxx_text_relocation_imports_observed" and
+            .gkrust_init_text_relocations>=1 and
+            .gkrust_shutdown_text_relocations>=1 and
+            .crash_generator_logic_desktop_text_relocations>=1 and
+            .all_three_expected_cxx_imports_observed==true and
+            .exact_cpp_source_callsite_count_proven==false and
+            .resolved_final_elf_callsite_machine_targets_proven==false and
+            .all_rust_cpp_ffi_seams_proven==false and
+            .conditional_dlopen_closure_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-ffi-object-relocations.json" >/dev/null
+          echo 'PASS: original C++ object-level Rust FFI text imports observed; final ELF callsites and graph remain open'
       - name: Stage fresh package and diagnose old and fresh on one runner
         shell: bash
         working-directory: source
@@ -198,6 +228,7 @@ jobs:
           path: |
             ${{ runner.temp }}/symbolized-native-wayland-report.txt
             ${{ runner.temp }}/m3-original-ffi-symbol-definitions.json
+            ${{ runner.temp }}/m3-original-ffi-object-relocations.json
             ${{ runner.temp }}/fresh-native.tar.xz.sha256
           if-no-files-found: warn
           retention-days: 14
