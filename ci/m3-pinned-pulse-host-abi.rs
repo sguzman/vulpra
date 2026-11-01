@@ -93,7 +93,7 @@ fn run()->Result<(),String>{
     let dynamically_resolved=loader_resolves(&requested)?;
     if dynamically_resolved!=requested.len(){return Err("Incomplete real glibc symbol resolution".into());}
     fs::write(&args[4],format!(
-        "{{\n  \"schema_version\": 1,\n  \"external_cubeb_source_commit\": \"{REV}\",\n  \"host_platform\": \"ubuntu-24.04-x86_64\",\n  \"requested_dlsym_function_count\": {},\n  \"host_exported_requested_functions\": {},\n  \"missing_requested_host_functions\": 0,\n  \"single_host_library_abi_compatible\": true,\\n  \"glibc_dlopen_and_dlsym_resolved_all_requested\": true,\n  \"browser_compiled_feature_flag_verified\": false,\n  \"browser_native_callsite_verified\": false,\n  \"arch_host_abi_verified\": false,\n  \"all_dlopen_dependencies_closed\": false,\n  \"m3_sixth_gate_closed\": false,\n  \"source_removal_authorized\": false\n}}\n",requested.len(),requested.len()
+        "{{\n  \"schema_version\": 1,\n  \"external_cubeb_source_commit\": \"{REV}\",\n  \"host_platform\": \"ubuntu-24.04-x86_64\",\n  \"requested_dlsym_function_count\": {},\n  \"host_exported_requested_functions\": {},\n  \"missing_requested_host_functions\": 0,\n  \"single_host_library_abi_compatible\": true,\n  \"glibc_dlopen_and_dlsym_resolved_all_requested\": true,\n  \"browser_compiled_feature_flag_verified\": false,\n  \"browser_native_callsite_verified\": false,\n  \"arch_host_abi_verified\": false,\n  \"all_dlopen_dependencies_closed\": false,\n  \"m3_sixth_gate_closed\": false,\n  \"source_removal_authorized\": false\n}}\n",requested.len(),requested.len()
     )).map_err(|e|e.to_string())?;
     println!("PASS: all {} pinned external cubeb PulseAudio dlsym requests exist in Ubuntu host ELF",requested.len());
     Ok(())
