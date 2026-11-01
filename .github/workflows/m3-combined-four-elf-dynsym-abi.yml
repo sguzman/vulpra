@@ -139,6 +139,9 @@ jobs:
             .unwind_fde_identical_under_either <=
               (.full_unique_in_text_fde_ranges - .unwind_fde_neither_alignment) and
             (.unwind_fde_eighth_bins|length)==8 and
+            (.unwind_fde_layout_transition.unmatched_original_fde_offsets|length)==.unwind_fde_neither_alignment and
+            (.unwind_fde_layout_transition.first_eighth_local_sixteenth_bins|length)==16 and
+            .unwind_fde_layout_transition.code_offset_not_source_line_or_function_identity==true and
             .sum_of_fde_span_bytes_not_unique_code_coverage==true and
             .only_unwind_described_code_ranges_examined==true and
             .all_compiled_functions_or_rust_ffi_proven==false and
