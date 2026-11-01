@@ -12,6 +12,7 @@ on:
       - ci/m3-xpcom-contract-source-witness.rs
       - ci/m3-original-native-relocation-shape.rs
       - ci/m3-libxul-packed-relr.rs
+      - ci/m3-static-rust-cpp-ffi-source-witness.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -40,6 +41,7 @@ jobs:
             ci/m3-xpcom-contract-source-witness.rs
             ci/m3-original-native-relocation-shape.rs
             ci/m3-libxul-packed-relr.rs
+            ci/m3-static-rust-cpp-ffi-source-witness.rs
             ci/mozconfig-linux-m3-baseline
             ci/mozconfig-linux-m3-combined-lean
       - name: Checkout exact pinned original Mozilla XPCOM contract source only
@@ -57,6 +59,17 @@ jobs:
             xpcom/components/gen_static_components.py
             xpcom/components/StaticComponents.cpp.in
             xpcom/components/StaticComponents.h
+            xpcom/build/XPCOMInit.cpp
+            toolkit/library/rust/lib.rs
+            toolkit/library/rust/shared/lib.rs
+            toolkit/library/rust/Cargo.toml
+            toolkit/library/rust/moz.build
+            toolkit/library/build/moz.build
+            toolkit/crashreporter/crash_helper/crashhelper.cpp
+            toolkit/crashreporter/crash_helper/moz.build
+            toolkit/crashreporter/crash_helper_server/src/lib.rs
+            toolkit/crashreporter/crash_helper_server/Cargo.toml
+            toolkit/crashreporter/crash_helper_server/moz.build
             xpcom/ds/PerfectHash.h
       - name: Compile and run Rust negative fixtures
         shell: bash
@@ -85,6 +98,9 @@ jobs:
           rustc --edition=2021 --test ci/m3-libxul-packed-relr.rs -o "$RUNNER_TEMP/packed-relr-test"
           "$RUNNER_TEMP/packed-relr-test"
           rustc --edition=2021 -O ci/m3-libxul-packed-relr.rs -o "$RUNNER_TEMP/packed-relr-audit"
+          rustc --edition=2021 --test ci/m3-static-rust-cpp-ffi-source-witness.rs -o "$RUNNER_TEMP/static-ffi-source-test"
+          "$RUNNER_TEMP/static-ffi-source-test"
+          rustc --edition=2021 -O ci/m3-static-rust-cpp-ffi-source-witness.rs -o "$RUNNER_TEMP/static-ffi-source-witness"
           command -v objdump
           command -v objcopy
           command -v cmp
@@ -120,6 +136,37 @@ jobs:
             .source_removal_authorized==false and
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/audit/original-xpcom-aboutstudies-contract-source.json" >/dev/null
+      - name: Verify exactly pinned C++ to Rust source FFI seam callsites and staticlib ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C original-contract-source rev-parse HEAD)" = "$SOURCE_SHA"
+          "$RUNNER_TEMP/static-ffi-source-witness" \
+            "$GITHUB_WORKSPACE/original-contract-source" \
+            "$RUNNER_TEMP/audit/original-static-rust-cpp-ffi-source-witness.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="pinned_original_two_rust_staticlib_cpp_source_ffi_seams_verified" and
+            .source_commit=="b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
+            .native_staticlib_roots==2 and
+            .native_consumer_targets==2 and
+            .cpp_callsite_functions==3 and
+            .gkrust_init_cpp_calls==2 and
+            .gkrust_shutdown_cpp_calls==1 and
+            .crash_generator_logic_desktop_cpp_calls==1 and
+            (.ffi_edges|length)==3 and
+            ([.ffi_edges[].source_export]|sort)==["GkRust_Init","GkRust_Shutdown","crash_generator_logic_desktop"] and
+            .rust_no_mangle_and_extern_c_source_confirmed==true and
+            .cpp_declarations_or_generated_cbindgen_bridge_confirmed==true and
+            .original_native_link_declarations_confirmed==true and
+            .actual_compiled_ffi_symbols_or_relocations_verified==false and
+            .all_static_rust_cpp_ffi_edges_identified==false and
+            .conditional_dlopen_closure_proven==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/original-static-rust-cpp-ffi-source-witness.json" >/dev/null
+          jq -c '{roots:.native_staticlib_roots,consumers:.native_consumer_targets,source_ffi_functions:.cpp_callsite_functions}' \
+            "$RUNNER_TEMP/audit/original-static-rust-cpp-ffi-source-witness.json"
       - name: Authenticate independently compiled original full and lean packages
         shell: bash
         env:
@@ -548,6 +595,7 @@ jobs:
             ${{ runner.temp }}/audit/compiled-libxul-two-range-delta.json
             ${{ runner.temp }}/audit/compiled-libxul-hinge-assembly.json
             ${{ runner.temp }}/audit/original-xpcom-aboutstudies-contract-source.json
+            ${{ runner.temp }}/audit/original-static-rust-cpp-ffi-source-witness.json
             ${{ runner.temp }}/audit/pinned-source-to-native-xpcom-contract-crosswalk.json
             ${{ runner.temp }}/audit/original-compiled-aboutstudies-contract-strings.json
             ${{ runner.temp }}/audit/compiled-28-elf-relocation-shape.json
