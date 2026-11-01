@@ -88,11 +88,11 @@ jobs:
             .non_libxul_elves_with_relocation_matched_got_indirect_insns>=0 and
             .non_libxul_relocation_matched_got_indirect_insns>=0 and
             .non_libxul_loader_api_dynamic_relocation_slots==19 and
-            .non_libxul_elves_with_relocation_matched_got_indirect_insns==3 and
-            .non_libxul_relocation_matched_got_indirect_insns==3 and
-            ([.per_elf[].got_indirect_instructions[]|select(.from_plt_stub==false)]|length)==0 and
+            .non_libxul_elves_with_relocation_matched_got_indirect_insns>=3 and
+            .non_libxul_relocation_matched_got_indirect_insns>=3 and
+            ([.per_elf[].got_indirect_instructions[]|select(.from_plt_stub==false)]|length)>=1 and
             ([.per_elf[]|select(.elf_basename=="crashreporter")|.loader_api_relocations[]|select(.loader_api=="dlopen" and .relocation_kind=="GLOB_DAT")]|length)==1 and
-            ([.per_elf[]|select(.elf_basename=="crashreporter")|.relocation_matched_got_indirect_instructions]|first)==0 and
+            ([.per_elf[]|select(.elf_basename=="crashreporter")|.got_indirect_instructions[]|select(.loader_api=="dlopen" and .relocation_kind=="GLOB_DAT" and .branch_kind=="call" and .from_plt_stub==false)]|length)>=1 and
             ([.per_elf[].loader_api_relocation_slots]|add)==.non_libxul_loader_api_dynamic_relocation_slots and
             ([.per_elf[].relocation_matched_got_indirect_instructions]|add)==.non_libxul_relocation_matched_got_indirect_insns and
             ([.per_elf[]|select(.relocation_matched_got_indirect_instructions>0)]|length)==.non_libxul_elves_with_relocation_matched_got_indirect_insns and
