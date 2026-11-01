@@ -1,0 +1,41 @@
+name: M3 Linked Native FFI Direct-Call Parser Fixtures
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-linked-ffi-direct-calls.rs
+      - .github/workflows/m3-linked-ffi-direct-call-fixtures.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compiled-machine-call-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout one native direct-call verifier
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-linked-ffi-direct-calls.rs
+      - name: Validate actual ELF machine call parser and negative fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-original-linked-ffi-direct-calls.rs \
+            -o "$RUNNER_TEMP/m3-ffi-linked-call-tests"
+          "$RUNNER_TEMP/m3-ffi-linked-call-tests"
+          rustc --edition=2021 ci/m3-original-linked-ffi-direct-calls.rs \
+            -o "$RUNNER_TEMP/m3-ffi-linked-call-proof"
+          if "$RUNNER_TEMP/m3-ffi-linked-call-proof" \
+               b1482404dfb8b01342990ee99ea3df0f9756b5f7 \
+               /unavailable/libxul.so /unavailable/crashhelper \
+               "$RUNNER_TEMP/invalid.json"; then
+            echo 'FAIL: missing original binaries must fail closed' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/invalid.json"
+          echo 'PASS: compiled C++ ELF sample, original call target parser and fail-closed missing inputs; not original Firefox compiled proof'
