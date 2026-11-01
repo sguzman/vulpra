@@ -10,6 +10,7 @@ on:
       - ci/m3-libxul-unwind-fde-shift.rs
       - ci/m3-libxul-hinge-assembly.rs
       - ci/m3-xpcom-contract-source-witness.rs
+      - ci/m3-original-native-relocation-shape.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -36,6 +37,7 @@ jobs:
             ci/m3-libxul-unwind-fde-shift.rs
             ci/m3-libxul-hinge-assembly.rs
             ci/m3-xpcom-contract-source-witness.rs
+            ci/m3-original-native-relocation-shape.rs
             ci/mozconfig-linux-m3-baseline
             ci/mozconfig-linux-m3-combined-lean
       - name: Checkout exact pinned original Mozilla XPCOM contract source only
@@ -75,6 +77,9 @@ jobs:
           rustc --edition=2021 --test ci/m3-xpcom-contract-source-witness.rs -o "$RUNNER_TEMP/xpcom-contract-source-test"
           "$RUNNER_TEMP/xpcom-contract-source-test"
           rustc --edition=2021 -O ci/m3-xpcom-contract-source-witness.rs -o "$RUNNER_TEMP/xpcom-contract-source-observer"
+          rustc --edition=2021 --test ci/m3-original-native-relocation-shape.rs -o "$RUNNER_TEMP/relocation-audit-test"
+          "$RUNNER_TEMP/relocation-audit-test"
+          rustc --edition=2021 -O ci/m3-original-native-relocation-shape.rs -o "$RUNNER_TEMP/relocation-audit"
           command -v objdump
           command -v objcopy
           command -v cmp
@@ -181,6 +186,34 @@ jobs:
             .source_removal_authorized==false and
             .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/audit/original-compiled-aboutstudies-contract-strings.json" >/dev/null
+      - name: Audit actual compiled 28-ELF dynamic relocation types and referenced symbols
+        shell: bash
+        timeout-minutes: 9
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/relocation-audit" \
+            "$RUNNER_TEMP/packages/full/extracted" \
+            "$RUNNER_TEMP/packages/lean/extracted" \
+            "$RUNNER_TEMP/audit/compiled-28-elf-relocation-shape.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="source_matched_28_compiled_elf_dynamic_relocation_shape_compared" and
+            .elf_files_compared==28 and
+            (.per_elf|length)==28 and
+            .full_relocation_records>0 and
+            .lean_relocation_records>0 and
+            .full_named_relocation_occurrences>0 and
+            .lean_named_relocation_occurrences>0 and
+            .changed_per_elf_relocation_type_records>=0 and
+            .changed_per_elf_named_relocation_reference_records>=0 and
+            .actual_compiled_elf_relocation_sections_inspected==true and
+            .relocation_offsets_and_addends_not_equated==true and
+            .relocations_do_not_prove_static_ffi_or_runtime_bindings==true and
+            .complete_dlopen_closure_proven==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/compiled-28-elf-relocation-shape.json" >/dev/null
+          jq -c '{full:.full_relocation_records,lean:.lean_relocation_records,named:[.full_named_relocation_occurrences,.lean_named_relocation_occurrences],changed_type_records:.changed_per_elf_relocation_type_records,changed_named_records:.changed_per_elf_named_relocation_reference_records,changed_files:.elf_paths_with_relocation_record_differences}' "$RUNNER_TEMP/audit/compiled-28-elf-relocation-shape.json"
       - name: Compare compiled libxul named dynamic-exported function bytes by symbol address
         shell: bash
         timeout-minutes: 8
@@ -423,5 +456,6 @@ jobs:
             ${{ runner.temp }}/audit/original-xpcom-aboutstudies-contract-source.json
             ${{ runner.temp }}/audit/pinned-source-to-native-xpcom-contract-crosswalk.json
             ${{ runner.temp }}/audit/original-compiled-aboutstudies-contract-strings.json
+            ${{ runner.temp }}/audit/compiled-28-elf-relocation-shape.json
           if-no-files-found: error
           retention-days: 14
