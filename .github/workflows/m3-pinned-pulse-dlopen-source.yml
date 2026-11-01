@@ -1,0 +1,86 @@
+# Pinned source-only crosswalk for the opt-in Rust PulseAudio dlopen path.
+# Does not claim linker resolution, complete runtime dlopen closure or source removal.
+name: M3 Exact External PulseAudio Dlopen Source Proof
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-pinned-pulse-dlopen-source.yml
+      - ci/m3-pinned-pulse-dlopen-source.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prove-external-pulse-dlopen-route:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      GECKO_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      CUBEB_SHA: 88194f91c8778fa608a19af7b91306094525595d
+    steps:
+      - name: Checkout bounded current Rust verifier
+        uses: actions/checkout@v4
+        with:
+          path: inspector
+          sparse-checkout: |
+            ci/m3-pinned-pulse-dlopen-source.rs
+      - name: Checkout exact original Gecko source anchors
+        uses: actions/checkout@v4
+        with:
+          path: gecko
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            toolkit/library/rust/shared/Cargo.toml
+            toolkit/library/rust/gkrust-features.mozbuild
+            media/libcubeb/src/moz.build
+            media/libcubeb/src/cubeb.c
+      - name: Checkout exact Mozilla cubeb-pulse-rs dependency
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla/cubeb-pulse-rs
+          path: cubeb-pulse
+          ref: 88194f91c8778fa608a19af7b91306094525595d
+          fetch-depth: 1
+          sparse-checkout: |
+            Cargo.toml
+            pulse-ffi
+            src/capi.rs
+            src/backend/context.rs
+      - name: Build and test source-boundary verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C inspector rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C gecko rev-parse HEAD)" = "$GECKO_SHA"
+          test "$(git -C cubeb-pulse rev-parse HEAD)" = "$CUBEB_SHA"
+          rustc --edition=2021 --test inspector/ci/m3-pinned-pulse-dlopen-source.rs \
+            -o "$RUNNER_TEMP/pulse-source-tests"
+          "$RUNNER_TEMP/pulse-source-tests"
+          rustc --edition=2021 inspector/ci/m3-pinned-pulse-dlopen-source.rs \
+            -o "$RUNNER_TEMP/pulse-source-proof"
+      - name: Verify real two-revision source route
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pulse-source-proof" "$GECKO_SHA" "$CUBEB_SHA" \
+            "$GITHUB_WORKSPACE/gecko" "$GITHUB_WORKSPACE/cubeb-pulse" \
+            "$RUNNER_TEMP/m3-external-pulse-dlopen-source.json"
+          test -s "$RUNNER_TEMP/m3-external-pulse-dlopen-source.json"
+          jq -e --arg a "$GECKO_SHA" --arg b "$CUBEB_SHA" \
+            '.gecko_source_commit==$a and .external_cubeb_source_commit==$b and
+             .conditional_pulse_dlopen_source_route_verified==true and
+             .all_conditional_dynamic_loads_mapped==false and
+             .native_callstack_attribution_proven==false and
+             .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/m3-external-pulse-dlopen-source.json" >/dev/null
+      - name: Preserve bounded source-only proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-external-pulse-dlopen-source-proof
+          path: ${{ runner.temp }}/m3-external-pulse-dlopen-source.json
+          if-no-files-found: warn
+          retention-days: 14
