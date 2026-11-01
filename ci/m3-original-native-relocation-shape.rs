@@ -110,8 +110,8 @@ fn changed_counts(a:&Counts,b:&Counts,sample:usize)->(usize,Vec<String>){
     let mut different=0;
     let mut examples=Vec::new();
     for k in a.keys().chain(b.keys()).collect::<BTreeSet<_>>(){
-        let x=a.get(*k).copied().unwrap_or(0);
-        let y=b.get(*k).copied().unwrap_or(0);
+        let x=a.get(k).copied().unwrap_or(0);
+        let y=b.get(k).copied().unwrap_or(0);
         if x!=y{
             different+=1;
             if examples.len()<sample{examples.push(format!("{k}:{x}->{y}"));}
@@ -217,7 +217,7 @@ mod tests{
         let b=Counts::from([("a".into(),1),("b".into(),2),("c".into(),1)]);
         let (n,d)=changed_counts(&a,&b,4);
         assert_eq!(n,2);
-        assert_eq!(d,["b:3->2","c:0->1"]);
+        assert_eq!(d,vec!["b:3->2".to_owned(),"c:0->1".to_owned()]);
     }
     #[test]
     fn reject_unknown_native_relocation_architecture(){
