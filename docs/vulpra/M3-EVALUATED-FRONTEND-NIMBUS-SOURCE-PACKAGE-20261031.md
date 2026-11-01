@@ -452,6 +452,18 @@ All other **534 distinct second-field values** maintain identical frequencies. T
 
 This closes the **source ownership and generated-code explanation of the specific 32-byte `libxul.so` transition**, not the full sixth M3 gate. The native archives were not executed in this audit, `about:studies` runtime handling was not exercised here, and completeness of unrelated FFI/linker/`dlopen` dependencies remains open. The normal build retains Normandy and `about:studies`; the lean removal is explicitly opt-in. No production pruning or additional savings. **M3 5/6 (83%), overall 61%, Δ0pp.**
 
+### Compiled XPCOM contract literal and retained AboutRedirector controls
+
+[**Checksum-verified original compiled `libxul.so` full-versus-four-opt-in contract string and source crosswalk 41257817588 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41257817588), [**lint 41257817568 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41257817568). A fail-closed read-only scanner checked the actual authenticated full and four-opt-in lean `libxul.so` bytes, independent of the generator inspection:
+
+| Exact compiled XPCOM AboutRedirector contract string | Full original | Lean original |
+| --- | --- | --- |
+| `@mozilla.org/network/protocol/about;1?what=studies` | **Present** | **Absent** |
+| `@mozilla.org/network/protocol/about;1?what=welcomeback` | Present | Present |
+| `@mozilla.org/network/protocol/about;1?what=profilemanager` | Present | Present |
+
+The machine crosswalk checks the string census against **36→35** original source contract declarations, **36→35** compiled AboutRedirector ModuleID `452` occurrences, and the **exact CID equality at `gStaticModules[452]` in both compiled browser packages**. It therefore demonstrates a specific intentional **Normandy-disabled `about:studies` native contract omission** while preserving two independently checked about-route controls. This is evidence of compiled **literal presence/absence and generated registration ownership**, **not an executed XPCOM lookup test**, a claim that the page loads successfully in normal builds, or a complete audit of all protected browser features. The remaining Rust/C++ FFI, other native linker inputs, and conditional `dlopen` closure are still unproved. No further source pruning, savings or sixth-gate credit; **overall 61%, M3 5/6 (83%), Δ0pp**.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
