@@ -20,6 +20,63 @@ fn source_proof(root:&Path)->Result<(),String>{
     }
     Ok(())
 }
+
+fn mandatory_60(root:&Path)->Result<Vec<String>,String>{
+    use std::collections::BTreeSet;
+    let src=fs::read_to_string(root.join("dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp"))
+        .map_err(|e|e.to_string())?;
+    if !src.contains("case 60:\n      version = AV_FUNC_60;") ||
+       !src.contains("LinkResult::MissingFFmpegFunction") {
+        return Err("Version-60 mandatory binding contract drift".into());
+    }
+    let start=src.find("  AV_FUNC(av_lockmgr_register,").ok_or("Missing first binding")?;
+    let end=start+src[start..].find("#ifdef MOZ_WIDGET_ANDROID")
+        .ok_or("Missing Android-only end boundary")?;
+    let chunk=&src[start..end];
+    let(mut pos,mut selected)=(0usize,BTreeSet::new());
+    while let Some(rel)=chunk[pos..].find("AV_FUNC("){
+        let begin=pos+rel+"AV_FUNC(".len();
+        let(mut depth,mut closing)=(1i32,None);
+        for(i,b)in chunk.as_bytes()[begin..].iter().enumerate(){
+            match b {b'('=>depth+=1,b')'=>{depth-=1;if depth==0{closing=Some(begin+i);break;}},_=>{}}
+        }
+        let last=closing.ok_or("Unclosed AV_FUNC macro")?;
+        let (symbol,mask)=chunk[begin..last].split_once(',').ok_or("Malformed AV_FUNC")?;
+        let symbol=symbol.trim();
+        if !symbol.bytes().all(|x|x.is_ascii_alphanumeric()||x==b'_') ||
+           !(symbol.starts_with("av_")||symbol.starts_with("avcodec_")){
+            return Err(format!("Invalid FFmpeg function {symbol}"));
+        }
+        let enabled=mask.split(|c:char|!c.is_ascii_alphanumeric()&&c!='_').any(
+            |x|matches!(x,"AV_FUNC_60"|"AV_FUNC_AVUTIL_60"|"AV_FUNC_AVCODEC_ALL"|"AV_FUNC_AVUTIL_ALL"));
+        if enabled&&!selected.insert(symbol.to_owned()){return Err("Duplicate FFmpeg60 function".into());}
+        pos=last+1;
+    }
+    if !(20..=100).contains(&selected.len()){return Err(format!("Unexpected required FFmpeg60 function count {}",selected.len()));}
+    Ok(selected.into_iter().collect())
+}
+#[cfg(target_os="linux")]
+fn resolve_required_60(symbols:&[String])->Result<usize,String>{
+    use std::ffi::{CString,c_char,c_void};
+    #[link(name="dl")]unsafe extern "C" {
+        fn dlopen(name:*const c_char,flags:i32)->*mut c_void;
+        fn dlsym(handle:*mut c_void,name:*const c_char)->*mut c_void;
+        fn dlclose(handle:*mut c_void)->i32;
+    }
+    let lib=CString::new("libavcodec.so.60").unwrap();
+    let handle=unsafe{dlopen(lib.as_ptr(),2)};
+    if handle.is_null(){return Err("Cannot open FFmpeg60 under RTLD_NOW".into());}
+    let mut missing=Vec::new();
+    for sym in symbols{
+        let name=CString::new(sym.as_str()).map_err(|e|e.to_string())?;
+        if unsafe{dlsym(handle,name.as_ptr())}.is_null(){missing.push(sym.as_str());}
+    }
+    if unsafe{dlclose(handle)}!=0||!missing.is_empty(){
+        return Err(format!("Missing FFmpeg60 mandatory dynamic function(s): {}",missing.join(",")));
+    }
+    Ok(symbols.len())
+}
+
 fn check_host_so(path:&Path)->Result<(),String>{
     use std::io::Read;
     let meta=fs::metadata(path).map_err(|e|e.to_string())?;
@@ -63,8 +120,10 @@ fn run()->Result<(),String>{
     source_proof(Path::new(&args[2]))?;
     check_host_so(Path::new(&args[3]))?;
     let version=runtime_version()?;
+    let required=mandatory_60(Path::new(&args[2]))?;
+    let resolved=resolve_required_60(&required)?;
     fs::write(&args[4],format!(
-        "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{SOURCE}\",\n \"host_platform\":\"ubuntu-24.04-x86_64\",\n \"requested_library\":\"libavcodec.so.60\",\n \"glibc_rtld_now_load_passed\":true,\n \"avcodec_version_symbol_resolved_and_invoked\":true,\n \"avcodec_runtime_major\":60,\n \"avcodec_runtime_raw_version\":{},\n \"complete_ffmpeg_function_set_verified\":false,\n \"original_vulpra_callsite_proven\":false,\n \"arch_host_abi_proven\":false,\n \"all_dynamic_loading_paths_proven\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_removal_authorized\":false\n}}\n",version
+        "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{SOURCE}\",\n \"host_platform\":\"ubuntu-24.04-x86_64\",\n \"requested_library\":\"libavcodec.so.60\",\n \"glibc_rtld_now_load_passed\":true,\n \"avcodec_version_symbol_resolved_and_invoked\":true,\n \"avcodec_runtime_major\":60,\n \"avcodec_runtime_raw_version\":{},\n \"required_ffmpeg60_function_count\":{},\n \"resolved_ffmpeg60_required_functions\":{},\n \"complete_ffmpeg60_required_function_set_verified\":true,\n \"complete_ffmpeg_function_set_verified\":false,\n \"original_vulpra_callsite_proven\":false,\n \"arch_host_abi_proven\":false,\n \"all_dynamic_loading_paths_proven\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_removal_authorized\":false\n}}\n",version,required.len(),resolved
     )).map_err(|e|e.to_string())?;
     println!("PASS: pinned FFmpeg 60 NSPR source load path and actual Ubuntu glibc RTLD_NOW avcodec_version major 60");
     Ok(())
@@ -74,6 +133,9 @@ fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
     use super::*;
     #[test]fn missing_source_path_fails_closed(){
         assert!(source_proof(Path::new("/definitely-missing-gecko-root")).is_err());
+    }
+    #[test]fn missing_mandatory_bindings_fail_closed(){
+        assert!(mandatory_60(Path::new("/definitely-missing-gecko-root")).is_err());
     }
     #[test]fn missing_host_library_fails_closed(){
         assert!(check_host_so(Path::new("/definitely-missing-libavcodec60")).is_err());
