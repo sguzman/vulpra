@@ -56,6 +56,12 @@ This is actual **host-library initialization and one function call**, but it nei
 
 Together, the scoped FFmpeg 60, PulseAudio and GTK DMA-BUF host experiments now cover the **three library names observed only in the original graphical loader workload**, but they do **not** turn three observed requests into a complete browser feature/dependency map. Their original source candidates, supported host bindings and incomplete runtime attribution remain explicitly separate.
 
+## FFmpeg 60 mandatory version-gated native bindings (2026-10-31)
+
+[Expanded exact-source + actual Ubuntu host CI 41263719499](https://github.com/sguzman/vulpra/actions/runs/41263719499) **PASSED**, artifact **13065844546**, with 3 Rust regression fixtures passed. The expanded `ci/m3-pinned-ffmpeg60-host-loader.rs` parses the original pinned `FFmpegLibWrapper.cpp` `AV_FUNC` (mandatory, not `AV_FUNC_OPTION`) macro call list, evaluates the major-60 version-bit selectors, excludes the Android-only section, and checks the real glibc `dlsym` bindings from Ubuntu 24.04 `libavcodec.so.60`. Of **51** mandatory macro declarations across version families, **44** apply to FFmpeg major 60, and **44/44** resolved successfully with zero missing; the audited RTLD_NOW open and `avcodec_version` invocation still passed. A first expanded-run failure identified an incorrectly cased audit source assertion (`MissingFFmpegFunction` versus original `MissingFFMpegFunction`), corrected before the accepted run.
+
+This verifies the **version-60 mandatory function-name resolution for the pinned original loader source on one Ubuntu host**, not optional GPU/media feature paths, actual video decode, complete FFmpeg version-family parity, originating browser call stacks, Arch/Hyprland host closure, or whole M3 completion.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
