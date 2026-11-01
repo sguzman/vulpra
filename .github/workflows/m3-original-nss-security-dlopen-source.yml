@@ -1,0 +1,117 @@
+# The protected NSS PKCS#11/FreeBL dynamic paths are source-candidates
+# for two OBSERVED native runtime edges. No in-browser callstack claim.
+name: M3 Original NSS Security Dynamic Source Routes
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-nss-security-dlopen-source.rs
+      - .github/workflows/m3-original-nss-security-dlopen-source.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-pinned-nss-vs-original-native:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      ORIGINAL_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ORIGINAL_ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      EVIDENCE_RUN: '41149955223'
+      EVIDENCE_HEAD: f39403ce50bd550b0123a9d68e45b3be947b38d7
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout bounded current NSS verifier
+        uses: actions/checkout@v4
+        with:
+          path: verifier
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-nss-security-dlopen-source.rs
+      - name: Checkout only exact historical NSS native loader sources
+        uses: actions/checkout@v4
+        with:
+          path: original
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/nss/lib/pk11wrap/pk11load.c
+            security/nss/lib/softoken/manifest.mn
+            security/nss/lib/freebl/loader.c
+            security/nss/lib/freebl/genload.c
+            security/nss/lib/freebl/blname.c
+            security/nss/lib/freebl/manifest.mn
+      - name: Authenticate exactly one successful original compiled browser graphical observation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C verifier rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original rev-parse HEAD)" = "$ORIGINAL_SHA"
+          gh run view "$EVIDENCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --json status,conclusion,headSha,name >"$RUNNER_TEMP/evidence-run.json"
+          jq -e --arg head "$EVIDENCE_HEAD" '
+            .headSha==$head and .status=="completed" and
+            .conclusion=="success" and
+            .name=="M3 Actual Wayland Native Loader Observation"
+          ' "$RUNNER_TEMP/evidence-run.json" >/dev/null
+          gh run download "$EVIDENCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-private-weston-wayland-loader-observed \
+            --dir "$RUNNER_TEMP/native"
+          report="$RUNNER_TEMP/native/m3-wayland-native-loader-observed.json"
+          test -s "$report"
+          test "$(stat -c '%s' "$report")" -le 65536
+          jq -e --arg sha "$ORIGINAL_SHA" --arg archive "$ORIGINAL_ARCHIVE_SHA256" '
+            .old_normal_native_archive_source==$sha and
+            .old_normal_native_archive_sha256==$archive and
+            .status=="actual_native_full_normal_loader_observation" and
+            .observed_workload_mode=="private_weston_wayland" and
+            .real_native_wayland_surface_commit_passed==true and
+            .loader_reported_dynamic_initialized_edge_count==21 and
+            ([.loader_reported_dynamic_initialized_edges[] |
+               select(.requester_basename=="libnspr4.so" and
+                 (.requested_library_basename=="libfreeblpriv3.so" or
+                  .requested_library_basename=="libsoftokn3.so"))] | length)==2 and
+            ([.loader_reported_dynamic_initialized_edges[] |
+               select(.requester_basename=="libnspr4.so" and
+                      .requested_library_basename=="libfreeblpriv3.so")] | length)==1 and
+            ([.loader_reported_dynamic_initialized_edges[] |
+               select(.requester_basename=="libnspr4.so" and
+                      .requested_library_basename=="libsoftokn3.so")] | length)==1 and
+            .complete_dlopen_graph_proven==false and
+            .whole_m3_feature_dependency_gate_completed==false
+          ' "$report" >/dev/null
+          echo 'PASS: original native Weston source and both observed NSPR NSS dynamic request edges authenticated'
+      - name: Verify exact historical NSS source route with Rust and negative fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2021 --test verifier/ci/m3-original-nss-security-dlopen-source.rs \
+            -o "$RUNNER_TEMP/nss-source-tests"
+          "$RUNNER_TEMP/nss-source-tests"
+          rustc --edition=2021 verifier/ci/m3-original-nss-security-dlopen-source.rs \
+            -o "$RUNNER_TEMP/nss-source-proof"
+          "$RUNNER_TEMP/nss-source-proof" "$ORIGINAL_SHA" original \
+            "$RUNNER_TEMP/m3-nss-original-dynamic-source-routes.json"
+          jq -e --arg sha "$ORIGINAL_SHA" '
+            .source_commit==$sha and
+            .source_supported_nss_dynamic_routes==2 and
+            .source_route_for_softoken_verified==true and
+            .source_route_for_freebl_verified==true and
+            .nss_security_removal_authorized==false and
+            .original_compiled_conditional_verified==false and
+            .original_compiled_callstack_verified==false and
+            .complete_dynamic_graph_verified==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-nss-original-dynamic-source-routes.json" >/dev/null
+      - name: Retain only bounded NSS source-candidate and original-run provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-nss-security-dynamic-source-provenance
+          path: |
+            ${{ runner.temp }}/m3-nss-original-dynamic-source-routes.json
+            ${{ runner.temp }}/evidence-run.json
+          if-no-files-found: error
+          retention-days: 14
