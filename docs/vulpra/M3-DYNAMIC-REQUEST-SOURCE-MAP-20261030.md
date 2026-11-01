@@ -260,6 +260,26 @@ The bounded `objdump -d --no-show-raw-insn` verification checks **four distinct 
 
 **No new source removal or measured package savings. M3 remains 5/6 = 83%, Vulpra overall 61%, Δ+0 percentage points.**
 
+## Exact-source WebAuthn `libudev.so.1` constructed SONAME and original compiled register-indirect `dlopen` (2026-11-01 UTC)
+
+[**Source-pinned WebAuthn libudev Rust-to-native CI 41357321586 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41357321586), [workflow lint 41357321553 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41357321553). **Artifact 13103488524 independently downloaded, unzipped and inspected.** New std-only Rust read-only verifier `ci/m3-original-webauthn-libudev-source-native.rs` checks independently SHA-pinned source `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, the immutable original full-normal archive SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`, and the actual **189,486,696-byte original stripped packaged `libxul.so`** (SHA-256 `d6d1af9d377cab1f31bda6cfe05c52b945b21f0c37295636d0aca99fef4272cf`). No browser, authenticator or network route is executed.
+
+**Original source ownership and semantics**: [`dom/webauthn/libudev-sys/src/lib.rs`](https://github.com/sguzman/vulpra/blob/b1482404dfb8b01342990ee99ea3df0f9756b5f7/dom/webauthn/libudev-sys/src/lib.rs), with related original [Cargo comments](https://github.com/sguzman/vulpra/blob/b1482404dfb8b01342990ee99ea3df0f9756b5f7/dom/webauthn/libudev-sys/Cargo.toml), implements the conditional Firefox WebAuthn/authenticator Rust libudev binding. Its lazy `LIBRARY` calls `Library::open("libudev.so.1")`, constructing a `CString` and requesting `RTLD_LAZY | RTLD_GLOBAL | RTLD_NOLOAD` first, then `RTLD_LAZY | RTLD_GLOBAL` if no library handle is returned. The original `ifnull!($a,$b)` macro expands to `if $a.is_null() { $b } else { $a }` and can **evaluate `$a` twice when non-null**. The source also provides null-function fallbacks when libudev or exported functions are unavailable; this is protected graceful-degradation and USB authenticator compatibility, not dead code.
+
+**Compiled source-matched machine witnesses** (independently bounded `objdump`/actual `readelf -Wr`):
+
+| Original `libxul.so` virtual address | Verified machine behavior |
+| --- | --- |
+| `0x9936608`, `0x9936615` | Two immediate stores `0x2e7665647562696c` and `0x312e6f73` construct the exact 12-byte Linux name `libudev.so.1`; explicit length `0x0c`, 13-byte buffer allocation including terminator |
+| `0xb3c33c8` | Actual `R_X86_64_GLOB_DAT dlopen@GLIBC_2.2.5` relocation |
+| `0x9936640` | RIP-relative load of that exact `dlopen` GOT function pointer into `%r14` |
+| `0x9936647`–`0x993664f` | Name pointer in `%rdi`, first flags **`0x105`**, first `call *%r14` |
+| `0x9936652`–`0x9936664` | Non-null result influences `lea 0x101(,%rcx,4),%esi` (**`0x101` on first-null, `0x105` on first-non-null**); saved name pointer restored and second `call *%r14` |
+
+The compiled conditional **second `dlopen` invocation** explains the earlier unexplained two register-indirect calls; it follows Rust `ifnull!` macro argument reevaluation, not two unrelated anonymous loader APIs. A source-matched candidate name **is stronger than an unowned compiled `dlopen` branch**, but does not automatically prove final symbol-level function ownership in stripped ELF, actual runtime execution, a successful library load, udev ABI compatibility on the user's host, WebAuthn hardware use, or the entire remaining M3 dependency graph. Tests include missing/changed original source, mutated immediate bytes/opcode/flags/registers and wrong/missing GOT relocation rejection.
+
+Archived JSON explicitly sets `actual_webauthn_key_flow_executed=false`, `actual_runtime_libudev_soname_loaded=false`, `complete_dynamic_library_dependency_graph_verified=false`, `target_endeavouros_hyprland_verified=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`. Keep USB authenticator and libudev fallback code protected. **No source removal or measured byte savings; M3 5/6 (83%), Vulpra overall 61%, Δ+0 percentage points.**
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
