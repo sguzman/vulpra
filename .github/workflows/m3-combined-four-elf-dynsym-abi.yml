@@ -11,6 +11,7 @@ on:
       - ci/m3-libxul-hinge-assembly.rs
       - ci/m3-xpcom-contract-source-witness.rs
       - ci/m3-original-native-relocation-shape.rs
+      - ci/m3-libxul-packed-relr.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -38,6 +39,7 @@ jobs:
             ci/m3-libxul-hinge-assembly.rs
             ci/m3-xpcom-contract-source-witness.rs
             ci/m3-original-native-relocation-shape.rs
+            ci/m3-libxul-packed-relr.rs
             ci/mozconfig-linux-m3-baseline
             ci/mozconfig-linux-m3-combined-lean
       - name: Checkout exact pinned original Mozilla XPCOM contract source only
@@ -80,6 +82,9 @@ jobs:
           rustc --edition=2021 --test ci/m3-original-native-relocation-shape.rs -o "$RUNNER_TEMP/relocation-audit-test"
           "$RUNNER_TEMP/relocation-audit-test"
           rustc --edition=2021 -O ci/m3-original-native-relocation-shape.rs -o "$RUNNER_TEMP/relocation-audit"
+          rustc --edition=2021 --test ci/m3-libxul-packed-relr.rs -o "$RUNNER_TEMP/packed-relr-test"
+          "$RUNNER_TEMP/packed-relr-test"
+          rustc --edition=2021 -O ci/m3-libxul-packed-relr.rs -o "$RUNNER_TEMP/packed-relr-audit"
           command -v objdump
           command -v objcopy
           command -v cmp
@@ -214,6 +219,37 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/audit/compiled-28-elf-relocation-shape.json" >/dev/null
           jq -c '{full:.full_relocation_records,lean:.lean_relocation_records,named:[.full_named_relocation_occurrences,.lean_named_relocation_occurrences],changed_type_records:.changed_per_elf_relocation_type_records,changed_named_records:.changed_per_elf_named_relocation_reference_records,changed_files:.elf_paths_with_relocation_record_differences}' "$RUNNER_TEMP/audit/compiled-28-elf-relocation-shape.json"
+      - name: Decode packed original compiled libxul ELF64 RELR targets in both variants
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/packed-relr-audit" \
+            "$RUNNER_TEMP/packages/full/extracted/vulpra/libxul.so" \
+            "$RUNNER_TEMP/packages/lean/extracted/vulpra/libxul.so" \
+            "$RUNNER_TEMP/audit/compiled-libxul-packed-relr.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="source_matched_original_native_libxul_packed_relr_decoded" and
+            .normal_encoded_word_count==13206 and
+            .lean_encoded_word_count==13206 and
+            .normal_direct_base_words==26 and
+            .lean_direct_base_words==26 and
+            .normal_decoded_target_addresses==478592 and
+            .lean_decoded_target_addresses==478592 and
+            .same_encoded_word_values>=0 and
+            .identical_position_target_addresses>=0 and
+            .set_intersection_of_relocation_target_addresses>=0 and
+            (.top_relative_address_shift_counts|length)>0 and
+            .all_decoded_target_offsets_sorted_unique==true and
+            .same_relocation_targets_or_addends_proven==false and
+            .actual_runtime_relocation_resolution_verified==false and
+            .complete_static_rust_cpp_ffi_verified==false and
+            .conditional_dlopen_closure_verified==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/compiled-libxul-packed-relr.json" >/dev/null
+          jq -c '{records:[.normal_decoded_target_addresses,.lean_decoded_target_addresses],encoded_words:[.normal_encoded_word_count,.lean_encoded_word_count],common_target_offsets:.set_intersection_of_relocation_target_addresses,top_shifts:.top_relative_address_shift_counts[:3]}' "$RUNNER_TEMP/audit/compiled-libxul-packed-relr.json"
       - name: Compare compiled libxul named dynamic-exported function bytes by symbol address
         shell: bash
         timeout-minutes: 8
@@ -457,5 +493,6 @@ jobs:
             ${{ runner.temp }}/audit/pinned-source-to-native-xpcom-contract-crosswalk.json
             ${{ runner.temp }}/audit/original-compiled-aboutstudies-contract-strings.json
             ${{ runner.temp }}/audit/compiled-28-elf-relocation-shape.json
+            ${{ runner.temp }}/audit/compiled-libxul-packed-relr.json
           if-no-files-found: error
           retention-days: 14
