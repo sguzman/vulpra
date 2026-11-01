@@ -20,10 +20,12 @@ fn scan_reloc_line(line:&str,section:&mut String,types:&mut Counts,names:&mut Co
  -> Result<bool,String>{
     if line.starts_with("Relocation section '"){
         let name=line.split('\'').nth(1).ok_or("Missing relocation section name")?;
-        if !(name.starts_with(".rela.")||name.starts_with(".rel.")){
-            return Err("Unexpected relocation section name".into());
+        if !(name.starts_with(".rela.")||name.starts_with(".rel.")||name.starts_with(".relr.")){
+            return Err(format!("Unexpected relocation section name: {name}"));
         }
-        *section=name.to_owned();
+        // Packed RELR has no explicit per-relocation symbol/type rows.
+    // Accept its section header, but do not misreport decoded RELR coverage.
+    *section=name.to_owned();
         return Ok(false);
     }
     let c:Vec<_>=line.split_whitespace().collect();
@@ -31,6 +33,7 @@ fn scan_reloc_line(line:&str,section:&mut String,types:&mut Counts,names:&mut Co
         return Ok(false);
     }
     if section.is_empty(){return Err("Relocation record without section header".into());}
+    if section.starts_with(".relr."){return Err("Unexpected typed relocation inside packed RELR section".into());}
     let reloc=c[2];
     if !reloc.starts_with("R_X86_64_"){
         return Err("Unexpected native relocation architecture".into());
