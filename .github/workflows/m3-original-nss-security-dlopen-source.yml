@@ -1,12 +1,13 @@
-# Four OBSERVED runtime edges to protected NSS and bundled FFVPX sources.
-# Exact-source candidates; no in-browser callstack or source pruning claim.
-name: M3 Original NSS and FFVPX Dynamic Source Routes
+# Twenty-one observed graphical loader edges: fourteen real XPCOM bootstrap
+# manifest dependencies + seven verified source candidates. No full graph claim.
+name: M3 Original 21 Observed Dynamic Source Candidates
 on:
   push:
     branches: [main]
     paths:
       - ci/m3-original-nss-security-dlopen-source.rs
       - ci/m3-original-ffvpx-dlopen-source.rs
+      - ci/m3-original-dependentlibs-graph.rs
       - .github/workflows/m3-original-nss-security-dlopen-source.yml
   workflow_dispatch:
 permissions:
@@ -16,12 +17,15 @@ jobs:
   source-pinned-nss-vs-original-native:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       ORIGINAL_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
       ORIGINAL_ARCHIVE_SHA256: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
       EVIDENCE_RUN: '41149955223'
       EVIDENCE_HEAD: f39403ce50bd550b0123a9d68e45b3be947b38d7
+      BASELINE_RUN: '40997075527'
+      SOURCE_CANDIDATES_RUN: '41138797948'
+      SOURCE_CANDIDATES_HEAD: 7a37bebadd8ce6355c70db7c2edf0ac8b1692ef6
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout bounded current NSS verifier
@@ -32,6 +36,7 @@ jobs:
           sparse-checkout: |
             ci/m3-original-nss-security-dlopen-source.rs
             ci/m3-original-ffvpx-dlopen-source.rs
+            ci/m3-original-dependentlibs-graph.rs
       - name: Checkout only exact historical NSS native loader sources
         uses: actions/checkout@v4
         with:
@@ -50,6 +55,7 @@ jobs:
             dom/media/platforms/PDMFactory.cpp
             media/ffvpx/libavcodec/moz.build
             media/ffvpx/libavutil/moz.build
+            xpcom/glue/standalone/nsXPCOMGlue.cpp
       - name: Authenticate exactly one successful original compiled browser graphical observation
         shell: bash
         run: |
@@ -136,13 +142,112 @@ jobs:
             .source_removal_authorized==false and
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/m3-ffvpx-original-dynamic-source-routes.json" >/dev/null
-      - name: Retain bounded NSS and FFVPX source candidates with original-run provenance
+      - name: Crosscheck authenticated original package bootstrap against all 21 real loader edges
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run view "$BASELINE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --json status,conclusion,headSha,name >"$RUNNER_TEMP/original-package-run.json"
+          jq -e --arg sha "$ORIGINAL_SHA" '
+            .headSha==$sha and .status=="completed" and .conclusion=="success" and
+            .name=="M3 Prebuild Source-Matched Full Normandy Baseline"
+          ' "$RUNNER_TEMP/original-package-run.json" >/dev/null
+          gh run download "$BASELINE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline \
+            --dir "$RUNNER_TEMP/original-package"
+          archive="$RUNNER_TEMP/original-package/full-normandy-baseline.tar.xz"
+          test -f "$archive"
+          test "$(stat -c '%s' "$archive")" -le 100000000
+          printf '%s  %s\n' "$ORIGINAL_ARCHIVE_SHA256" "$archive" | sha256sum -c -
+          jq -e --arg sha "$ORIGINAL_SHA" --arg archive "$ORIGINAL_ARCHIVE_SHA256" '
+            .source_commit==$sha and .sha256==$archive and
+            .variant=="full-normandy"
+          ' "$RUNNER_TEMP/original-package/m3-full-normandy-baseline.json" >/dev/null
+          tar -xJOf "$archive" ./vulpra/dependentlibs.list \
+            >"$RUNNER_TEMP/original-dependentlibs.list"
+          test -s "$RUNNER_TEMP/original-dependentlibs.list"
+          test "$(stat -c '%s' "$RUNNER_TEMP/original-dependentlibs.list")" -le 1024
+          rustc --edition=2021 --test verifier/ci/m3-original-dependentlibs-graph.rs \
+            -o "$RUNNER_TEMP/dependentlibs-source-tests"
+          "$RUNNER_TEMP/dependentlibs-source-tests"
+          rustc --edition=2021 verifier/ci/m3-original-dependentlibs-graph.rs \
+            -o "$RUNNER_TEMP/dependentlibs-source-proof"
+          "$RUNNER_TEMP/dependentlibs-source-proof" "$ORIGINAL_SHA" original \
+            "$RUNNER_TEMP/original-dependentlibs.list" \
+            "$RUNNER_TEMP/m3-original-bootstrap-manifest-source.json"
+          jq -e --arg sha "$ORIGINAL_SHA" '
+            .gecko_source_commit==$sha and
+            .source_xpcom_manifest_loader_verified==true and
+            .packaged_dependency_manifest_entries==14 and
+            .manifest_order_and_unique_names_verified==true and
+            .runtime_edge_set_match_checked_separately==false and
+            .all_runtime_dlopen_paths_proven==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-bootstrap-manifest-source.json" >/dev/null
+          gh run view "$SOURCE_CANDIDATES_RUN" --repo "$GITHUB_REPOSITORY" \
+            --json status,conclusion,headSha,name >"$RUNNER_TEMP/source-three-run.json"
+          jq -e --arg sha "$SOURCE_CANDIDATES_HEAD" '
+            .headSha==$sha and .status=="completed" and .conclusion=="success" and
+            .name=="M3 Native Dynamic Requests To Original Source Candidates"
+          ' "$RUNNER_TEMP/source-three-run.json" >/dev/null
+          gh run download "$SOURCE_CANDIDATES_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-source-three-dynamic-request-candidates \
+            --dir "$RUNNER_TEMP/source-three"
+          jq -e --arg sha "$ORIGINAL_SHA" --arg archive "$ORIGINAL_ARCHIVE_SHA256" '
+            .historical_compiled_source==$sha and
+            .original_native_package_sha256==$archive and
+            .source_candidates_confirmed_with_exact_original_tree==true and
+            (.observed_three_dynamic_library_requests|length)==3 and
+            .actual_call_stacks_captured==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/source-three/m3-source-dynamic-requests-crosswalk.json" >/dev/null
+          jq -e --rawfile manifest "$RUNNER_TEMP/original-dependentlibs.list" '
+            ($manifest|split("\n")|map(select(length>0))) as $bootstrap |
+            ([.loader_reported_dynamic_initialized_edges[] |
+                .requester_basename+"|"+.requested_library_basename]) as $observed |
+            ([
+              "libnspr4.so|libavcodec.so.60",
+              "libnspr4.so|libfreeblpriv3.so",
+              "libnspr4.so|libmozavcodec.so",
+              "libnspr4.so|libmozavutil.so",
+              "libnspr4.so|libsoftokn3.so",
+              "libxul.so|libgbm.so.1",
+              "libxul.so|libpulse.so.0"
+             ] + ($bootstrap|map("vulpra|"+.))) as $expected |
+             ($bootstrap|length)==14 and
+             ($bootstrap|unique|length)==14 and
+             ($observed|length)==21 and
+             ($observed|unique|length)==21 and
+             ($observed|sort)==($expected|sort) and
+             .complete_dlopen_graph_proven==false and
+             .whole_m3_feature_dependency_gate_completed==false
+          ' "$RUNNER_TEMP/native/m3-wayland-native-loader-observed.json" >/dev/null
+          jq -n --arg sha "$ORIGINAL_SHA" --arg archive "$ORIGINAL_ARCHIVE_SHA256" '{
+            schema_version:1,
+            historical_compiled_source:$sha,
+            original_package_sha256:$archive,
+            original_real_graphical_observed_dynamic_edges:21,
+            original_xpcom_packaged_manifest_preloads:14,
+            independently_source_supported_other_dynamic_edges:7,
+            observed_edge_source_candidate_set_matches_exactly:true,
+            source_candidates_are_not_proven_compiled_callsites:true,
+            all_possible_dlopen_paths_proven:false,
+            target_workstation_verified:false,
+            source_removal_authorized:false,
+            m3_sixth_gate_closed:false
+          }' > "$RUNNER_TEMP/m3-original-21-observed-source-candidates.json"
+          echo 'PASS: 21/21 original observed dynamic edges match 14 exact packaged XPCOM dependencies + 7 source candidates; not entire conditional loader graph'
+      - name: Retain bounded original 21-edge observed source candidate evidence
         uses: actions/upload-artifact@v4
         with:
-          name: m3-original-nss-and-ffvpx-dynamic-source-provenance
+          name: m3-original-21-observed-dynamic-source-candidates
           path: |
             ${{ runner.temp }}/m3-nss-original-dynamic-source-routes.json
             ${{ runner.temp }}/m3-ffvpx-original-dynamic-source-routes.json
+            ${{ runner.temp }}/m3-original-bootstrap-manifest-source.json
+            ${{ runner.temp }}/m3-original-21-observed-source-candidates.json
+            ${{ runner.temp }}/original-package-run.json
+            ${{ runner.temp }}/source-three-run.json
             ${{ runner.temp }}/evidence-run.json
           if-no-files-found: error
           retention-days: 14
