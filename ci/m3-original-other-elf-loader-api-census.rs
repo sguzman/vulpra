@@ -233,7 +233,18 @@ fn inspect(root:&Path)->Result<String,String> {
             format!("{{\"loader_api\":{},\"relocation_kind\":{},\"slots\":{}}}",json(api),json(kind),slots)
         }).collect::<Vec<_>>().join(",");
         let got=got_insns.iter().map(|((api,rel_kind,branch_kind,plt),n)|{
-            format!("{{\"loader_api\":{},\"relocation_kind\":{},\"branch_kind\":{},\"from_plt_stub\":{},\"instructions\":{}}}",json(api),json(rel_kind),json(branch_kind),plt,n
+            let mut item=String::from("{\"loader_api\":");
+            item.push_str(&json(api));
+            item.push_str(",\"relocation_kind\":");
+            item.push_str(&json(rel_kind));
+            item.push_str(",\"branch_kind\":");
+            item.push_str(&json(branch_kind));
+            item.push_str(",\"from_plt_stub\":");
+            item.push_str(if *plt{"true"}else{"false"});
+            item.push_str(",\"instructions\":");
+            item.push_str(&n.to_string());
+            item.push('}');
+            item
         }).collect::<Vec<_>>().join(",");
         rows.push(format!("    {{\"elf_basename\":{},\"dynamic_undefined_loader_api_imports\":[{}],\"named_direct_loader_api_branches\":{},\"direct_branches\":[{}],\"loader_api_relocation_slots\":{},\"loader_api_relocations\":[{}],\"relocation_matched_got_indirect_instructions\":{},\"got_indirect_instructions\":[{}]}}",
             json(name),names,count,records,relocation_slots.len(),relocs,got_count,got));
