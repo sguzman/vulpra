@@ -26,7 +26,7 @@ fn mandatory_60(root:&Path)->Result<Vec<String>,String>{
     let src=fs::read_to_string(root.join("dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp"))
         .map_err(|e|e.to_string())?;
     if !src.contains("case 60:\n      version = AV_FUNC_60;") ||
-       !src.contains("LinkResult::MissingFFmpegFunction") {
+       !src.contains("LinkResult::MissingFFMpegFunction") {
         return Err("Version-60 mandatory binding contract drift".into());
     }
     let start=src.find("  AV_FUNC(av_lockmgr_register,").ok_or("Missing first binding")?;
