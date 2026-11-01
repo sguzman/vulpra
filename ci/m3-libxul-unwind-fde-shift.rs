@@ -136,6 +136,57 @@ fn alignment_union(full: &BTreeSet<Range>, lean: &BTreeSet<Range>,
     (both,zero_only,shifted_only,neither,identical_any,bins)
 }
 
+// Bounded numeric code offsets only: do not export raw unwind instructions.
+fn boundary_transition(full: &BTreeSet<Range>, lean: &BTreeSet<Range>,
+                       full_len: usize, lean_len: usize, delta: usize)
+    -> Result<String,String> {
+    let (mut last_zero,mut first_shift)=(None::<usize>,None::<usize>);
+    let mut no_alignment=Vec::new();
+    let mut records=Vec::new();
+    let mut buckets=[[0usize;4];16];
+    for &(start,end) in full {
+        let z=end<=lean_len && lean.contains(&(start,end));
+        let t=match(start.checked_add(delta),end.checked_add(delta)){
+            (Some(p),Some(q)) if q<=lean_len=>lean.contains(&(p,q)),
+            _=>false,
+        };
+        if z && !t {last_zero=Some(last_zero.map_or(start,|p|p.max(start)));}
+        if t && !z {first_shift=Some(first_shift.map_or(start,|p|p.min(start)));}
+        if !z && !t {
+            no_alignment.push((start,end));
+            if no_alignment.len()>10 {return Err("Too many unmatched FDE ranges for bounded hinge report".into());}
+        }
+        records.push((start,z,t));
+        let region=(start as u128 * 128 / full_len as u128) as usize;
+        if region<16 {
+            buckets[region][0]+=1;
+            if z {buckets[region][1]+=1;}
+            if t {buckets[region][2]+=1;}
+            if !z && !t {buckets[region][3]+=1;}
+        }
+    }
+    let last_zero=last_zero.ok_or("No original-only FDE hinge anchors")?;
+    let first_shift=first_shift.ok_or("No shifted-only FDE hinge anchors")?;
+    let late_zero=records.iter().filter(|(s,z,t)|*z && !*t && *s>=first_shift).count();
+    let early_shift=records.iter().filter(|(s,z,t)|*t && !*z && *s<=last_zero).count();
+    let missing=no_alignment.iter().map(|(a,b)|format!(
+        "{{\"original_text_offset_start\":{a},\"original_text_offset_end\":{b}}}"
+    )).collect::<Vec<_>>().join(",");
+    let bins=buckets.iter().enumerate().map(|(idx,c)|format!(
+        "{{\"first_eighth_sixteenth\":{idx},\"original_fde_ranges\":{},\"zero_offset\":{},\"plus_32_offset\":{},\"neither\":{}}}",
+        c[0],c[1],c[2],c[3]
+    )).collect::<Vec<_>>().join(",");
+    Ok(format!(
+        "{{\"last_zero_only_original_start_offset\":{last_zero},\
+        \"first_plus_32_only_original_start_offset\":{first_shift},\
+        \"zero_only_not_strictly_before_first_shift_count\":{late_zero},\
+        \"shift_only_not_strictly_after_last_zero_count\":{early_shift},\
+        \"unmatched_original_fde_offsets\":[{missing}],\
+        \"first_eighth_local_sixteenth_bins\":[{bins}],\
+        \"code_offset_not_source_line_or_function_identity\":true}}"
+    ))
+}
+
 fn run() -> Result<(), String> {
     let args:Vec<_>=std::env::args().collect();
     if args.len()!=4 {return Err("usage: m3-ehframe FULL_LIBXUL LEAN_LIBXUL REPORT".into());}
@@ -148,6 +199,8 @@ fn run() -> Result<(), String> {
     let same=compare_ranges(&fdes_a,&fdes_b,&code_a,&code_b,0);
     let shifted=compare_ranges(&fdes_a,&fdes_b,&code_a,&code_b,32);
     let union=alignment_union(&fdes_a,&fdes_b,&code_a,&code_b,32);
+    let transition=boundary_transition(&fdes_a,&fdes_b,code_a.len(),code_b.len(),32)?;
+
     if union.0+union.1+union.2+union.3 != fdes_a.len() {
         return Err("Incomplete exclusive FDE layout classification".into());
     }
@@ -171,6 +224,7 @@ fn run() -> Result<(), String> {
         \"unwind_fde_neither_alignment\":{},\
         \"unwind_fde_identical_under_either\":{},\
         \"unwind_fde_eighth_bins\":[{buckets}],\
+        "unwind_fde_layout_transition\":{transition},\
         \"sum_of_fde_span_bytes_not_unique_code_coverage\":true,\
         \"only_unwind_described_code_ranges_examined\":true,\
         \"all_compiled_functions_or_rust_ffi_proven\":false,\
@@ -189,6 +243,15 @@ fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn hinge_and_unmatched_ranges_are_bounded() {
+        let a:BTreeSet<_>=[(1,4),(4,7),(7,9)].into_iter().collect();
+        let b:BTreeSet<_>=[(1,4),(6,9)].into_iter().collect();
+        let d=boundary_transition(&a,&b,9,11,2).unwrap();
+        assert!(d.contains("\"last_zero_only_original_start_offset\":1"));
+        assert!(d.contains("\"first_plus_32_only_original_start_offset\":4"));
+        assert!(d.contains("\"unmatched_original_fde_offsets\":[{\"original_text_offset_start\":7,\"original_text_offset_end\":9}]"));
+    }
     #[test]
     fn exclusive_alignment_fixture() {
         let a:BTreeSet<_>=[(1,4),(4,7),(7,9)].into_iter().collect();
