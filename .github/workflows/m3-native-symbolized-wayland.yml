@@ -11,6 +11,7 @@ on:
       - ci/m3-original-linked-ffi-symbol-proof.rs
       - ci/m3-original-compiled-ffi-object-relocations.rs
       - ci/m3-original-linked-ffi-direct-calls.rs
+      - ci/m3-original-compiled-ffmpeg-loader-call.rs
       - ci/tests/m3-wayland-gdb-sanitize-test.sh
   workflow_dispatch:
 permissions:
@@ -44,6 +45,8 @@ jobs:
           "$RUNNER_TEMP/m3-ffi-object-relocation-tests"
           rustc --edition=2021 --test ci/m3-original-linked-ffi-direct-calls.rs -o "$RUNNER_TEMP/m3-ffi-final-link-call-tests"
           "$RUNNER_TEMP/m3-ffi-final-link-call-tests"
+          rustc --edition=2021 --test ci/m3-original-compiled-ffmpeg-loader-call.rs -o "$RUNNER_TEMP/m3-ffmpeg-loader-call-tests"
+          "$RUNNER_TEMP/m3-ffmpeg-loader-call-tests"
           test -f packaging/test-wayland.sh
           echo 'PASS: diagnostic contract only, not browser acceptance'
   compile-source-pinned-with-debug-symbols:
@@ -232,6 +235,31 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/m3-original-ffi-final-machine-call-targets.json" >/dev/null
           echo 'PASS: four source-pinned native C++ functions directly branch to three compiled Rust symbols; whole gate open'
+      - name: Verify original compiled FFmpeg-to-NSPR dynamic loader callsite
+        shell: bash
+        working-directory: source
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          objdir="$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline"
+          rustc --edition=2021 "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-compiled-ffmpeg-loader-call.rs" \
+            -o "$RUNNER_TEMP/m3-ffmpeg-loader-native-call"
+          "$RUNNER_TEMP/m3-ffmpeg-loader-native-call" "$SOURCE_SHA" \
+            "$objdir/dist/bin/libxul.so" \
+            "$RUNNER_TEMP/m3-original-ffmpeg-loader-native-call.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .source_commit==$sha and
+            .status=="compiled_ffmpeg_loader_direct_nspr_branch_verified" and
+            .compiled_ffmpeg_init_direct_pr_loadlibrarywithflags_branches>=1 and
+            .selected_compiled_callsite_verified==true and
+            .actual_soname_argument_proven==false and
+            .all_dlopen_routes_verified==false and
+            .arch_workstation_verified==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-ffmpeg-loader-native-call.json" >/dev/null
+          echo 'PASS: FFmpeg compiled loader direct NSPR branch; broader native feature/dlopen gate remains open'
       - name: Stage fresh package and diagnose old and fresh on one runner
         shell: bash
         working-directory: source
@@ -262,6 +290,7 @@ jobs:
             ${{ runner.temp }}/m3-original-ffi-symbol-definitions.json
             ${{ runner.temp }}/m3-original-ffi-object-relocations.json
             ${{ runner.temp }}/m3-original-ffi-final-machine-call-targets.json
+            ${{ runner.temp }}/m3-original-ffmpeg-loader-native-call.json
             ${{ runner.temp }}/fresh-native.tar.xz.sha256
           if-no-files-found: warn
           retention-days: 14
