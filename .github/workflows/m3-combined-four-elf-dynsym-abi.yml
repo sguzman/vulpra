@@ -139,6 +139,48 @@ jobs:
           "$RUNNER_TEMP/abi-observer" "$RUNNER_TEMP/packages/full/extracted" "$RUNNER_TEMP/packages/lean/extracted" "$RUNNER_TEMP/audit/compiled-full-versus-lean-exported-dynsym.json"
           jq -e '.status=="compiled_full_vs_four_optin_elf_dynamic_exports_compared" and .original_full_elf_count==28 and .combined_lean_elf_count==28 and .full_exported_symbol_occurrences>0 and .lean_exported_symbol_occurrences>0 and .full_undefined_import_symbol_occurrences>0 and .lean_undefined_import_symbol_occurrences>0 and .text_sections_compared==28 and (.text_sections_equal + .text_sections_different)==28 and (.differing_text_section_byte_metrics|length)==.text_sections_different and (.differing_text_section_alignment|length)==.text_sections_different and .only_text_section_bytes_examined==true and (.per_elf|length)==28 and .actual_compiled_elf_dynamics_examined==true and .all_rust_cpp_ffi_and_static_symbols_proven==false and .runtime_dlopen_closure_proven==false and .binary_size_reduction_proven==false and .source_removal_authorized==false and .m3_sixth_gate_closed==false' "$RUNNER_TEMP/audit/compiled-full-versus-lean-exported-dynsym.json" >/dev/null
           jq -c '{exports:[.full_exported_symbol_occurrences,.lean_exported_symbol_occurrences],parity:.exact_exported_dynamic_abi_parity,differences:.changed_export_records,undefined_imports:[.full_undefined_import_symbol_occurrences,.lean_undefined_import_symbol_occurrences],import_parity:.exact_undefined_dynamic_import_parity,import_differences:.differing_undefined_import_records,text_sections_equal:.text_sections_equal,text_sections_different:.text_sections_different}' "$RUNNER_TEMP/audit/compiled-full-versus-lean-exported-dynsym.json"
+      - name: Verify actual compiled about studies contract absent only in opt-in lean native libxul
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          normal="$RUNNER_TEMP/packages/full/extracted/vulpra/libxul.so"
+          lean="$RUNNER_TEMP/packages/lean/extracted/vulpra/libxul.so"
+          studies='@mozilla.org/network/protocol/about;1?what=studies'
+          grep -aFq -- "$studies" "$normal"
+          set +e
+          grep -aFq -- "$studies" "$lean"
+          lean_studies_status=$?
+          set -e
+          test "$lean_studies_status" -eq 1
+          for retained in welcomeback profilemanager; do
+            contract="@mozilla.org/network/protocol/about;1?what=$retained"
+            grep -aFq -- "$contract" "$normal"
+            grep -aFq -- "$contract" "$lean"
+          done
+          jq -n --arg source "$SOURCE_SHA" '{
+            schema_version:1,
+            status:"original_compiled_native_aboutstudies_contract_literal_removed_as_guarded",
+            original_source_commit:$source,
+            full_aboutstudies_contract_present:true,
+            four_optin_lean_aboutstudies_contract_present:false,
+            retained_welcomeback_contract_present_in_both:true,
+            retained_profilemanager_contract_present_in_both:true,
+            real_packaged_compiled_libxul_read_only:true,
+            contract_lookup_actually_executed:false,
+            all_static_modules_proven:false,
+            source_removal_authorized:false,
+            m3_sixth_gate_closed:false
+          }' > "$RUNNER_TEMP/audit/original-compiled-aboutstudies-contract-strings.json"
+          jq -e '.full_aboutstudies_contract_present==true and
+            .four_optin_lean_aboutstudies_contract_present==false and
+            .retained_welcomeback_contract_present_in_both==true and
+            .retained_profilemanager_contract_present_in_both==true and
+            .real_packaged_compiled_libxul_read_only==true and
+            .contract_lookup_actually_executed==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/audit/original-compiled-aboutstudies-contract-strings.json" >/dev/null
       - name: Compare compiled libxul named dynamic-exported function bytes by symbol address
         shell: bash
         timeout-minutes: 8
@@ -325,9 +367,11 @@ jobs:
           set -euo pipefail
           jq -n \
             --slurpfile s "$RUNNER_TEMP/audit/original-xpcom-aboutstudies-contract-source.json" \
-            --slurpfile b "$RUNNER_TEMP/audit/compiled-libxul-hinge-assembly.json" '
+            --slurpfile b "$RUNNER_TEMP/audit/compiled-libxul-hinge-assembly.json" \
+            --slurpfile strings "$RUNNER_TEMP/audit/original-compiled-aboutstudies-contract-strings.json" '
             ($s[0]) as $source |
             ($b[0]) as $binary |
+            ($strings[0]) as $literal |
             if $source.normal_about_contracts==$binary.full_occurrences_of_changed_field_value and
                $source.four_optin_lean_about_contracts==$binary.lean_occurrences_of_changed_field_value and
                $source.about_contract_delta==($binary.indexed_native_table_full.index_record_count - $binary.indexed_native_table_lean.index_record_count) and
@@ -338,6 +382,10 @@ jobs:
                $binary.compiled_module_id_452_is_about_redirector==true and
                $binary.binary_module_452_full_about_redirector_cid.compiled_cid_bytes_exact_match==true and
                $binary.binary_module_452_lean_about_redirector_cid.compiled_cid_bytes_exact_match==true and
+               $literal.full_aboutstudies_contract_present==true and
+               $literal.four_optin_lean_aboutstudies_contract_present==false and
+               $literal.retained_welcomeback_contract_present_in_both==true and
+               $literal.retained_profilemanager_contract_present_in_both==true and
                $source.source_removal_authorized==false and
                $binary.source_removal_authorized==false
             then {
@@ -350,13 +398,14 @@ jobs:
               omitted_lean_about_contract:$source.excluded_lean_contract,
               raw_module_index_proven_from_unstripped_symbols:false,
               compiled_module_index_452_cid_directly_verified:true,
+              actual_compiled_contract_literal_and_two_retained_controls_verified:true,
               actual_full_contract_registry_execution_verified:false,
               source_pruning_authorized:false,
               m3_sixth_gate_closed:false
             } else error("Pinned XPCOM source and compiled contract-table change disagree")
             end
           ' > "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json"
-          jq -e '.schema_version==1 and .status=="pinned_original_xpcom_aboutstudies_contract_source_matches_native_36_to_35_delta" and .source_full_about_contracts==36 and .source_lean_about_contracts==35 and .compiled_full_anonymous_module_id_frequency==36 and .compiled_lean_anonymous_module_id_frequency==35 and .raw_module_index_proven_from_unstripped_symbols==false and .compiled_module_index_452_cid_directly_verified==true and .actual_full_contract_registry_execution_verified==false and .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
+          jq -e '.schema_version==1 and .status=="pinned_original_xpcom_aboutstudies_contract_source_matches_native_36_to_35_delta" and .source_full_about_contracts==36 and .source_lean_about_contracts==35 and .compiled_full_anonymous_module_id_frequency==36 and .compiled_lean_anonymous_module_id_frequency==35 and .raw_module_index_proven_from_unstripped_symbols==false and .compiled_module_index_452_cid_directly_verified==true and .actual_compiled_contract_literal_and_two_retained_controls_verified==true and .actual_full_contract_registry_execution_verified==false and .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json" >/dev/null
           jq -c '{source:[.source_full_about_contracts,.source_lean_about_contracts],native:[.compiled_full_anonymous_module_id_frequency,.compiled_lean_anonymous_module_id_frequency],omitted:.omitted_lean_about_contract}' \
             "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json"
@@ -373,5 +422,6 @@ jobs:
             ${{ runner.temp }}/audit/compiled-libxul-hinge-assembly.json
             ${{ runner.temp }}/audit/original-xpcom-aboutstudies-contract-source.json
             ${{ runner.temp }}/audit/pinned-source-to-native-xpcom-contract-crosswalk.json
+            ${{ runner.temp }}/audit/original-compiled-aboutstudies-contract-strings.json
           if-no-files-found: error
           retention-days: 14
