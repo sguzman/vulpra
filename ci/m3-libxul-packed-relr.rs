@@ -145,7 +145,7 @@ mod tests{
     fn relr_binary_base_and_bitmap_follow_elf64_rules(){
         // 0x1000 explicit, bitmap then two slots after the base.
         let (a,base)=expanded(&[0x1000,0b1011]).unwrap();
-        assert_eq!(a,[0x1000,0x1008,0x1020]);
+        assert_eq!(a,[0x1000,0x1008,0x1018]);
         assert_eq!(base,1);
         assert!(expanded(&[3]).is_err());
         assert!(expanded(&[0]).is_err());
