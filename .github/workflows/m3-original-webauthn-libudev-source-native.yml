@@ -1,0 +1,115 @@
+# Exact-source Firefox WebAuthn USB authenticator libudev dynamic loading:
+# reconstruct the 12-byte SONAME and RTLD_NOLOAD fallback register-call path
+# from the authenticated ORIGINAL compiled libxul.so without executing it.
+name: M3 Original WebAuthn Libudev Native Loader Source Match
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-webauthn-libudev-source-native.rs
+      - .github/workflows/m3-original-webauthn-libudev-source-native.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-pinned-original-webauthn-libudev-machine-route:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      LIBXUL_SHA: d6d1af9d377cab1f31bda6cfe05c52b945b21f0c37295636d0aca99fef4272cf
+      ORIGINAL_RUN: '40997075527'
+    steps:
+      - name: Checkout bounded Rust machine/source verifier only
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-webauthn-libudev-source-native.rs
+      - name: Checkout exact source commit with original WebAuthn Rust loader
+        uses: actions/checkout@v4
+        with:
+          path: original-source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/webauthn/libudev-sys/src/lib.rs
+            dom/webauthn/libudev-sys/Cargo.toml
+      - name: Verify immutable source provenance and source-bound native regression fixtures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          export M3_ORIGINAL_UDEV_SOURCE_FILE="$GITHUB_WORKSPACE/original-source/dom/webauthn/libudev-sys/src/lib.rs"
+          rustc --edition=2021 --test diagnostics/ci/m3-original-webauthn-libudev-source-native.rs \
+            -o "$RUNNER_TEMP/m3-original-webauthn-libudev-tests"
+          "$RUNNER_TEMP/m3-original-webauthn-libudev-tests"
+          rustc --edition=2021 -O diagnostics/ci/m3-original-webauthn-libudev-source-native.rs \
+            -o "$RUNNER_TEMP/m3-original-webauthn-libudev-auditor"
+      - name: Recover only immutable original libxul.so from SHA256-authenticated package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original" "$RUNNER_TEMP/package"
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xJf "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" \
+            -C "$RUNNER_TEMP/package" ./vulpra/libxul.so
+          test "$(stat -c '%s' "$RUNNER_TEMP/package/vulpra/libxul.so")" -eq 189486696
+          test "$(sha256sum "$RUNNER_TEMP/package/vulpra/libxul.so" | cut -d ' ' -f 1)" = "$LIBXUL_SHA"
+      - name: Prove exact original libudev constructed SONAME and two native dlopen machine calls
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/m3-original-webauthn-libudev-auditor" "$SOURCE_SHA" "$ARCHIVE_SHA" \
+            original-source/dom/webauthn/libudev-sys/src/lib.rs \
+            "$RUNNER_TEMP/package/vulpra/libxul.so" \
+            "$RUNNER_TEMP/m3-original-webauthn-libudev-source-native.json"
+          jq -e --arg sha "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" --arg elf "$LIBXUL_SHA" '
+            .schema_version==1 and
+            .status=="original_webauthn_libudev_source_to_native_register_dlopen_candidate_verified" and
+            .original_source_commit==$sha and
+            .original_archive_sha256==$archive and
+            .native_libxul_sha256==$elf and
+            .native_libxul_bytes==189486696 and
+            .original_source_path=="dom/webauthn/libudev-sys/src/lib.rs" and
+            .native_constructed_soname=="libudev.so.1" and
+            .source_conditional_lazy_library==true and
+            .source_libudev_udev_new_null_fallback==true and
+            .native_dlopen_got_glibc_2_2_5_relocation_verified==true and
+            .native_first_call_register_r14_address==160654927 and
+            .native_second_call_register_r14_address==160654948 and
+            .native_first_rtld_flags_hex=="0x105" and
+            .native_second_rtld_flags_conditional_hex==["0x101","0x105"] and
+            .source_ifnull_macro_evaluates_first_argument_twice_on_success==true and
+            .native_compiled_candidate_argument_verified==true and
+            .actual_webauthn_key_flow_executed==false and
+            .actual_runtime_libudev_soname_loaded==false and
+            .complete_dynamic_library_dependency_graph_verified==false and
+            .target_endeavouros_hyprland_verified==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-webauthn-libudev-source-native.json" >/dev/null
+          echo 'PASS: libudev.so.1 original WebAuthn lazy dynamic loader source/machine mapping; no full closure'
+      - name: Upload only bounded sanitized original source-to-machine evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-webauthn-libudev-source-machine
+          path: ${{ runner.temp }}/m3-original-webauthn-libudev-source-native.json
+          if-no-files-found: warn
+          retention-days: 14
