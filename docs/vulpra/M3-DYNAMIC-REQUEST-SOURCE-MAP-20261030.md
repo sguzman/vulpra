@@ -78,6 +78,20 @@ The report deliberately retains `complete_ffmpeg_function_set_verified:false`: i
 
 The **Arch container is not the user's EndeavourOS workstation**. Successful symbol binding does not establish an actual Wayland/Hyprland GPU or audio device, source feature activation in the compiled Firefox, full dynamic load dependency coverage, Arch host package-version reproducibility, or entire M3 gate completion. Explicit artifact flags `arch_container_abi_verified=true`, `arch_host_abi_verified=false`, and `m3_sixth_gate_closed=false` preserve these boundaries. No code was pruned.
 
+## Full observed transitive ELF edges for the three original graphical-only Arch library roots (2026-11-01 UTC)
+
+[Arch library-root edge CI 41267548152](https://github.com/sguzman/vulpra/actions/runs/41267548152) **PASSED**, [workflow lint 41267548302](https://github.com/sguzman/vulpra/actions/runs/41267548302) **PASSED**, artifact **13068206838** independently inspected. The source-pinned original Gecko `b1482404` and exact external `cubeb-pulse-rs` `88194f91` library/function probes still resolve **82/82 PulseAudio + 18/18 GBM + 1/1 DRM** source-requested function pointers in the real disposable Arch host libraries. The shared `ci/m3-arch-elf-needed-closure.rs` now recursively enumerates the `readelf -d` `DT_NEEDED` names on every host DSO resolved by glibc `ldd`, checking actual files, owners and named dependency targets. Exact report counts:
+
+| Actual Arch library root | Direct `DT_NEEDED` | Real ELF files examined | Resolved observed DSO-to-DSO edges | Missing |
+|---|---:|---:|---:|---:|
+| `libpulse.so.0` | 4 | 19 | 48 | 0 |
+| `libgbm.so.1` | 5 | 6 | 7 | 0 |
+| `libdrm.so.2` | 1 | 2 | 1 | 0 |
+
+All **56/56** reported per-root DSO edges resolved; totals **10 root-direct dependencies, 27 DSO/interpreter inspections, 56 edges** are **sums of individual root audits, not globally deduplicated library or edge totals**. The original FFmpeg63 Arch separate audit [41267318912](https://github.com/sguzman/vulpra/actions/runs/41267318912) verified 94 files and 277 observed edges for its own root. The shared inspector also passed the independent FFmpeg63 regression [41267525589](https://github.com/sguzman/vulpra/actions/runs/41267525589).
+
+The scope remains actual ELF `DT_NEEDED` transitively resolved from **known host runtime library roots**, not conditional `dlopen` calls reachable from the compiled Vulpra executable, user workstation/Hyprland libraries, actual audio/video device behavior, or safe engine-source removal. This does not close M3 acceptance gate 6.
+
 ## Original FFmpeg 63 ABI on disposable Arch Linux (2026-11-01 UTC)
 
 [Source-pinned real Arch x86-64 FFmpeg 63 CI 41266875131](https://github.com/sguzman/vulpra/actions/runs/41266875131) **PASSED**; [workflow lint 41266875168](https://github.com/sguzman/vulpra/actions/runs/41266875168) **PASSED**. The artifact **13068330122** was independently opened and checked. The exact original Gecko source commit `b1482404dfb8b01342990ee99ea3df0f9756b5f7` maps the Linux FFmpeg loader's generated `FFMPEG_MAX_MAJOR_VERSION=63` SONAME candidate to `libavcodec.so.63`. The native version-63 C++ `AV_FUNC` masks require **42** function names, with **28** `AV_FUNC_OPTION`/`AV_FUNC_OPTION_SILENT` names separately classified as optional. Using a disposable Arch x86-64 userland and an actual Arch `ffmpeg` package, the bounded Rust auditor used `dlopen(RTLD_NOW)`, invoked `avcodec_version` (major **63**, raw **4129126**), and resolved **42/42 mandatory and 28/28 optional names, 70/70 total, 0 missing**. Three Rust negative fixtures passed, as did the exact-source checkout checks. Arch base-image digest retained: `archlinux@sha256:e82623936fa1a69700b48e98b058df6eaab18b737c27473a7234a40fdecb9413`; rolling package versions were not frozen.
