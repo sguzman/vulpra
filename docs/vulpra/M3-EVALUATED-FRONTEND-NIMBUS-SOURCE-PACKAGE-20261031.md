@@ -389,6 +389,20 @@ Therefore **282,692 / 282,694 (99.9993%)** of original unwind-described code-ran
 
 Thus the exclusive layout transition occurs within a tightly bounded **944-byte window between those start offsets**, surrounding exactly two original unmatched FDE ranges. The FDE scan still covers only unwind-described intervals; many ranges at matching offsets have differing machine-code bytes, so the evidence does **not** establish a single inserted code sequence, source-level cause, same runtime semantics, or full native FFI/dlopen dependency closure. There is no authorization to prune any code based solely on this mapping. **Overall 61%, M3 5/6 (83%), Δ0pp.**
 
+### Exact native 32-byte layout delta explained by two anonymous unwind ranges
+
+[**Source-pinned full vs four-opt-in compiled native two-range/gap arithmetic 41255162049 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41255162049), [**workflow lint 41255162053 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41255162053). The follow-up read-only FDE inspector exposed **six** lean FDE intervals adjacent to the monotonic hinge, and a strict machine-checked independent `jq` audit reconciled the original two unmatched code-range lengths and the respective inter-range gaps. The final archived JSON was inspected, rather than relying on the workflow status alone.
+
+| Exact source-pinned compiled native component | Original `.text` | Combined four-opt-in lean `.text` | Difference |
+| --- | ---: | ---: | ---: |
+| First anonymous unwind-described range | **454 B** | **466 B** | **+12 B** |
+| Gap between these ranges | **10 B** | **14 B** | **+4 B** |
+| Second anonymous unwind-described range | **461 B** | **473 B** | **+12 B** |
+| Gap to next corresponding FDE boundary | **3 B** | **7 B** | **+4 B** |
+| **Total layout growth at the hinge** | | | **+32 B** |
+
+The first original and lean range share `.text` starting offset **11,654,896**. The next original FDE shift-only start at **11,655,824** matches the lean start at **11,655,856**, precisely +32 bytes. The exact `12 + 4 + 12 + 4 = 32` decomposition **fully accounts for the change in layout addresses after this transition**. The gaps are measured byte distances between FDE intervals; their contents and reasons for growth were **not** asserted to be padding instructions. Likewise these two ranges have no established named source owner or identical semantics. This explains an important compiled address-layout discrepancy but **does not** close full native/Rust/C++ FFI symbol equivalence, actual linker command reproducibility, or unobserved runtime `dlopen` dependencies; it permits no source pruning or new packaged-savings claim. **M3 remains 5/6 (83%), overall 61%, Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
