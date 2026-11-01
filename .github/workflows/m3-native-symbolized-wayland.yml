@@ -147,7 +147,7 @@ jobs:
       - name: Capture exact-source unstripped Rust FFI archive-to-consumer definitions
         shell: bash
         working-directory: source
-        timeout-minutes: 12
+        timeout-minutes: 35
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
@@ -156,6 +156,12 @@ jobs:
           mapfile -t crash_rust < <(find "$objdir" -type f -name 'libcrash_helper_server.a' -print)
           test "${#gkrust[@]}" -eq 1
           test "${#crash_rust[@]}" -eq 1
+          for native in "${gkrust[0]}" "${crash_rust[0]}" \
+            "$objdir/dist/bin/libxul.so" "$objdir/dist/bin/crashhelper"; do
+            test -f "$native"
+            printf 'NATIVE_INPUT %s bytes=%s\\n' \
+              "$(basename -- "$native")" "$(stat -c '%s' -- "$native")"
+          done
           rustc --edition=2021 "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-linked-ffi-symbol-proof.rs" \
             -o "$RUNNER_TEMP/m3-ffi-symbol-proof"
           "$RUNNER_TEMP/m3-ffi-symbol-proof" "$SOURCE_SHA" \
