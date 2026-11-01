@@ -235,6 +235,18 @@ jobs:
               .lean_remainder_divisor==651 and
               .identical_prime_multiply_immediate=="0x1000193"
             ) and
+            .indexed_native_table_full.index_record_stride_bytes==8 and
+            .indexed_native_table_lean.index_record_stride_bytes==8 and
+            .indexed_native_table_full.index_record_count==652 and
+            .indexed_native_table_lean.index_record_count==651 and
+            .indexed_native_table_full.first_word_distinct_count==652 and
+            .indexed_native_table_lean.first_word_distinct_count==651 and
+            .indexed_native_table_full.second_word_distinct_count==535 and
+            .indexed_native_table_lean.second_word_distinct_count==535 and
+            .indexed_native_table_full.aligned_tail_zero_bytes==0 and
+            .indexed_native_table_lean.aligned_tail_zero_bytes==8 and
+            .indexed_native_table_full.field_interpretation_proven==false and
+            .indexed_native_table_lean.field_interpretation_proven==false and
             .source_and_runtime_function_identity_proven==false and
             .compiled_hash_bucket_count_change_is_feature_proven==false and
             .all_native_code_or_static_ffi_proven==false and
