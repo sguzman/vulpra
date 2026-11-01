@@ -36,6 +36,6 @@ The parser was instead returned to its original **combined-trace initialized-nam
 
 ## Gate limits
 
-This is **bounded graph reachability** in an original compiled browser workload. It is not per-feature necessity, transitive host/library ABI or symbol version closure, full unexecuted `dlopen`/WebExtensions route coverage, a source-pruning authorization, a new compressed package saving, or native acceptance on the user's Arch/Hyprland workstation. The original ordinary-runner SIGSEGV remains unresolved pending the source-pinned symbol build.
+This is **bounded graph reachability** in an original compiled browser workload. It is not per-feature necessity, transitive host/library ABI or symbol version closure, full unexecuted `dlopen`/WebExtensions route coverage, a source-pruning authorization, a new compressed package saving, or native acceptance on the user's Arch/Hyprland workstation. The ordinary-runner crash described during this earlier investigation was subsequently **source-symbolized** as Firefox's deliberate `MOZ_Crash` when strict CI-only nonlocal-network access is refused; the ordinary-host offline and disconnected-namespace online ten-second graphical tests both **passed** in [the verified correction](M3-WAYLAND-SIGSEGV-20261030.md). The unresolved scope is ordinary-host online acceptance under that strict guard and target EndeavourOS/Hyprland behavior—not an unknown SIGSEGV source.
 
 **M3 is still 5/6 (83%), overall project 61%, session Δ0 percentage points.**
