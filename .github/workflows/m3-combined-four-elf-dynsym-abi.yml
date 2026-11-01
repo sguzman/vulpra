@@ -8,6 +8,7 @@ on:
       - ci/m3-combined-four-elf-dynsym-abi.rs
       - ci/m3-libxul-exported-function-bodies.rs
       - ci/m3-libxul-unwind-fde-shift.rs
+      - ci/m3-libxul-hinge-assembly.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +33,7 @@ jobs:
             ci/m3-combined-four-elf-dynsym-abi.rs
             ci/m3-libxul-exported-function-bodies.rs
             ci/m3-libxul-unwind-fde-shift.rs
+            ci/m3-libxul-hinge-assembly.rs
       - name: Compile and run Rust negative fixtures
         shell: bash
         run: |
@@ -47,6 +49,10 @@ jobs:
           "$RUNNER_TEMP/unwind-fde-test"
           rustc --edition=2021 -O ci/m3-libxul-unwind-fde-shift.rs -o "$RUNNER_TEMP/unwind-fde-observer"
           command -v readelf
+          rustc --edition=2021 --test ci/m3-libxul-hinge-assembly.rs -o "$RUNNER_TEMP/hinge-assembly-test"
+          "$RUNNER_TEMP/hinge-assembly-test"
+          rustc --edition=2021 -O ci/m3-libxul-hinge-assembly.rs -o "$RUNNER_TEMP/hinge-assembly-observer"
+          command -v objdump
           command -v objcopy
           command -v cmp
       - name: Authenticate independently compiled original full and lean packages
@@ -206,6 +212,38 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/audit/compiled-libxul-two-range-delta.json" >/dev/null
           jq -c '{full:.full_anonymous_range_lengths,lean:.lean_anonymous_range_lengths,range_growth:.code_range_length_growth,gap_growth:.inter_range_gap_growth,total:.total_accounted_delta}' "$RUNNER_TEMP/audit/compiled-libxul-two-range-delta.json"
+      - name: Verify original compiled two-hinge hash divisor arithmetic from native disassembly
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/hinge-assembly-observer" \
+            "$RUNNER_TEMP/packages/full/extracted/vulpra/libxul.so" \
+            "$RUNNER_TEMP/packages/lean/extracted/vulpra/libxul.so" \
+            "$RUNNER_TEMP/audit/compiled-libxul-hinge-assembly.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="pinned_actual_compiled_libxul_two_hinge_hash_divisors_explained" and
+            (.ranges|length)==2 and
+            all(.ranges[];
+              .full_instructions==115 and
+              .lean_instructions==120 and
+              .shared_mnemonic_subsequence_length==115 and
+              .added_lean_mnemonics==["mov","sub","shr","add","shr"] and
+              .removed_full_mnemonics==[] and
+              .full_remainder_divisor==652 and
+              .lean_remainder_divisor==651 and
+              .identical_prime_multiply_immediate=="0x1000193"
+            ) and
+            .source_and_runtime_function_identity_proven==false and
+            .compiled_hash_bucket_count_change_is_feature_proven==false and
+            .all_native_code_or_static_ffi_proven==false and
+            .runtime_dlopen_closure_proven==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/compiled-libxul-hinge-assembly.json" >/dev/null
+          jq -c '{hash_modulus_pairs:[.ranges[]|[.full_remainder_divisor,.lean_remainder_divisor]],instructions:[.ranges[]|[.full_instructions,.lean_instructions]]}' \
+            "$RUNNER_TEMP/audit/compiled-libxul-hinge-assembly.json"
       - name: Archive bounded comparison rather than compiled browser code
         if: success()
         uses: actions/upload-artifact@v4
@@ -216,5 +254,6 @@ jobs:
             ${{ runner.temp }}/audit/compiled-libxul-exported-function-bodies.json
             ${{ runner.temp }}/audit/compiled-libxul-unwind-fde-shift.json
             ${{ runner.temp }}/audit/compiled-libxul-two-range-delta.json
+            ${{ runner.temp }}/audit/compiled-libxul-hinge-assembly.json
           if-no-files-found: error
           retention-days: 14
