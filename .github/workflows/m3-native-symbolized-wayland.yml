@@ -159,7 +159,7 @@ jobs:
           for native in "${gkrust[0]}" "${crash_rust[0]}" \
             "$objdir/dist/bin/libxul.so" "$objdir/dist/bin/crashhelper"; do
             test -f "$native"
-            printf 'NATIVE_INPUT %s bytes=%s\\n' \
+            printf 'NATIVE_INPUT %s bytes=%s\n' \
               "$(basename -- "$native")" "$(stat -c '%s' -- "$native")"
           done
           rustc --edition=2021 "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-linked-ffi-symbol-proof.rs" \
