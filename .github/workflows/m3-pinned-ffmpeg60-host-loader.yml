@@ -67,6 +67,11 @@ jobs:
             .required_ffmpeg60_function_count>=20 and
             .resolved_ffmpeg60_required_functions==.required_ffmpeg60_function_count and
             .complete_ffmpeg60_required_function_set_verified==true and
+            .optional_ffmpeg60_request_count==27 and
+            .optional_ffmpeg60_resolved_function_count>=0 and
+            .optional_ffmpeg60_unavailable_function_count>=0 and
+            (.optional_ffmpeg60_resolved_function_count+.optional_ffmpeg60_unavailable_function_count)==27 and
+            .optional_ffmpeg60_functions_are_required==false and
             .complete_ffmpeg_function_set_verified==false and
             .original_vulpra_callsite_proven==false and
             .arch_host_abi_proven==false and
