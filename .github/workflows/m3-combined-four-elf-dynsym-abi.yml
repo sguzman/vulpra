@@ -52,6 +52,7 @@ jobs:
             toolkit/moz.configure
             xpcom/components/gen_static_components.py
             xpcom/components/StaticComponents.cpp.in
+            xpcom/components/StaticComponents.h
             xpcom/ds/PerfectHash.h
       - name: Compile and run Rust negative fixtures
         shell: bash
@@ -102,6 +103,7 @@ jobs:
             .source_cpp_route_guarded_by_normandy==true and
             .xpcom_perfecthash_contract_entries_verified==true and
             .xpcom_contract_entries_store_module_ids==true and
+            .compiled_module_array_index_and_cid_source_layout_verified==true and
             .compiled_raw_module_id_452_independently_named==false and
             .actual_compiled_binary_verified_by_this_source_guard==false and
             .unrelated_static_module_dependencies_verified==false and
@@ -302,6 +304,11 @@ jobs:
             .indexed_native_table_lean.field_interpretation_proven==false and
             .single_changed_uninterpreted_second_field_value==452 and
             .full_occurrences_of_changed_field_value==36 and
+            .compiled_module_id_452_is_about_redirector==true and
+            .binary_module_452_full_about_redirector_cid.compiled_cid_bytes_exact_match==true and
+            .binary_module_452_lean_about_redirector_cid.compiled_cid_bytes_exact_match==true and
+            .binary_module_452_full_about_redirector_cid.native_static_module_stride_bytes==28 and
+            .binary_module_452_lean_about_redirector_cid.native_static_module_stride_bytes==28 and
             .lean_occurrences_of_changed_field_value==35 and
             .source_and_runtime_function_identity_proven==false and
             .compiled_hash_bucket_count_change_is_feature_proven==false and
@@ -327,6 +334,10 @@ jobs:
                $binary.single_changed_uninterpreted_second_field_value==452 and
                $source.excluded_lean_contract=="@mozilla.org/network/protocol/about;1?what=studies" and
                $source.compiled_raw_module_id_452_independently_named==false and
+               $source.compiled_module_array_index_and_cid_source_layout_verified==true and
+               $binary.compiled_module_id_452_is_about_redirector==true and
+               $binary.binary_module_452_full_about_redirector_cid.compiled_cid_bytes_exact_match==true and
+               $binary.binary_module_452_lean_about_redirector_cid.compiled_cid_bytes_exact_match==true and
                $source.source_removal_authorized==false and
                $binary.source_removal_authorized==false
             then {
@@ -338,13 +349,14 @@ jobs:
               compiled_lean_anonymous_module_id_frequency:$binary.lean_occurrences_of_changed_field_value,
               omitted_lean_about_contract:$source.excluded_lean_contract,
               raw_module_index_proven_from_unstripped_symbols:false,
+              compiled_module_index_452_cid_directly_verified:true,
               actual_full_contract_registry_execution_verified:false,
               source_pruning_authorized:false,
               m3_sixth_gate_closed:false
             } else error("Pinned XPCOM source and compiled contract-table change disagree")
             end
           ' > "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json"
-          jq -e '.schema_version==1 and .status=="pinned_original_xpcom_aboutstudies_contract_source_matches_native_36_to_35_delta" and .source_full_about_contracts==36 and .source_lean_about_contracts==35 and .compiled_full_anonymous_module_id_frequency==36 and .compiled_lean_anonymous_module_id_frequency==35 and .raw_module_index_proven_from_unstripped_symbols==false and .actual_full_contract_registry_execution_verified==false and .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
+          jq -e '.schema_version==1 and .status=="pinned_original_xpcom_aboutstudies_contract_source_matches_native_36_to_35_delta" and .source_full_about_contracts==36 and .source_lean_about_contracts==35 and .compiled_full_anonymous_module_id_frequency==36 and .compiled_lean_anonymous_module_id_frequency==35 and .raw_module_index_proven_from_unstripped_symbols==false and .compiled_module_index_452_cid_directly_verified==true and .actual_full_contract_registry_execution_verified==false and .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json" >/dev/null
           jq -c '{source:[.source_full_about_contracts,.source_lean_about_contracts],native:[.compiled_full_anonymous_module_id_frequency,.compiled_lean_anonymous_module_id_frequency],omitted:.omitted_lean_about_contract}' \
             "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json"
