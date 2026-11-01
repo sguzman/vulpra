@@ -9,6 +9,7 @@ on:
       - ci/m3-libxul-exported-function-bodies.rs
       - ci/m3-libxul-unwind-fde-shift.rs
       - ci/m3-libxul-hinge-assembly.rs
+      - ci/m3-xpcom-contract-source-witness.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -34,6 +35,24 @@ jobs:
             ci/m3-libxul-exported-function-bodies.rs
             ci/m3-libxul-unwind-fde-shift.rs
             ci/m3-libxul-hinge-assembly.rs
+            ci/m3-xpcom-contract-source-witness.rs
+            ci/mozconfig-linux-m3-baseline
+            ci/mozconfig-linux-m3-combined-lean
+      - name: Checkout exact pinned original Mozilla XPCOM contract source only
+        uses: actions/checkout@v4
+        with:
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          path: original-contract-source
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            browser/components/about/components.conf
+            browser/components/about/AboutRedirector.cpp
+            browser/moz.configure
+            toolkit/moz.configure
+            xpcom/components/gen_static_components.py
+            xpcom/components/StaticComponents.cpp.in
+            xpcom/ds/PerfectHash.h
       - name: Compile and run Rust negative fixtures
         shell: bash
         run: |
@@ -52,9 +71,43 @@ jobs:
           rustc --edition=2021 --test ci/m3-libxul-hinge-assembly.rs -o "$RUNNER_TEMP/hinge-assembly-test"
           "$RUNNER_TEMP/hinge-assembly-test"
           rustc --edition=2021 -O ci/m3-libxul-hinge-assembly.rs -o "$RUNNER_TEMP/hinge-assembly-observer"
+          rustc --edition=2021 --test ci/m3-xpcom-contract-source-witness.rs -o "$RUNNER_TEMP/xpcom-contract-source-test"
+          "$RUNNER_TEMP/xpcom-contract-source-test"
+          rustc --edition=2021 -O ci/m3-xpcom-contract-source-witness.rs -o "$RUNNER_TEMP/xpcom-contract-source-observer"
           command -v objdump
           command -v objcopy
           command -v cmp
+      - name: Prove 36 full versus 35 lean original about:studies XPCOM contract source guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C original-contract-source rev-parse HEAD)" = "$SOURCE_SHA"
+          mkdir -p "$RUNNER_TEMP/audit"
+          "$RUNNER_TEMP/xpcom-contract-source-observer" \
+            "$GITHUB_WORKSPACE/original-contract-source" \
+            "$GITHUB_WORKSPACE/ci/mozconfig-linux-m3-baseline" \
+            "$GITHUB_WORKSPACE/ci/mozconfig-linux-m3-combined-lean" \
+            "$RUNNER_TEMP/audit/original-xpcom-aboutstudies-contract-source.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="pinned_original_normandy_aboutstudies_contract_source_guard" and
+            .unconditional_about_pages==31 and
+            .selectable_profile_pages==4 and
+            .full_normandy_only_pages==1 and
+            .normal_about_contracts==36 and
+            .four_optin_lean_about_contracts==35 and
+            .about_contract_delta==1 and
+            .excluded_lean_contract=="@mozilla.org/network/protocol/about;1?what=studies" and
+            .about_redirector_constructor_preserved==true and
+            .source_cpp_route_guarded_by_normandy==true and
+            .xpcom_perfecthash_contract_entries_verified==true and
+            .xpcom_contract_entries_store_module_ids==true and
+            .compiled_raw_module_id_452_independently_named==false and
+            .actual_compiled_binary_verified_by_this_source_guard==false and
+            .unrelated_static_module_dependencies_verified==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/original-xpcom-aboutstudies-contract-source.json" >/dev/null
       - name: Authenticate independently compiled original full and lean packages
         shell: bash
         env:
@@ -259,6 +312,42 @@ jobs:
           ' "$RUNNER_TEMP/audit/compiled-libxul-hinge-assembly.json" >/dev/null
           jq -c '{hash_modulus_pairs:[.ranges[]|[.full_remainder_divisor,.lean_remainder_divisor]],instructions:[.ranges[]|[.full_instructions,.lean_instructions]]}' \
             "$RUNNER_TEMP/audit/compiled-libxul-hinge-assembly.json"
+      - name: Reconcile pinned source about studies contract delta with actual compiled native hash table
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n \
+            --slurpfile s "$RUNNER_TEMP/audit/original-xpcom-aboutstudies-contract-source.json" \
+            --slurpfile b "$RUNNER_TEMP/audit/compiled-libxul-hinge-assembly.json" '
+            ($s[0]) as $source |
+            ($b[0]) as $binary |
+            if $source.normal_about_contracts==$binary.full_occurrences_of_changed_field_value and
+               $source.four_optin_lean_about_contracts==$binary.lean_occurrences_of_changed_field_value and
+               $source.about_contract_delta==($binary.indexed_native_table_full.index_record_count - $binary.indexed_native_table_lean.index_record_count) and
+               $binary.single_changed_uninterpreted_second_field_value==452 and
+               $source.excluded_lean_contract=="@mozilla.org/network/protocol/about;1?what=studies" and
+               $source.compiled_raw_module_id_452_independently_named==false and
+               $source.source_removal_authorized==false and
+               $binary.source_removal_authorized==false
+            then {
+              schema_version:1,
+              status:"pinned_original_xpcom_aboutstudies_contract_source_matches_native_36_to_35_delta",
+              source_full_about_contracts:$source.normal_about_contracts,
+              source_lean_about_contracts:$source.four_optin_lean_about_contracts,
+              compiled_full_anonymous_module_id_frequency:$binary.full_occurrences_of_changed_field_value,
+              compiled_lean_anonymous_module_id_frequency:$binary.lean_occurrences_of_changed_field_value,
+              omitted_lean_about_contract:$source.excluded_lean_contract,
+              raw_module_index_proven_from_unstripped_symbols:false,
+              actual_full_contract_registry_execution_verified:false,
+              source_pruning_authorized:false,
+              m3_sixth_gate_closed:false
+            } else error("Pinned XPCOM source and compiled contract-table change disagree")
+            end
+          ' > "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json"
+          jq -e '.schema_version==1 and .status=="pinned_original_xpcom_aboutstudies_contract_source_matches_native_36_to_35_delta" and .source_full_about_contracts==36 and .source_lean_about_contracts==35 and .compiled_full_anonymous_module_id_frequency==36 and .compiled_lean_anonymous_module_id_frequency==35 and .raw_module_index_proven_from_unstripped_symbols==false and .actual_full_contract_registry_execution_verified==false and .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json" >/dev/null
+          jq -c '{source:[.source_full_about_contracts,.source_lean_about_contracts],native:[.compiled_full_anonymous_module_id_frequency,.compiled_lean_anonymous_module_id_frequency],omitted:.omitted_lean_about_contract}' \
+            "$RUNNER_TEMP/audit/pinned-source-to-native-xpcom-contract-crosswalk.json"
       - name: Archive bounded comparison rather than compiled browser code
         if: success()
         uses: actions/upload-artifact@v4
@@ -270,5 +359,7 @@ jobs:
             ${{ runner.temp }}/audit/compiled-libxul-unwind-fde-shift.json
             ${{ runner.temp }}/audit/compiled-libxul-two-range-delta.json
             ${{ runner.temp }}/audit/compiled-libxul-hinge-assembly.json
+            ${{ runner.temp }}/audit/original-xpcom-aboutstudies-contract-source.json
+            ${{ runner.temp }}/audit/pinned-source-to-native-xpcom-contract-crosswalk.json
           if-no-files-found: error
           retention-days: 14
