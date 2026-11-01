@@ -23,6 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: inspector
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-pinned-pulse-dlopen-source.rs
       - name: Checkout exact original Gecko source anchors
@@ -32,6 +33,7 @@ jobs:
           ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
           fetch-depth: 1
           filter: blob:none
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
             toolkit/library/rust/shared/Cargo.toml
             toolkit/library/rust/gkrust-features.mozbuild
@@ -44,6 +46,7 @@ jobs:
           path: cubeb-pulse
           ref: 88194f91c8778fa608a19af7b91306094525595d
           fetch-depth: 1
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
             Cargo.toml
             pulse-ffi
