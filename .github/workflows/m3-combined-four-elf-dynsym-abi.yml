@@ -205,12 +205,13 @@ jobs:
             .status=="source_matched_28_compiled_elf_dynamic_relocation_shape_compared" and
             .elf_files_compared==28 and
             (.per_elf|length)==28 and
-            .full_relocation_records>0 and
-            .lean_relocation_records>0 and
-            .full_named_relocation_occurrences>0 and
-            .lean_named_relocation_occurrences>0 and
-            .changed_per_elf_relocation_type_records>=0 and
-            .changed_per_elf_named_relocation_reference_records>=0 and
+            .full_relocation_records==46356 and
+            .lean_relocation_records==46356 and
+            .full_named_relocation_occurrences==8894 and
+            .lean_named_relocation_occurrences==8894 and
+            .changed_per_elf_relocation_type_records==0 and
+            .changed_per_elf_named_relocation_reference_records==0 and
+            .elf_paths_with_relocation_record_differences==0 and
             .actual_compiled_elf_relocation_sections_inspected==true and
             .relocation_offsets_and_addends_not_equated==true and
             .relocations_do_not_prove_static_ffi_or_runtime_bindings==true and
@@ -233,13 +234,15 @@ jobs:
             .status=="source_matched_original_native_libxul_packed_relr_decoded" and
             .normal_encoded_word_count==13206 and
             .lean_encoded_word_count==13206 and
+            .normal_relr_vma==.lean_relr_vma and
             .normal_direct_base_words==26 and
             .lean_direct_base_words==26 and
             .normal_decoded_target_addresses==478592 and
             .lean_decoded_target_addresses==478592 and
-            .same_encoded_word_values>=0 and
-            .identical_position_target_addresses>=0 and
-            .set_intersection_of_relocation_target_addresses>=0 and
+            .same_encoded_word_values==6884 and
+            .identical_position_target_addresses==0 and
+            .set_intersection_of_relocation_target_addresses==327359 and
+            .unique_position_shift_values==43 and
             (.top_relative_address_shift_counts|length)>0 and
             .all_decoded_target_offsets_sorted_unique==true and
             .same_relocation_targets_or_addends_proven==false and
@@ -250,6 +253,61 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/audit/compiled-libxul-packed-relr.json" >/dev/null
           jq -c '{records:[.normal_decoded_target_addresses,.lean_decoded_target_addresses],encoded_words:[.normal_encoded_word_count,.lean_encoded_word_count],common_target_offsets:.set_intersection_of_relocation_target_addresses,top_shifts:.top_relative_address_shift_counts[:3]}' "$RUNNER_TEMP/audit/compiled-libxul-packed-relr.json"
+      - name: Fail closed on combined original typed and packed relocation witness
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          jq -n \
+            --slurpfile typed "$RUNNER_TEMP/audit/compiled-28-elf-relocation-shape.json" \
+            --slurpfile relr "$RUNNER_TEMP/audit/compiled-libxul-packed-relr.json" '
+            ($typed[0]) as $a |
+            ($relr[0]) as $b |
+            if $a.elf_files_compared==28 and
+               $a.full_relocation_records==$a.lean_relocation_records and
+               $a.full_named_relocation_occurrences==$a.lean_named_relocation_occurrences and
+               $a.changed_per_elf_relocation_type_records==0 and
+               $a.changed_per_elf_named_relocation_reference_records==0 and
+               $a.elf_paths_with_relocation_record_differences==0 and
+               $b.normal_decoded_target_addresses==$b.lean_decoded_target_addresses and
+               $b.normal_encoded_word_count==$b.lean_encoded_word_count and
+               $b.all_decoded_target_offsets_sorted_unique==true and
+               $b.same_relocation_targets_or_addends_proven==false and
+               $a.complete_dlopen_closure_proven==false and
+               $b.complete_static_rust_cpp_ffi_verified==false and
+               $a.m3_sixth_gate_closed==false and $b.m3_sixth_gate_closed==false
+            then {
+              schema_version:1,
+              status:"original_compiled_28_elf_typed_and_packed_relocation_count_parity",
+              source_commit:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+              normal_typed_relocations:$a.full_relocation_records,
+              lean_typed_relocations:$a.lean_relocation_records,
+              normal_named_references:$a.full_named_relocation_occurrences,
+              lean_named_references:$a.lean_named_relocation_occurrences,
+              normal_packed_relr_targets:$b.normal_decoded_target_addresses,
+              lean_packed_relr_targets:$b.lean_decoded_target_addresses,
+              normal_combined_record_count:($a.full_relocation_records + $b.normal_decoded_target_addresses),
+              lean_combined_record_count:($a.lean_relocation_records + $b.lean_decoded_target_addresses),
+              actual_relocation_target_values_equivalent:false,
+              complete_rust_cpp_static_ffi_graph_proven:false,
+              all_runtime_dlopen_edges_proven:false,
+              source_removal_authorized:false,
+              m3_sixth_gate_closed:false
+            } else error("Typed/packed relocation census no longer reconciles") end
+          ' > "$RUNNER_TEMP/audit/original-compiled-typed-packed-relocation-crosswalk.json"
+          jq -e '
+            .status=="original_compiled_28_elf_typed_and_packed_relocation_count_parity" and
+            .normal_typed_relocations==46356 and .lean_typed_relocations==46356 and
+            .normal_named_references==8894 and .lean_named_references==8894 and
+            .normal_packed_relr_targets==478592 and .lean_packed_relr_targets==478592 and
+            .normal_combined_record_count==524948 and .lean_combined_record_count==524948 and
+            .actual_relocation_target_values_equivalent==false and
+            .complete_rust_cpp_static_ffi_graph_proven==false and
+            .all_runtime_dlopen_edges_proven==false and
+            .source_removal_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/original-compiled-typed-packed-relocation-crosswalk.json" >/dev/null
+          jq -c '{typed:.normal_typed_relocations,packed:.normal_packed_relr_targets,total:.normal_combined_record_count}' \
+            "$RUNNER_TEMP/audit/original-compiled-typed-packed-relocation-crosswalk.json"
       - name: Compare compiled libxul named dynamic-exported function bytes by symbol address
         shell: bash
         timeout-minutes: 8
@@ -494,5 +552,6 @@ jobs:
             ${{ runner.temp }}/audit/original-compiled-aboutstudies-contract-strings.json
             ${{ runner.temp }}/audit/compiled-28-elf-relocation-shape.json
             ${{ runner.temp }}/audit/compiled-libxul-packed-relr.json
+            ${{ runner.temp }}/audit/original-compiled-typed-packed-relocation-crosswalk.json
           if-no-files-found: error
           retention-days: 14
