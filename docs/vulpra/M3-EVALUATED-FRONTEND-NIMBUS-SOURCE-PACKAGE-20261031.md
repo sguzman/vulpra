@@ -464,6 +464,23 @@ This closes the **source ownership and generated-code explanation of the specifi
 
 The machine crosswalk checks the string census against **36→35** original source contract declarations, **36→35** compiled AboutRedirector ModuleID `452` occurrences, and the **exact CID equality at `gStaticModules[452]` in both compiled browser packages**. It therefore demonstrates a specific intentional **Normandy-disabled `about:studies` native contract omission** while preserving two independently checked about-route controls. This is evidence of compiled **literal presence/absence and generated registration ownership**, **not an executed XPCOM lookup test**, a claim that the page loads successfully in normal builds, or a complete audit of all protected browser features. The remaining Rust/C++ FFI, other native linker inputs, and conditional `dlopen` closure are still unproved. No further source pruning, savings or sixth-gate credit; **overall 61%, M3 5/6 (83%), Δ0pp**.
 
+### Source-matched original compiled typed and packed ELF relocation coverage
+
+[**Actual original full-versus-four-opt-in 28-ELF native typed relocation and `libxul.so` packed RELR CI 41259530887 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41259530887), [**workflow lint 41259457000 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41259457000). Std-only Rust inspectors `ci/m3-original-native-relocation-shape.rs` and `ci/m3-libxul-packed-relr.rs` read both SHA-256-authenticated original-source native packages without executing browser code. All 28 exact matching packaged ELF paths were audited by GNU `readelf --wide --relocs`, and the additional packed `.relr.dyn` section of `libxul.so` was decoded explicitly from its original native ELF64 bytes. Negative fixtures passed. The archived bounded JSON reports from the final green run were downloaded and inspected.
+
+| Actually compiled source-matched relocation metric | Original full | Combined four-opt-in lean | Per-record shape difference |
+| --- | ---: | ---: | --- |
+| Compiled ELF members examined | **28** | **28** | Same paths |
+| Ordinary typed ELF relocation records | **46,356** | **46,356** | **0** per-ELF relocation-type differences |
+| Named typed relocation-reference occurrences | **8,894** | **8,894** | **0** per-ELF named-reference differences |
+| Packed `libxul.so` ELF64 `.relr.dyn` encoded 64-bit words | **13,206** | **13,206** | Not identical byte-for-byte |
+| Decoded packed ELF64 relative relocation target offsets | **478,592** | **478,592** | Counts match; target addresses differ |
+| **Ordinary typed + decoded packed target records** | **524,948** | **524,948** | Not a semantic graph-equivalence claim |
+
+Both `.relr.dyn` sections have **26** direct-base words and **478,592** sorted unique decoded relocation target addresses. **6,884 / 13,206** original packed words match the lean word at the same encoded index; **327,359** relocation target addresses occur in both sets, but **0** decoded target offsets match *at the same positional index*, consistent with data-section relocation and changed link layout. Alignment of positional target offsets produces **43 distinct delta values**; the most common lean-minus-full shift is **+8,224 bytes for 372,931** targets. These offsets are not imported symbol names, and positional matching cannot establish identical relocation ownership. The former typed-relocation inspector deliberately excluded packed RELR, so these two separate checks are needed to cover the observed original format.
+
+**Limit:** This strengthens the actual compiled ELF relocation *shape* inventory, which is more direct than previous mere `.dynsym` name parity, but it does **not** reveal relocated values/addends, prove resolved dynamic bindings, associate all internal C++/Rust FFI functions with retained source/build features, cover conditional `dlopen` routes, or establish runtime equivalence. Native linker/source pruning remains **not authorized**. No new package savings or additional M3 gate credit. **M3 5/6 (83%), overall Vulpra 61%, session Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
