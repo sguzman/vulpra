@@ -1,11 +1,12 @@
-# The protected NSS PKCS#11/FreeBL dynamic paths are source-candidates
-# for two OBSERVED native runtime edges. No in-browser callstack claim.
-name: M3 Original NSS Security Dynamic Source Routes
+# Four OBSERVED runtime edges to protected NSS and bundled FFVPX sources.
+# Exact-source candidates; no in-browser callstack or source pruning claim.
+name: M3 Original NSS and FFVPX Dynamic Source Routes
 on:
   push:
     branches: [main]
     paths:
       - ci/m3-original-nss-security-dlopen-source.rs
+      - ci/m3-original-ffvpx-dlopen-source.rs
       - .github/workflows/m3-original-nss-security-dlopen-source.yml
   workflow_dispatch:
 permissions:
@@ -30,6 +31,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-original-nss-security-dlopen-source.rs
+            ci/m3-original-ffvpx-dlopen-source.rs
       - name: Checkout only exact historical NSS native loader sources
         uses: actions/checkout@v4
         with:
@@ -44,6 +46,10 @@ jobs:
             security/nss/lib/freebl/genload.c
             security/nss/lib/freebl/blname.c
             security/nss/lib/freebl/manifest.mn
+            dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp
+            dom/media/platforms/PDMFactory.cpp
+            media/ffvpx/libavcodec/moz.build
+            media/ffvpx/libavutil/moz.build
       - name: Authenticate exactly one successful original compiled browser graphical observation
         shell: bash
         run: |
@@ -80,6 +86,12 @@ jobs:
             ([.loader_reported_dynamic_initialized_edges[] |
                select(.requester_basename=="libnspr4.so" and
                       .requested_library_basename=="libsoftokn3.so")] | length)==1 and
+            ([.loader_reported_dynamic_initialized_edges[] |
+               select(.requester_basename=="libnspr4.so" and
+                      .requested_library_basename=="libmozavcodec.so")] | length)==1 and
+            ([.loader_reported_dynamic_initialized_edges[] |
+               select(.requester_basename=="libnspr4.so" and
+                      .requested_library_basename=="libmozavutil.so")] | length)==1 and
             .complete_dlopen_graph_proven==false and
             .whole_m3_feature_dependency_gate_completed==false
           ' "$report" >/dev/null
@@ -106,12 +118,31 @@ jobs:
             .complete_dynamic_graph_verified==false and
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/m3-nss-original-dynamic-source-routes.json" >/dev/null
-      - name: Retain only bounded NSS source-candidate and original-run provenance
+          rustc --edition=2021 --test verifier/ci/m3-original-ffvpx-dlopen-source.rs \
+            -o "$RUNNER_TEMP/ffvpx-source-tests"
+          "$RUNNER_TEMP/ffvpx-source-tests"
+          rustc --edition=2021 verifier/ci/m3-original-ffvpx-dlopen-source.rs \
+            -o "$RUNNER_TEMP/ffvpx-source-proof"
+          "$RUNNER_TEMP/ffvpx-source-proof" "$ORIGINAL_SHA" original \
+            "$RUNNER_TEMP/m3-ffvpx-original-dynamic-source-routes.json"
+          jq -e --arg sha "$ORIGINAL_SHA" '
+            .source_commit==$sha and
+            .source_dynamic_roots_verified==2 and
+            .source_supported_bundled_ffvpx_roots==["libmozavcodec.so","libmozavutil.so"] and
+            .bundled_build_sources_verified==true and
+            .original_native_loader_observation_authenticated_separately==true and
+            .native_callsite_relocations_proven==false and
+            .all_runtime_loader_routes_proven==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-ffvpx-original-dynamic-source-routes.json" >/dev/null
+      - name: Retain bounded NSS and FFVPX source candidates with original-run provenance
         uses: actions/upload-artifact@v4
         with:
-          name: m3-original-nss-security-dynamic-source-provenance
+          name: m3-original-nss-and-ffvpx-dynamic-source-provenance
           path: |
             ${{ runner.temp }}/m3-nss-original-dynamic-source-routes.json
+            ${{ runner.temp }}/m3-ffvpx-original-dynamic-source-routes.json
             ${{ runner.temp }}/evidence-run.json
           if-no-files-found: error
           retention-days: 14
