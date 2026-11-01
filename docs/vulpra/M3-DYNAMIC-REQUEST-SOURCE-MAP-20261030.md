@@ -68,6 +68,16 @@ This verifies the **version-60 mandatory function-name resolution for the pinned
 
 The report deliberately retains `complete_ffmpeg_function_set_verified:false`: it does not test every codec version, non-`AV_FUNC` dynamic loading, actual decoding, or actual original Vulpra callsites and Arch/Hyprland host parity. No source removal or sixth-gate acceptance follows from this scoped result.
 
+## Independent disposable Arch Linux dynamic host ABI (2026-10-31)
+
+[Arch Linux x86-64 container CI 41266577521](https://github.com/sguzman/vulpra/actions/runs/41266577521) **PASSED** after a first attempt exposed an isolated bind-volume UID/permissions error; the corrected run executed the probes as the unprivileged CI volume owner with a **read-only root filesystem, no container network, all Linux capabilities dropped and `no-new-privileges`**. [Workflow lint 41266577514](https://github.com/sguzman/vulpra/actions/runs/41266577514) **PASSED**. The artifact **13067860323** preserves two bounded JSON reports and base image provenance, verified by independent artifact inspection.
+
+- Exact external pinned `cubeb-pulse-rs` revision `88194f91`: actual Arch `libpulse.so.0` exports and glibc `dlopen`/`dlsym` resolved **82/82** literal dynamic function requests, **0 missing**.
+- Exact original Gecko `b1482404` GTK DMA-BUF: actual Arch `libgbm.so.1` **18/18** and `libdrm.so.2` **1/1** source-declared glibc dynamic function requests resolved, **0 missing**.
+- **101/101** in-scope named dynamic functions resolved across the independent Arch container's actual libraries; source and runtime identity verified. Base image pulled at immutable recorded digest `archlinux@sha256:e82623936fa1a69700b48e98b058df6eaab18b737c27473a7234a40fdecb9413`, while downstream rolling package versions are not pinned.
+
+The **Arch container is not the user's EndeavourOS workstation**. Successful symbol binding does not establish an actual Wayland/Hyprland GPU or audio device, source feature activation in the compiled Firefox, full dynamic load dependency coverage, Arch host package-version reproducibility, or entire M3 gate completion. Explicit artifact flags `arch_container_abi_verified=true`, `arch_host_abi_verified=false`, and `m3_sixth_gate_closed=false` preserve these boundaries. No code was pruned.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
