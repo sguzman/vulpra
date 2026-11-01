@@ -12,6 +12,7 @@ on:
       - ci/m3-original-compiled-ffi-object-relocations.rs
       - ci/m3-original-linked-ffi-direct-calls.rs
       - ci/m3-original-compiled-ffmpeg-loader-call.rs
+      - ci/m3-original-compiled-loader-api-census.rs
       - ci/tests/m3-wayland-gdb-sanitize-test.sh
   workflow_dispatch:
 permissions:
@@ -47,6 +48,8 @@ jobs:
           "$RUNNER_TEMP/m3-ffi-final-link-call-tests"
           rustc --edition=2021 --test ci/m3-original-compiled-ffmpeg-loader-call.rs -o "$RUNNER_TEMP/m3-ffmpeg-loader-call-tests"
           "$RUNNER_TEMP/m3-ffmpeg-loader-call-tests"
+          rustc --edition=2021 --test ci/m3-original-compiled-loader-api-census.rs -o "$RUNNER_TEMP/m3-native-loader-census-tests"
+          "$RUNNER_TEMP/m3-native-loader-census-tests"
           test -f packaging/test-wayland.sh
           echo 'PASS: diagnostic contract only, not browser acceptance'
   compile-source-pinned-with-debug-symbols:
@@ -260,6 +263,39 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/m3-original-ffmpeg-loader-native-call.json" >/dev/null
           echo 'PASS: FFmpeg compiled loader direct NSPR branch; broader native feature/dlopen gate remains open'
+      - name: Census original native direct loader API callsites
+        shell: bash
+        working-directory: source
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          objdir="$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline"
+          rustc --edition=2021 "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-compiled-loader-api-census.rs" \
+            -o "$RUNNER_TEMP/m3-native-loader-census"
+          "$RUNNER_TEMP/m3-native-loader-census" "$SOURCE_SHA" \
+            "$objdir/dist/bin/libxul.so" \
+            "$RUNNER_TEMP/m3-original-compiled-loader-api-census.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .schema_version==1 and
+            .source_commit==$sha and
+            .binary=="libxul.so" and
+            (.unstripped_native_elf_sha256|test("^[a-f0-9]{64}$")) and
+            .status=="compiled_direct_loader_api_callsite_census" and
+            .direct_loader_branches>=1 and
+            .distinct_caller_loader_kind_records>=1 and
+            .independently_accepted_ffmpeg_to_nspr_call_count==1 and
+            (.direct_loader_callsite_records|length)==.distinct_caller_loader_kind_records and
+            .indirect_loader_calls_enumerated==false and
+            .every_dynamic_loader_api_enumerated==false and
+            .actual_dynamic_library_names_verified==false and
+            .conditional_runtime_routes_exercised==false and
+            .all_elf_consumers_covered==false and
+            .arch_workstation_verified==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-compiled-loader-api-census.json" >/dev/null
+          echo 'PASS: bounded original linked libxul loader-callsite census; indirect/runtime routes remain OPEN'
       - name: Stage fresh package and diagnose old and fresh on one runner
         shell: bash
         working-directory: source
@@ -291,6 +327,7 @@ jobs:
             ${{ runner.temp }}/m3-original-ffi-object-relocations.json
             ${{ runner.temp }}/m3-original-ffi-final-machine-call-targets.json
             ${{ runner.temp }}/m3-original-ffmpeg-loader-native-call.json
+            ${{ runner.temp }}/m3-original-compiled-loader-api-census.json
             ${{ runner.temp }}/fresh-native.tar.xz.sha256
           if-no-files-found: warn
           retention-days: 14
