@@ -181,8 +181,8 @@ fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
     use super::*;
     #[test]fn source_fails_without_lazy_or_no_load_guard(){
         assert!(source_witness("not the original source").is_err());
-        let source=include_str!("../dom/webauthn/libudev-sys/src/lib.rs");
-        source_witness(source).unwrap();
+        let source=std::fs::read_to_string(std::env::var("M3_ORIGINAL_UDEV_SOURCE_FILE").unwrap()).unwrap();
+        source_witness(&source).unwrap();
         assert!(source_witness(&source.replace("RTLD_NOLOAD","RTLD_MISSING")).is_err());
         assert!(source_witness(&source.replace("Library::open(\"libudev.so.1\")","Library::open(\"fake.so\")")).is_err());
     }
