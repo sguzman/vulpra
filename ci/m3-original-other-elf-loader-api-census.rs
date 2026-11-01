@@ -233,7 +233,7 @@ fn inspect(root:&Path)->Result<String,String> {
             format!("{{\"loader_api\":{},\"relocation_kind\":{},\"slots\":{}}}",json(api),json(kind),slots)
         }).collect::<Vec<_>>().join(",");
         let got=got_insns.iter().map(|((api,rel_kind,branch_kind,plt),n)|{
-            format!("{{\"loader_api\":{},\"relocation_kind\":{},\"branch_kind\":{},\"from_plt_stub\":{},\"instructions\":{}}}",json(api),json(rel_kind),json(branch_kind,plt,n)
+            format!("{{\"loader_api\":{},\"relocation_kind\":{},\"branch_kind\":{},\"from_plt_stub\":{},\"instructions\":{}}}",json(api),json(rel_kind),json(branch_kind),plt,n
         }).collect::<Vec<_>>().join(",");
         rows.push(format!("    {{\"elf_basename\":{},\"dynamic_undefined_loader_api_imports\":[{}],\"named_direct_loader_api_branches\":{},\"direct_branches\":[{}],\"loader_api_relocation_slots\":{},\"loader_api_relocations\":[{}],\"relocation_matched_got_indirect_instructions\":{},\"got_indirect_instructions\":[{}]}}",
             json(name),names,count,records,relocation_slots.len(),relocs,got_count,got));
@@ -306,6 +306,22 @@ void *example(void){void *a=dlopen("libx.so",0);return a?a:PR_LoadLibrary(1);}"#
         assert!(c.get(&("PR_LoadLibrary".to_owned(),"call".to_owned())).copied().unwrap_or(0)>=1);
         fs::write(&lib,b"not an elf").unwrap();
         assert!(!elf(&lib).unwrap());
+        fs::remove_dir_all(&d).unwrap();
+    }
+    #[test]fn real_compiled_got_indirect_positive_and_negative_fixture(){
+        let d=env::temp_dir().join(format!("vulpra-m3-other-got-{}",std::process::id()));
+        fs::create_dir_all(&d).unwrap();
+        let src=d.join("stub.c");let lib=d.join("libtest.so");
+        fs::write(&src,r#"extern void *dlopen(const char*,int);
+void *example(void){return dlopen("libx.so",0);}"#).unwrap();
+        assert!(Command::new("cc").args(["-shared","-fPIC","-O0","-fno-plt"])
+            .arg(&src).arg("-o").arg(&lib).status().unwrap().success());
+        let reloc=loader_relocations(&lib).unwrap();
+        assert!(reloc.values().any(|(api,kind)|api=="dlopen"&&kind=="GLOB_DAT"));
+        let got=got_indirect_insns(&lib,&reloc).unwrap();
+        assert!(got.iter().any(|((api,kind,branch,in_plt),n)|
+            api=="dlopen"&&kind=="GLOB_DAT"&&branch=="call"&&!*in_plt&&*n>=1));
+        assert_eq!(got_indirect_insns(&lib,&BTreeMap::new()).unwrap().values().copied().sum::<u64>(),0);
         fs::remove_dir_all(&d).unwrap();
     }
     #[test]fn absent_original_package_fails_closed(){
