@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - ci/m3-pinned-arch-ffmpeg63-host.rs
-      - ci/m3-arch-ffmpeg63-elf-needed-closure.rs
+      - ci/m3-arch-elf-needed-closure.rs
       - .github/workflows/m3-arch-ffmpeg63-original-abi.yml
   workflow_dispatch:
 permissions:
@@ -26,7 +26,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-pinned-arch-ffmpeg63-host.rs
-            ci/m3-arch-ffmpeg63-elf-needed-closure.rs
+            ci/m3-arch-elf-needed-closure.rs
       - name: Checkout exact original Gecko FFmpeg C++ source
         uses: actions/checkout@v4
         with:
@@ -47,9 +47,9 @@ jobs:
           rustc --edition=2021 --test inspector/ci/m3-pinned-arch-ffmpeg63-host.rs -o "$RUNNER_TEMP/ffmpeg63-fixtures"
           "$RUNNER_TEMP/ffmpeg63-fixtures"
           rustc --edition=2021 inspector/ci/m3-pinned-arch-ffmpeg63-host.rs -o "$RUNNER_TEMP/ffmpeg63-abi"
-          rustc --edition=2021 --test inspector/ci/m3-arch-ffmpeg63-elf-needed-closure.rs -o "$RUNNER_TEMP/ffmpeg63-needed-tests"
+          rustc --edition=2021 --test inspector/ci/m3-arch-elf-needed-closure.rs -o "$RUNNER_TEMP/ffmpeg63-needed-tests"
           "$RUNNER_TEMP/ffmpeg63-needed-tests"
-          rustc --edition=2021 inspector/ci/m3-arch-ffmpeg63-elf-needed-closure.rs -o "$RUNNER_TEMP/ffmpeg63-needed-closure"
+          rustc --edition=2021 inspector/ci/m3-arch-elf-needed-closure.rs -o "$RUNNER_TEMP/ffmpeg63-needed-closure"
       - name: Prepare disposable rolling Arch x86-64 FFmpeg host
         shell: bash
         run: |
