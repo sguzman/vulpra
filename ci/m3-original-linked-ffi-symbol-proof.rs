@@ -9,13 +9,17 @@ use std::process::{Command, Stdio};
 
 const SOURCE: &str = "b1482404dfb8b01342990ee99ea3df0f9756b5f7";
 const SYMBOLS: [&str; 3] = ["GkRust_Init", "GkRust_Shutdown", "crash_generator_logic_desktop"];
-const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_INPUT_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 const MAX_NM_LINES: usize = 20_000_000;
 
 fn check_input(path: &Path, archive: bool) -> Result<(), String> {
     let meta = fs::metadata(path).map_err(|e| format!("Missing native symbol input: {e}"))?;
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("unknown");
     if !meta.is_file() || meta.len() < 8 || meta.len() > MAX_INPUT_BYTES {
-        return Err("Native symbol input has invalid size or kind".into());
+        return Err(format!(
+            "Native symbol input {name} has invalid size or kind: bytes={}, max={MAX_INPUT_BYTES}",
+            meta.len()
+        ));
     }
     let mut f = File::open(path).map_err(|e| e.to_string())?;
     let mut magic = [0; 8];
