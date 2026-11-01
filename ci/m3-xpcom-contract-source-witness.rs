@@ -44,6 +44,7 @@ fn run()->Result<(),String>{
     let toolkit_config=file(original,"toolkit/moz.configure")?;
     let generator=file(original,"xpcom/components/gen_static_components.py")?;
     let static_cxx=file(original,"xpcom/components/StaticComponents.cpp.in")?;
+    let static_header=file(original,"xpcom/components/StaticComponents.h")?;
     let hash=file(original,"xpcom/ds/PerfectHash.h")?;
     let baseline=fs::read_to_string(&args[2]).map_err(|e|e.to_string())?;
     let lean=fs::read_to_string(&args[3]).map_err(|e|e.to_string())?;
@@ -85,6 +86,12 @@ fn run()->Result<(),String>{
         "compiled contract lookup")?;
     require(&static_cxx,"StaticComponents::InvalidateContractID",
         "compiled contract invalidation")?;
+    require(&static_header,"struct StaticModule {", "original XPCOM static module type")?;
+    require(&static_header,"nsID mCID;", "CID at start of XPCOM static module")?;
+    require(&static_header,"ModuleID ID() const { return ModuleID(this - gStaticModules); }",
+        "compiled static module ID by array index")?;
+    require(&static_header,"struct ContractEntry final {", "source contract index type")?;
+    require(&static_header,"ModuleID mModuleID;", "source contract to module reference")?;
     require(&hash,"FNV_OFFSET_BASIS = 0x811C9DC5",
         "source FNV basis")?;
     require(&hash,"FNV_PRIME = 16777619",
@@ -109,6 +116,7 @@ fn run()->Result<(),String>{
         \"source_cpp_route_guarded_by_normandy\":true,\
         \"xpcom_perfecthash_contract_entries_verified\":true,\
         \"xpcom_contract_entries_store_module_ids\":true,\
+        \"compiled_module_array_index_and_cid_source_layout_verified\":true,\
         \"compiled_raw_module_id_452_independently_named\":false,\
         \"actual_compiled_binary_verified_by_this_source_guard\":false,\
         \"unrelated_static_module_dependencies_verified\":false,\
