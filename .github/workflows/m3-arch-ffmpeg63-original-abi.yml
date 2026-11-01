@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - ci/m3-pinned-arch-ffmpeg63-host.rs
+      - ci/m3-arch-ffmpeg63-elf-needed-closure.rs
       - .github/workflows/m3-arch-ffmpeg63-original-abi.yml
   workflow_dispatch:
 permissions:
@@ -25,6 +26,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-pinned-arch-ffmpeg63-host.rs
+            ci/m3-arch-ffmpeg63-elf-needed-closure.rs
       - name: Checkout exact original Gecko FFmpeg C++ source
         uses: actions/checkout@v4
         with:
@@ -45,6 +47,9 @@ jobs:
           rustc --edition=2021 --test inspector/ci/m3-pinned-arch-ffmpeg63-host.rs -o "$RUNNER_TEMP/ffmpeg63-fixtures"
           "$RUNNER_TEMP/ffmpeg63-fixtures"
           rustc --edition=2021 inspector/ci/m3-pinned-arch-ffmpeg63-host.rs -o "$RUNNER_TEMP/ffmpeg63-abi"
+          rustc --edition=2021 --test inspector/ci/m3-arch-ffmpeg63-elf-needed-closure.rs -o "$RUNNER_TEMP/ffmpeg63-needed-tests"
+          "$RUNNER_TEMP/ffmpeg63-needed-tests"
+          rustc --edition=2021 inspector/ci/m3-arch-ffmpeg63-elf-needed-closure.rs -o "$RUNNER_TEMP/ffmpeg63-needed-closure"
       - name: Prepare disposable rolling Arch x86-64 FFmpeg host
         shell: bash
         run: |
@@ -73,6 +78,8 @@ jobs:
               test -f /usr/lib/libavcodec.so.63
               /reports/ffmpeg63-abi "'"$SOURCE_SHA"'" /work/pinned \
                 /usr/lib/libavcodec.so.63 /reports/m3-arch-ffmpeg63-original.json
+              /reports/ffmpeg63-needed-closure "'"$SOURCE_SHA"'" /usr/lib/libavcodec.so.63 \
+                /reports/m3-arch-ffmpeg63-transitive.json
             '
           jq -e --arg sha "$SOURCE_SHA" '
             .source_commit==$sha and
@@ -91,7 +98,18 @@ jobs:
             .real_video_decode_verified==false and
             .full_dependency_graph_verified==false and
             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-arch-ffmpeg63-original.json" >/dev/null
+          jq -e --arg sha "$SOURCE_SHA" '
+            .gecko_source_commit==$sha and
+            .userland=="archlinux-container-x86_64" and
+            .root=="libavcodec.so.63" and
+            .direct_elf_needed_count>=3 and
+            .resolved_glibc_ldd_name_count>=.direct_elf_needed_count and
+            .missing_direct_needed_count==0 and
+            .all_observed_ldd_bindings_resolved==true and
+            .complete_conditional_dlopen_graph_proven==false and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-arch-ffmpeg63-transitive.json" >/dev/null
           jq -c '{major:.ffmpeg_major,required:.resolved_mandatory_functions,optional:.resolved_optional_functions,unavailable_optional:.missing_optional_functions}' "$RUNNER_TEMP/m3-arch-ffmpeg63-original.json"
+          jq -c '{direct_needed:.direct_elf_needed_count,resolved_flat_ldd:.resolved_glibc_ldd_name_count,missing:.missing_direct_needed_count}' "$RUNNER_TEMP/m3-arch-ffmpeg63-transitive.json"
       - name: Retain only bounded JSON ABI and Arch base image provenance
         if: always()
         uses: actions/upload-artifact@v4
@@ -99,6 +117,7 @@ jobs:
           name: m3-original-arch-ffmpeg63-abi
           path: |
             ${{ runner.temp }}/m3-arch-ffmpeg63-original.json
+            ${{ runner.temp }}/m3-arch-ffmpeg63-transitive.json
             ${{ runner.temp }}/arch-image-base-digest.txt
           if-no-files-found: warn
           retention-days: 14
