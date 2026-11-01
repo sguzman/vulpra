@@ -84,10 +84,17 @@ jobs:
             .non_libxul_elves_with_direct_loader_branches>=0 and
             .non_libxul_direct_named_loader_api_branches>=0 and
             .non_libxul_direct_loader_api_branch_records>=0 and
+            .non_libxul_loader_api_dynamic_relocation_slots>=0 and
+            .non_libxul_elves_with_relocation_matched_got_indirect_insns>=0 and
+            .non_libxul_relocation_matched_got_indirect_insns>=0 and
+            ([.per_elf[].loader_api_relocation_slots]|add)==.non_libxul_loader_api_dynamic_relocation_slots and
+            ([.per_elf[].relocation_matched_got_indirect_instructions]|add)==.non_libxul_relocation_matched_got_indirect_insns and
+            ([.per_elf[]|select(.relocation_matched_got_indirect_instructions>0)]|length)==.non_libxul_elves_with_relocation_matched_got_indirect_insns and
             .no_executable_entrypoints_run==true and
             .only_selected_imports_and_named_direct_branches==true and
             .stripped_function_caller_attribution_proven==false and
             .indirect_loader_calls_enumerated==false and
+            .only_rip_relative_relocation_matched_indirects_audited==true and
             .runtime_library_argument_values_verified==false and
             .all_possible_dynamic_library_routes_proven==false and
             .target_endeavouros_hyprland_verified==false and
