@@ -1,0 +1,39 @@
+# Preflight the native FFI archive-to-ELF auditor against real GNU nm,
+# independent of the expensive pinned Firefox native compilation.
+name: M3 Native FFI GNU NM Archive ELF Fixtures
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-linked-ffi-symbol-proof.rs
+      - .github/workflows/m3-ffi-nm-archive-elf-fixture.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-tool-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only native symbol witness
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-linked-ffi-symbol-proof.rs
+      - name: Verify real GNU nm archive and ELF binding fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v cc
+          command -v ar
+          command -v nm
+          command -v rustc
+          rustc --edition=2021 --test ci/m3-original-linked-ffi-symbol-proof.rs \
+            -o "$RUNNER_TEMP/m3-ffi-real-nm-tests"
+          "$RUNNER_TEMP/m3-ffi-real-nm-tests"
+          rustc --edition=2021 ci/m3-original-linked-ffi-symbol-proof.rs \
+            -o "$RUNNER_TEMP/m3-original-linked-ffi-auditor"
+          test -x "$RUNNER_TEMP/m3-original-linked-ffi-auditor"
+          echo 'PASS: native FFI reader tested with actual GNU nm archive and ELF fixtures'
