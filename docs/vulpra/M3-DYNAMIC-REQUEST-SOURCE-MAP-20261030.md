@@ -48,6 +48,14 @@ The scoped host ABI studies were independently strengthened beyond static symbol
 
 These are genuine host-side loader operations on disposable Ubuntu 24.04 CI runners, not executed inside the compiled Vulpra process. They establish callable pointer *resolution*, **not** function correctness or successful device/audio initialization, original compiled feature activation, root-cause diagnosis for graphical SIGSEGV, or target Arch/Hyprland ABI. The sixth M3 gate remains open; no pruning or new savings.
 
+## Original FFmpeg 60 loader and host-version function (2026-10-31)
+
+[Exact original source + real Ubuntu host loader CI 41263175174](https://github.com/sguzman/vulpra/actions/runs/41263175174) **PASSED**, artifact **13065749110**; [workflow lint 41263175182](https://github.com/sguzman/vulpra/actions/runs/41263175182) **PASSED**. The new Rust verifier `ci/m3-pinned-ffmpeg60-host-loader.rs` checks exact Gecko source `b1482404` for the `libavcodec.so.60` candidate, NSPR `PR_LoadLibraryWithFlags(... PR_LD_NOW | PR_LD_LOCAL)`, handoff to `FFmpegLibWrapper::Link()`, C ABI declaration and `PR_FindSymbol(... "avcodec_version")`. Against actual Ubuntu 24.04 x86-64 `libavcodec.so.60`, glibc `dlopen` with `RTLD_NOW | RTLD_LOCAL` succeeded, `dlsym` resolved `avcodec_version`, and calling that C ABI function returned major version **60**. Rust negative fixtures reject missing original source or host inputs.
+
+This is actual **host-library initialization and one function call**, but it neither proves the original Vulpra process traversed this callsite nor resolves every version-gated required/optional FFmpeg function. It does not establish video-decoding behavior, Arch compatibility or other `dlopen` routes; no source removal or full M3 acceptance is authorized.
+
+Together, the scoped FFmpeg 60, PulseAudio and GTK DMA-BUF host experiments now cover the **three library names observed only in the original graphical loader workload**, but they do **not** turn three observed requests into a complete browser feature/dependency map. Their original source candidates, supported host bindings and incomplete runtime attribution remain explicitly separate.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
