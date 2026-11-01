@@ -2,7 +2,7 @@
 // Source-pinned native artifacts are authenticated by the surrounding workflow.
 // This is machine-code structural evidence, not source-function attribution or
 // instruction-level semantic equivalence.
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -139,7 +139,7 @@ fn compare(one:&[Instruction],two:&[Instruction],id:usize,normal_bytes:usize,lea
 // lea targets. Raw field values are uninterpreted: no source ownership claim.
 fn rodata_index_witness(
     elf: &Path, table_start: u64, next_array: u64, record_count: usize
-) -> Result<String,String> {
+) -> Result<(String,BTreeMap<u32,usize>),String> {
     let mut cmd=Command::new("readelf");
     cmd.args(["--wide","--section-headers","--"]).arg(elf);
     let output=tool_output(cmd)?;
@@ -171,21 +171,23 @@ fn rodata_index_witness(
     }
     let mut first=BTreeSet::new();
     let mut second=BTreeSet::new();
+    let mut second_frequency=BTreeMap::<u32,usize>::new();
     for rec in contents[..bytes].chunks_exact(8){
         let a=u32::from_le_bytes(rec[0..4].try_into().map_err(|_|"Bad table first word")?);
         let b=u32::from_le_bytes(rec[4..8].try_into().map_err(|_|"Bad table second word")?);
         first.insert(a);
         second.insert(b);
+        *second_frequency.entry(b).or_default()+=1;
     }
     if first.len()!=record_count || second.len()!=535 {
         return Err("Original native index table word cardinality changed".into());
     }
-    Ok(format!(
+    Ok((format!(
       "{{\"index_record_stride_bytes\":8,\"index_record_count\":{record_count},\
        \"first_word_distinct_count\":{},\"second_word_distinct_count\":{},\
        \"aligned_tail_zero_bytes\":{},\"field_interpretation_proven\":false}}",
       first.len(),second.len(),length-bytes
-    ))
+    ),second_frequency))
 }
 
 fn run()->Result<(),String>{
@@ -198,8 +200,14 @@ fn run()->Result<(),String>{
     if len_a!=EXPECTED_TEXT_FULL || len_b!=EXPECTED_TEXT_LEAN{
         return Err("Original source-pinned compiled libxul .text size drift".into());
     }
-    let full_table=rodata_index_witness(a,0x11faa40,0x11fbea0,652)?;
-    let lean_table=rodata_index_witness(b,0x11fc8c0,0x11fdd20,651)?;
+    let (full_table,full_frequency)=rodata_index_witness(a,0x11faa40,0x11fbea0,652)?;
+    let (lean_table,lean_frequency)=rodata_index_witness(b,0x11fc8c0,0x11fdd20,651)?;
+    let changed:Vec<_>=full_frequency.iter().filter(|(key,count)|lean_frequency.get(key)!=Some(count)).collect();
+    if full_frequency.len()!=lean_frequency.len() ||
+       changed.len()!=1 || *changed[0].0!=452 || *changed[0].1!=36 ||
+       lean_frequency.get(&452)!=Some(&35) {
+        return Err("Actual compiled static index second-field frequency drift differs from expected one-record delta".into());
+    }
     let mut records=Vec::new();
     for (idx,(of,lf,ol,ll)) in HINGES.iter().copied().enumerate(){
         let x=disassemble(a,addr_a,of,lf)?;
@@ -214,6 +222,9 @@ fn run()->Result<(),String>{
         \"runtime_dlopen_closure_proven\":false,\
         \"source_removal_authorized\":false,\"m3_sixth_gate_closed\":false,\
         \"indexed_native_table_full\":{full_table},\"indexed_native_table_lean\":{lean_table},\
+        \"single_changed_uninterpreted_second_field_value\":452,\
+        \"full_occurrences_of_changed_field_value\":36,\
+        \"lean_occurrences_of_changed_field_value\":35,\
         \"ranges\":[{}]}}\n",records.join(","));
     fs::write(&args[3],report).map_err(|e|e.to_string())?;
     println!("PASS: two original compiled native FDEs use 652 vs 651 hash divisor with 5 extra lean instructions each");
