@@ -411,6 +411,22 @@ Neither packaged `libxul.so` has `.symtab`, `.debug_info`, or `.debug_line` sect
 
 This manual bounded artifact inspection does not grant deletion authority, new packaged savings or the final M3 dependency-closure gate; **M3 5/6 (83%), overall 61%, Δ0pp.**
 
+### Actual compiled hash-divisor root cause of the two anonymous `libxul.so` code-range growths
+
+[**Independent original compiled ELF disassembly and hashed-divisor witness 41256689265 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41256689265), [**workflow lint 41256689254 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41256689254). The std-only Rust inspector `ci/m3-libxul-hinge-assembly.rs` uses system `objdump` to inspect only the two previously checksum-pinned source-matched full-vs-combined-lean `.text` FDE code intervals. Its synthetic opcode-sequence fixtures pass and its bounded result JSON was independently downloaded and inspected. This resolves **why the two native code ranges grew by 12 bytes each**, without relying on stripped names or claiming full source ownership.
+
+| Native code-range feature | Full normal original | Four-opt-in lean original |
+| --- | ---: | ---: |
+| First FDE range size / instructions | **454 B / 115** | **466 B / 120** |
+| Second FDE range size / instructions | **461 B / 115** | **473 B / 120** |
+| Integer remainder divisor embedded in both routines | **652 (`0x28c`)** | **651 (`0x28b`)** |
+| Reciprocal multiplication constant used by compiler | `0xc907da4f` | `0x92add007` |
+| Common 32-bit hash multiplication constant | `0x1000193` | `0x1000193` |
+
+Both FDE pairs retain the entire original **115-mnemonic ordered subsequence** and add exactly **five** lean mnemonics: `mov`, `sub`, `shr`, `add`, `shr`, with **none removed**. The changed reciprocal-division sequence implements remainder by **651 instead of 652**, accounting for the **+12 B in each routine** and hence the earlier fail-closed **12+4+12+4 = 32 B** layout decomposition. An independent deterministic 50,007-value arithmetic spot-check per divisor matched the modulo results; this is supportive local math, not exhaustive theorem proving.
+
+The native function input performs FNV-style byte mixing (same `0x1000193` prime), and the assembly references an adjacent indexed static table. A changed generated hash-table cardinality is a **plausible structural interpretation**, but **the exact Mozilla source feature/name of the one fewer entry, runtime behavior, and reason for the generated table change are not yet established**. Mnemonic ordered-subsequence equality does *not* prove identical operations or semantics: the compiler has changed division/remainder arithmetic by construction. The original packaged binaries remain stripped, lacking a reliable named source-function owner for these ranges. No new source pruning, savings, linker/FFI/dlopen closure or sixth-gate credit. Overall **61%**, M3 **5/6 (83%)**, Δ0pp.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
