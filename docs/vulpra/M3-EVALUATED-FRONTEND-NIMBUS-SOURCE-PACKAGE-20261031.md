@@ -364,6 +364,20 @@ There were **exactly 2 eligible named defined exported `FUNC` symbols** in each 
 
 **253,073 / 282,694 (89.5%)** of original unwind ranges have a same-length, exact FDE boundary witness **at the +32-byte position** in lean. This gives strong, function-like (unwind-described) structural evidence for the widespread linker/code-layout displacement, far beyond the **two** defined dynamic exported `FUNC` symbols. The 165,160 shifted-boundary matched but byte-different FDE code spans prevent claiming native bit identity; byte changes may include address-relative instructions, but their meaning is **not established**. FDE ranges need not cover every machine-code function, can overlap, and identical span byte totals cannot be treated as unique verified code coverage. No full executable linker/reproducibility or static Rust/C++ FFI graph, conditional `dlopen` closure, source pruning or further package savings; M3 stays **5/6 (83%)**, overall **61%**, Δ0pp.
 
+### Exclusive original ELF `.eh_frame` zero-vs-32-byte range reconciliation
+
+[**Exact source-matched compiled `libxul.so` FDE alignment partition 41254766335 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41254766335), [**lint 41254740114 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41254740114). The original source-pinned full versus four-opt-in lean native ELF verifier now counts each full-build FDE range **exactly once**, classified as matching the lean emitted FDE boundary at zero offset, +32 bytes, both offsets, or neither. The archived JSON passed fail-closed arithmetic checks and was inspected.
+
+| Mutually exclusive original `.text` unwind FDE classification | Full-origin distinct FDE ranges |
+| --- | ---: |
+| Zero offset only | **29,619** |
+| +32 bytes only | **244,952** |
+| Both placements | **8,121** |
+| Neither placement | **2** |
+| **Total** | **282,694** |
+
+Therefore **282,692 / 282,694 (99.9993%)** of original unwind-described code-range boundaries have at least one exact corresponding lean range at these two placements. **99,201** original FDE ranges also have equal actual machine-code bytes under at least one of the two placements (not unique function/code coverage). The regional one-eighth census is particularly diagnostic: in the **last seven eighths**, all **236,819** original FDE ranges have a +32-byte lean counterpart and **zero** fail both alignments. The **first eighth** contains 45,875 FDE ranges with 32,375 zero-offset matches, 16,254 shifted matches and **two** unmatched FDE boundaries (the zero/shift matches can overlap). This strongly narrows the native compiled layout-boundary discrepancy to an early transition; it does **not** prove a single inserted 32-byte instruction block, source reason, full code equivalence, disassembly equivalence, Rust/C++ FFI, actual linker command parity or arbitrary runtime `dlopen` coverage. No new pruning, size savings or full M3 sixth gate credit; **M3 5/6 (83%), overall 61%, Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
