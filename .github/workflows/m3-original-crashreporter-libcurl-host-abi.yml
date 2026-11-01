@@ -99,6 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm --network none --read-only --cap-drop ALL \
+            --user "$(id -u):$(id -g)" \
             --security-opt no-new-privileges --pids-limit 64 --memory 512m \
             -v "$RUNNER_TEMP/m3-libcurl-host-abi:/audit/probe:ro" \
             -v "$GITHUB_WORKSPACE/source/toolkit/crashreporter/client/app/src/net/libcurl.rs:/audit/source.rs:ro" \
