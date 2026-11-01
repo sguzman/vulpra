@@ -33,6 +33,12 @@ This proves the *exact-revision source route*, not that the observed glibc reque
 
 This establishes only one **source-revision-to-Ubuntu-host library ABI**. It does **not** confirm the original browser's exact evaluated `MOZ_PULSEAUDIO`, the compiled caller's actual `dlopen` route, successful initialization of PulseAudio, compatible symbol versions on other hosts, Arch/Hyprland compatibility, or the complete native graph. No additional source can be pruned and the M3 sixth gate remains open.
 
+## Original GTK DMA-BUF GBM/DRM host-function ABI (2026-10-31)
+
+[Real Ubuntu ELF CI 41262872037](https://github.com/sguzman/vulpra/actions/runs/41262872037) **PASSED**, artifact **13065778386**. The bounded `ci/m3-pinned-dmabuf-host-abi.rs` verifies original Gecko commit `b1482404` and examines its authentic `widget/gtk/DMABufDevice.cpp` literal runtime requests. The source loads both `libgbm.so.1` and `libdrm.so.2` conditionally. All **18/18** required GBM functions and **1/1** DRM function are present in the respective real Ubuntu 24.04 little-endian x86-64 host ELF dynamic export tables; zero missing. Fail-closed Rust parser and missing-export fixtures passed; [workflow lint 41262837965](https://github.com/sguzman/vulpra/actions/runs/41262837965) **PASSED**. The initial CI run failed on a Rust symbol-set type inference error, which was corrected at commit `01a022ec`; only the later successful run is accepted.
+
+This resolves the *source-to-specific-host dynamic function-name ABI* for both DMA-BUF libraries; it is **not** evidence of the browser's exact linked callsite, successful device operation, broader `dlopen` closure, full host/Arch symbol versions, or safe source removal. No whole M3 sixth-gate credit.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
