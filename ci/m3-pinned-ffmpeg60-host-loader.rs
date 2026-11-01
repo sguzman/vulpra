@@ -55,6 +55,61 @@ fn mandatory_60(root:&Path)->Result<Vec<String>,String>{
     if !(20..=100).contains(&selected.len()){return Err(format!("Unexpected required FFmpeg60 function count {}",selected.len()));}
     Ok(selected.into_iter().collect())
 }
+// Source-only optional capabilities are not promoted to mandatory; a missing
+// optional dlsym is recorded, not treated as a failed browser requirement.
+fn optional_60(root:&Path)->Result<Vec<String>,String>{
+    use std::collections::BTreeSet;
+    let src=fs::read_to_string(root.join("dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp"))
+        .map_err(|e|e.to_string())?;
+    let start=src.find("  AV_FUNC(av_lockmgr_register,").ok_or("Missing FFmpeg bindings")?;
+    let end=start+src[start..].find("#ifdef MOZ_WIDGET_ANDROID").ok_or("Missing platform boundary")?;
+    let chunk=&src[start..end];
+    let mut set=BTreeSet::new();
+    for prefix in ["AV_FUNC_OPTION(", "AV_FUNC_OPTION_SILENT("]{
+        let(mut at, mut seen)=(0usize,0usize);
+        while let Some(rel)=chunk[at..].find(prefix){
+            let begin=at+rel+prefix.len();
+            let(mut depth, mut closing)=(1i32,None);
+            for(i,b)in chunk.as_bytes()[begin..].iter().enumerate(){
+                match b{b'('=>depth+=1,b')'=>{depth-=1;if depth==0{closing=Some(begin+i);break;}},_=>{}}
+            }
+            let last=closing.ok_or("Unclosed optional FFmpeg macro")?;
+            let (name,mask)=chunk[begin..last].split_once(',').ok_or("No FFmpeg optional version mask")?;
+            let name=name.trim();
+            if !name.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_'){
+                return Err("Unexpected optional native function identifier".into());
+            }
+            if mask.split(|c:char|!c.is_ascii_alphanumeric()&&c!='_').any(
+                |x|matches!(x,"AV_FUNC_60"|"AV_FUNC_AVUTIL_60"|"AV_FUNC_AVCODEC_ALL"|"AV_FUNC_AVUTIL_ALL")){
+                if !set.insert(name.to_string()){return Err("Duplicate optional FFmpeg60 function".into());}
+            }
+            seen+=1;at=last+1;
+        }
+        if seen==0{return Err("Missing optional FFmpeg binding list".into());}
+    }
+    if set.len()!=27{return Err(format!("Expected 27 exact-source FFmpeg60 optional functions, got {}",set.len()));}
+    Ok(set.into_iter().collect())
+}
+#[cfg(target_os="linux")]
+fn resolve_optional_60(symbols:&[String])->Result<usize,String>{
+    use std::ffi::{CString,c_char,c_void};
+    #[link(name="dl")]unsafe extern "C"{
+        fn dlopen(name:*const c_char,flags:i32)->*mut c_void;
+        fn dlsym(handle:*mut c_void,name:*const c_char)->*mut c_void;
+        fn dlclose(handle:*mut c_void)->i32;
+    }
+    let name=CString::new("libavcodec.so.60").unwrap();
+    let handle=unsafe{dlopen(name.as_ptr(),2)};
+    if handle.is_null(){return Err("Optional FFmpeg probe could not open host codec".into());}
+    let mut matched=0usize;
+    for sym in symbols{
+        let key=CString::new(sym.as_str()).map_err(|e|e.to_string())?;
+        if !unsafe{dlsym(handle,key.as_ptr())}.is_null(){matched+=1;}
+    }
+    if unsafe{dlclose(handle)}!=0{return Err("Optional FFmpeg probe could not close host codec".into());}
+    Ok(matched)
+}
+
 #[cfg(target_os="linux")]
 fn resolve_required_60(symbols:&[String])->Result<usize,String>{
     use std::ffi::{CString,c_char,c_void};
@@ -122,8 +177,10 @@ fn run()->Result<(),String>{
     let version=runtime_version()?;
     let required=mandatory_60(Path::new(&args[2]))?;
     let resolved=resolve_required_60(&required)?;
+    let optional=optional_60(Path::new(&args[2]))?;
+    let optional_resolved=resolve_optional_60(&optional)?;
     fs::write(&args[4],format!(
-        "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{SOURCE}\",\n \"host_platform\":\"ubuntu-24.04-x86_64\",\n \"requested_library\":\"libavcodec.so.60\",\n \"glibc_rtld_now_load_passed\":true,\n \"avcodec_version_symbol_resolved_and_invoked\":true,\n \"avcodec_runtime_major\":60,\n \"avcodec_runtime_raw_version\":{},\n \"required_ffmpeg60_function_count\":{},\n \"resolved_ffmpeg60_required_functions\":{},\n \"complete_ffmpeg60_required_function_set_verified\":true,\n \"complete_ffmpeg_function_set_verified\":false,\n \"original_vulpra_callsite_proven\":false,\n \"arch_host_abi_proven\":false,\n \"all_dynamic_loading_paths_proven\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_removal_authorized\":false\n}}\n",version,required.len(),resolved
+        "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{SOURCE}\",\n \"host_platform\":\"ubuntu-24.04-x86_64\",\n \"requested_library\":\"libavcodec.so.60\",\n \"glibc_rtld_now_load_passed\":true,\n \"avcodec_version_symbol_resolved_and_invoked\":true,\n \"avcodec_runtime_major\":60,\n \"avcodec_runtime_raw_version\":{},\n \"required_ffmpeg60_function_count\":{},\n \"resolved_ffmpeg60_required_functions\":{},\n \"complete_ffmpeg60_required_function_set_verified\":true,\n \"optional_ffmpeg60_request_count\":{},\n \"optional_ffmpeg60_resolved_function_count\":{},\n \"optional_ffmpeg60_unavailable_function_count\":{},\n \"optional_ffmpeg60_functions_are_required\":false,\n \"complete_ffmpeg_function_set_verified\":false,\n \"original_vulpra_callsite_proven\":false,\n \"arch_host_abi_proven\":false,\n \"all_dynamic_loading_paths_proven\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_removal_authorized\":false\n}}\n",version,required.len(),resolved,optional.len(),optional_resolved,optional.len()-optional_resolved
     )).map_err(|e|e.to_string())?;
     println!("PASS: pinned FFmpeg 60 NSPR source load path and actual Ubuntu glibc RTLD_NOW avcodec_version major 60");
     Ok(())
@@ -136,6 +193,9 @@ fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
     }
     #[test]fn missing_mandatory_bindings_fail_closed(){
         assert!(mandatory_60(Path::new("/definitely-missing-gecko-root")).is_err());
+    }
+    #[test]fn missing_optional_source_fails_closed(){
+        assert!(optional_60(Path::new("/definitely-missing-gecko-root")).is_err());
     }
     #[test]fn missing_host_library_fails_closed(){
         assert!(check_host_so(Path::new("/definitely-missing-libavcodec60")).is_err());
