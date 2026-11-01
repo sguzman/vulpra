@@ -8,6 +8,7 @@ on:
       - .github/workflows/m3-native-symbolized-wayland.yml
       - ci/m3-symbolized-wayland-compare.sh
       - ci/m3-wayland-gdb-sanitize.awk
+      - ci/m3-original-linked-ffi-symbol-proof.rs
       - ci/tests/m3-wayland-gdb-sanitize-test.sh
   workflow_dispatch:
 permissions:
@@ -35,6 +36,8 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash -n ci/m3-symbolized-wayland-compare.sh
           bash ci/tests/m3-wayland-gdb-sanitize-test.sh
+          rustc --edition=2021 --test ci/m3-original-linked-ffi-symbol-proof.rs -o "$RUNNER_TEMP/m3-ffi-symbol-tests"
+          "$RUNNER_TEMP/m3-ffi-symbol-tests"
           test -f packaging/test-wayland.sh
           echo 'PASS: diagnostic contract only, not browser acceptance'
   compile-source-pinned-with-debug-symbols:
@@ -141,6 +144,26 @@ jobs:
           test -f "$linked"
           readelf -SW "$linked" | grep -Eq '[.]debug_info|[.]symtab'
           echo 'PASS: linked native libxul retains symbols; not browser acceptance'
+      - name: Capture exact-source unstripped Rust FFI archive-to-consumer definitions
+        shell: bash
+        working-directory: source
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          objdir="$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline"
+          mapfile -t gkrust < <(find "$objdir" -type f -name 'libgkrust.a' -print)
+          mapfile -t crash_rust < <(find "$objdir" -type f -name 'libcrash_helper_server.a' -print)
+          test "${#gkrust[@]}" -eq 1
+          test "${#crash_rust[@]}" -eq 1
+          rustc --edition=2021 "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-linked-ffi-symbol-proof.rs" \
+            -o "$RUNNER_TEMP/m3-ffi-symbol-proof"
+          "$RUNNER_TEMP/m3-ffi-symbol-proof" "$SOURCE_SHA" \
+            "${gkrust[0]}" "$objdir/dist/bin/libxul.so" \
+            "${crash_rust[0]}" "$objdir/dist/bin/crashhelper" \
+            "$RUNNER_TEMP/m3-original-ffi-symbol-definitions.json"
+          test -s "$RUNNER_TEMP/m3-original-ffi-symbol-definitions.json"
+          echo 'PASS: bounded FFI named-definition evidence; callsite and dlopen closure remain open'
       - name: Stage fresh package and diagnose old and fresh on one runner
         shell: bash
         working-directory: source
@@ -168,6 +191,7 @@ jobs:
           name: m3-symbolized-native-wayland-summary
           path: |
             ${{ runner.temp }}/symbolized-native-wayland-report.txt
+            ${{ runner.temp }}/m3-original-ffi-symbol-definitions.json
             ${{ runner.temp }}/fresh-native.tar.xz.sha256
           if-no-files-found: warn
           retention-days: 14
