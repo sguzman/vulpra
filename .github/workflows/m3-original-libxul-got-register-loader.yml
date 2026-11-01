@@ -1,0 +1,99 @@
+# Exact ORIGINAL source-pinned packaged libxul.so: selected loader GOT
+# relocations, non-PLT calls, PLT forwarding, and two register-indirect calls.
+# No original browser execution, no pruning and no full graph claim.
+name: M3 Original Libxul GOT Register Loader Machine Calls
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-libxul-got-register-loader.rs
+      - .github/workflows/m3-original-libxul-got-register-loader.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-stripped-libxul-loader-indirection:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      LIBXUL_SHA: d6d1af9d377cab1f31bda6cfe05c52b945b21f0c37295636d0aca99fef4272cf
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout only bounded Rust original ELF auditor
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-libxul-got-register-loader.rs
+      - name: Test actual instruction and relocation parser positive and negative fixtures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-original-libxul-got-register-loader.rs \
+            -o "$RUNNER_TEMP/m3-original-libxul-indirect-tests"
+          "$RUNNER_TEMP/m3-original-libxul-indirect-tests"
+          rustc --edition=2021 -O ci/m3-original-libxul-got-register-loader.rs \
+            -o "$RUNNER_TEMP/m3-original-libxul-indirect"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+      - name: Recover only original libxul.so from authenticated compiled package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original" "$RUNNER_TEMP/package"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xJf "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" \
+            -C "$RUNNER_TEMP/package" ./vulpra/libxul.so
+          test "$(stat -c '%s' "$RUNNER_TEMP/package/vulpra/libxul.so")" -eq 189486696
+          test "$(sha256sum "$RUNNER_TEMP/package/vulpra/libxul.so" | cut -d ' ' -f 1)" = "$LIBXUL_SHA"
+      - name: Prove real original stripped libxul loader RIP/GOT and register call witnesses
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/m3-original-libxul-indirect" "$SOURCE_SHA" "$ARCHIVE_SHA" \
+            "$RUNNER_TEMP/package/vulpra/libxul.so" \
+            "$RUNNER_TEMP/m3-original-libxul-got-register-native.json"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" --arg elf "$LIBXUL_SHA" '
+            .schema_version==1 and
+            .status=="original_stripped_libxul_compiled_loader_got_and_register_indirect_sequence_verified" and
+            .original_source_commit==$src and
+            .original_archive_sha256==$sha and
+            .original_stripped_libxul_sha256==$elf and
+            .original_stripped_libxul_bytes==189486696 and
+            .selected_exact_native_loader_dynamic_relocations==5 and
+            .selected_got_indirect_nonplt_calls==4 and
+            .selected_plt_loader_jumps==3 and
+            .selected_register_indirect_dlopen_calls==2 and
+            .selected_register_got_loads==1 and
+            .selected_compiled_nonplt_loader_calls==6 and
+            .all_verified_instruction_addresses_in_source_pinned_original_stripped_binary==true and
+            .no_browser_code_executed==true and
+            .actual_runtime_dlopen_soname_arguments_proven==false and
+            .all_register_indirect_loader_routes_enumerated==false and
+            .complete_native_loader_dependency_graph_proven==false and
+            .target_user_workstation_verified==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-libxul-got-register-native.json" >/dev/null
+          echo 'PASS: original libxul GOT and register loader callsites verified; no whole graph'
+      - name: Upload only bounded native callsite witness
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-libxul-loader-got-register-indirections
+          path: ${{ runner.temp }}/m3-original-libxul-got-register-native.json
+          if-no-files-found: warn
+          retention-days: 14
