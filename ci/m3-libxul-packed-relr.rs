@@ -23,8 +23,8 @@ fn section(elf:&Path)->Result<(u64,u64,usize),String>{
     for line in text.lines(){
         let c:Vec<_>=line.split_whitespace().collect();
         let Some(i)=c.iter().position(|x|*x==".relr.dyn") else{continue};
-        if i+4>=c.len()||c[i+1]!="PROGBITS"||found.is_some(){
-            return Err("Ambiguous non-PROGBITS original .relr.dyn section".into());
+        if i+4>=c.len()||!["PROGBITS","RELR"].contains(&c[i+1])||found.is_some(){
+            return Err(format!("Ambiguous or invalid original .relr.dyn header: {}",line.trim()));
         }
         let number=|j:usize|u64::from_str_radix(c[i+j],16).map_err(|e|e.to_string());
         let (addr,file_offset,length)=(number(2)?,number(3)?,number(4)?);
