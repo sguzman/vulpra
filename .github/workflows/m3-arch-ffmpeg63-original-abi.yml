@@ -1,0 +1,104 @@
+# Inspect original Gecko FFmpeg63 source against a real disposable Arch x86-64
+# FFmpeg 9 library, without touching the user's browser or machine.
+name: M3 Arch FFmpeg63 Original Runtime ABI
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-pinned-arch-ffmpeg63-host.rs
+      - .github/workflows/m3-arch-ffmpeg63-original-abi.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-arch-ffmpeg63:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+    steps:
+      - name: Checkout only current bounded Rust inspector
+        uses: actions/checkout@v4
+        with:
+          path: inspector
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-pinned-arch-ffmpeg63-host.rs
+      - name: Checkout exact original Gecko FFmpeg C++ source
+        uses: actions/checkout@v4
+        with:
+          path: pinned
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/media/platforms/ffmpeg/FFmpegRuntimeLinker.cpp
+            dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp
+            dom/media/platforms/ffmpeg/FFmpegLibWrapper.h
+      - name: Compile fail-closed original FFmpeg63 ABI auditor and fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C inspector rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C pinned rev-parse HEAD)" = "$SOURCE_SHA"
+          rustc --edition=2021 --test inspector/ci/m3-pinned-arch-ffmpeg63-host.rs -o "$RUNNER_TEMP/ffmpeg63-fixtures"
+          "$RUNNER_TEMP/ffmpeg63-fixtures"
+          rustc --edition=2021 inspector/ci/m3-pinned-arch-ffmpeg63-host.rs -o "$RUNNER_TEMP/ffmpeg63-abi"
+      - name: Prepare disposable rolling Arch x86-64 FFmpeg host
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull archlinux:base
+          docker image inspect --format '{{index .RepoDigests 0}}' archlinux:base > "$RUNNER_TEMP/arch-image-base-digest.txt"
+          cat > "$RUNNER_TEMP/Dockerfile.ffmpeg63" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed ffmpeg binutils
+          EOF
+          docker build -f "$RUNNER_TEMP/Dockerfile.ffmpeg63" \
+            -t vulpra-m3-arch-ffmpeg63:local "$RUNNER_TEMP"
+      - name: Exercise real Arch FFmpeg63 mandatory and optional function pointers
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only \
+            --user "$(id -u):$(id -g)" \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 128 \
+            -v "$GITHUB_WORKSPACE:/work:ro" \
+            -v "$RUNNER_TEMP:/reports" \
+            --entrypoint /bin/bash vulpra-m3-arch-ffmpeg63:local -c '
+              set -euo pipefail
+              grep -Fxq "ID=arch" /etc/os-release
+              test -f /usr/lib/libavcodec.so.63
+              /reports/ffmpeg63-abi "'"$SOURCE_SHA"'" /work/pinned \
+                /usr/lib/libavcodec.so.63 /reports/m3-arch-ffmpeg63-original.json
+            '
+          jq -e --arg sha "$SOURCE_SHA" '
+            .source_commit==$sha and
+            .host_platform=="archlinux-container-x86_64" and
+            .library=="libavcodec.so.63" and
+            .ffmpeg_major==63 and
+            .version_function_invoked==true and
+            .declared_mandatory_functions==42 and
+            .resolved_mandatory_functions==42 and
+            .missing_mandatory_functions==0 and
+            .declared_optional_functions==28 and
+            (.resolved_optional_functions+.missing_optional_functions)==28 and
+            .arch_container_loader_verified==true and
+            .user_arch_host_verified==false and
+            .compiled_browser_callsite_verified==false and
+            .real_video_decode_verified==false and
+            .full_dependency_graph_verified==false and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/m3-arch-ffmpeg63-original.json" >/dev/null
+          jq -c '{major:.ffmpeg_major,required:.resolved_mandatory_functions,optional:.resolved_optional_functions,unavailable_optional:.missing_optional_functions}' "$RUNNER_TEMP/m3-arch-ffmpeg63-original.json"
+      - name: Retain only bounded JSON ABI and Arch base image provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-arch-ffmpeg63-abi
+          path: |
+            ${{ runner.temp }}/m3-arch-ffmpeg63-original.json
+            ${{ runner.temp }}/arch-image-base-digest.txt
+          if-no-files-found: warn
+          retention-days: 14
