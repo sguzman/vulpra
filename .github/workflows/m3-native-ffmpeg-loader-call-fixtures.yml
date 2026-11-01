@@ -1,0 +1,40 @@
+name: M3 Native FFmpeg Loader Callsite Parser Fixtures
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-compiled-ffmpeg-loader-call.rs
+      - .github/workflows/m3-native-ffmpeg-loader-call-fixtures.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-callsite-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout scoped native Rust auditor
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-compiled-ffmpeg-loader-call.rs
+      - name: Verify real GNU ELF and fail-closed C++ fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-original-compiled-ffmpeg-loader-call.rs \
+            -o "$RUNNER_TEMP/m3-ffmpeg-nspr-tests"
+          "$RUNNER_TEMP/m3-ffmpeg-nspr-tests"
+          rustc --edition=2021 ci/m3-original-compiled-ffmpeg-loader-call.rs \
+            -o "$RUNNER_TEMP/m3-ffmpeg-nspr-proof"
+          if "$RUNNER_TEMP/m3-ffmpeg-nspr-proof" \
+               b1482404dfb8b01342990ee99ea3df0f9756b5f7 \
+               /unavailable/libxul.so "$RUNNER_TEMP/invalid.json"; then
+            echo "FAIL: absent compiled Firefox ELF must fail closed" >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/invalid.json"
+          echo "PASS: compiled synthetic ELF only, not original native Firefox proof"
