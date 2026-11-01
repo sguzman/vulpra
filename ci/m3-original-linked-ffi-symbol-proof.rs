@@ -130,6 +130,40 @@ mod tests {
         assert!(require(&m, &["GkRust_Init"], "fixture").is_err());
     }
     #[test]
+    fn real_gnu_nm_parses_c_archive_and_linked_elf() {
+        use std::process::Command;
+        let dir = std::env::temp_dir().join(format!(
+            "m3-ffi-real-nm-{}-{:?}", std::process::id(), std::thread::current().id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("ffi.c");
+        let object = dir.join("ffi.o");
+        let archive = dir.join("libgkrust.a");
+        let linked = dir.join("libxul.so");
+        fs::write(
+            &source,
+            "void GkRust_Init(void){}\\nvoid GkRust_Shutdown(void){}\\n",
+        ).unwrap();
+        let status = Command::new("cc")
+            .args(["-fPIC", "-c"])
+            .arg(&source).arg("-o").arg(&object)
+            .status().unwrap();
+        assert!(status.success(), "C compiler failed synthetic FFI fixture");
+        let status = Command::new("ar").arg("rcs").arg(&archive)
+            .arg(&object).status().unwrap();
+        assert!(status.success(), "ar failed synthetic Rust staticlib fixture");
+        let status = Command::new("cc").arg("-shared").arg(&object)
+            .arg("-o").arg(&linked).status().unwrap();
+        assert!(status.success(), "native ELF link failed");
+        let defined_archive = inspect(&archive, true).unwrap();
+        let defined_linked = inspect(&linked, false).unwrap();
+        require(&defined_archive, &SYMBOLS[..2], "synthetic gkrust").unwrap();
+        require(&defined_linked, &SYMBOLS[..2], "synthetic libxul").unwrap();
+        assert_eq!(defined_archive.len(), 2);
+        assert_eq!(defined_linked.len(), 2);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+    #[test]
     fn requires_real_elf_or_ar_magic() {
         let p = std::env::temp_dir().join(format!("m3-native-ffi-fixture-{}", std::process::id()));
         fs::write(&p, b"invalid!").unwrap();
