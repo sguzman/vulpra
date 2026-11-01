@@ -224,7 +224,7 @@ fn run() -> Result<(), String> {
         \"unwind_fde_neither_alignment\":{},\
         \"unwind_fde_identical_under_either\":{},\
         \"unwind_fde_eighth_bins\":[{buckets}],\
-        "unwind_fde_layout_transition\":{transition},\
+        \"unwind_fde_layout_transition\":{transition},\
         \"sum_of_fde_span_bytes_not_unique_code_coverage\":true,\
         \"only_unwind_described_code_ranges_examined\":true,\
         \"all_compiled_functions_or_rust_ffi_proven\":false,\
