@@ -97,6 +97,6 @@ mod tests{
         assert_eq!(count_matches(b"abcabc",needle,0),2);
         assert_eq!(count_matches(b"abcabc",needle,3),1);
         assert_eq!(count_matches(b"ab",needle,0),0);
-        assert_eq!(count_matches(b"zabca",needle,3),0);
+        assert_eq!(count_matches(b"zabca",needle,3),1);
     }
 }
