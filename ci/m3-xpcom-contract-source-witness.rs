@@ -125,7 +125,7 @@ mod tests{
     #[test]
     fn parse_declared_python_literal_pages(){
         let rows="pages = [\n    'foo',\n    'bar',\n]\n";
-        assert_eq!(list_entries(rows,"pages = [\n","\n]\n").unwrap(),["foo","bar"]);
+        assert_eq!(list_entries(rows,"pages = [\n","\n]\n").unwrap(),vec!["foo".to_owned(),"bar".to_owned()]);
         assert!(list_entries("pages = [\nfoo,\n]\n","pages = [\n","\n]\n").is_err());
     }
     #[test]
