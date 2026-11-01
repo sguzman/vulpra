@@ -62,6 +62,12 @@ Together, the scoped FFmpeg 60, PulseAudio and GTK DMA-BUF host experiments now 
 
 This verifies the **version-60 mandatory function-name resolution for the pinned original loader source on one Ubuntu host**, not optional GPU/media feature paths, actual video decode, complete FFmpeg version-family parity, originating browser call stacks, Arch/Hyprland host closure, or whole M3 completion.
 
+## Major-60 optional source-declared FFmpeg capabilities (2026-10-31)
+
+[Extended original-source + real-host check 41263892872 PASS](https://github.com/sguzman/vulpra/actions/runs/41263892872), artifact **13066377046**, [lint 41263892759 PASS](https://github.com/sguzman/vulpra/actions/runs/41263892759). The accepted JSON artifact reports **27/27** optional major-60 `AV_FUNC_OPTION` or `AV_FUNC_OPTION_SILENT` native function names resolved, with **zero unavailable**, separately from the already accepted **44/44 mandatory** bindings. The original Linux GTK-specific option block is included; Android-only functions are excluded. **71/71** in-scope original major-60 mandatory-plus-optional named function bindings resolved from actual Ubuntu 24.04 `libavcodec.so.60` through glibc. Source macro-scope count and original `avcodec_version` major verification are preserved.
+
+The report deliberately retains `complete_ffmpeg_function_set_verified:false`: it does not test every codec version, non-`AV_FUNC` dynamic loading, actual decoding, or actual original Vulpra callsites and Arch/Hyprland host parity. No source removal or sixth-gate acceptance follows from this scoped result.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
