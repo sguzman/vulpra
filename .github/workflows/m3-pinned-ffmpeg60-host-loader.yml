@@ -64,6 +64,9 @@ jobs:
             .glibc_rtld_now_load_passed==true and
             .avcodec_version_symbol_resolved_and_invoked==true and
             .avcodec_runtime_major==60 and
+            .required_ffmpeg60_function_count>=20 and
+            .resolved_ffmpeg60_required_functions==.required_ffmpeg60_function_count and
+            .complete_ffmpeg60_required_function_set_verified==true and
             .complete_ffmpeg_function_set_verified==false and
             .original_vulpra_callsite_proven==false and
             .arch_host_abi_proven==false and
