@@ -247,6 +247,9 @@ jobs:
             .indexed_native_table_lean.aligned_tail_zero_bytes==8 and
             .indexed_native_table_full.field_interpretation_proven==false and
             .indexed_native_table_lean.field_interpretation_proven==false and
+            .single_changed_uninterpreted_second_field_value==452 and
+            .full_occurrences_of_changed_field_value==36 and
+            .lean_occurrences_of_changed_field_value==35 and
             .source_and_runtime_function_identity_proven==false and
             .compiled_hash_bucket_count_change_is_feature_proven==false and
             .all_native_code_or_static_ffi_proven==false and
