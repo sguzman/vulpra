@@ -27,6 +27,12 @@ The exact external source closes the previously uninspected *source candidate* c
 
 This proves the *exact-revision source route*, not that the observed glibc request executed that specific call site. It does not verify the exact compiled `MOZ_PULSEAUDIO` value, native FFI/linker binding, runtime call stacks, Arch host compatibility, or the complete conditional dynamic-loading graph. It authorizes no source removal or new M3 gate credit.
 
+## Original pinned PulseAudio function ABI against an actual Ubuntu host (2026-10-31)
+
+[Real host ELF audit 41262701646](https://github.com/sguzman/vulpra/actions/runs/41262701646) **PASSED**, artifact **13064984891**; [workflow lint 41262701481](https://github.com/sguzman/vulpra/actions/runs/41262701481) **PASSED**. The new `ci/m3-pinned-pulse-host-abi.rs` parses all **82** literal `dlsym` function requests in the exact pinned `mozilla/cubeb-pulse-rs` commit `88194f91` and compares them to the **actual** little-endian x86-64 dynamic function exports of Ubuntu 24.04's `libpulse.so.0`, using binutils `nm -D`. **82/82 function names were found; zero were missing.** The source revision, x86-64 ELF identity, unique symbol names, fixture failures and bounded output are checked in CI.
+
+This establishes only one **source-revision-to-Ubuntu-host library ABI**. It does **not** confirm the original browser's exact evaluated `MOZ_PULSEAUDIO`, the compiled caller's actual `dlopen` route, successful initialization of PulseAudio, compatible symbol versions on other hosts, Arch/Hyprland compatibility, or the complete native graph. No additional source can be pruned and the M3 sixth gate remains open.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
