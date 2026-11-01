@@ -54,6 +54,30 @@ fn subset(label:&str,needed:&BTreeSet<String>,found:&BTreeSet<String>)->Result<(
     if !missing.is_empty(){return Err(format!("{label} missing host functions: {}",missing.join(",")));}
     Ok(())
 }
+// Additionally exercise real glibc library loading and per-name dlsym on the
+// Ubuntu runner. No browser code or hardware device is initialized.
+#[cfg(target_os="linux")]
+fn runtime_bindings(soname:&str, required:&BTreeSet<String>)->Result<usize,String>{
+    use std::ffi::{CString,c_char,c_void};
+    #[link(name="dl")]
+    unsafe extern "C"{
+        fn dlopen(name:*const c_char,flags:i32)->*mut c_void;
+        fn dlsym(handle:*mut c_void,name:*const c_char)->*mut c_void;
+        fn dlclose(handle:*mut c_void)->i32;
+    }
+    let name=CString::new(soname).map_err(|e|e.to_string())?;
+    let handle=unsafe{dlopen(name.as_ptr(),1)}; // RTLD_LAZY | RTLD_LOCAL
+    if handle.is_null(){return Err(format!("glibc cannot load {soname}"));}
+    let mut count=0;let mut missing=Vec::new();
+    for symbol in required{
+        let name=CString::new(symbol.as_str()).map_err(|e|e.to_string())?;
+        if unsafe{dlsym(handle,name.as_ptr())}.is_null(){missing.push(symbol.as_str());}
+        else{count+=1;}
+    }
+    let close=unsafe{dlclose(handle)};
+    if close!=0||!missing.is_empty(){return Err(format!("{soname} unresolved: {}",missing.join(",")));}
+    Ok(count)
+}
 fn run()->Result<(),String>{
     let args:Vec<String>=std::env::args().collect();
     if args.len()!=6||args[1]!=SOURCE{return Err("usage: dmabuf-host-abi SOURCE_SHA SOURCE_CPP LIBGBM_SO LIBDRM_SO OUTPUT_JSON".into());}
@@ -61,8 +85,11 @@ fn run()->Result<(),String>{
     let (gbm,drm)=symbols(&src)?;
     subset("libgbm.so.1",&gbm,&host(Path::new(&args[3]))?)?;
     subset("libdrm.so.2",&drm,&host(Path::new(&args[4]))?)?;
+    if runtime_bindings("libgbm.so.1",&gbm)?!=gbm.len()||runtime_bindings("libdrm.so.2",&drm)?!=drm.len(){
+        return Err("Incomplete glibc runtime symbol resolution".into());
+    }
     fs::write(&args[5],format!(
-        "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{SOURCE}\",\n \"host_platform\":\"ubuntu-24.04-x86_64\",\n \"requested_gbm_functions\":{},\n \"matched_gbm_exports\":{},\n \"requested_drm_functions\":{},\n \"matched_drm_exports\":{},\n \"missing_requested_functions\":0,\n \"direct_source_to_host_abi_proven\":true,\n \"compiled_browser_callstack_proven\":false,\n \"all_dynamic_loading_paths_proven\":false,\n \"arch_host_abi_proven\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_removal_authorized\":false\n}}\n",gbm.len(),gbm.len(),drm.len(),drm.len()
+        "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{SOURCE}\",\n \"host_platform\":\"ubuntu-24.04-x86_64\",\n \"requested_gbm_functions\":{},\n \"matched_gbm_exports\":{},\n \"requested_drm_functions\":{},\n \"matched_drm_exports\":{},\n \"missing_requested_functions\":0,\n \"direct_source_to_host_abi_proven\":true,\n \"glibc_dlopen_dlsym_resolved_all_functions\":true,\n \"compiled_browser_callstack_proven\":false,\n \"all_dynamic_loading_paths_proven\":false,\n \"arch_host_abi_proven\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_removal_authorized\":false\n}}\n",gbm.len(),gbm.len(),drm.len(),drm.len()
     )).map_err(|e|e.to_string())?;
     println!("PASS: exact-source 18 GBM + 1 DRM dynamic function names are exported by Ubuntu host ELFs");
     Ok(())
