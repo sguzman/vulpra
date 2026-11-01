@@ -40,11 +40,12 @@ fn classify(display:&str)->Option<usize>{
 fn candidates(path:&Path,crash:bool)->Result<BTreeMap<usize,String>,String>{
  check_elf(path)?;
  let mut child=Command::new("nm")
-   .args(["--defined-only","--extern-only","--no-demangle","--format=posix"])
+   .args(["--defined-only","--no-demangle","--format=posix"])
    .arg(path).stdout(Stdio::piped()).stderr(Stdio::null()).spawn()
    .map_err(|e|format!("GNU nm not available: {e}"))?;
  let stdout=child.stdout.take().ok_or("Missing nm output")?;
  let mut found=BTreeMap::new();let mut lines=0;let mut possible=0;
+ let mut candidate_hints=Vec::new();
  for line in BufReader::new(stdout).lines(){
    let line=line.map_err(|e|e.to_string())?;
    lines+=1;
@@ -55,7 +56,7 @@ fn candidates(path:&Path,crash:bool)->Result<BTreeMap<usize,String>,String>{
    let mut columns=line.split_whitespace();
    let Some(raw)=columns.next()else{continue};
    let Some(kind)=columns.next()else{continue};
-   if !matches!(kind,"T"|"W"){continue;}
+   if !matches!(kind,"T"|"t"|"W"|"w"){continue;}
    if !(raw.contains("NS_InitXPCOM")||raw.contains("NS_InitMinimalXPCOM")||
         raw.contains("ShutdownXPCOM")||raw=="main"){continue;}
    possible+=1;
@@ -63,7 +64,9 @@ fn candidates(path:&Path,crash:bool)->Result<BTreeMap<usize,String>,String>{
      let _=child.kill();let _=child.wait();
      return Err("Too many original native caller symbol candidates".into());
    }
-   if let Some(i)=classify(&demangle(raw)?){
+   let display=demangle(raw)?;
+   if candidate_hints.len()<12{candidate_hints.push(format!("{raw} [{kind}] -> {display}"));}
+   if let Some(i)=classify(&display){
      if (crash&&i!=3)||(!crash&&i==3){continue;}
      if found.insert(i,raw.to_owned()).is_some(){
        let _=child.kill();let _=child.wait();
@@ -73,7 +76,7 @@ fn candidates(path:&Path,crash:bool)->Result<BTreeMap<usize,String>,String>{
  }
  if !child.wait().map_err(|e|e.to_string())?.success(){return Err("GNU nm failed on linked native ELF".into());}
  for idx in if crash{3..4}else{0..3}{
-   if !found.contains_key(&idx){return Err(format!("Missing real native caller symbol {}",CALLERS[idx].0));}
+   if !found.contains_key(&idx){return Err(format!("Missing real native caller symbol {}; scanned {} text symbols, {} name candidates, examples: {}",CALLERS[idx].0,lines,possible,candidate_hints.join(" | ")));}
  }
  Ok(found)
 }
@@ -143,9 +146,9 @@ fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
    let a=dir.join("ffi.cpp");let b=dir.join("crash.cpp");
    fs::write(&a,r#"extern "C" __attribute__((noinline)) void GkRust_Init(){}
 extern "C" __attribute__((noinline)) void GkRust_Shutdown(){}
-extern "C" __attribute__((noinline)) void NS_InitXPCOM(){GkRust_Init();}
-extern "C" __attribute__((noinline)) void NS_InitMinimalXPCOM(){GkRust_Init();}
-namespace mozilla {__attribute__((noinline)) void ShutdownXPCOM(void*){GkRust_Shutdown();}}
+static __attribute__((used,noinline)) void NS_InitXPCOM(){GkRust_Init();}
+static __attribute__((used,noinline)) void NS_InitMinimalXPCOM(){GkRust_Init();}
+namespace mozilla {static __attribute__((used,noinline)) void ShutdownXPCOM(void*){GkRust_Shutdown();}}
 "#).unwrap();
    fs::write(&b,r#"extern "C" __attribute__((noinline)) int crash_generator_logic_desktop(){return 7;}
 int main(){return crash_generator_logic_desktop();}
