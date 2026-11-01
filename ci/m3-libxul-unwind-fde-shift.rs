@@ -172,6 +172,24 @@ fn boundary_transition(full: &BTreeSet<Range>, lean: &BTreeSet<Range>,
     let missing=no_alignment.iter().map(|(a,b)|format!(
         "{{\"original_text_offset_start\":{a},\"original_text_offset_end\":{b}}}"
     )).collect::<Vec<_>>().join(",");
+    let low=no_alignment.iter().map(|(a,_)|*a).min()
+        .ok_or("Missing numeric changed original FDE witness")?.saturating_sub(256);
+    let high=no_alignment.iter().map(|(_,b)|*b).max()
+        .ok_or("Missing numeric changed original FDE witness")?
+        .saturating_add(delta).saturating_add(256);
+    let mut nearby_lean=Vec::new();
+    for &(begin,end) in lean {
+        if begin>=low && begin<=high {
+            if nearby_lean.len()>=32 {
+                return Err("Too many nearby lean native FDEs for bounded hinge report".into());
+            }
+            nearby_lean.push(format!(
+                "{{\"lean_text_offset_start\":{begin},\"lean_text_offset_end\":{end},\"length\":{}}}",
+                end-begin
+            ));
+        }
+    }
+    let nearby_lean=nearby_lean.join(",");
     let bins=buckets.iter().enumerate().map(|(idx,c)|format!(
         "{{\"first_eighth_sixteenth\":{idx},\"original_fde_ranges\":{},\"zero_offset\":{},\"plus_32_offset\":{},\"neither\":{}}}",
         c[0],c[1],c[2],c[3]
@@ -182,6 +200,7 @@ fn boundary_transition(full: &BTreeSet<Range>, lean: &BTreeSet<Range>,
         \"zero_only_not_strictly_before_first_shift_count\":{late_zero},\
         \"shift_only_not_strictly_after_last_zero_count\":{early_shift},\
         \"unmatched_original_fde_offsets\":[{missing}],\
+        \"nearby_lean_fde_offsets\":[{nearby_lean}],\
         \"first_eighth_local_sixteenth_bins\":[{bins}],\
         \"code_offset_not_source_line_or_function_identity\":true}}"
     ))
