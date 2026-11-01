@@ -8,6 +8,7 @@ on:
       - .github/workflows/m3-arch-container-loader-abi.yml
       - ci/m3-pinned-pulse-host-abi.rs
       - ci/m3-pinned-dmabuf-host-abi.rs
+      - ci/m3-arch-elf-needed-closure.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +29,7 @@ jobs:
           sparse-checkout: |
             ci/m3-pinned-pulse-host-abi.rs
             ci/m3-pinned-dmabuf-host-abi.rs
+            ci/m3-arch-elf-needed-closure.rs
       - name: Checkout exact pinned original Gecko DMA-BUF source
         uses: actions/checkout@v4
         with:
@@ -60,6 +62,9 @@ jobs:
           "$RUNNER_TEMP/dmabuf-tests"
           rustc --edition=2021 inspector/ci/m3-pinned-pulse-host-abi.rs -o "$RUNNER_TEMP/pulse-abi-proof"
           rustc --edition=2021 inspector/ci/m3-pinned-dmabuf-host-abi.rs -o "$RUNNER_TEMP/dmabuf-abi-proof"
+          rustc --edition=2021 --test inspector/ci/m3-arch-elf-needed-closure.rs -o "$RUNNER_TEMP/arch-elf-needed-tests"
+          "$RUNNER_TEMP/arch-elf-needed-tests"
+          rustc --edition=2021 inspector/ci/m3-arch-elf-needed-closure.rs -o "$RUNNER_TEMP/arch-elf-needed-closure"
       - name: Build disposable actual Arch Linux dynamic libraries
         shell: bash
         run: |
@@ -95,6 +100,10 @@ jobs:
                 /work/pinned/widget/gtk/DMABufDevice.cpp \
                 /usr/lib/libgbm.so.1 /usr/lib/libdrm.so.2 \
                 /reports/arch-dmabuf-abi.json
+              for soname in libpulse.so.0 libgbm.so.1 libdrm.so.2; do
+                /reports/arch-elf-needed-closure "'"$SOURCE_SHA"'" \
+                  "/usr/lib/$soname" "/reports/arch-elf-$soname.json"
+              done
             '
           jq -e '
             .host_platform=="archlinux-container-x86_64" and
@@ -115,7 +124,22 @@ jobs:
             .arch_host_abi_proven==false and
             .all_dynamic_loading_paths_proven==false and
             .m3_sixth_gate_closed==false' "$RUNNER_TEMP/arch-dmabuf-abi.json" >/dev/null
-          echo 'PASS: actual Arch container dynamically loaded all 82 PulseAudio + 19 DMA-BUF symbols; not user host'
+          for soname in libpulse.so.0 libgbm.so.1 libdrm.so.2; do
+            jq -e --arg name "$soname" '
+              .gecko_source_commit=="b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
+              .userland=="archlinux-container-x86_64" and
+              .root==$name and
+              .direct_elf_needed_count>=1 and
+              .missing_direct_needed_count==0 and
+              .resolved_transitive_direct_edge_count>=1 and
+              .all_observed_transitive_direct_edges_resolved==true and
+              .complete_conditional_dlopen_graph_proven==false and
+              .original_browser_compiled_root_proven==false and
+              .target_workstation_verified==false and
+              .m3_sixth_gate_closed==false' "$RUNNER_TEMP/arch-elf-$soname.json" >/dev/null
+            jq -c '{root,direct:.direct_elf_needed_count,files:.resolved_transitive_elf_file_count,edges:.resolved_transitive_direct_edge_count,missing:.missing_direct_needed_count}' "$RUNNER_TEMP/arch-elf-$soname.json"
+          done
+          echo 'PASS: actual Arch container dynamically loaded 82 PulseAudio + 19 DMA-BUF functions and separately audited all observed ELF edges; not user host'
       - name: Upload only bounded ABI and base-image provenance
         if: always()
         uses: actions/upload-artifact@v4
@@ -124,6 +148,9 @@ jobs:
           path: |
             ${{ runner.temp }}/arch-pulse-abi.json
             ${{ runner.temp }}/arch-dmabuf-abi.json
+            ${{ runner.temp }}/arch-elf-libpulse.so.0.json
+            ${{ runner.temp }}/arch-elf-libgbm.so.1.json
+            ${{ runner.temp }}/arch-elf-libdrm.so.2.json
             ${{ runner.temp }}/arch-image-base-digest.txt
           if-no-files-found: warn
           retention-days: 14
