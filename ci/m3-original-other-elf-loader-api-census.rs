@@ -207,19 +207,36 @@ fn inspect(root:&Path)->Result<String,String> {
     let members=collect(root)?;
     let mut rows=Vec::new();let mut imported=0usize;let mut branch_total=0u64;let mut branch_files=0usize;let mut import_files=0usize;
     let mut record_count=0usize;
+    let mut reloc_count=0usize;let mut got_total=0u64;let mut got_files=0usize;
     for (name,path) in &members {
         if name=="libxul.so" {continue;}
         let imported_names=imports(path)?;
         let branch_counts=calls(path)?;
+        let relocation_slots=loader_relocations(path)?;
+        let got_insns=got_indirect_insns(path,&relocation_slots)?;
+        let got_count:u64=got_insns.values().copied().sum();
         let count: u64=branch_counts.values().copied().sum();
         if count>0 {branch_files+=1;}
         if !imported_names.is_empty(){import_files+=1;}
         branch_total+=count;imported+=imported_names.len();record_count+=branch_counts.len();
+        reloc_count+=relocation_slots.len();got_total+=got_count;
+        if got_count>0{got_files+=1;}
         let names=imported_names.iter().map(|s|json(s)).collect::<Vec<_>>().join(",");
         let records=branch_counts.iter().map(|((api,kind),count)|{
             format!("{{\"loader_api\":{},\"branch_kind\":{},\"native_branches\":{}}}",json(api),json(kind),count)
         }).collect::<Vec<_>>().join(",");
-        rows.push(format!("    {{\"elf_basename\":{},\"dynamic_undefined_loader_api_imports\":[{}],\"named_direct_loader_api_branches\":{},\"direct_branches\":[{}]}}",json(name),names,count,records));
+        let mut reloc_kinds=BTreeMap::<(String,String),u64>::new();
+        for (_, (api,kind)) in &relocation_slots {
+            *reloc_kinds.entry((api.clone(),kind.clone())).or_insert(0)+=1;
+        }
+        let relocs=reloc_kinds.iter().map(|((api,kind),slots)|{
+            format!("{{\"loader_api\":{},\"relocation_kind\":{},\"slots\":{}}}",json(api),json(kind),slots)
+        }).collect::<Vec<_>>().join(",");
+        let got=got_insns.iter().map(|((api,rel_kind,branch_kind,plt),n)|{
+            format!("{{\"loader_api\":{},\"relocation_kind\":{},\"branch_kind\":{},\"from_plt_stub\":{},\"instructions\":{}}}",json(api),json(rel_kind),json(branch_kind,plt,n)
+        }).collect::<Vec<_>>().join(",");
+        rows.push(format!("    {{\"elf_basename\":{},\"dynamic_undefined_loader_api_imports\":[{}],\"named_direct_loader_api_branches\":{},\"direct_branches\":[{}],\"loader_api_relocation_slots\":{},\"loader_api_relocations\":[{}],\"relocation_matched_got_indirect_instructions\":{},\"got_indirect_instructions\":[{}]}}",
+            json(name),names,count,records,relocation_slots.len(),relocs,got_count,got));
     }
     if rows.len()!=27 {return Err("Expected exact 27 non-libxul native ELF members".into());}
     Ok(format!(concat!(
@@ -233,17 +250,21 @@ fn inspect(root:&Path)->Result<String,String> {
         "  \"non_libxul_elves_with_direct_loader_branches\":{},\n",
         "  \"non_libxul_direct_named_loader_api_branches\":{},\n",
         "  \"non_libxul_direct_loader_api_branch_records\":{},\n",
+        "  \"non_libxul_loader_api_dynamic_relocation_slots\":{},\n",
+        "  \"non_libxul_elves_with_relocation_matched_got_indirect_insns\":{},\n",
+        "  \"non_libxul_relocation_matched_got_indirect_insns\":{},\n",
         "  \"per_elf\":[\n{}\n  ],\n",
         "  \"no_executable_entrypoints_run\":true,\n",
         "  \"only_selected_imports_and_named_direct_branches\":true,\n",
         "  \"stripped_function_caller_attribution_proven\":false,\n",
         "  \"indirect_loader_calls_enumerated\":false,\n",
+        "  \"only_rip_relative_relocation_matched_indirects_audited\":true,\n",
         "  \"runtime_library_argument_values_verified\":false,\n",
         "  \"all_possible_dynamic_library_routes_proven\":false,\n",
         "  \"target_endeavouros_hyprland_verified\":false,\n",
         "  \"source_pruning_authorized\":false,\n",
         "  \"m3_sixth_gate_closed\":false\n}}\n"
-    ),json(SOURCE),json(ARCHIVE),import_files,imported,branch_files,branch_total,record_count,rows.join(",\n")))
+    ),json(SOURCE),json(ARCHIVE),import_files,imported,branch_files,branch_total,record_count,reloc_count,got_files,got_total,rows.join(",\n")))
 }
 fn run()->Result<(),String>{
     let args:Vec<String>=env::args().collect();
