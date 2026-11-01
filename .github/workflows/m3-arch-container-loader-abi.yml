@@ -1,0 +1,128 @@
+# Disposable Arch Linux x86-64 userland validates a different distro's
+# actual native loader ABI. This is NOT user's EndeavourOS/Hyprland device.
+name: M3 Arch Container PulseAudio and DMA-BUF ABI
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-arch-container-loader-abi.yml
+      - ci/m3-pinned-pulse-host-abi.rs
+      - ci/m3-pinned-dmabuf-host-abi.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  arch-container-native-dlopen:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      CUBEB_SHA: 88194f91c8778fa608a19af7b91306094525595d
+    steps:
+      - name: Checkout bounded original-source inspectors
+        uses: actions/checkout@v4
+        with:
+          path: inspector
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-pinned-pulse-host-abi.rs
+            ci/m3-pinned-dmabuf-host-abi.rs
+      - name: Checkout exact pinned original Gecko DMA-BUF source
+        uses: actions/checkout@v4
+        with:
+          path: pinned
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            widget/gtk/DMABufDevice.cpp
+      - name: Checkout exact pinned external Rust cubeb PulseAudio source
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla/cubeb-pulse-rs
+          path: external
+          ref: 88194f91c8778fa608a19af7b91306094525595d
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            pulse-ffi/src/ffi_funcs.rs
+      - name: Build bounded Rust readers and verify exact sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C inspector rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C pinned rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git -C external rev-parse HEAD)" = "$CUBEB_SHA"
+          rustc --edition=2021 --test inspector/ci/m3-pinned-pulse-host-abi.rs -o "$RUNNER_TEMP/pulse-tests"
+          rustc --edition=2021 --test inspector/ci/m3-pinned-dmabuf-host-abi.rs -o "$RUNNER_TEMP/dmabuf-tests"
+          "$RUNNER_TEMP/pulse-tests"
+          "$RUNNER_TEMP/dmabuf-tests"
+          rustc --edition=2021 inspector/ci/m3-pinned-pulse-host-abi.rs -o "$RUNNER_TEMP/pulse-abi-proof"
+          rustc --edition=2021 inspector/ci/m3-pinned-dmabuf-host-abi.rs -o "$RUNNER_TEMP/dmabuf-abi-proof"
+      - name: Build disposable actual Arch Linux dynamic libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull archlinux:base
+          docker image inspect --format '{{index .RepoDigests 0}}' archlinux:base > "$RUNNER_TEMP/arch-image-base-digest.txt"
+          cat > "$RUNNER_TEMP/Dockerfile.m3arch" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed libpulse libdrm mesa binutils
+          EOF
+          docker build -f "$RUNNER_TEMP/Dockerfile.m3arch" \
+            -t vulpra-m3-arch-loader-abi:local "$RUNNER_TEMP"
+      - name: Exercise original dynamic function ABI offline inside Arch userland
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 128 \
+            -v "$GITHUB_WORKSPACE:/work:ro" \
+            -v "$RUNNER_TEMP:/reports" \
+            --entrypoint /bin/bash vulpra-m3-arch-loader-abi:local -c '
+              set -euo pipefail
+              grep -Fxq "ID=arch" /etc/os-release
+              test -f /usr/lib/libpulse.so.0
+              test -f /usr/lib/libgbm.so.1
+              test -f /usr/lib/libdrm.so.2
+              /reports/pulse-abi-proof "'"$CUBEB_SHA"'" \
+                /work/external/pulse-ffi/src/ffi_funcs.rs \
+                /usr/lib/libpulse.so.0 /reports/arch-pulse-abi.json
+              /reports/dmabuf-abi-proof "'"$SOURCE_SHA"'" \
+                /work/pinned/widget/gtk/DMABufDevice.cpp \
+                /usr/lib/libgbm.so.1 /usr/lib/libdrm.so.2 \
+                /reports/arch-dmabuf-abi.json
+            '
+          jq -e '
+            .host_platform=="archlinux-container-x86_64" and
+            .requested_dlsym_function_count==82 and
+            .missing_requested_host_functions==0 and
+            .glibc_dlopen_and_dlsym_resolved_all_requested==true and
+            .arch_container_abi_verified==true and
+            .arch_host_abi_verified==false and
+            .all_dlopen_dependencies_closed==false and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/arch-pulse-abi.json" >/dev/null
+          jq -e '
+            .host_platform=="archlinux-container-x86_64" and
+            .requested_gbm_functions==18 and
+            .requested_drm_functions==1 and
+            .missing_requested_functions==0 and
+            .glibc_dlopen_dlsym_resolved_all_functions==true and
+            .arch_container_abi_verified==true and
+            .arch_host_abi_proven==false and
+            .all_dynamic_loading_paths_proven==false and
+            .m3_sixth_gate_closed==false' "$RUNNER_TEMP/arch-dmabuf-abi.json" >/dev/null
+          echo 'PASS: actual Arch container dynamically loaded all 82 PulseAudio + 19 DMA-BUF symbols; not user host'
+      - name: Upload only bounded ABI and base-image provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-arch-container-original-loader-abi
+          path: |
+            ${{ runner.temp }}/arch-pulse-abi.json
+            ${{ runner.temp }}/arch-dmabuf-abi.json
+            ${{ runner.temp }}/arch-image-base-digest.txt
+          if-no-files-found: warn
+          retention-days: 14
