@@ -1,0 +1,106 @@
+# Exact-original crashreporter libcurl fallback names: source and compiled
+# relocation-backed table, without executing crashreporter or networking.
+name: M3 Original Crashreporter Native Libcurl Loader Candidates
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-crashreporter-libcurl-source-native.rs
+      - .github/workflows/m3-original-crashreporter-libcurl-native.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-matched-native-crashreporter-libcurl-candidates:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout only original-candidate Rust verifier
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-crashreporter-libcurl-source-native.rs
+      - name: Checkout exact immutable original browser libcurl source
+        uses: actions/checkout@v4
+        with:
+          path: source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/crashreporter/client/app/src/net/libcurl.rs
+      - name: Authenticate source identity and test bounded Rust fixtures
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
+          rustc --edition=2021 --test diagnostics/ci/m3-original-crashreporter-libcurl-source-native.rs \
+            -o "$RUNNER_TEMP/m3-crashreporter-libcurl-tests"
+          "$RUNNER_TEMP/m3-crashreporter-libcurl-tests"
+          rustc --edition=2021 -O diagnostics/ci/m3-original-crashreporter-libcurl-source-native.rs \
+            -o "$RUNNER_TEMP/m3-crashreporter-libcurl-audit"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg src "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$src' >/dev/null
+      - name: Download authenticated full-normal original package and extract only crashreporter
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original" "$RUNNER_TEMP/package"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xJf "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" \
+            -C "$RUNNER_TEMP/package" ./vulpra/crashreporter
+          test -f "$RUNNER_TEMP/package/vulpra/crashreporter"
+          test "$(stat -c '%s' "$RUNNER_TEMP/package/vulpra/crashreporter")" -eq 4558472
+      - name: Verify compiled libcurl six-name table and dlopen GOT instruction
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/m3-crashreporter-libcurl-audit" "$SOURCE_SHA" "$ARCHIVE_SHA" \
+            source/toolkit/crashreporter/client/app/src/net/libcurl.rs \
+            "$RUNNER_TEMP/package/vulpra/crashreporter" \
+            "$RUNNER_TEMP/m3-original-crashreporter-libcurl-native.json"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="source_and_compiled_crashreporter_libcurl_loader_candidate_table_verified" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .native_binary=="crashreporter" and
+            .original_linux_candidate_count==6 and
+            .original_linux_candidate_names==[
+              "libcurl.so","libcurl.so.4","libcurl-gnutls.so",
+              "libcurl-gnutls.so.4","libcurl.so.3","libcurl-gnutls.so.3"
+            ] and
+            .source_declares_libloading_library_new==true and
+            .compiled_relative_relocation_backed_candidate_table_verified==true and
+            .all_compiled_candidate_name_bytes_match_pinned_rust_source==true and
+            .compiled_table_reference_and_dlopen_got_instruction_verified==true and
+            .runtime_executed_route_verified==false and
+            .runtime_selected_soname_verified==false and
+            .all_possible_loader_paths_verified==false and
+            .target_endeavouros_hyprland_verified==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-crashreporter-libcurl-native.json" >/dev/null
+          echo 'PASS: original crashreporter source-to-compiled six libcurl loader candidates; no runtime/pruning gate'
+      - name: Upload only sanitized compiled candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-crashreporter-libcurl-native-candidates
+          path: ${{ runner.temp }}/m3-original-crashreporter-libcurl-native.json
+          if-no-files-found: warn
+          retention-days: 14
