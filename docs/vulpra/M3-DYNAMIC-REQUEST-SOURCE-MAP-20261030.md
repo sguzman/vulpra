@@ -159,6 +159,35 @@ The same full-native workflow reverified the previously accepted **3/3 Rust arch
 
 **Important exclusions:** this is *one original Linux x86-64 compiled `libxul.so`* and a constrained API-name-based direct branch census. It omits indirect/tail-through-register calls, unknown loader wrappers, potential optimized/inlined code, other ELF consumers and platform-specific branches, dynamic loader-selected library arguments, user-host EndeavourOS/Hyprland behavior and unexercised feature routes. `indirect_loader_calls_enumerated=false`, `every_dynamic_loader_api_enumerated=false`, `actual_dynamic_library_names_verified=false`, `conditional_runtime_routes_exercised=false`, `all_elf_consumers_covered=false`, `arch_workstation_verified=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`. No new deletion, compression savings, or sixth gate accepted. **M3 5/6 (83%), overall 61%, Δ+0 percentage points.**
 
+## Original native package — other 27 ELF loader API imports and branches (2026-11-01 UTC)
+
+[**Original non-`libxul.so` native census CI 41350581069 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41350581069), [workflow lint 41350581035 — PASS](https://github.com/sguzman/vulpra/actions/runs/41350581035); **artifact 13101107465 independently downloaded and inspected**. New std-only Rust tool `ci/m3-original-other-elf-loader-api-census.rs` authenticates the previously compiled source-pinned full-normal native package at run **40997075527**, exact original source `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, and archive SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`. It reads **all 28 original packaged x86-64 ELF files** (no application main execution) and explicitly excludes `libxul.so`, leaving **27/27** separately scoped files. Its native C shared-library positive/negative regression fixtures also passed.
+
+Actual **stripped packaged ELF** observations: **16 of 27 files** carry **18 distinct per-ELF undefined dynamic loader-API import records** for the selected `dlopen`/`dlmopen`/`PR_LoadLibrary`/`PR_LoadLibraryWithFlags`/`PR_LoadLibraryByPathname` names; **15 of 27 files** carry **47 named-target direct call/tail-branch instructions**, grouped into **21 distinct per-ELF API/branch-kind records**. This is not 47 distinct libraries or features, and an import without a recognized direct branch can still be legitimately used through another invocation mechanism.
+
+| Original packaged ELF | Selected loader-API imports | Direct branch instructions |
+| --- | --- | ---: |
+| `crashhelper` | `dlopen` | 6 |
+| `crashreporter` | `dlopen` | 0 |
+| `gfxtest` | `dlopen` | 11 |
+| `libfreeblpriv3.so` | `dlopen` | 2 |
+| `libmozavcodec.so` | `dlopen` | 1 |
+| `libmozavutil.so` | `PR_LoadLibrary`, `dlopen` | 4 |
+| `libmozsandbox.so` | `dlopen` | 1 |
+| `libmozsqlite3.so` | `dlopen` | 1 |
+| `libnspr4.so` | `dlopen` | 4 (including a locally resolved `PR_LoadLibraryWithFlags` call) |
+| `libnss3.so` | `PR_LoadLibrary` | 2 |
+| `libnssutil3.so` | `PR_LoadLibraryWithFlags` | 3 |
+| `libonnxruntime.so` | `dlopen` | 1 |
+| `libsoftokn3.so` | `PR_LoadLibraryWithFlags`, `dlopen` | 3 |
+| `pingsender` | `dlopen` | 6 |
+| `vulpra` | `dlopen` | 1 |
+| `vulpra-bin` | `dlopen` | 1 |
+
+These **16 imported-API ELF members** include **15 with direct branches** and `crashreporter` with an import but **zero scanner-matched direct branches**. The other eleven ELF members have no imports or branches matched by the *selected name set*, not proof of having no dynamically loaded dependencies. The `libnspr4.so` direct internal `PR_LoadLibraryWithFlags` call demonstrates why imported names and machine branches should be reported as different evidence classes rather than forced into one-to-one parity.
+
+**Limitations:** the prior `libxul.so` 73-branch census used a **full rebuilt unstripped linked ELF**; this check used the **immutable archived stripped original package**. They cover complementary ELF sets and different build artifacts; don't combine their counts into a unique caller or complete ABI/feature graph. Stripping removes reliable caller-symbol attribution. The named-target parser excludes register-indirect dispatch, non-selected loader wrappers/APIs, runtime SONAME argument values, other platform build branches, exercised runtime behavior and target EndeavourOS/Hyprland validation. Its machine-readable report retains `stripped_function_caller_attribution_proven=false`, `indirect_loader_calls_enumerated=false`, `runtime_library_argument_values_verified=false`, `all_possible_dynamic_library_routes_proven=false`, `target_endeavouros_hyprland_verified=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`. No additional source deletion, compiled-byte savings or sixth M3 gate credit. **M3 5/6 = 83%, overall 61%, Δ+0 pp**.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
