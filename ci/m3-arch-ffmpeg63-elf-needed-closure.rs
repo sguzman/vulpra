@@ -108,7 +108,7 @@ fn run()->Result<(),String>{
     if !missing.is_empty(){return Err(format!("Missing dynamic loader bindings: {}",missing.join(",")));}
     let quoted=|names:&BTreeSet<String>|names.iter().map(|s|format!("\"{s}\""))
         .collect::<Vec<_>>().join(",");
-    let edge_records=edges.iter().map(|(src,dst)|format!("[\\"{src}\\",\\"{dst}\\"]"))
+    let edge_records=edges.iter().map(|(src,dst)|format!(r#"["{src}","{dst}"]"#))
         .collect::<Vec<_>>().join(",");
     let report=format!(
         "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{PINNED}\",\n \"userland\":\"archlinux-container-x86_64\",\n \"root\":\"{ROOT}\",\n \"direct_elf_needed_count\":{},\n \"resolved_glibc_ldd_name_count\":{},\n \"missing_direct_needed_count\":0,\n \"direct_needed_names\":[{}],\n \"resolved_transitive_names\":[{}],\n \"all_observed_ldd_bindings_resolved\":true,\n \"resolved_transitive_elf_file_count\":{},\n \"resolved_transitive_direct_edge_count\":{},\n \"resolved_transitive_direct_edges\":[{}],\n \"all_observed_transitive_direct_edges_resolved\":true,\n \"complete_conditional_dlopen_graph_proven\":false,\n \"original_browser_compiled_root_proven\":false,\n \"target_workstation_verified\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_pruning_authorized\":false\n}}\n",
