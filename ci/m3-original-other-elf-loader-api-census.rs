@@ -150,6 +150,20 @@ fn loader_relocations(path:&Path)->Result<BTreeMap<u64,(String,String)>,String>{
     }
     Ok(found)
 }
+fn rip_got_instruction(line:&str)->Option<(u64,&'static str)>{
+    let (address,insn)=line.split_once(':')?;
+    if address.trim().is_empty()||!address.trim().bytes().all(|b|b.is_ascii_hexdigit()){return None;}
+    let (left,comment)=insn.split_once('#')?;
+    if !left.contains("(%rip)")||!left.contains('*'){return None;}
+    let kind=match left.split_whitespace().next()?{
+        "call"|"callq"=>"call","jmp"|"jmpq"=>"tail-jump",_=>return None
+    };
+    // The objdump symbol may name an unrelated nearest export on stripped
+    // ELF. Trust the numeric GOT offset only if readelf has its relocation.
+    let slot=comment.trim().split_whitespace().next()?;
+    if slot.len()>16||slot.is_empty()||!slot.bytes().all(|b|b.is_ascii_hexdigit()){return None;}
+    Some((u64::from_str_radix(slot,16).ok()?,kind))
+}
 fn got_indirect_insns(path:&Path,relocs:&BTreeMap<u64,(String,String)>)
  ->Result<BTreeMap<(String,String,String,bool),u64>,String>{
     let mut child=Command::new("objdump").args(["-d","--no-show-raw-insn"])
@@ -168,19 +182,7 @@ fn got_indirect_insns(path:&Path,relocs:&BTreeMap<u64,(String,String)>)
             plt=section.starts_with(".plt")||section.starts_with(".iplt");
             continue;
         }
-        let Some((address,insn))=line.split_once(':') else {continue};
-        if address.trim().is_empty()||!address.trim().bytes().all(|b|b.is_ascii_hexdigit()){continue;}
-        let Some((left,comment))=insn.split_once('#') else {continue};
-        if !left.contains("(%rip)")||!left.contains('*'){continue;}
-        let branch_kind=match left.split_whitespace().next().unwrap_or(""){
-            "call"|"callq"=>"call","jmp"|"jmpq"=>"tail-jump",_=>continue
-        };
-        // GNU objdump on STRIPPED ELF often annotates GOT slot addresses
-        // using the nearest unrelated symbol. The numeric slot address is
-        // authoritative; only the exact readelf relocation names its API.
-        let slot=comment.trim().split_whitespace().next().unwrap_or("");
-        if slot.len()>16||slot.is_empty()||!slot.bytes().all(|b|b.is_ascii_hexdigit()){continue;}
-        let offset=u64::from_str_radix(slot,16).map_err(|e|e.to_string())?;
+        let Some((offset,branch_kind))=rip_got_instruction(&line) else {continue};
         if let Some((rel_api,rel_kind))=relocs.get(&offset){
             *counts.entry((rel_api.clone(),rel_kind.clone(),branch_kind.into(),plt)).or_insert(0)+=1;
         }
@@ -329,10 +331,10 @@ void *example(void){return dlopen("libx.so",0);}"#).unwrap();
             .arg(&src).arg("-o").arg(&lib).status().unwrap().success());
         let reloc=loader_relocations(&lib).unwrap();
         assert!(reloc.values().any(|(api,kind)|api=="dlopen"&&kind=="GLOB_DAT"));
-        // An exact native GOT slot remains identifiable even if objdump
-        // prints the WRONG nearest symbol for an otherwise stripped binary.
-        let fake_symbol="  110c: call *0x2eb6(%rip) # 3fc8 <__xstat64@plt+0x41ee8>";
-        assert!(fake_symbol.contains("__xstat64"));
+        assert_eq!(rip_got_instruction("  1bd274: call *0x29847e(%rip) # 4556f8 <__xstat64@plt+0x41ee8>"),Some((0x4556f8,"call")));
+        assert_eq!(rip_got_instruction("  1030: jmp *0x2fca(%rip) # 4000 <dlopen@GLIBC_2.34>"),Some((0x4000,"tail-jump")));
+        assert_eq!(rip_got_instruction("  110c: call *%rax"),None);
+        assert_eq!(rip_got_instruction("  110c: call 1030 <dlopen@plt>"),None);
         let got=got_indirect_insns(&lib,&reloc).unwrap();
         assert!(got.iter().any(|((api,kind,branch,in_plt),n)|
             api=="dlopen"&&kind=="GLOB_DAT"&&branch=="call"&&!*in_plt&&*n>=1));
