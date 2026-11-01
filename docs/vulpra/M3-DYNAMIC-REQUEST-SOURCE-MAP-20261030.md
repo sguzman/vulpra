@@ -206,6 +206,23 @@ The **existing 47 symbol-named direct loader branches** and 18 per-ELF undefined
 
 **Remaining limits:** other register-indirect and function-pointer load cases, static and dynamically chosen wrappers, all feature branches, actual runtime SONAMEs and ABI providers, protected security paths and real target EndeavourOS/Hyprland cannot be closed by this scanner. The archived JSON retains `indirect_loader_calls_enumerated=false`, `only_rip_relative_relocation_matched_indirects_audited=true`, `runtime_library_argument_values_verified=false`, `all_possible_dynamic_library_routes_proven=false`, `source_pruning_authorized=false` and `m3_sixth_gate_closed=false`. **M3 remains 5/6 (83%), overall 61%, Δ+0 pp; no new source removal or byte savings.**
 
+## Original `crashreporter` exact compiled libcurl fallback candidate table (2026-11-01 UTC)
+
+[**Original source-to-native libcurl candidate verifier CI 41353633757 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41353633757), [workflow lint 41353633552 — PASS](https://github.com/sguzman/vulpra/actions/runs/41353633552), original source `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, same checksum-verified original full-normal package from **40997075527**, SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`. Artifact **13102287419 independently downloaded and inspected**. New std-only Rust read-only auditor `ci/m3-original-crashreporter-libcurl-source-native.rs` compiles and passes positive/negative source, relocation and machine-instruction fixtures; it verifies the exact original `toolkit/crashreporter/client/app/src/net/libcurl.rs` and **actual extracted original stripped ELF `vulpra/crashreporter`** (4,558,472 B), without running the executable.
+
+Original Rust source builds `CURL_LIB_NAMES` under `cfg!(target_os = "linux")` and calls `CURL_LIB_NAMES.iter().find_map(|name| ... unsafe { Library::new(name) })`, via `libloading::{Library, Symbol}` and a lazy `Curl::load`. **All six original Linux candidates, in order**, appear as exact UTF-8 bytes at ELF-mapped locations reconstructed from the **six `R_X86_64_RELATIVE` table-pointer relocations** (consecutive 16-byte pairs starting at native address `0x417aa8`, each containing an ELF-backed string address and its real byte length):
+
+1. `libcurl.so`
+2. `libcurl.so.4`
+3. `libcurl-gnutls.so`
+4. `libcurl-gnutls.so.4`
+5. `libcurl.so.3`
+6. `libcurl-gnutls.so.3`
+
+The same binary's disassembly includes a candidate-array address reference at **`0x1bd1cc`** (table address `0x417aa8`) and the earlier independently proved **`dlopen` GOT-indirect call at `0x1bd274`**, through `0x4556f8` where `readelf` identifies `R_X86_64_GLOB_DAT dlopen@GLIBC_2.2.5`. These appear in a bounded original instruction window, and the compiled data table matches source ordering and byte lengths **6/6**. This connects the application-level crash-report HTTP/upload dynamic loader **candidate list** with actual compiled machine references, rather than merely guessing from a source file or glibc-requester basename. The binary is not executed.
+
+**Precisely unproven:** the audit does not dynamically execute the `libcurl` loader branch, observe **which SONAME successfully loads** (or whether all candidates fail), verify libcurl's transitive ABI/security dependencies on EndeavourOS/Hyprland, prove all possible `libloading` uses, or authorize removal. The report deliberately preserves `runtime_executed_route_verified=false`, `runtime_selected_soname_verified=false`, `all_possible_loader_paths_verified=false`, `target_endeavouros_hyprland_verified=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`. Preserve **crashreporter, libcurl fallback behavior and crash-upload functionality** as protected dependency routes. **M3 5/6 (83%), overall 61%, Δ+0 percentage points** and no new source deletion or compressed byte saving.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
