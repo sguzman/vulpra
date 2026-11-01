@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project": "Vulpra",
-  "as_of": "2026-10-31",
+  "as_of": "2026-11-01",
   "source_version": "159.0b5",
   "upstream_tag": "FIREFOX_159_0b5_RELEASE",
   "upstream_commit": "34ac0671eb25f31f8c56ace36e1c413dd471eb8d",
