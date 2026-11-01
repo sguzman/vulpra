@@ -39,6 +39,15 @@ This establishes only one **source-revision-to-Ubuntu-host library ABI**. It doe
 
 This resolves the *source-to-specific-host dynamic function-name ABI* for both DMA-BUF libraries; it is **not** evidence of the browser's exact linked callsite, successful device operation, broader `dlopen` closure, full host/Arch symbol versions, or safe source removal. No whole M3 sixth-gate credit.
 
+## Real host glibc dynamic symbol resolution (2026-10-31)
+
+The scoped host ABI studies were independently strengthened beyond static symbol-table presence:
+
+- [PulseAudio runtime loader CI 41263023348 PASS](https://github.com/sguzman/vulpra/actions/runs/41263023348), artifact **13065394897**: glibc successfully `dlopen`ed `libpulse.so.0` with `RTLD_LAZY` and returned non-null `dlsym` pointers for all **82/82** functions requested by the exact pinned external Rust source.
+- [GTK DMA-BUF runtime loader CI 41263026786 PASS](https://github.com/sguzman/vulpra/actions/runs/41263026786), artifact **13065927862**: glibc successfully `dlopen`ed `libgbm.so.1` and `libdrm.so.2` with `RTLD_LAZY | RTLD_LOCAL` and resolved all **18 GBM** plus **1 DRM** requested functions. [Lint 41263026719 PASS](https://github.com/sguzman/vulpra/actions/runs/41263026719).
+
+These are genuine host-side loader operations on disposable Ubuntu 24.04 CI runners, not executed inside the compiled Vulpra process. They establish callable pointer *resolution*, **not** function correctness or successful device/audio initialization, original compiled feature activation, root-cause diagnosis for graphical SIGSEGV, or target Arch/Hyprland ABI. The sixth M3 gate remains open; no pruning or new savings.
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
