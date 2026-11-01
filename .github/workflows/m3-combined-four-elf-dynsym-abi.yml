@@ -13,6 +13,7 @@ on:
       - ci/m3-original-native-relocation-shape.rs
       - ci/m3-libxul-packed-relr.rs
       - ci/m3-static-rust-cpp-ffi-source-witness.rs
+      - ci/m3-original-compiled-rust-provenance.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -42,6 +43,7 @@ jobs:
             ci/m3-original-native-relocation-shape.rs
             ci/m3-libxul-packed-relr.rs
             ci/m3-static-rust-cpp-ffi-source-witness.rs
+            ci/m3-original-compiled-rust-provenance.rs
             ci/mozconfig-linux-m3-baseline
             ci/mozconfig-linux-m3-combined-lean
       - name: Checkout exact pinned original Mozilla XPCOM contract source only
@@ -101,6 +103,9 @@ jobs:
           rustc --edition=2021 --test ci/m3-static-rust-cpp-ffi-source-witness.rs -o "$RUNNER_TEMP/static-ffi-source-test"
           "$RUNNER_TEMP/static-ffi-source-test"
           rustc --edition=2021 -O ci/m3-static-rust-cpp-ffi-source-witness.rs -o "$RUNNER_TEMP/static-ffi-source-witness"
+          rustc --edition=2021 --test ci/m3-original-compiled-rust-provenance.rs -o "$RUNNER_TEMP/rust-provenance-test"
+          "$RUNNER_TEMP/rust-provenance-test"
+          rustc --edition=2021 -O ci/m3-original-compiled-rust-provenance.rs -o "$RUNNER_TEMP/rust-provenance"
           command -v objdump
           command -v objcopy
           command -v cmp
@@ -355,6 +360,42 @@ jobs:
           ' "$RUNNER_TEMP/audit/original-compiled-typed-packed-relocation-crosswalk.json" >/dev/null
           jq -c '{typed:.normal_typed_relocations,packed:.normal_packed_relr_targets,total:.normal_combined_record_count}' \
             "$RUNNER_TEMP/audit/original-compiled-typed-packed-relocation-crosswalk.json"
+      - name: Bind two original Rust staticlib roots to real compiled native source filename witnesses
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/rust-provenance" \
+            "$RUNNER_TEMP/packages/full/extracted" \
+            "$RUNNER_TEMP/packages/lean/extracted" \
+            "$RUNNER_TEMP/audit/original-compiled-rust-source-provenance.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_compiled_two_native_rust_staticlib_source_path_provenance" and
+            .source_commit=="b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
+            .normal_source_path_occurrences==4 and
+            .lean_source_path_occurrences==4 and
+            (.full_records|length)==4 and
+            (.lean_records|length)==4 and
+            (all(.full_records[]; .source_path_occurrences==1)) and
+            (all(.lean_records[]; .source_path_occurrences==1)) and
+            ([.full_records[].rust_source_file]|sort)==
+                (["toolkit/library/rust/shared/lib.rs",
+                  "toolkit/crashreporter/crash_helper_server/src/lib.rs",
+                  "toolkit/crashreporter/crash_helper_server/src/ipc_server.rs",
+                  "toolkit/crashreporter/crash_helper_server/src/breakpad_crash_generator.rs"]|sort) and
+            ([.lean_records[].rust_source_file]|sort)==
+                ([.full_records[].rust_source_file]|sort) and
+            .authenticated_real_compiled_native_elf_bytes_examined==true and
+            .source_path_strings_are_not_resolved_ffi_symbols==true and
+            .compiled_cpp_to_rust_call_targets_proven==false and
+            .all_static_rust_cpp_ffi_edges_identified==false and
+            .conditional_dlopen_closure_proven==false and
+            .source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/audit/original-compiled-rust-source-provenance.json" >/dev/null
+          jq -c '{full:.normal_source_path_occurrences,lean:.lean_source_path_occurrences,ffi_symbols_resolved:.compiled_cpp_to_rust_call_targets_proven}' \
+            "$RUNNER_TEMP/audit/original-compiled-rust-source-provenance.json"
       - name: Compare compiled libxul named dynamic-exported function bytes by symbol address
         shell: bash
         timeout-minutes: 8
@@ -596,6 +637,7 @@ jobs:
             ${{ runner.temp }}/audit/compiled-libxul-hinge-assembly.json
             ${{ runner.temp }}/audit/original-xpcom-aboutstudies-contract-source.json
             ${{ runner.temp }}/audit/original-static-rust-cpp-ffi-source-witness.json
+            ${{ runner.temp }}/audit/original-compiled-rust-source-provenance.json
             ${{ runner.temp }}/audit/pinned-source-to-native-xpcom-contract-crosswalk.json
             ${{ runner.temp }}/audit/original-compiled-aboutstudies-contract-strings.json
             ${{ runner.temp }}/audit/compiled-28-elf-relocation-shape.json
