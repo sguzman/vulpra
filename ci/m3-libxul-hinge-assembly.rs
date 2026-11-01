@@ -2,7 +2,9 @@
 // Source-pinned native artifacts are authenticated by the surrounding workflow.
 // This is machine-code structural evidence, not source-function attribution or
 // instruction-level semantic equivalence.
-use std::fs;
+use std::collections::BTreeSet;
+use std::fs::{self, File};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::process::Command;
 
@@ -133,6 +135,59 @@ fn compare(one:&[Instruction],two:&[Instruction],id:usize,normal_bytes:usize,lea
         one.len(),two.len(),as_json_items(&added)
     ))
 }
+// A code-generated 8-byte index array bounded by two actual compiled
+// lea targets. Raw field values are uninterpreted: no source ownership claim.
+fn rodata_index_witness(
+    elf: &Path, table_start: u64, next_array: u64, record_count: usize
+) -> Result<String,String> {
+    let mut cmd=Command::new("readelf");
+    cmd.args(["--wide","--section-headers","--"]).arg(elf);
+    let output=tool_output(cmd)?;
+    let mut bounds=None;
+    for line in output.lines() {
+        let cols:Vec<_>=line.split_whitespace().collect();
+        let Some(i)=cols.iter().position(|x|*x==".rodata") else {continue};
+        if i+4>=cols.len()||cols[i+1]!="PROGBITS"||bounds.is_some(){
+            return Err("Nonunique original compiled rodata section".into());
+        }
+        let number=|j:usize|u64::from_str_radix(cols[i+j],16).map_err(|e|e.to_string());
+        bounds=Some((number(2)?,number(3)?,number(4)?));
+    }
+    let (vma,file_offset,len)=bounds.ok_or("Original compiled rodata section missing")?;
+    let bytes=record_count.checked_mul(8).ok_or("Record count overflow")?;
+    let end=table_start.checked_add(bytes as u64).ok_or("Native table size overflow")?;
+    if table_start<vma || end>next_array || next_array>vma+len ||
+        next_array-end>16 || record_count<500 || record_count>1000 {
+        return Err("Index table shape inconsistent with original native rodata".into());
+    }
+    let start=file_offset+(table_start-vma);
+    let length=(next_array-table_start) as usize;
+    let mut file=File::open(elf).map_err(|e|e.to_string())?;
+    file.seek(SeekFrom::Start(start)).map_err(|e|e.to_string())?;
+    let mut contents=vec![0u8;length];
+    file.read_exact(&mut contents).map_err(|e|e.to_string())?;
+    if contents[bytes..].iter().any(|x|*x!=0){
+        return Err("Nonzero indexed table alignment bytes".into());
+    }
+    let mut first=BTreeSet::new();
+    let mut second=BTreeSet::new();
+    for rec in contents[..bytes].chunks_exact(8){
+        let a=u32::from_le_bytes(rec[0..4].try_into().map_err(|_|"Bad table first word")?);
+        let b=u32::from_le_bytes(rec[4..8].try_into().map_err(|_|"Bad table second word")?);
+        first.insert(a);
+        second.insert(b);
+    }
+    if first.len()!=record_count || second.len()!=535 {
+        return Err("Original native index table word cardinality changed".into());
+    }
+    Ok(format!(
+      "{{\"index_record_stride_bytes\":8,\"index_record_count\":{record_count},\
+       \"first_word_distinct_count\":{},\"second_word_distinct_count\":{},\
+       \"aligned_tail_zero_bytes\":{},\"field_interpretation_proven\":false}}",
+      first.len(),second.len(),length-bytes
+    ))
+}
+
 fn run()->Result<(),String>{
     let args:Vec<_>=std::env::args().collect();
     if args.len()!=4 {return Err("usage: m3-libxul-hinge-assembly FULL_LIBXUL LEAN_LIBXUL JSON".into());}
@@ -143,6 +198,8 @@ fn run()->Result<(),String>{
     if len_a!=EXPECTED_TEXT_FULL || len_b!=EXPECTED_TEXT_LEAN{
         return Err("Original source-pinned compiled libxul .text size drift".into());
     }
+    let full_table=rodata_index_witness(a,0x11faa40,0x11fbea0,652)?;
+    let lean_table=rodata_index_witness(b,0x11fc8c0,0x11fdd20,651)?;
     let mut records=Vec::new();
     for (idx,(of,lf,ol,ll)) in HINGES.iter().copied().enumerate(){
         let x=disassemble(a,addr_a,of,lf)?;
@@ -156,6 +213,7 @@ fn run()->Result<(),String>{
         \"all_native_code_or_static_ffi_proven\":false,\
         \"runtime_dlopen_closure_proven\":false,\
         \"source_removal_authorized\":false,\"m3_sixth_gate_closed\":false,\
+        \"indexed_native_table_full\":{full_table},\"indexed_native_table_lean\":{lean_table},\
         \"ranges\":[{}]}}\n",records.join(","));
     fs::write(&args[3],report).map_err(|e|e.to_string())?;
     println!("PASS: two original compiled native FDEs use 652 vs 651 hash divisor with 5 extra lean instructions each");
