@@ -403,6 +403,14 @@ Thus the exclusive layout transition occurs within a tightly bounded **944-byte 
 
 The first original and lean range share `.text` starting offset **11,654,896**. The next original FDE shift-only start at **11,655,824** matches the lean start at **11,655,856**, precisely +32 bytes. The exact `12 + 4 + 12 + 4 = 32` decomposition **fully accounts for the change in layout addresses after this transition**. The gaps are measured byte distances between FDE intervals; their contents and reasons for growth were **not** asserted to be padding instructions. Likewise these two ranges have no established named source owner or identical semantics. This explains an important compiled address-layout discrepancy but **does not** close full native/Rust/C++ FFI symbol equivalence, actual linker command reproducibility, or unobserved runtime `dlopen` dependencies; it permits no source pruning or new packaged-savings claim. **M3 remains 5/6 (83%), overall 61%, Δ0pp.**
 
+### Compiled packaged source-function attribution limit
+
+Both independently compiled original-source package artifacts were inspected read-only and individually verified against their retained SHA-256 sidecars: [**normal full native run 40997075527**](https://github.com/sguzman/vulpra/actions/runs/40997075527) and [**four-opt-in lean run 41222758405**](https://github.com/sguzman/vulpra/actions/runs/41222758405). Only the actual packaged `vulpra/libxul.so` member was extracted from each archive in an isolated analysis workspace; no application executable was run.
+
+Neither packaged `libxul.so` has `.symtab`, `.debug_info`, or `.debug_line` sections. Both carry a `.gnu_debuglink` section whose declared separate debug-info filename is **`crti.o`**, not a usable `libxul.so` source-symbol companion in these artifacts. Consequently the two anonymously named native FDE code ranges (454→466 B and 461→473 B) **cannot be reliably attributed to source function names using these packaged ELF symbols alone**. A separately retained exact-build link map or proper debug-symbol artifact would be needed to assign them source identities. This is an attribution and evidence-retention limitation, **not** proof of a browser runtime defect or of source-level semantic changes.
+
+This manual bounded artifact inspection does not grant deletion authority, new packaged savings or the final M3 dependency-closure gate; **M3 5/6 (83%), overall 61%, Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
