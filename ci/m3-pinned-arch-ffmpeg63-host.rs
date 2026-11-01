@@ -41,7 +41,8 @@ fn source_contract(root:&Path)->Result<(BTreeSet<String>,BTreeSet<String>),Strin
     let header=fs::read_to_string(root.join("dom/media/platforms/ffmpeg/FFmpegLibWrapper.h"))
         .map_err(|e|e.to_string())?;
     for (text,required)in [
-        (linker.as_str(),"\"libavcodec.so.63\""),
+        (linker.as_str(),"\"libavcodec.so.\" FFMPEG_MAX_MAJOR_VERSION_STR(FFMPEG_MAX_MAJOR_VERSION)"),
+        (header.as_str(),"#define FFMPEG_MAX_MAJOR_VERSION 63"),
         (linker.as_str(),"PR_LoadLibraryWithFlags(lspec, PR_LD_NOW | PR_LD_LOCAL)"),
         (linker.as_str(),"sLibAV.Link()"),
         (src.as_str(),"case 63:\n      version = AV_FUNC_63;"),
