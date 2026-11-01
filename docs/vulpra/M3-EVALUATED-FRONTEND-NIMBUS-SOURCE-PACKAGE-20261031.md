@@ -427,6 +427,20 @@ Both FDE pairs retain the entire original **115-mnemonic ordered subsequence** a
 
 The native function input performs FNV-style byte mixing (same `0x1000193` prime), and the assembly references an adjacent indexed static table. A changed generated hash-table cardinality is a **plausible structural interpretation**, but **the exact Mozilla source feature/name of the one fewer entry, runtime behavior, and reason for the generated table change are not yet established**. Mnemonic ordered-subsequence equality does *not* prove identical operations or semantics: the compiler has changed division/remainder arithmetic by construction. The original packaged binaries remain stripped, lacking a reliable named source-function owner for these ranges. No new source pruning, savings, linker/FFI/dlopen closure or sixth-gate credit. Overall **61%**, M3 **5/6 (83%)**, Δ0pp.
 
+### Original compiled indexed hash-table cardinality and single anonymous field difference
+
+[**Source-pinned compiled `libxul.so` 8-byte indexed table check 41257069967 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41257069967), [**workflow lint 41257070033 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41257070033). The Rust disassembly witness independently reads the actual `.rodata` bytes behind the verified 652-versus-651 integer remainder operations in both original full and four-opt-in native packages, and follows the next indexed-array address to validate element stride and alignment. The archived machine report from [**initial evidence run 41257052284 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41257052284) was inspected.
+
+| Anonymous original native table property | Full | Four-opt-in lean |
+| --- | ---: | ---: |
+| Actual indexed 8-byte records | **652** | **651** |
+| Distinct first 32-bit words | 652 | 651 |
+| Distinct second 32-bit words | **535** | **535** |
+| Zero bytes to next aligned compiled array | 0 | **8** |
+| Occurrences of *uninterpreted* second word `452` | **36** | **35** |
+
+All other **534 distinct second-field values** maintain identical frequencies. This independently ties the compiled remainder-divisor change to a **one-record reduction in the indexed static data**, with no offset/stride guess required. The meaning of either 32-bit record field is **not established**: `452` is a raw binary value, **not** an authorized Mozilla feature ID, function, property, asset or user-facing removal. The FDE machine-code growth remains proven, but neither the source owner nor safe removal semantics are. No source pruning, new package savings, or final M3 gate credit; **M3 5/6 (83%), overall 61%, Δ0pp.**
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
