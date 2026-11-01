@@ -78,6 +78,23 @@ fn runtime_bindings(soname:&str, required:&BTreeSet<String>)->Result<usize,Strin
     if close!=0||!missing.is_empty(){return Err(format!("{soname} unresolved: {}",missing.join(",")));}
     Ok(count)
 }
+// This CI userland is not the user's Arch/Hyprland installation.
+fn detect_userland()->Result<&'static str,String>{
+    if !cfg!(all(target_os="linux",target_arch="x86_64")){
+        return Err("Only Linux x86-64 native ABI supported".into());
+    }
+    let os=fs::read_to_string("/etc/os-release").map_err(|e|e.to_string())?;
+    let id=os.lines().find_map(|l|l.strip_prefix("ID="))
+        .ok_or("Missing os-release ID")?.trim_matches('"');
+    let version=os.lines().find_map(|l|l.strip_prefix("VERSION_ID="))
+        .unwrap_or("").trim_matches('"');
+    match (id,version){
+        ("ubuntu","24.04")=>Ok("ubuntu-24.04-x86_64"),
+        ("arch",_)=>Ok("archlinux-container-x86_64"),
+        _=>Err(format!("Unverified ABI userland: {id} {version}"))
+    }
+}
+
 fn run()->Result<(),String>{
     let args:Vec<String>=std::env::args().collect();
     if args.len()!=6||args[1]!=SOURCE{return Err("usage: dmabuf-host-abi SOURCE_SHA SOURCE_CPP LIBGBM_SO LIBDRM_SO OUTPUT_JSON".into());}
@@ -88,10 +105,11 @@ fn run()->Result<(),String>{
     if runtime_bindings("libgbm.so.1",&gbm)?!=gbm.len()||runtime_bindings("libdrm.so.2",&drm)?!=drm.len(){
         return Err("Incomplete glibc runtime symbol resolution".into());
     }
+    let platform=detect_userland()?;
     fs::write(&args[5],format!(
-        "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{SOURCE}\",\n \"host_platform\":\"ubuntu-24.04-x86_64\",\n \"requested_gbm_functions\":{},\n \"matched_gbm_exports\":{},\n \"requested_drm_functions\":{},\n \"matched_drm_exports\":{},\n \"missing_requested_functions\":0,\n \"direct_source_to_host_abi_proven\":true,\n \"glibc_dlopen_dlsym_resolved_all_functions\":true,\n \"compiled_browser_callstack_proven\":false,\n \"all_dynamic_loading_paths_proven\":false,\n \"arch_host_abi_proven\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_removal_authorized\":false\n}}\n",gbm.len(),gbm.len(),drm.len(),drm.len()
+        "{{\n \"schema_version\":1,\n \"gecko_source_commit\":\"{SOURCE}\",\n \"host_platform\":\"{platform}\",\n \"requested_gbm_functions\":{},\n \"matched_gbm_exports\":{},\n \"requested_drm_functions\":{},\n \"matched_drm_exports\":{},\n \"missing_requested_functions\":0,\n \"direct_source_to_host_abi_proven\":true,\n \"glibc_dlopen_dlsym_resolved_all_functions\":true,\n \"compiled_browser_callstack_proven\":false,\n \"all_dynamic_loading_paths_proven\":false,\n \"arch_container_abi_verified\":{},\n \"arch_host_abi_proven\":false,\n \"m3_sixth_gate_closed\":false,\n \"source_removal_authorized\":false\n}}\n",gbm.len(),gbm.len(),drm.len(),drm.len(),platform=="archlinux-container-x86_64"
     )).map_err(|e|e.to_string())?;
-    println!("PASS: exact-source 18 GBM + 1 DRM dynamic function names are exported by Ubuntu host ELFs");
+    println!("PASS: all 18 GBM and 1 DRM native functions resolve on {platform} native host loader");
     Ok(())
 }
 fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
