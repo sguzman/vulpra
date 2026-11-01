@@ -280,6 +280,23 @@ The compiled conditional **second `dlopen` invocation** explains the earlier une
 
 Archived JSON explicitly sets `actual_webauthn_key_flow_executed=false`, `actual_runtime_libudev_soname_loaded=false`, `complete_dynamic_library_dependency_graph_verified=false`, `target_endeavouros_hyprland_verified=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`. Keep USB authenticator and libudev fallback code protected. **No source removal or measured byte savings; M3 5/6 (83%), Vulpra overall 61%, Δ+0 percentage points.**
 
+## Exact-original WebAuthn libudev isolated Ubuntu and Arch dynamic-symbol/NOLOAD ABI checks (2026-11-01 UTC)
+
+[**Source-pinned two-host libudev CI 41358205206 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41358205206), [workflow lint 41358205144 — PASS](https://github.com/sguzman/vulpra/actions/runs/41358205144). **Artifact 13103579910 independently downloaded, unzipped and both JSON records inspected**. New std-only Rust `ci/m3-original-webauthn-libudev-host-abi.rs` and `.github/workflows/m3-original-webauthn-libudev-host-abi.yml` authenticate the earlier original machine-source route [41357321586](https://github.com/sguzman/vulpra/actions/runs/41357321586), artifact-proven constructed native `libudev.so.1` candidate, original source `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, and checkout of exact original `dom/webauthn/libudev-sys/src/lib.rs`.
+
+The probe extracts **all 49 original source-declared `define!(udev_..., ...)` symbol names**, rejects source declaration count/name duplicates and original `Library::open` / `ifnull!` / `RTLD_NOLOAD` drift, then invokes actual host glibc `dlopen("libudev.so.1", RTLD_LAZY|RTLD_GLOBAL|RTLD_NOLOAD)`, conditional normal `dlopen(..., RTLD_LAZY|RTLD_GLOBAL)`, `dlsym` for each original symbol, repeated already-loaded `RTLD_NOLOAD` calls and paired `dlclose` cleanup. This **reproduces the original source's macro branch semantics**, including its second evaluation of the NOLOAD expression for an initially nonnull handle, rather than assuming every USB authenticator path makes exactly one loader call. Actual host calls occur only in isolated test processes, not in the original browser.
+
+| Isolated userspace | First `RTLD_NOLOAD` | Fallback `dlopen` | Warm `RTLD_NOLOAD` twice | Original `udev_*` exported symbols |
+| --- | --- | --- | --- | --- |
+| Ubuntu 24.04, `unshare --net`, `libudev1` | Library not already loaded | Successfully opened `libudev.so.1` | Both succeeded | **49/49** |
+| Disposable `archlinux:base` with `systemd-libs`, Docker `--network none`, read-only root, no capabilities | Library not already loaded | Successfully opened `libudev.so.1` | Both succeeded | **49/49** |
+
+The source symbol ordering and names are identical in both archived JSON records, as enforced by a CI crosscheck; the host function-pointer existence and both `dlclose` cleanup paths succeeded. The original source's null-function fallback and protected USB security-key/WebAuthn handling remain mandatory. Negative host fixtures verify nonexistent `udev_*` symbol rejection; no network, key, `udev_new` call, device enumeration or browser process was used.
+
+**Exact limit:** this establishes **49/49 source-declared host symbol availability and actual loader-flag behavior**, **not** signatures/calling-convention runtime correctness, complete libudev transitive closure, an actual WebAuthn USB authenticator session, original `libxul.so` runtime `dlopen` execution, selected provider on the user's EndeavourOS/Hyprland machine, or safe source removal. Both records explicitly retain `original_browser_executed=false`, `real_webauthn_usb_authenticator_exercised=false`, `libudev_function_called=false`, `network_egress_allowed=false`, `runtime_original_browser_libudev_load_observed=false`, `target_endeavouros_hyprland_verified=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`.
+
+**No source removed or new byte savings. M3 5/6 (83%), overall 61%, Δ+0 percentage points.**
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
