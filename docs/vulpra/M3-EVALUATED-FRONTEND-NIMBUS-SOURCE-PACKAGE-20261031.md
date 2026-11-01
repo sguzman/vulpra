@@ -497,6 +497,18 @@ Both `.relr.dyn` sections have **26** direct-base words and **478,592** sorted u
 
 **Important scope boundary:** source-level FFI declarations/calls plus retained compiled Rust source filename strings do **not** prove a particular internal linker-resolved symbol/relocation or callsite machine instruction in these stripped archives, nor enumerate every source or generated FFI boundary, static library/archive member, or conditional runtime `dlopen` dependency. This is a meaningful **narrow source-to-binary provenance crosswalk**, not completion of the sixth M3 gate. No changes to installed Firefox, source pruning, new compressed savings, or progress percentage. **M3 5/6 (83%), Vulpra overall 61%, Δ0pp.**
 
+### Exact original unstripped Rust archive-to-ELF symbol definitions (2026-11-01 UTC)
+
+[Corrected native source-pinned compilation and symbol proof **41266265493 PASS**](https://github.com/sguzman/vulpra/actions/runs/41266265493), artifact **13068918079** independently inspected. After a previous successfully compiled source-matched original Firefox build [41261983583](https://github.com/sguzman/vulpra/actions/runs/41261983583) hit the original auditor's **2 GiB maximum input-file bound**, the proof was rerun with explicit bounded file-size diagnostics and a **16 GiB upper bound**. The corrected native job compiled unmodified original source `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and successfully ran the real GNU `nm` archive-plus-ELF verifier. The report `m3-original-ffi-symbol-definitions.json` says `status="compiled_archive_and_consumer_named_definitions_verified"`, with **3/3 original archive-to-linked-ELF function-definition pairs** and **one external defined text symbol in each expected inspected input**:
+
+| Exact original Rust static archive | Native linked consumer | Verified named function definition in both |
+| --- | --- | --- |
+| `libgkrust.a` | `libxul.so` | `GkRust_Init` |
+| `libgkrust.a` | `libxul.so` | `GkRust_Shutdown` |
+| `libcrash_helper_server.a` | `crashhelper` | `crash_generator_logic_desktop` |
+
+This advances the earlier *source-only/retained-source-path* provenance into **actual original linked named definitions**, but it does not independently associate all **four original C++ callsites** with native relocation targets, prove all internal or generated FFI seams, demonstrate functional execution of the Rust exports, or establish unobserved runtime conditional loading. The original diagnostic report also retains the prior test-only `MOZ_Crash`/network-guard trace; that report is not a new graphical acceptance. The proof flags are explicitly `complete_static_callsite_resolution_proven=false`, `conditional_dlopen_closure_proven=false`, `source_pruning_authorized=false`, and `m3_sixth_gate_closed=false`. **M3 5/6 (83%), overall 61%, Δ0 pp**, no new source deletion or accepted package savings.
+
 ## Boundaries and next actual work
 
 The selected opt-in features **do not shrink the evaluated directory-traversal graph**; they change guarded packaged JS/resources and add a Nimbus bootstrap fallback. The previous separately verified compiled 28-ELF direct library-import graph also remained unchanged. Consequently this 26,136-byte combined compressed-archive delta cannot be projected into eliminated native libraries or a smaller Gecko compilation tree.
