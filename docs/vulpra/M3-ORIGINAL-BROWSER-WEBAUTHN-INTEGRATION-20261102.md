@@ -2,8 +2,29 @@
 
 - Date: 2026-11-02 UTC.
 - Issue: [#4 — Original browser WebAuthn virtual authenticator returns `NotAllowedError` in isolated CI](https://github.com/sguzman/vulpra/issues/4).
-- **Status: BLOCKED / NOT ACCEPTED.** This document records both bounded positive evidence and the remaining failed registration. It must not be used to claim browser WebAuthn acceptance, libudev runtime execution, or source-pruning authority.
+- **Current status: original-browser virtual-authenticator create/get ACCEPTED; prior `NotAllowedError` blocker resolved by matching upstream attachment selection.** Earlier failures below are historical diagnostic evidence, not current failures. The result does **not** establish physical USB/libudev runtime execution, full loader closure or source-pruning authority.
 - Overall Vulpra: **61%**, M3: **5/6 = 83%**, session delta **+0 percentage points**; no new source removals or measured package bytes.
+
+## Verified resolution: original-browser WebAuthn credential round trip (2026-11-02 UTC)
+
+[**CI 41370020422 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41370020422), [workflow lint 41370020375 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41370020375). **Artifact 13109166364 independently downloaded and JSON inspected** (`m3-original-browser-webauthn-virtual.json`). The earlier test configuration combined a registered **`internal` virtual CTAP2 authenticator** with `authenticatorAttachment:"platform"`. Comparing the **exact original Firefox test helper** `dom/webauthn/tests/browser/head.js` at immutable source commit `b1482404dfb8b01342990ee99ea3df0f9756b5f7` revealed that upstream uses **`authenticatorAttachment:"cross-platform"`** for credential creation even while its virtual authenticator is registered as **`internal`**. Switching only the isolated Rust-served QA page's WebAuthn selection to `cross-platform` (with `residentKey:"discouraged"`) fixed the observed `NotAllowedError`. **The original Vulpra package, source, and user browser remain unchanged.**
+
+The successful workflow still SHA-authenticates the original source/native archive, executes the actual packaged original `vulpra` browser under a disposable Arch private-Weston graphical process, establishes a real localhost-only WebDriver session, inspects Gecko's actual virtual-authenticator registry, and issues a genuine WebDriver click that triggers `navigator.credentials.create`. It confirms the generated credential is stored in the virtual authenticator via WebDriver's credential-list endpoint; then a second click triggers `navigator.credentials.get` and validates non-empty authenticator data and signature. These are **actual browser WebAuthn JavaScript results**, not a standalone `libudev-sys` Rust test or faked JavaScript success.
+
+| Source-pinned archived result | Verified value |
+| --- | --- |
+| `original_native_browser_executed`, `localhost_secure_origin` | `true`, `true` |
+| `actual_browser_navigator_credentials_create_succeeded` | `true` |
+| `actual_browser_navigator_credentials_get_succeeded` | `true` |
+| `virtual_ctap2_internal_authenticator_used`, `virtual_credential_is_ephemeral` | `true`, `true` |
+| `original_browser_libudev_mapped_at_end` | **`false`** |
+| `original_browser_dynamic_libudev_load_proven`, `actual_physical_usb_webauthn_path_verified` | `false`, `false` |
+| `no_network_egress`, `real_user_profile_or_browser_accessed` | `true`, `false` |
+| `full_dynamic_loader_graph_proven`, `source_pruning_authorized`, `m3_sixth_gate_closed` | `false`, `false`, `false` |
+
+**Limit:** the virtual `internal` software authenticator is not a hardware USB/FIDO device. `libudev.so.1` was **not present in the observed browser process mappings at the end of this workload**. This does not prove it was never transiently loaded, and it does not exercise the actual USB authenticator/libudev branch. The separate source-pinned Ubuntu/Arch `libudev` ABI/first-use checks remain valid, but cannot stand in for actual original-browser USB use. **M3 sixth gate stays open; no new deletion or package-byte savings.**
+
+The expensive browser regression remains available through manual `workflow_dispatch`; its earlier temporary push trigger was removed after the passing run. Issue [#4](https://github.com/sguzman/vulpra/issues/4) records the resolution and is suitable for closure as a **virtual-authenticator-only** blocker.
 
 ## Immutable native provenance
 
@@ -21,7 +42,7 @@ After addressing test-environment startup constraints, the test runs the **actua
 
 The W3C WebDriver virtual CTAP2 authenticator API accepts an *internal* test authenticator, and a **Chrome-context inspection of the original browser's actual `nsIWebAuthnService.hasVirtualAuthenticator(id)` returns true**. Thus the registered test device is real inside the browser's virtual-authenticator database, not just an HTTP endpoint accepting a request.
 
-However, both direct async JavaScript and genuine WebDriver user-click requests to `navigator.credentials.create` return **`NotAllowedError`**. This was seen using the original test's internal virtual-authenticator/softtoken preference configuration. **No credential creation, virtual credential storage, or credential assertion has been established.** Do not classify this as a successful WebAuthn feature test, nor infer a product regression on normal user hosts.
+In the **historical, misconfigured** runs, both direct async JavaScript and genuine WebDriver user-click requests to `navigator.credentials.create` returned **`NotAllowedError`**. This was seen using the original test's internal virtual-authenticator/softtoken preference configuration. **No credential creation, virtual credential storage, or credential assertion has been established.** Do not classify this as a successful WebAuthn feature test, nor infer a product regression on normal user hosts.
 
 ## Diagnostic progression and strict exclusions
 
@@ -40,6 +61,6 @@ However, both direct async JavaScript and genuine WebDriver user-click requests 
 
 ## Forward engineering acceptance
 
-The isolated test remains available by **manual `workflow_dispatch` only** while blocked, rather than producing repeat red push CI. Issue #4 owns the next diagnostic steps: inspect actual WebAuthn service transaction / permission / prompt rejection, virtual authenticator presence and eligibility, and offline-mode interactions. Only accept a browser-level WebAuthn gate if the original native browser creates a credential, the browser's virtual authenticator owns it, and `navigator.credentials.get` produces a real assertion. Even that still would not prove physical USB security-key discovery or dynamic `libudev.so.1` loading by the original packaged browser.
+The isolated test remains available by **manual `workflow_dispatch` only** as an expensive passing regression, rather than a routine push CI job. Issue #4's original virtual-device rejection is resolved as described above. The next dependency-closure target is genuine, physically grounded USB/libudev loading and ABI coverage without modifying the user's installed browser. Only accept a browser-level WebAuthn gate if the original native browser creates a credential, the browser's virtual authenticator owns it, and `navigator.credentials.get` produces a real assertion. Even that still would not prove physical USB security-key discovery or dynamic `libudev.so.1` loading by the original packaged browser.
 
 **Not achieved:** any source pruning, all-ELF build/source/FFI/loader dependency closure, actual runtime WebAuthn USB/libudev behavior, real EndeavourOS/Hyprland host verification, or the sixth M3 acceptance gate. Previous isolated original Rust `udev_new`/symbol compatibility evidence remains valid independently, but cannot substitute for this browser feature integration.
