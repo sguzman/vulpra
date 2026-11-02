@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/m3-original-native-arch-loader-list.yml
       - ci/m3-original-native-elf-loader-list.rs
+      - ci/m3-original-arch-per-elf-loader-map.jq
   workflow_dispatch:
 permissions:
   contents: read
@@ -87,59 +88,46 @@ jobs:
           glibc_version="$(docker run --rm --network none --read-only --cap-drop ALL \
             m3-original-arch-loader:ci pacman -Q glibc | awk '{print $2}')"
           printf '%s' "$glibc_version" | grep -Eq '^[0-9][0-9A-Za-z.+_:-]*$'
-          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
-            --arg image "$image_id" --arg glibc "$glibc_version" \
-            --slurpfile sample "$RUNNER_TEMP/arch-results/original-arch-elf-list.json" '
-             ($sample[0]) as $s |
-             if ($s.schema_version==1 and
-                 $s.status=="source_pinned_original_all_28_elf_loader_list_resolution" and
-                 $s.original_source_commit==$src and $s.original_archive_sha256==$sha and
-                 $s.original_elf_members_listed==28 and
-                 ($s.original_elf_basenames|length)==28 and
-                 $s.declared_direct_needed_edges==268 and
-                 $s.direct_needed_sonames_present_in_loader_lists==268 and
-                 $s.loader_listed_provider_name_occurrences>=268 and
-                 $s.distinct_loader_listed_provider_basenames>=1 and
-                 $s.glibc_linker_list_metadata_only==true and
-                 $s.application_main_executed==false and
-                 $s.no_network_egress==true and
-                 $s.complete_lazy_or_future_dlopen_map_proven==false and
-                 $s.source_pruning_authorized==false and
-                 $s.m3_sixth_gate_closed==false)
-             then {
-               schema_version:1,
-               status:"original_archlinux_userspace_all_28_elf_loader_list_resolved",
-               original_source_commit:$src,
-               original_archive_sha256:$sha,
-               arch_container_image_id:$image,
-               arch_userspace_glibc_version:$glibc,
-               original_elf_count:$s.original_elf_members_listed,
-               original_direct_needed_edges:$s.declared_direct_needed_edges,
-               direct_needed_names_listed_in_arch:$s.direct_needed_sonames_present_in_loader_lists,
-               arch_loader_provider_name_occurrences:$s.loader_listed_provider_name_occurrences,
-               distinct_arch_loader_provider_basenames:$s.distinct_loader_listed_provider_basenames,
-               arch_loader_provider_basenames:$s.loader_listed_provider_basenames,
-               original_requester_basenames:$s.original_elf_basenames,
-               arch_userspace_container_only:true,
-               runtime_network_disabled:true,
-               application_main_executed:false,
-               actual_arch_host_or_hyprland_tested:false,
-               complete_lazy_transitive_feature_map_proven:false,
-               generated_build_feature_ownership_complete:false,
-               installed_browser_or_profile_changed:false,
-               source_removal_authorized:false,
-               m3_sixth_gate_closed:false
-             } else error("Arch loader evidence incomplete") end' \
+          # The observer already calculates per-ELF Arch loader lists.
+          # Preserve its original immutable 28-way partition; earlier reports
+          # discarded these records and retained only a 90-provider global set.
+          emit_audit() {
+            jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+              --arg image "$image_id" --arg glibc "$glibc_version" \
+              --slurpfile sample "$1" \
+              -f ci/m3-original-arch-per-elf-loader-map.jq
+          }
+          emit_audit "$RUNNER_TEMP/arch-results/original-arch-elf-list.json" \
             > "$RUNNER_TEMP/arch-results/original-arch-platform-audit.json"
+          # Real-output negative checks: reject one per-ELF needed count drift
+          # and removal of one loader-listed provider without rewriting data.
+          jq '.per_original_elf["libxul.so"].declared_direct_needed_count+=1' \
+            "$RUNNER_TEMP/arch-results/original-arch-elf-list.json" \
+            > "$RUNNER_TEMP/arch-results/forged.json"
+          if emit_audit "$RUNNER_TEMP/arch-results/forged.json" >/dev/null 2>&1; then
+            echo 'FAIL: per-ELF original direct SONAME drift accepted' >&2; exit 1
+          fi
+          jq '.per_original_elf["libxul.so"].loader_listed_provider_basenames |= .[1:]' \
+            "$RUNNER_TEMP/arch-results/original-arch-elf-list.json" \
+            > "$RUNNER_TEMP/arch-results/forged.json"
+          if emit_audit "$RUNNER_TEMP/arch-results/forged.json" >/dev/null 2>&1; then
+            echo 'FAIL: missing original per-ELF Arch provider accepted' >&2; exit 1
+          fi
+          rm -f "$RUNNER_TEMP/arch-results/forged.json"
           jq -e '.status=="original_archlinux_userspace_all_28_elf_loader_list_resolved" and
             .original_elf_count==28 and .original_direct_needed_edges==268 and
             .direct_needed_names_listed_in_arch==268 and
             .arch_userspace_container_only==true and
             .runtime_network_disabled==true and
+            .per_original_elf_provider_map_preserved_and_count_reconciled==true and
+            .per_original_elf_provider_map_metadata_only==true and
+            (.per_original_elf|keys)==(.original_requester_basenames|sort) and
+            ([.per_original_elf[].declared_direct_needed_count]|add)==268 and
+            ([.per_original_elf[].loader_listed_provider_count]|add)==.arch_loader_provider_name_occurrences and
             .actual_arch_host_or_hyprland_tested==false and
             .source_removal_authorized==false and .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/arch-results/original-arch-platform-audit.json" >/dev/null
-          echo 'PASS: Arch Linux glibc userspace lists each direct dependency for all 28 original compiled ELF files'
+          echo 'PASS: all 28 original ELF Arch provider lists independently retained and reconciled; no application executed'
       - name: Preserve only sanitized Arch-userspace loader audit data
         uses: actions/upload-artifact@v4
         with:
