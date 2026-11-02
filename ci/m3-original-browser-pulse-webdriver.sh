@@ -8,6 +8,9 @@ browser="$(realpath -e "$1")"; origin="$(realpath -e "$2")"; report="$3"
 [[ -x "$browser" && -x "$origin" && "$(basename "$browser")" == vulpra ]] || exit 2
 [[ "$MOZ_DISABLE_NONLOCAL_CONNECTIONS" == 1 && "$VULPRA_OFFLINE_CONTAINER_ONLY" == 1 && "$VULPRA_M3_NO_AUDIO_DEVICE" == 1 ]] || exit 2
 [[ "$(awk '/^CapEff:/ {print $2}' /proc/self/status)" == 0000000000000000 ]] || exit 2
+[[ "${LD_PRELOAD:-}" == /audit/libpulse-trace.so &&
+   "${VULPRA_M3_LIBPULSE_DLOPEN_TRACE:-}" == /tmp/vulpra-m3-libpulse-dlopen.trace &&
+   -r /audit/libpulse-trace.so ]] || { echo 'Missing exact isolated libpulse interposer' >&2; exit 2; }
 work="$(mktemp -d /tmp/vulpra-pulse.XXXXXX)"
 export HOME="$work/home" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/runtime"
 export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
@@ -116,7 +119,22 @@ backend="$(jq -er '.value.backend // empty' <<<"$result" 2>/dev/null || true)"
 echo "Original browser native cubeb backend=$backend" >&2
 is_rust=false
 [[ "$backend" == pulse-rust ]] && is_rust=true
-jq -n --argjson pre "$pre" --arg backend "$backend" --argjson rust "$is_rust" '{
+probe_stage='original-libxul-libpulse-loader-trace'
+trace="$VULPRA_M3_LIBPULSE_DLOPEN_TRACE"
+[[ -f "$trace" && ! -L "$trace" && -s "$trace" ]] || {
+  echo 'No actual libxul-origin libpulse.so.0 dlopen record' >&2; exit 1;
+}
+# Accept only complete four-column native records with real libxul-origin
+# normalized return PC, flags and successful open. Never archive raw PCs/PIDs.
+trace_count="$(awk -F '\t' '
+NF!=4 || $1 !~ /^[0-9]+$/ || $2 !~ /^0x[0-9a-f]+$/ ||
+ $3 !~ /^0x[0-9a-f]+$/ || ($4!="hit" && $4!="miss"){bad=1}
+$4=="hit" {hits++}
+END {if (bad || hits<1) exit 1; print hits}
+' "$trace")" || { echo 'Malformed or empty original libpulse native dlopen trace' >&2; exit 1; }
+[[ "$trace_count" =~ ^[1-9][0-9]*$ && "$trace_count" -le 1000 ]] || exit 1
+echo "Original libxul.so-origin successful libpulse.so.0 dlopen count=$trace_count (diagnostic interposed)" >&2
+jq -n --argjson pre "$pre" --arg backend "$backend" --argjson rust "$is_rust" --argjson loads "$trace_count" '{
 schema_version:1,status:"original_browser_webaudio_pulse_null_sink_stream_verified",
 source_commit:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
 archive_sha256:"7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a",
@@ -125,6 +143,10 @@ pulse_null_sink_created:true,pulse_sink_had_no_inputs_before_browser_audio:true,
 pulse_sink_input_observed_during_browser_audio:true,libpulse_mapped_before_click:$pre,
 libpulse_mapped_during_audio:true,reported_cubeb_backend:$backend,
 reported_cubeb_backend_is_pulse_rust:$rust,
+instrumented_original_libxul_origin_libpulse_dlopen_successes:$loads,
+original_browser_libpulse_loader_caller_pc_observed_with_ld_preload:true,
+instrumentation_changes_original_symbol_resolution:true,
+uninterposed_original_browser_loader_callstack_proven:false,
 compiled_rust_pulse_callsite_proven:false,
 physical_audio_or_microphone_used:false,network_egress_allowed:false,
 target_endeavouros_verified:false,source_pruning_authorized:false,m3_sixth_gate_closed:false

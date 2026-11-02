@@ -3,9 +3,17 @@
 # CI 41483634953 proved actual audio stream; 41487961096 independently
 # proved runtime-selected "pulse-rust" via privileged native windowUtils.
 # Privileged WebDriver access is restricted to the disposable no-egress CI.
-# Keep this expensive original-browser workload manually dispatchable.
+# Follow-up bounded CI-only libpulse dlopen interposer checks original libxul
+# caller PCs; it does not prove an uninstrumented Rust/C++ FFI stack.
+# Keep the expensive experiment manual-only after passing acceptance.
 name: M3 Original Browser Pulse Null Sink
 on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-browser-pulse-webdriver.sh
+      - ci/m3-original-libpulse-dlopen-callsite.c
+      - .github/workflows/m3-original-browser-pulse-null-sink.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +36,7 @@ jobs:
           sparse-checkout: |
             ci/m3-original-browser-pulse-local-origin.rs
             ci/m3-original-browser-pulse-webdriver.sh
+            ci/m3-original-libpulse-dlopen-callsite.c
       - name: Checkout original cubeb backend source contracts
         uses: actions/checkout@v4
         with:
@@ -60,6 +69,10 @@ jobs:
           grep -Fq 'const char* backend = cubeb_get_backend_id(handle->Context());' original-source/dom/media/CubebUtils.cpp
           grep -Fq 'new AudioContext(' diagnostics/ci/m3-original-browser-pulse-local-origin.rs
           bash -n diagnostics/ci/m3-original-browser-pulse-webdriver.sh
+          cc -std=c11 -Wall -Wextra -Werror -fPIC -shared \
+            diagnostics/ci/m3-original-libpulse-dlopen-callsite.c -ldl \
+            -o "$RUNNER_TEMP/m3-libpulse-trace.so"
+          test -s "$RUNNER_TEMP/m3-libpulse-trace.so"
           rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-pulse-local-origin.rs \
             -o "$RUNNER_TEMP/m3-original-pulse-local-origin"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
@@ -99,12 +112,15 @@ jobs:
             --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
             -v "$RUNNER_TEMP/package/vulpra:/original:ro" \
             -v "$RUNNER_TEMP/m3-original-pulse-local-origin:/audit/local-origin:ro" \
+            -v "$RUNNER_TEMP/m3-libpulse-trace.so:/audit/libpulse-trace.so:ro" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-pulse-webdriver.sh:/audit/webdriver.sh:ro" \
             -v "$RUNNER_TEMP/reports:/reports:rw" \
             -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
             -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
             -e VULPRA_M3_NO_AUDIO_DEVICE=1 \
+            -e LD_PRELOAD=/audit/libpulse-trace.so \
+            -e VULPRA_M3_LIBPULSE_DLOPEN_TRACE=/tmp/vulpra-m3-libpulse-dlopen.trace \
             vulpra-m3-pulse:ci /bin/bash -c '
               set -euo pipefail
               test ! -e /dev/snd
@@ -130,6 +146,10 @@ jobs:
             .libpulse_mapped_during_audio==true and
             (.reported_cubeb_backend=="pulse-rust") and
             (.reported_cubeb_backend_is_pulse_rust==true) and
+            (.instrumented_original_libxul_origin_libpulse_dlopen_successes|type=="number" and .>=1 and .<=1000) and
+            .original_browser_libpulse_loader_caller_pc_observed_with_ld_preload==true and
+            .instrumentation_changes_original_symbol_resolution==true and
+            .uninterposed_original_browser_loader_callstack_proven==false and
             .compiled_rust_pulse_callsite_proven==false and
             .physical_audio_or_microphone_used==false and
             .network_egress_allowed==false and
