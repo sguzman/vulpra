@@ -1,5 +1,49 @@
 # M3 — Original packaged 28-ELF source, loader and runtime-binding matrix (2026-11-02)
 
+## Independently verified per-ELF Arch versus Ubuntu native providers (2026-11-02)
+
+The original source-pinned full-normal browser was **not rebuilt**. [**Actual isolated Arch native glibc loader CI 41515240015 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41515240015), [**workflow lint 41515238477 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41515238477), and separately downloaded/inspected artifact **13174887436**. A corrected reporting boundary now preserves each of the **28 actual original ELF per-file Arch `ld-linux-x86-64.so.2 --list` provider basenames** previously calculated but omitted from the archived report. It rechecks per-file `DT_NEEDED` and provider counts against the global totals and rejects two deliberately corrupted original-report variants. The real native Arch snapshot reported image identity `sha256:e6e8decde3fa6f8f856e65aca051e221c9c938bdd3c3c5678b1e18c173e2e87f` and userspace glibc `2.44+r50+g1848099f063e-1`.
+
+[**Separate cross-platform independent reconciliation CI 41515803526 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41515803526), [**lint 41515803766 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41515803766), artifact **13175133359**, also downloaded/inspected. It joins those new actual per-original-ELF Arch provider lists to the already accepted [**28-ELF source/Ubuntu/runtime matrix 41513030899**](https://github.com/sguzman/vulpra/actions/runs/41513030899). Inputs were authenticated by immutable source `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and full-normal compiled archive SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`. The independent crosswalk verifies every binary identity and **all 28/28 per-file original direct-needed counts match** across Ubuntu and Arch. In the two real loader snapshots, **268/268** direct SONAME declarations resolved in each environment, with **586 Ubuntu vs 584 Arch** per-ELF loader-provider occurrences. Global provider-name unions are **91 Ubuntu / 90 Arch**, of which **81 shared**, **10 Ubuntu-only**, and **9 Arch-only**. These are names observed in glibc `--list` metadata, **not actual libraries used at runtime**.
+
+The machine-readable artifact preserves **complete source ownership and both provider-name sets for every individual ELF**. Counts below summarize the original immutable package on the two CI userspaces. **Providers** include direct and transitively loader-listed libraries, plus interpreter/vDSO entries when listed. **Ubuntu-only / Arch-only** are unique to that particular file's loader-listed set, not files absent from or unsupported on a distribution.
+
+| Original packaged ELF | Direct (both) | Ubuntu providers | Arch providers | Ubuntu-only | Arch-only |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `crashhelper` | 7 | 8 | 8 | 0 | 0 |
+| `crashreporter` | 13 | 73 | 73 | 10 | 10 |
+| `gfxtest` | 28 | 74 | 73 | 10 | 9 |
+| `libclearkey.so` | 10 | 16 | 16 | 0 | 0 |
+| `libfreeblpriv3.so` | 6 | 8 | 8 | 0 | 0 |
+| `libgkcodecs.so` | 5 | 7 | 7 | 0 | 0 |
+| `liblgpllibs.so` | 6 | 7 | 7 | 0 | 0 |
+| `libmozavcodec.so` | 8 | 13 | 13 | 0 | 0 |
+| `libmozavutil.so` | 10 | 12 | 12 | 0 | 0 |
+| `libmozgtk.so` | 4 | 70 | 71 | 10 | 11 |
+| `libmozinference.so` | 7 | 8 | 8 | 0 | 0 |
+| `libmozsandbox.so` | 10 | 12 | 12 | 0 | 0 |
+| `libmozsqlite3.so` | 4 | 6 | 6 | 0 | 0 |
+| `libmozwayland.so` | 2 | 4 | 4 | 0 | 0 |
+| `libnspr4.so` | 3 | 5 | 5 | 0 | 0 |
+| `libnss3.so` | 7 | 9 | 9 | 0 | 0 |
+| `libnssutil3.so` | 6 | 8 | 8 | 0 | 0 |
+| `libonnxruntime.so` | 7 | 8 | 8 | 0 | 0 |
+| `libplc4.so` | 3 | 6 | 6 | 0 | 0 |
+| `libplds4.so` | 3 | 6 | 6 | 0 | 0 |
+| `libsmime3.so` | 8 | 10 | 10 | 0 | 0 |
+| `libsoftokn3.so` | 8 | 11 | 11 | 0 | 0 |
+| `libssl3.so` | 8 | 10 | 10 | 0 | 0 |
+| `libxul.so` | 49 | 90 | 89 | 10 | 9 |
+| `pingsender` | 7 | 8 | 8 | 0 | 0 |
+| `updater` | 25 | 81 | 80 | 10 | 9 |
+| `vulpra` | 7 | 8 | 8 | 0 | 0 |
+| `vulpra-bin` | 7 | 8 | 8 | 0 | 0 |
+| **28 original ELF files** | **268** | **586** | **584** | **Per-file counts; not additive names** | **Per-file counts; not additive names** |
+
+Five ELF files have differing provider-name sets in these specific CI environments: **`crashreporter`, `gfxtest`, `libmozgtk.so`, `libxul.so`, and `updater`**. The global ten Ubuntu-only names and nine Arch-only names belong to these real test environments; **a name difference is not evidence of a missing dependency, unused feature, or permission to prune a security component**. The initial artifact's per-file Arch mapping was explicitly unknown rather than inferred; this new independent original-source Arch test now resolves that *bounded metadata* gap.
+
+**Still unproven:** Actual feature execution across all 28 paths, arbitrary future/conditional `dlopen` calls and full symbol-accurate transitive load graph, generated Ninja/Cargo feature ownership, the real EndeavourOS/Hyprland workstation, hardware, unrestricted production networking, and safe code deletion. The browser was not launched or installed by these two new tests. **M3 remains 5/6 (83%); overall Vulpra 61%; session Δ +0 pp. No source removals or new package-size savings.**
+
 ## Verifiable result and exact provenance
 
 [**Independent read-only CI 41513030899 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41513030899), [**GitHub Actions workflow lint 41513031183 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41513031183). **Artifact 13174097102**, `m3-original-28-elf-feature-loader-binding-matrix.json`, independently downloaded and inspected. The report was produced entirely from five previously successful, immutable, source- and archive-authenticated GitHub Actions evidence artifacts; no new Firefox build, browser run, package modification or user profile access was performed.
