@@ -2,12 +2,9 @@
 # deliberately minimal public C API entrypoint. This MUST NOT be confused with
 # the separate external Rust probe's dlopen of ONNX itself.
 name: M3 Original ONNX Inner Dlopen Diagnostic
+# Exact-original runtime test already passed in 41524996253.
+# Avoid repeated original archive extraction on documentation-only updates.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-onnx-inner-dlopen.yml
-      - ci/m3-original-onnx-inner-dlopen-observe.c
   workflow_dispatch:
 permissions:
   contents: read
@@ -127,7 +124,8 @@ jobs:
           sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
             LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             timeout --signal=TERM --kill-after=3s 25s \
-            "$probe" "$package/libonnxruntime.so" >"$RUNNER_TEMP/control.stdout"
+            "$probe" "$package/libonnxruntime.so" |
+            tee "$RUNNER_TEMP/control.stdout" >/dev/null
           grep -Fxq 'PASS: original packaged ONNX Runtime C API base and nonempty version string invoked' \
             "$RUNNER_TEMP/control.stdout"
           # Only the probe receives LD_PRELOAD. Preloading the timeout
@@ -136,7 +134,8 @@ jobs:
             LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             timeout --signal=TERM --kill-after=3s 25s \
             env LD_PRELOAD="$shim" M3_ONNX_INNER_DLOPEN_REPORT="$report" \
-            "$probe" "$package/libonnxruntime.so" >"$RUNNER_TEMP/observed.stdout"
+            "$probe" "$package/libonnxruntime.so" |
+            tee "$RUNNER_TEMP/observed.stdout" >/dev/null
           grep -Fxq 'PASS: original packaged ONNX Runtime C API base and nonempty version string invoked' \
             "$RUNNER_TEMP/observed.stdout"
           test -s "$report"
