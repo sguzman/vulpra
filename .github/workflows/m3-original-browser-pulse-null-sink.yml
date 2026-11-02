@@ -1,14 +1,11 @@
 # Source-pinned original packaged Vulpra live WebAudio -> PulseAudio null sink.
 # No physical audio device, microphone, host Pulse/PipeWire or network.
-# CI 41483634953 passed; follow-up diagnostic tests exact native
-# about:support cubeb backend ID. Restore manual dispatch after validation.
+# CI 41483634953 proved actual audio stream; 41487961096 independently
+# proved runtime-selected "pulse-rust" via privileged native windowUtils.
+# Privileged WebDriver access is restricted to the disposable no-egress CI.
+# Keep this expensive original-browser workload manually dispatchable.
 name: M3 Original Browser Pulse Null Sink
 on:
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-browser-pulse-webdriver.sh
-      - .github/workflows/m3-original-browser-pulse-null-sink.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -131,8 +128,8 @@ jobs:
             .pulse_sink_input_observed_during_browser_audio==true and
             (.libpulse_mapped_before_click|type=="boolean") and
             .libpulse_mapped_during_audio==true and
-            (.reported_cubeb_backend|test("^[a-z][a-z0-9-]{1,31}$")) and
-            (.reported_cubeb_backend_is_pulse_rust==(.reported_cubeb_backend=="pulse-rust")) and
+            (.reported_cubeb_backend=="pulse-rust") and
+            (.reported_cubeb_backend_is_pulse_rust==true) and
             .compiled_rust_pulse_callsite_proven==false and
             .physical_audio_or_microphone_used==false and
             .network_egress_allowed==false and
