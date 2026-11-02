@@ -1,0 +1,166 @@
+# Execute only the original, unmodified Firefox WebAuthn libudev-sys Rust
+# udev_new/udev_unref first-use path in no-egress disposable Linux hosts.
+# No original browser binary, USB enumeration, authenticator or user profile.
+name: M3 Original WebAuthn Rust Libudev First-Use Smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-webauthn-libudev-wrapper-smoke.rs
+      - .github/workflows/m3-original-webauthn-libudev-wrapper-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-source-lazy-rust-wrapper:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      PREVIOUS_NATIVE_RUN: '41357321586'
+      PREVIOUS_NATIVE_HEAD: 5f7437f957e45201149ce42ecad6c662b16d19bf
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout bounded executable harness only
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-webauthn-libudev-wrapper-smoke.rs
+      - name: Checkout immutable original libudev-sys Rust crate
+        uses: actions/checkout@v4
+        with:
+          path: original
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/webauthn/libudev-sys/Cargo.toml
+            dom/webauthn/libudev-sys/src/lib.rs
+      - name: Authenticate original compiled WebAuthn SONAME evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original rev-parse HEAD)" = "$SOURCE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREVIOUS_NATIVE_RUN" |
+            jq -e --arg head "$PREVIOUS_NATIVE_HEAD" '.status=="completed" and .conclusion=="success" and .head_sha==$head' >/dev/null
+          mkdir -p "$RUNNER_TEMP/pinned"
+          gh run download "$PREVIOUS_NATIVE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-webauthn-libudev-source-machine --dir "$RUNNER_TEMP/pinned"
+          jq -e --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" '
+            .status=="original_webauthn_libudev_source_to_native_register_dlopen_candidate_verified" and
+            .original_source_commit==$source and .original_archive_sha256==$archive and
+            .native_constructed_soname=="libudev.so.1" and
+            .native_compiled_candidate_argument_verified==true and
+            .actual_webauthn_key_flow_executed==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/pinned/m3-original-webauthn-libudev-source-native.json" >/dev/null
+          grep -Fq 'Library::open("libudev.so.1")' original/dom/webauthn/libudev-sys/src/lib.rs
+          grep -Fq 'define!(udev_new, extern "C" fn () -> *mut udev);' original/dom/webauthn/libudev-sys/src/lib.rs
+          grep -Fq 'define!(udev_unref, extern "C" fn (*mut udev) -> *mut udev);' original/dom/webauthn/libudev-sys/src/lib.rs
+      - name: Compile real original crate and minimal standalone Rust first-use harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original-udev-crate-smoke/src"
+          cp diagnostics/ci/m3-original-webauthn-libudev-wrapper-smoke.rs \
+            "$RUNNER_TEMP/original-udev-crate-smoke/src/main.rs"
+          cat >"$RUNNER_TEMP/original-udev-crate-smoke/Cargo.toml" <<EOF
+          [package]
+          name = "vulpra-m3-original-udev-smoke"
+          version = "0.1.0"
+          edition = "2021"
+
+          [dependencies]
+          libudev-sys = { path = "$GITHUB_WORKSPACE/original/dom/webauthn/libudev-sys", version = "=0.1.3" }
+          libc = "=0.2.186"
+          lazy_static = "=1.4.0"
+          EOF
+          cargo generate-lockfile --manifest-path "$RUNNER_TEMP/original-udev-crate-smoke/Cargo.toml"
+          cargo build --release --locked --manifest-path "$RUNNER_TEMP/original-udev-crate-smoke/Cargo.toml"
+          rustc --edition=2021 --test diagnostics/ci/m3-original-webauthn-libudev-wrapper-smoke.rs \
+            -o "$RUNNER_TEMP/m3-source-original-udev-wrapper-tests" \
+            --extern libudev_sys="$(find "$RUNNER_TEMP/original-udev-crate-smoke/target/release/deps" -maxdepth 1 -name 'liblibudev_sys-*.rlib' | head -1)" \
+            -L dependency="$RUNNER_TEMP/original-udev-crate-smoke/target/release/deps"
+          "$RUNNER_TEMP/m3-source-original-udev-wrapper-tests"
+          cp "$RUNNER_TEMP/original-udev-crate-smoke/target/release/vulpra-m3-original-udev-smoke" "$RUNNER_TEMP/m3-original-webauthn-wrapper"
+          # The provider must remain lazy: the executable may not link the
+          # original dynamic library as an ELF startup DT_NEEDED dependency.
+          if readelf -d "$RUNNER_TEMP/m3-original-webauthn-wrapper" |
+             grep -F 'Shared library: [libudev.so.1]'; then
+            echo 'FAIL: original wrapper binary linked libudev eagerly' >&2
+            exit 1
+          fi
+      - name: Execute actual original WebAuthn Rust wrapper in no-egress Ubuntu process
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo unshare --net -- "$RUNNER_TEMP/m3-original-webauthn-wrapper" "$SOURCE_SHA" \
+            ubuntu-24.04 "$RUNNER_TEMP/m3-original-udev-wrapper-ubuntu.json"
+      - name: Build disposable Arch userspace with actual libudev provider
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-original-udev"
+          cat >"$RUNNER_TEMP/arch-original-udev/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed systemd-libs && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t vulpra-original-udev-smoke:ci "$RUNNER_TEMP/arch-original-udev"
+      - name: Execute original Rust lazy loader and context API in no-egress Arch
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 64 --memory 512m \
+            --user "$(id -u):$(id -g)" \
+            -v "$RUNNER_TEMP/m3-original-webauthn-wrapper:/audit/original-smoke:ro" \
+            -v "$RUNNER_TEMP:/reports:rw" \
+            vulpra-original-udev-smoke:ci \
+            /audit/original-smoke "$SOURCE_SHA" archlinux-container \
+            /reports/m3-original-udev-wrapper-arch.json
+      - name: Verify two host first-use original Rust-loader observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in ubuntu:ubuntu-24.04 arch:archlinux-container; do
+            suffix="${pair%%:*}"; profile="${pair#*:}"
+            jq -e --arg src "$SOURCE_SHA" --arg profile "$profile" '
+              .schema_version==1 and
+              .status=="source_pinned_original_rust_webauthn_libudev_first_use_context_smoke" and
+              .original_source_commit==$src and .isolated_host==$profile and
+              .original_libudev_sys_rust_source_compiled_and_executed==true and
+              .source_udev_new_function_invoked==true and
+              .source_udev_unref_function_invoked==true and
+              .source_udev_new_returned_nonnull_context==true and
+              .libudev_soname=="libudev.so.1" and
+              .libudev_noload_pre_first_use==false and
+              .libudev_noload_post_first_use==true and
+              .libudev_noload_after_context_release==true and
+              .original_compiled_wrapper_dlopen_lazy_route_observed==true and
+              .usb_device_enumeration_performed==false and
+              .webauthn_security_key_session_performed==false and
+              .original_browser_executed==false and
+              .network_egress_allowed_during_test==false and
+              .user_workstation_verified==false and
+              .complete_loader_dependency_closure==false and
+              .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+            ' "$RUNNER_TEMP/m3-original-udev-wrapper-${suffix}.json" >/dev/null
+          done
+          echo 'PASS: real original WebAuthn Rust libudev-sys first use and context release, both isolated Linux hosts'
+      - name: Upload only sanitized source-pinned two-host original wrapper outcomes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-webauthn-libudev-real-wrapper-first-use
+          path: |
+            ${{ runner.temp }}/m3-original-udev-wrapper-ubuntu.json
+            ${{ runner.temp }}/m3-original-udev-wrapper-arch.json
+          if-no-files-found: warn
+          retention-days: 14
