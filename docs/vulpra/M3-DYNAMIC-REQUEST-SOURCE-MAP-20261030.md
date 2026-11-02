@@ -297,6 +297,26 @@ The source symbol ordering and names are identical in both archived JSON records
 
 **No source removed or new byte savings. M3 5/6 (83%), overall 61%, Δ+0 percentage points.**
 
+## Unmodified original WebAuthn Rust `libudev-sys` first-use loader executed on isolated Ubuntu and Arch (2026-11-02 UTC)
+
+[**Original WebAuthn Rust wrapper CI 41365492654 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41365492654), workflow lint [41365492595 — PASS](https://github.com/sguzman/vulpra/actions/runs/41365492595). **Artifact 13106374819 independently downloaded; both original Ubuntu and Arch JSON records inspected**. Original source identity is unchanged at `b1482404dfb8b01342990ee99ea3df0f9756b5f7`. The CI authenticates the earlier [source-to-original compiled machine WebAuthn `libudev.so.1` witness 41357321586 PASS](https://github.com/sguzman/vulpra/actions/runs/41357321586), then checks out the **unmodified original source of `dom/webauthn/libudev-sys/src/lib.rs` plus its Cargo manifest**. It builds the *actual* `libudev-sys` Rust crate as a path dependency in a throwaway Cargo project, with pinned `libc 0.2.186` and `lazy_static 1.4.0` dependency versions, and links only the minimal new test harness `ci/m3-original-webauthn-libudev-wrapper-smoke.rs`. There is **no change to Firefox's source or application binary**.
+
+This is stronger than the previous isolated ABI-name probe: the **original `libudev_sys::udev_new` lazy-static Rust symbol** is actually invoked and returns a nonnull `udev` context; the original `libudev_sys::udev_unref` wrapper is invoked on the same context. The standalone program is first checked to have **no ELF DT_NEEDED link to `libudev.so.1`**, confirming loading is dynamic rather than an eager link introduced by this test. The harness uses actual glibc `dlopen(...,RTLD_LAZY|RTLD_GLOBAL|RTLD_NOLOAD)` only to check process state **before** and **after** the original Rust function calls, and closes those observation handles. No application start, USB enumerator, authenticator challenge or external network operation is performed.
+
+| Exact original Rust first-use execution | Ubuntu 24.04 no-egress namespace | Disposable Arch `archlinux:base` with `systemd-libs`, no-egress read-only container |
+| --- | --- | --- |
+| `libudev.so.1` already loaded before `udev_new` | No | No |
+| Real original `libudev_sys::udev_new` | Nonnull context | Nonnull context |
+| `RTLD_NOLOAD` after first use | Found loaded `libudev.so.1` | Found loaded `libudev.so.1` |
+| Real original `libudev_sys::udev_unref` | Invoked | Invoked |
+| `RTLD_NOLOAD` after context release | Still loaded via original lazy static | Still loaded via original lazy static |
+
+The two sanitized artifact reports explicitly record `original_libudev_sys_rust_source_compiled_and_executed=true`, `source_udev_new_function_invoked=true`, `source_udev_unref_function_invoked=true`, `libudev_noload_pre_first_use=false`, `libudev_noload_post_first_use=true`, `libudev_noload_after_context_release=true`, `original_compiled_wrapper_dlopen_lazy_route_observed=true`. CI also passed standalone bounded Rust fixtures and archive-proven original source identity.
+
+**Limitations:** the test executes the original **library crate**, **not the original Firefox browser's WebAuthn/authenticator integration**. It does not prove any security-key discovery, USB device use, actual Firefox triggered `libudev.so.1` load, user-specific EndeavourOS/Hyprland behavior, every libudev function or full conditional loader graph. It must **not** be treated as proof that the user's computer has a working USB authenticator or that any source can safely be deleted. Both reports have `original_browser_executed=false`, `usb_device_enumeration_performed=false`, `webauthn_security_key_session_performed=false`, `network_egress_allowed_during_test=false`, `user_workstation_verified=false`, `complete_loader_dependency_closure=false`, `source_pruning_authorized=false`, `m3_sixth_gate_closed=false`.
+
+**No new source deletion, package-size reduction, sixth M3 gate credit, or overall product-progress percentage change. M3 5/6 = 83%, Vulpra overall 61%, Δ+0 percentage points.**
+
 ## Explicitly unverified
 
 - Full native source-to-runtime stack attribution and all feature-route invocations.
