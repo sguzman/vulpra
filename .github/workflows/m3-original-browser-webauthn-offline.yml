@@ -1,0 +1,142 @@
+# Real original compiled Vulpra binary, WebDriver virtual CTAP2 USB
+# WebAuthn create/get, private localhost server and disconnected namespace.
+# This never uses a physical key or changes installed/user Firefox profiles.
+name: M3 Original Browser Offline Virtual WebAuthn
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-browser-webauthn-local-origin.rs
+      - ci/m3-original-browser-webauthn-webdriver.sh
+      - .github/workflows/m3-original-browser-webauthn-offline.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-native-browser-virtual-webauthn:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      ORIGINAL_RUN: '40997075527'
+    steps:
+      - name: Checkout only CI Rust local-origin and WebDriver test
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-webauthn-local-origin.rs
+            ci/m3-original-browser-webauthn-webdriver.sh
+      - name: Checkout original source WebAuthn virtual-authenticator regression
+        uses: actions/checkout@v4
+        with:
+          path: original-source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/webauthn/tests/test_webauthn_webdriver_virtual_authenticator.html
+            dom/webauthn/tests/browser/browser.toml
+      - name: Authenticate immutable original native browser and offline test code
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE_SHA"
+          grep -Fq 'addVirtualAuthenticator()' original-source/dom/webauthn/tests/test_webauthn_webdriver_virtual_authenticator.html
+          grep -Fq 'security.webauth.webauthn_enable_usbtoken=false' original-source/dom/webauthn/tests/browser/browser.toml
+          bash -n diagnostics/ci/m3-original-browser-webauthn-webdriver.sh
+          rustc --edition=2021 -O diagnostics/ci/m3-original-browser-webauthn-local-origin.rs \
+            -o "$RUNNER_TEMP/m3-original-local-origin"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
+            jq -e --arg src "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$src' >/dev/null
+          mkdir -p "$RUNNER_TEMP/original-archive" "$RUNNER_TEMP/packaged" "$RUNNER_TEMP/reports"
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original-archive"
+          (cd "$RUNNER_TEMP/original-archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original-archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/original-archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/packaged"
+          test -x "$RUNNER_TEMP/packaged/vulpra/vulpra"
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/packaged/vulpra/application.ini"
+      - name: Build disposable Arch userspace with WebDriver and original browser dependencies
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-webauthn"
+          cat >"$RUNNER_TEMP/arch-webauthn/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            bash coreutils curl jq grep findutils procps-ng util-linux \
+            iproute2 geckodriver gtk3 dbus-glib alsa-lib nss \
+            mesa libglvnd ttf-dejavu \
+            && command -v geckodriver && command -v ip && command -v setpriv \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t vulpra-m3-original-webauthn:ci "$RUNNER_TEMP/arch-webauthn"
+      - name: Execute real original native browser virtual USB WebAuthn with namespace-only loopback
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          # NETWORK NONE: no internet or bridge. Grant NET_ADMIN only to
+          # transient root namespace setup so private loopback can be raised.
+          # Drop it before executing geckodriver, original browser and test.
+          docker run --rm --network none --read-only --shm-size 256m \
+            --cap-drop ALL --cap-add NET_ADMIN \
+            --security-opt no-new-privileges --pids-limit 128 --memory 2g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
+            -v "$RUNNER_TEMP/packaged/vulpra:/original:ro" \
+            -v "$RUNNER_TEMP/m3-original-local-origin:/audit/local-origin:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-webauthn-webdriver.sh:/audit/webdriver.sh:ro" \
+            -v "$RUNNER_TEMP/reports:/reports:rw" \
+            -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
+            -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
+            vulpra-m3-original-webauthn:ci /bin/bash -c '
+              set -euo pipefail
+              ip link set lo up
+              exec setpriv --reuid "$CI_UID" --regid "$CI_GID" \
+                --clear-groups --bounding-set=-net_admin \
+                /bin/bash /audit/webdriver.sh /original/vulpra /audit/local-origin \
+                /reports/m3-original-browser-webauthn-virtual.json
+            '
+      - name: Accept actual original browser WebAuthn create and assertion, never hardware
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_browser_real_webauthn_virtual_usb_create_get" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .original_native_browser_executed==true and
+            .localhost_secure_origin==true and
+            .actual_browser_navigator_credentials_create_succeeded==true and
+            .actual_browser_navigator_credentials_get_succeeded==true and
+            .virtual_ctap2_usb_authenticator_used==true and
+            .virtual_credential_is_ephemeral==true and
+            .user_usb_hardware_or_authenticator_accessed==false and
+            (.original_browser_libudev_mapped_at_end|type)=="boolean" and
+            .original_browser_dynamic_libudev_load_proven==false and
+            .actual_physical_usb_webauthn_path_verified==false and
+            .no_network_egress==true and
+            .real_user_profile_or_browser_accessed==false and
+            .user_endeavouros_hyprland_verified==false and
+            .full_dynamic_loader_graph_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/reports/m3-original-browser-webauthn-virtual.json" >/dev/null
+          echo 'PASS: real original native Vulpra WebAuthn create+get, loopback only; no physical USB or full dynamic closure'
+      - name: Upload only sanitized browser feature observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-browser-offline-webauthn-virtual
+          path: ${{ runner.temp }}/reports/m3-original-browser-webauthn-virtual.json
+          if-no-files-found: warn
+          retention-days: 14
