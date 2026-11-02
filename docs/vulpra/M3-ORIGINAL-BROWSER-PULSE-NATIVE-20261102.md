@@ -1,5 +1,23 @@
 # M3 — Original packaged Vulpra WebAudio to isolated PulseAudio null sink (2026-11-02)
 
+## Actual original compiled cubeb C→Rust PulseAudio function-address link (2026-11-02 UTC)
+
+**Exact-source native build [41497793049](https://github.com/sguzman/vulpra/actions/runs/41497793049) completed its full original Firefox compilation successfully**, but the overall workflow concluded **failure** at a subsequent JSON field-name assertion. Its native compiled-FFI verifier itself printed **PASS**, and artifact **13172262356** (`m3-original-linked-cubeb-pulse-ffi.json`) was independently downloaded and inspected. The field mismatch was between the verifier's `uninstrumented_original_browser_stack_proven: false` and the workflow's erroneous `uninterposed_original_browser_stack_proven` lookup. The correct key is now required by the full workflow, which has been restored to **manual-only** to avoid another automatic, resource-intensive native rebuild. The historical failed workflow has **not** been relabeled successful.
+
+**Independent archival acceptance [41511180121](https://github.com/sguzman/vulpra/actions/runs/41511180121)**, artifact **13172649065** (downloaded and inspected), authenticated the failed source-pinned run and exact successful **original compile, Rust FFI archive/ELF definitions, compiled C++ text relocations, and four previously known C++→Rust direct machine calls** before the single failed `cubeb` report-acceptance step. It rechecked all four actual archived JSON outputs against the original Git SHA `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and the expected constrained negative assertions; **no additional Firefox compilation** was performed. [Workflow lint 41511181157](https://github.com/sguzman/vulpra/actions/runs/41511181157) passed.
+
+| Original unstripped `libxul.so` compiled witness | Verified count |
+| --- | ---: |
+| Actual native `cubeb_init` defined text symbol | **1** |
+| Actual linked Rust `pulse_rust_init` defined text symbol | **1** |
+| `cubeb_init` instruction referencing `pulse_rust_init` native address | **1** |
+| `cubeb_init` indirect call instruction | **1** |
+| FFI address references resolved through a dynamic relocation slot | **0** |
+
+The audited `ci/m3-original-linked-cubeb-pulse-ffi.sh` inspects `nm`, `readelf` and bounded GNU `objdump` output from the **actual original-source compiled unstripped `libxul.so`**; its native ELF positive and fail-closed negative fixtures passed in the same source-pinned workflow preflight. The output contains a real linked Rust symbol and a native address-taken instruction in compiled `cubeb_init`, rather than merely grep-matched source text or an assumed direct call. The separate real packaged-browser [selected `pulse-rust` backend evidence 41487961096](https://github.com/sguzman/vulpra/actions/runs/41487961096) remains valid and complementary.
+
+**Strict bounds:** A function-address reference and indirect branch do **not**, alone, prove the indirect branch targeted that function at runtime or provide an uninstrumented browser stack; a complete direct/indirect FFI universe, all transitive runtime `dlopen` dependencies and target physical host behavior remain open. The native compilation performed in the **failed** run is genuine, but independent acceptance of its recorded artifact is **not a second compile**. No source files were removed, no savings measured and no further gate credit awarded. **M3 5/6 (83%); overall 61%; session Δ +0 pp.**
+
 ## Actual compiled `libxul.so` PulseAudio `dlopen` callsite (2026-11-02 UTC)
 
 [**Exact-original native CI 41492260472 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41492260472); [**workflow lint 41492260503 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41492260503). **Artifact 13163799244** was independently downloaded; its single bounded JSON record was inspected. The workflow again authenticated original source commit `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and its **full-normal original browser tar.xz** SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` before running in private no-egress Arch/Weston, with synthetic-only PulseAudio output. This was the **actual original executable**, not a mock Rust shim or a source-only grep.
