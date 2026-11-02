@@ -13,6 +13,9 @@ export HOME="$work/home" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/runti
 export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
 export WAYLAND_DISPLAY=wayland-vulpra-pulse XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1
 export MOZ_CRASHREPORTER_DISABLE=1 XRE_START_OFFLINE=1
+# System-level WebDriver access is only for this disposable, --network none
+# original browser. Firefox 138+ requires explicit parent/chrome access.
+export MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1
 unset MOZ_HEADLESS DISPLAY
 mkdir -m 0700 "$HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
 weston_pid='' pulse_pid='' origin_pid='' driver_pid='' session=''
@@ -45,7 +48,7 @@ done
 [[ "$ready" == true && -z "$(pactl list short sink-inputs)" ]] || exit 1
 probe_stage='browser-startup'
 "$origin" vulpra-original-pulse-offline >"$work/origin.log" 2>&1 & origin_pid=$!
-geckodriver --host 127.0.0.1 --port 4444 --log error >"$work/driver.log" 2>&1 & driver_pid=$!
+geckodriver --allow-system-access --host 127.0.0.1 --port 4444 --log error >"$work/driver.log" 2>&1 & driver_pid=$!
 ready=false
 for _ in {1..45}; do
  if curl --noproxy '*' -s --max-time 1 "$base/status" | jq -e '.value.ready==true' >/dev/null 2>&1 &&
