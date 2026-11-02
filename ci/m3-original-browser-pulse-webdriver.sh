@@ -88,27 +88,26 @@ for _ in {1..60}; do
  sleep 0.15
 done
 [[ "$sink" == true && "$mapped" == true && "$running" == true ]] || { echo "Audio witness missing: $sink $mapped $running" >&2; exit 1; }
-probe_stage='native-backend-about-support'
-echo 'Pulse stream, mapping and browser WebAudio confirmed; querying native backend' >&2
-# Read the native cubeb backend ID via the *original* about:support media
-# diagnostics pipeline. This is actual browser state, not a source guess.
-support_reply="$(api POST "/session/$session/url" '{"url":"about:support"}')"
-if ! jq -e '.value==null' <<<"$support_reply" >/dev/null; then
-  jq -r '.value.error // "unexpected about:support navigation response"' <<<"$support_reply" >&2
+probe_stage='native-backend-chrome-context'
+echo 'Pulse stream, mapping and browser WebAudio confirmed; querying native cubeb backend' >&2
+# Firefox about:support uses Services.wm.getMostRecentWindow("").windowUtils.
+# Query the same native interface on the disposable browser chrome window.
+# Direct WebDriver navigation to about:support is unsupported.
+switch_reply="$(api POST "/session/$session/moz/context" '{"context":"chrome"}')"
+if ! jq -e '.value==null or .value=="chrome"' <<<"$switch_reply" >/dev/null; then
+  jq -r '.value.error // "WebDriver chrome context switch unavailable"' <<<"$switch_reply" >&2
   exit 1
 fi
-probe_stage='native-backend-row'
+probe_stage='native-backend-window-utils'
 backend=''
-for _ in {1..60}; do
-  result="$(api POST "/session/$session/execute/sync" '{"script":"const row=[...document.querySelectorAll(\"#media-info-tbody tr\")].find(r=>r.querySelector(\"th\")?.getAttribute(\"data-l10n-id\")===\"audio-backend\");return {uri:document.documentURI,backend:row?.querySelector(\"td\")?.textContent?.trim()||null};","args":[]}' )"
-  if jq -e '.value.uri=="about:support"' <<<"$result" >/dev/null 2>&1; then
-    backend="$(jq -er '.value.backend // empty' <<<"$result" 2>/dev/null || true)"
-    [[ "$backend" =~ ^[a-z][a-z0-9-]{1,31}$ ]] && break
-  fi
-  sleep 0.25
-done
+result="$(api POST "/session/$session/execute/sync" '{"script":"return {chrome:document.documentURI.startsWith(\"chrome://\"),backend:window.windowUtils.currentAudioBackend};","args":[]}' )"
+if ! jq -e '.value.chrome==true' <<<"$result" >/dev/null; then
+  jq -r '.value.error // "Original browser chrome windowUtils unavailable"' <<<"$result" >&2
+  exit 1
+fi
+backend="$(jq -er '.value.backend // empty' <<<"$result" 2>/dev/null || true)"
 [[ "$backend" =~ ^[a-z][a-z0-9-]{1,31}$ ]] || {
-  echo 'Native about:support cubeb backend ID was not available' >&2
+  echo 'Native browser cubeb backend ID was not available' >&2
   exit 1
 }
 echo "Original browser native cubeb backend=$backend" >&2
