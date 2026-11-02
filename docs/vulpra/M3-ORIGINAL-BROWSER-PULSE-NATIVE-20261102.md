@@ -1,5 +1,27 @@
 # M3 — Original packaged Vulpra WebAudio to isolated PulseAudio null sink (2026-11-02)
 
+## Actual compiled `libxul.so` PulseAudio `dlopen` callsite (2026-11-02 UTC)
+
+[**Exact-original native CI 41492260472 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41492260472); [**workflow lint 41492260503 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41492260503). **Artifact 13163799244** was independently downloaded; its single bounded JSON record was inspected. The workflow again authenticated original source commit `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and its **full-normal original browser tar.xz** SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` before running in private no-egress Arch/Weston, with synthetic-only PulseAudio output. This was the **actual original executable**, not a mock Rust shim or a source-only grep.
+
+A separate CI-only `LD_PRELOAD` C interposer (`ci/m3-original-libpulse-dlopen-callsite.c`) recorded only successful or unsuccessful `dlopen("libpulse.so.0", flags)` calls **whose direct return-address owner was the original compiled `libxul.so`**. It resolved the return PC via `dladdr` to an ASLR-normalized `libxul.so` offset, recording PID/PC/flags/result in a **local-only** four-column file. The shell harness rejected a missing, malformed or empty trace and accepted the real native result only if at least one actual **successful** `libxul.so`-origin `dlopen` was witnessed. **Two successful calls were observed**; the sanitized artifact includes the count but **no raw process IDs, PC values, paths, stack data, credentials or microphone content**. The same session independently witnessed live user-clicked WebAudio, fresh PulseAudio null-sink input, mapped `libpulse.so.0`, and original cubeb backend ID **`pulse-rust`**.
+
+| Sanitized original native-browser assertion | Result |
+| --- | --- |
+| `instrumented_original_libxul_origin_libpulse_dlopen_successes` | **2** |
+| `original_browser_libpulse_loader_caller_pc_observed_with_ld_preload` | **true** |
+| `reported_cubeb_backend` | **`pulse-rust`** |
+| `pulse_sink_input_observed_during_browser_audio` | **true** |
+| `libpulse_mapped_before_click` | **true** |
+| `instrumentation_changes_original_symbol_resolution` | **true** |
+| `uninterposed_original_browser_loader_callstack_proven` | **false** |
+| `compiled_rust_pulse_callsite_proven` | **false** |
+| `source_pruning_authorized` / `m3_sixth_gate_closed` | **false / false** |
+
+**Interpretation and bounds:** This establishes an actual **compiled `libxul.so` → glibc `dlopen("libpulse.so.0")`** edge in the instrumented original runtime and independently verified Rust PulseAudio backend selection. It does **not** symbolize the return PC as `pulse_rust_init` or identify the exact C↔Rust machine-code call edge, prove a new library mapping at WebAudio click, or provide an unmodified full call stack. An earlier uninstrumented native browser audio control [41487961096](https://github.com/sguzman/vulpra/actions/runs/41487961096) confirmed functional WebAudio/PulseAudio without this interposer, but did **not** capture a return PC. Neither run claims physical sound, hardware devices, microphone, target EndeavourOS/Hyprland behavior, all dynamic library requesters, deletion authorization, source pruning or package savings.
+
+The trace workload is expensive and was restored to **manual `workflow_dispatch` only** after this pass. This accepted subtask does **not** close the complete M3 sixth gate: **M3 5/6 (83%), overall 61%, session Δ+0 percentage points**.
+
 ## Actual original-browser Rust PulseAudio backend selection (2026-11-02)
 
 [**Source-pinned native browser CI 41487961096 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41487961096). **Artifact 13162449750** was independently downloaded and the sanitized JSON inspected. The real original packaged browser in a disposable, no-network Arch Linux + Weston session started a live WebAudio oscillator following a WebDriver button click, established a fresh PulseAudio null-sink input, and exposed its own **native cubeb backend ID `pulse-rust`**. The JSON specifically records `reported_cubeb_backend: "pulse-rust"` and `reported_cubeb_backend_is_pulse_rust: true`, alongside the existing positive stream / mapped-library observations and negative permission/pruning claims. The new CI acceptance requires **both** exact runtime value and true boolean; no other backend counts as an accepted Rust PulseAudio witness.

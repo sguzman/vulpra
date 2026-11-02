@@ -3,17 +3,12 @@
 # CI 41483634953 proved actual audio stream; 41487961096 independently
 # proved runtime-selected "pulse-rust" via privileged native windowUtils.
 # Privileged WebDriver access is restricted to the disposable no-egress CI.
-# Follow-up bounded CI-only libpulse dlopen interposer checks original libxul
-# caller PCs; it does not prove an uninstrumented Rust/C++ FFI stack.
-# Keep the expensive experiment manual-only after passing acceptance.
+# Native source-pinned CI 41492260472 passed; sanitized artifact 13163799244:
+# two successful instrumented libxul-origin libpulse.so.0 dlopen records.
+# LD_PRELOAD modifies symbol resolution; no uninstrumented full FFI stack.
+# Keep the expensive native experiment manually dispatchable.
 name: M3 Original Browser Pulse Null Sink
 on:
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-browser-pulse-webdriver.sh
-      - ci/m3-original-libpulse-dlopen-callsite.c
-      - .github/workflows/m3-original-browser-pulse-null-sink.yml
   workflow_dispatch:
 permissions:
   contents: read
