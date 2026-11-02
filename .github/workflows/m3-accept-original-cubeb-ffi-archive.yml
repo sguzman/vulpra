@@ -1,0 +1,171 @@
+# Cheap independent acceptance of the exact original Firefox 159 compiled
+# cubeb C -> Rust FFI witness from CI 41497793049.
+# That job compiled successfully but failed only its final JSON-key assertion.
+# Never mark its GitHub run green and do not repeat the ~hour native build.
+name: M3 Accept Original Compiled Cubeb FFI Archive
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-accept-original-cubeb-ffi-archive.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  accept-source-pinned-archived-real-elf:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SOURCE_RUN: '41497793049'
+      SOURCE_HEAD: f7481a066ac82d1a45353dbbd38457f981dc3105
+      ORIGINAL_SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARTIFACT_ID: '13172262356'
+    steps:
+      - name: Checkout archive acceptance contract only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/m3-accept-original-cubeb-ffi-archive.yml
+      - name: Authenticate compiled source and precisely known failed assertion
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_HEAD" '
+              .head_sha==$sha and
+              .path==".github/workflows/m3-native-symbolized-wayland.yml" and
+              .status=="completed" and .conclusion=="failure" and
+              .run_attempt==1
+            ' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/jobs?per_page=40" |
+            jq -e '
+              [.jobs[]|select(.name=="diagnostic-contract" and .conclusion=="success")]|length==1
+            ' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/jobs?per_page=40" |
+            jq -e '
+              [.jobs[]|select(.name=="compile-source-pinned-with-debug-symbols")] as $j |
+              ($j|length)==1 and
+              $j[0].conclusion=="failure" and
+              $j[0].id==125457423757 and
+              ([$j[0].steps[]|select(.conclusion=="failure")]|length)==1 and
+              ([$j[0].steps[]|select(
+                .name=="Prove exact original compiled cubeb-to-Rust PulseAudio address reference" and
+                .conclusion=="failure")]|length)==1 and
+              (["Compile pinned normal Vulpra retaining transient linked symbols",
+                "Capture exact-source unstripped Rust FFI archive-to-consumer definitions",
+                "Check original compiled C++ FFI text relocations before package",
+                "Verify exact original final ELF machine call targets"] |
+                all(. as $name | ([$j[0].steps[]|select(.name==$name and .conclusion=="success")]|length)==1))
+            ' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/artifacts?per_page=40" |
+            jq -e --argjson id "$ARTIFACT_ID" '
+              [.artifacts[]|select(
+                .id==$id and
+                .name=="m3-symbolized-native-wayland-summary" and
+                .expired==false and .size_in_bytes>0
+              )]|length==1
+            ' >/dev/null
+          echo 'PASS: native compilation and previous FFI checks succeeded; one known cubeb acceptance step failed'
+      - name: Download only the immutable run artifact, not native binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original-cubeb-artifact"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name m3-symbolized-native-wayland-summary \
+            --dir "$RUNNER_TEMP/original-cubeb-artifact"
+          cd "$RUNNER_TEMP/original-cubeb-artifact"
+          test "$(find . -maxdepth 1 -type f -name '*.json' | wc -l)" -eq 4
+          for name in \
+            m3-original-ffi-symbol-definitions.json \
+            m3-original-ffi-object-relocations.json \
+            m3-original-ffi-final-machine-call-targets.json \
+            m3-original-linked-cubeb-pulse-ffi.json; do
+            test -s "$name" && test ! -L "$name"
+          done
+      - name: Independently require the actual original compiled FFI evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/original-cubeb-artifact"
+          jq -e --arg src "$ORIGINAL_SOURCE" '
+            .schema_version==1 and
+            .status=="exact_original_compiled_cubeb_pulse_rust_address_and_dispatch_verified" and
+            .source_commit==$src and
+            .compiled_input=="original unstripped libxul.so" and
+            .cubeb_init_text_definition_count==1 and
+            .pulse_rust_init_text_definition_count==1 and
+            .cubeb_init_address_takes_pulse_rust_init==1 and
+            .cubeb_init_direct_address_instructions==1 and
+            .cubeb_init_relocated_symbol_slot_references==0 and
+            .cubeb_init_indirect_call_instructions==1 and
+            .source_to_native_ffi_address_reference_proven==true and
+            .actual_indirect_call_target_executed_proven==false and
+            .direct_cubeb_to_pulse_rust_call_instruction_proven==false and
+            .uninstrumented_original_browser_stack_proven==false and
+            (has("uninterposed_original_browser_stack_proven")|not) and
+            .full_ffi_dependency_graph_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' m3-original-linked-cubeb-pulse-ffi.json >/dev/null
+          jq -e --arg src "$ORIGINAL_SOURCE" '
+            .schema_version==1 and
+            .source_commit==$src and
+            .status=="compiled_archive_and_consumer_named_definitions_verified" and
+            .native_archive_to_elf_function_pairs==3 and
+            .complete_static_callsite_resolution_proven==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' m3-original-ffi-symbol-definitions.json >/dev/null
+          jq -e --arg src "$ORIGINAL_SOURCE" '
+            .schema_version==1 and
+            .source_commit==$src and
+            .status=="compiled_cxx_text_relocation_imports_observed" and
+            .gkrust_init_text_relocations==2 and
+            .gkrust_shutdown_text_relocations==1 and
+            .crash_generator_logic_desktop_text_relocations==1 and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' m3-original-ffi-object-relocations.json >/dev/null
+          jq -e --arg src "$ORIGINAL_SOURCE" '
+            .schema_version==1 and
+            .source_commit==$src and
+            .status=="four_native_direct_caller_branches_to_linked_rust_ffi_definitions" and
+            .caller_functions_verified==4 and
+            .all_four_specific_native_branch_targets_verified==true and
+            .all_cpp_ffi_callers_enumerated==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' m3-original-ffi-final-machine-call-targets.json >/dev/null
+          jq -n --arg src "$ORIGINAL_SOURCE" --arg head "$SOURCE_HEAD" \
+             --argjson original_run "$SOURCE_RUN" --argjson artifact_id "$ARTIFACT_ID" '
+          {
+            schema_version:1,
+            status:"archived_original_linked_cubeb_ffi_pass_independently_accepted",
+            original_source_commit:$src,
+            compiled_workflow_commit:$head,
+            archived_native_run:$original_run,
+            archived_artifact_id:$artifact_id,
+            original_native_compile_step_passed:true,
+            original_workflow_conclusion:"failure",
+            archived_compiled_cubeb_init_address_takes_pulse_rust_init:1,
+            archived_compiled_cubeb_init_indirect_calls:1,
+            original_indirect_target_executed_proven:false,
+            uninstrumented_browser_callstack_proven:false,
+            independent_native_recompile_performed:false,
+            source_pruning_authorized:false,
+            m3_sixth_gate_closed:false
+          }' >"$RUNNER_TEMP/m3-original-cubeb-ffi-independent-acceptance.json"
+          echo 'PASS: source-pinned original compiled cubeb Rust address+indirect dispatch crosschecked from failed-run archive; no rerun'
+      - name: Upload only bounded independent acceptance summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-compiled-cubeb-ffi-archive-accepted
+          path: ${{ runner.temp }}/m3-original-cubeb-ffi-independent-acceptance.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,21 +1,10 @@
 # Full-normal historical source rebuild for isolated Linux Wayland diagnosis.
 # Not an accepted graphical browser test or an M3 gate.
 name: M3 Native Source-Pinned Wayland Symbol Diagnosis
+# The expensive full-source compilation is manual-only after the original
+# build ran to completion in 41497793049. Independent cheap archive acceptance
+# lives in m3-accept-original-cubeb-ffi-archive.yml.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-native-symbolized-wayland.yml
-      - ci/m3-symbolized-wayland-compare.sh
-      - ci/m3-wayland-gdb-sanitize.awk
-      - ci/m3-original-linked-ffi-symbol-proof.rs
-      - ci/m3-original-compiled-ffi-object-relocations.rs
-      - ci/m3-original-linked-ffi-direct-calls.rs
-      - ci/m3-original-linked-cubeb-pulse-ffi.sh
-      - ci/tests/m3-original-linked-cubeb-pulse-ffi-test.sh
-      - ci/m3-original-compiled-ffmpeg-loader-call.rs
-      - ci/m3-original-compiled-loader-api-census.rs
-      - ci/tests/m3-wayland-gdb-sanitize-test.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -268,7 +257,7 @@ jobs:
             .source_to_native_ffi_address_reference_proven==true and
             .actual_indirect_call_target_executed_proven==false and
             .direct_cubeb_to_pulse_rust_call_instruction_proven==false and
-            .uninterposed_original_browser_stack_proven==false and
+            .uninstrumented_original_browser_stack_proven==false and
             .full_ffi_dependency_graph_proven==false and
             .source_pruning_authorized==false and
             .m3_sixth_gate_closed==false
