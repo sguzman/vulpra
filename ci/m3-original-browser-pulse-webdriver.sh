@@ -81,14 +81,34 @@ for _ in {1..60}; do
  sleep 0.15
 done
 [[ "$sink" == true && "$mapped" == true && "$running" == true ]] || { echo "Audio witness missing: $sink $mapped $running" >&2; exit 1; }
-jq -n --argjson pre "$pre" '{
+# Read the native cubeb backend ID via the *original* about:support media
+# diagnostics pipeline. This is actual browser state, not a source guess.
+api POST "/session/$session/url" '{"url":"about:support"}' | jq -e '.value==null' >/dev/null
+backend=''
+for _ in {1..60}; do
+  result="$(api POST "/session/$session/execute/sync" '{"script":"const row=[...document.querySelectorAll(\"#media-info-tbody tr\")].find(r=>r.querySelector(\"th\")?.getAttribute(\"data-l10n-id\")===\"audio-backend\");return {uri:document.documentURI,backend:row?.querySelector(\"td\")?.textContent?.trim()||null};","args":[]}' )"
+  if jq -e '.value.uri=="about:support"' <<<"$result" >/dev/null 2>&1; then
+    backend="$(jq -er '.value.backend // empty' <<<"$result" 2>/dev/null || true)"
+    [[ "$backend" =~ ^[a-z][a-z0-9-]{1,31}$ ]] && break
+  fi
+  sleep 0.25
+done
+[[ "$backend" =~ ^[a-z][a-z0-9-]{1,31}$ ]] || {
+  echo 'Native about:support cubeb backend ID was not available' >&2
+  exit 1
+}
+is_rust=false
+[[ "$backend" == pulse-rust ]] && is_rust=true
+jq -n --argjson pre "$pre" --arg backend "$backend" --argjson rust "$is_rust" '{
 schema_version:1,status:"original_browser_webaudio_pulse_null_sink_stream_verified",
 source_commit:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
 archive_sha256:"7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a",
 original_native_browser_executed:true,real_user_click_audio_context_running:true,
 pulse_null_sink_created:true,pulse_sink_had_no_inputs_before_browser_audio:true,
 pulse_sink_input_observed_during_browser_audio:true,libpulse_mapped_before_click:$pre,
-libpulse_mapped_during_audio:true,compiled_rust_pulse_callsite_proven:false,
+libpulse_mapped_during_audio:true,reported_cubeb_backend:$backend,
+reported_cubeb_backend_is_pulse_rust:$rust,
+compiled_rust_pulse_callsite_proven:false,
 physical_audio_or_microphone_used:false,network_egress_allowed:false,
 target_endeavouros_verified:false,source_pruning_authorized:false,m3_sixth_gate_closed:false
 }' >"$report"

@@ -1,8 +1,14 @@
 # Source-pinned original packaged Vulpra live WebAudio -> PulseAudio null sink.
 # No physical audio device, microphone, host Pulse/PipeWire or network.
-# CI 41483634953 passed; keep expensive native experiment manual-only.
+# CI 41483634953 passed; follow-up diagnostic tests exact native
+# about:support cubeb backend ID. Restore manual dispatch after validation.
 name: M3 Original Browser Pulse Null Sink
 on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-browser-pulse-webdriver.sh
+      - .github/workflows/m3-original-browser-pulse-null-sink.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,6 +41,10 @@ jobs:
             media/libcubeb/src/cubeb.c
             media/libcubeb/src/moz.build
             toolkit/library/rust/shared/Cargo.toml
+            toolkit/library/rust/gkrust-features.mozbuild
+            toolkit/modules/Troubleshoot.sys.mjs
+            toolkit/content/aboutSupport.js
+            dom/media/CubebUtils.cpp
       - name: Authenticate source backend boundary and immutable browser package
         shell: bash
         env:
@@ -47,6 +57,10 @@ jobs:
           grep -Fq '      pulse_rust_init,' original-source/media/libcubeb/src/cubeb.c
           grep -Fq "DEFINES['USE_PULSE_RUST'] = True" original-source/media/libcubeb/src/moz.build
           grep -Fq 'pulse-dlopen' original-source/toolkit/library/rust/shared/Cargo.toml
+          grep -Fq 'gkrust_features += ["cubeb_pulse_rust"]' original-source/toolkit/library/rust/gkrust-features.mozbuild
+          grep -Fq 'data.currentAudioBackend = winUtils.currentAudioBackend' original-source/toolkit/modules/Troubleshoot.sys.mjs
+          grep -Fq 'insertBasicInfo("audio-backend", data.currentAudioBackend)' original-source/toolkit/content/aboutSupport.js
+          grep -Fq 'const char* backend = cubeb_get_backend_id(handle->Context());' original-source/dom/media/CubebUtils.cpp
           grep -Fq 'new AudioContext(' diagnostics/ci/m3-original-browser-pulse-local-origin.rs
           bash -n diagnostics/ci/m3-original-browser-pulse-webdriver.sh
           rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-pulse-local-origin.rs \
@@ -117,6 +131,8 @@ jobs:
             .pulse_sink_input_observed_during_browser_audio==true and
             (.libpulse_mapped_before_click|type=="boolean") and
             .libpulse_mapped_during_audio==true and
+            (.reported_cubeb_backend|test("^[a-z][a-z0-9-]{1,31}$")) and
+            (.reported_cubeb_backend_is_pulse_rust==(.reported_cubeb_backend=="pulse-rust")) and
             .compiled_rust_pulse_callsite_proven==false and
             .physical_audio_or_microphone_used==false and
             .network_egress_allowed==false and
