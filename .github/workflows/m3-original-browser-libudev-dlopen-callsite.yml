@@ -10,6 +10,12 @@ name: M3 Original Browser Libudev Dlopen Callsite Trace
 # Exact-original instrumented callsite CI 41374201977 PASS; keep this
 # expensive source-pinned native browser experiment manually dispatchable.
 on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-libudev-dlopen-callsite.c
+      - ci/m3-original-browser-webauthn-webdriver.sh
+      - .github/workflows/m3-original-browser-libudev-dlopen-callsite.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -118,6 +124,7 @@ jobs:
             -e VULPRA_M3_ORIGINAL_WEBAUTHN_MODE=usb-dlopen-trace \
             -e LD_PRELOAD=/audit/libudev-trace.so \
             -e VULPRA_M3_LIBUDEV_DLOPEN_TRACE=/tmp/vulpra-m3-libudev-dlopen.trace \
+            -e VULPRA_M3_LIBUDEV_DLOPEN_STACK=/tmp/vulpra-m3-libudev-dlopen.stack \
             -e VULPRA_M3_NO_USB_PASSTHROUGH=1 \
             vulpra-m3-original-webauthn:ci /bin/bash -c '
               set -euo pipefail
@@ -127,7 +134,7 @@ jobs:
                 /bin/bash /audit/webdriver.sh /original/vulpra /audit/local-origin \
                 /reports/m3-original-browser-libudev-dlopen-callsite.json
             '
-      - name: Accept exact original libxul callsites and runtime loader flags but not a complete stack
+      - name: Accept original libxul callsites and bounded instrumented stack, not full graph
         shell: bash
         run: |
           set -euo pipefail
@@ -148,6 +155,8 @@ jobs:
             .source_pinned_libxul_noload_miss_at_return_pc_0x9936652==true and
             .source_pinned_libxul_normal_load_hit_at_return_pc_0x9936667==true and
             .exact_two_machine_callsite_and_flags_outcomes_reconciled==true and
+            .bounded_instrumented_libxul_unwind_two_or_more_frames==true and
+            .full_uninstrumented_browser_stack_observed==false and
             .original_browser_uninstrumented_control_ci==41371647131 and
             .actual_original_dlopen_call_stack_observed==false and
             .original_browser_libudev_runtime_dependency_proven==false and

@@ -157,6 +157,7 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
   fi
   if browser_maps_udev; then mapped_during=true; fi
   callsites_verified=false
+  stack_verified=false
   if [[ "$mode" == usb-dlopen-trace ]]; then
     trace_path="$VULPRA_M3_LIBUDEV_DLOPEN_TRACE"
     [[ -f "$trace_path" ]] || { echo 'Original libxul produced no interposed dlopen trace' >&2; exit 1; }
@@ -181,10 +182,31 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
     }
     callsites_verified=true
   fi
+
+  # Optional independent bounded unwind. Keep old 4-column trace unchanged;
+  # never upload transient-PID traces or claim a full uninstrumented stack.
+  if [[ -n "${VULPRA_M3_LIBUDEV_DLOPEN_STACK:-}" ]]; then
+    [[ "$mode" == usb-dlopen-trace && "$VULPRA_M3_LIBUDEV_DLOPEN_STACK" == /tmp/vulpra-m3-libudev-dlopen.stack ]] || exit 2
+    [[ -f "$VULPRA_M3_LIBUDEV_DLOPEN_STACK" ]] || { echo 'No bounded original libxul stack evidence' >&2; exit 1; }
+    if ! awk -F '\t' '
+      {
+        if (NF<5 || $1!~/^[0-9]+$/ || $2!~/^0x[0-9a-f]+$/ ||
+            $3!~/^[0-9]+$/ || $3<2 || $3>12 || NF!=3+$3 || $4!=$2) {bad=1;exit}
+        for (i=4;i<=NF;i++) if ($i!~/^0x[0-9a-f]+$/) {bad=1;exit}
+        if ($2=="0x9936652") first[$1]=1
+        if ($2=="0x9936667") second[$1]=1
+      }
+      END {if (bad) exit 6; for (pid in first) if (second[pid]) found=1; if (!found) exit 7}
+    ' "$VULPRA_M3_LIBUDEV_DLOPEN_STACK"; then
+      echo 'Original source-pinned libxul unwind is absent, truncated or mismatched' >&2
+      exit 1
+    fi
+    stack_verified=true
+  fi
   status="original_browser_usb_backend_no_device_negative_probe"
   if [[ "$mode" == usb-dlopen-trace ]]; then status="original_browser_usb_libudev_interposed_callsite_verified"; fi
   jq -n --argjson initial "$preloaded" --argjson mapped "$mapped_during" \
-    --argjson verified "$callsites_verified" --arg status "$status" '{
+    --argjson verified "$callsites_verified" --argjson stack "$stack_verified" --arg status "$status" '{
 
     schema_version:1,
     status:$status,
@@ -203,6 +225,8 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
     source_pinned_libxul_noload_miss_at_return_pc_0x9936652:$verified,
     source_pinned_libxul_normal_load_hit_at_return_pc_0x9936667:$verified,
     exact_two_machine_callsite_and_flags_outcomes_reconciled:$verified,
+    bounded_instrumented_libxul_unwind_two_or_more_frames:$stack,
+    full_uninstrumented_browser_stack_observed:false,
     original_browser_uninstrumented_control_ci:41371647131,
     actual_original_dlopen_call_stack_observed:false,
     original_browser_libudev_runtime_dependency_proven:false,
