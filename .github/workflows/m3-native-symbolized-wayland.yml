@@ -11,6 +11,8 @@ on:
       - ci/m3-original-linked-ffi-symbol-proof.rs
       - ci/m3-original-compiled-ffi-object-relocations.rs
       - ci/m3-original-linked-ffi-direct-calls.rs
+      - ci/m3-original-linked-cubeb-pulse-ffi.sh
+      - ci/tests/m3-original-linked-cubeb-pulse-ffi-test.sh
       - ci/m3-original-compiled-ffmpeg-loader-call.rs
       - ci/m3-original-compiled-loader-api-census.rs
       - ci/tests/m3-wayland-gdb-sanitize-test.sh
@@ -46,6 +48,10 @@ jobs:
           "$RUNNER_TEMP/m3-ffi-object-relocation-tests"
           rustc --edition=2021 --test ci/m3-original-linked-ffi-direct-calls.rs -o "$RUNNER_TEMP/m3-ffi-final-link-call-tests"
           "$RUNNER_TEMP/m3-ffi-final-link-call-tests"
+          bash -n ci/m3-original-linked-cubeb-pulse-ffi.sh
+          bash -n ci/tests/m3-original-linked-cubeb-pulse-ffi-test.sh
+          bash ci/tests/m3-original-linked-cubeb-pulse-ffi-test.sh \
+            ci/m3-original-linked-cubeb-pulse-ffi.sh
           rustc --edition=2021 --test ci/m3-original-compiled-ffmpeg-loader-call.rs -o "$RUNNER_TEMP/m3-ffmpeg-loader-call-tests"
           "$RUNNER_TEMP/m3-ffmpeg-loader-call-tests"
           rustc --edition=2021 --test ci/m3-original-compiled-loader-api-census.rs -o "$RUNNER_TEMP/m3-native-loader-census-tests"
@@ -238,6 +244,36 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/m3-original-ffi-final-machine-call-targets.json" >/dev/null
           echo 'PASS: four source-pinned native C++ functions directly branch to three compiled Rust symbols; whole gate open'
+      - name: Prove exact original compiled cubeb-to-Rust PulseAudio address reference
+        shell: bash
+        working-directory: source
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          original="$GITHUB_WORKSPACE/source/obj-vulpra-linux-m3-baseline/dist/bin/libxul.so"
+          test -f "$original"
+          bash "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-linked-cubeb-pulse-ffi.sh" \
+            "$SOURCE_SHA" "$original" \
+            "$RUNNER_TEMP/m3-original-linked-cubeb-pulse-ffi.json"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .schema_version==1 and
+            .source_commit==$sha and
+            .status=="exact_original_compiled_cubeb_pulse_rust_address_and_dispatch_verified" and
+            .compiled_input=="original unstripped libxul.so" and
+            .cubeb_init_text_definition_count==1 and
+            .pulse_rust_init_text_definition_count==1 and
+            (.cubeb_init_address_takes_pulse_rust_init|type=="number" and .>=1 and .<=64) and
+            (.cubeb_init_indirect_call_instructions|type=="number" and .>=1 and .<=128) and
+            .source_to_native_ffi_address_reference_proven==true and
+            .actual_indirect_call_target_executed_proven==false and
+            .direct_cubeb_to_pulse_rust_call_instruction_proven==false and
+            .uninterposed_original_browser_stack_proven==false and
+            .full_ffi_dependency_graph_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-linked-cubeb-pulse-ffi.json" >/dev/null
+          echo 'PASS: original linked cubeb has Rust PulseAudio address reference and indirect dispatch, not full FFI graph'
       - name: Verify original compiled FFmpeg-to-NSPR dynamic loader callsite
         shell: bash
         working-directory: source
@@ -326,6 +362,7 @@ jobs:
             ${{ runner.temp }}/m3-original-ffi-symbol-definitions.json
             ${{ runner.temp }}/m3-original-ffi-object-relocations.json
             ${{ runner.temp }}/m3-original-ffi-final-machine-call-targets.json
+            ${{ runner.temp }}/m3-original-linked-cubeb-pulse-ffi.json
             ${{ runner.temp }}/m3-original-ffmpeg-loader-native-call.json
             ${{ runner.temp }}/m3-original-compiled-loader-api-census.json
             ${{ runner.temp }}/fresh-native.tar.xz.sha256
