@@ -5,6 +5,32 @@
 - Scope: disposable original `b1482404` browser, no USB device passthrough, no network egress or installed user browser
 - Progress: **Vulpra overall 61%; M3 5/6 = 83%; Δ+0 percentage points**. No code pruned, no savings.
 
+## Exact original `libxul.so` caller return PCs and `dlopen("libudev.so.1")` flags (2026-11-02 UTC)
+
+[**CI 41374201977 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41374201977), [lint 41374201953 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41374201953). **Artifact 13110232821 independently downloaded and JSON inspected** (`m3-original-browser-libudev-dlopen-callsite.json`). The diagnostic builds tiny `ci/m3-original-libudev-dlopen-callsite.c` with strict GCC flags and injects it **only into a disposable original-browser CI namespace** via `LD_PRELOAD` to interpose the `dlopen` entrypoint. It forwards to the real `dlopen` via `dlsym(RTLD_NEXT, "dlopen")` and filters strictly to requests named `libudev.so.1` from an address inside `libxul.so`, using `dladdr` to normalize the caller return address against the original ELF's load base. Raw per-process trace lines (with transient PIDs) are validated inside the container but **never uploaded**. This is **instrumented tracing, not byte-for-byte ordinary runtime symbol binding**.
+
+The source-pinned original browser's **real user-click WebAuthn USB-backend registration request**, with USB pref `true`, softtoken pref `false`, no WebDriver virtual authenticator and no device passed through, made both exact source-matched calls. The CI fail-closed verifier requires the two observations to be from **the same original browser process**:
+
+| Original `libxul.so` machine instruction | Observed ASLR-normalized return PC | Actual loader flags | Result |
+| --- | --- | --- | --- |
+| `0x993664f` — `call *%r14` | `0x9936652` | `0x105` = `RTLD_LAZY \| RTLD_GLOBAL \| RTLD_NOLOAD` | **miss** |
+| `0x9936664` — `call *%r14` | `0x9936667` | `0x101` = `RTLD_LAZY \| RTLD_GLOBAL` | **hit** |
+
+These return PCs reconcile with the **previously independently authenticated original packaged** 189,486,696-byte stripped `libxul.so` native machine audit [41357321586 PASS](https://github.com/sguzman/vulpra/actions/runs/41357321586), source ownership `dom/webauthn/libudev-sys/src/lib.rs`, `dlopen` GOT slot `0xb3c33c8`, and the original Rust `ifnull!` fallback logic. They do **not** count as new distinct library-loading branches beyond the already recorded two machine calls. This makes the requested **SONAME `libudev.so.1`**, **two exact loader callsites**, **loader flags**, and **miss/success result** empirically attributable in the isolated instrumented original-browser USB workload.
+
+The archived JSON also verifies **`libudev_mapped_before_attempt=false`** and **`libudev_mapped_during_or_after_attempt=true`**; an **independent uninstrumented control** already saw the same mapping transition in [41371647131 PASS](https://github.com/sguzman/vulpra/actions/runs/41371647131). The tracer therefore does **not** serve as the only evidence the browser loads libudev.
+
+### Strict non-claims
+
+- **No complete original-browser call stack** was captured. The interposer captures a **single direct caller return PC**, not a backtrace; archived `actual_original_dlopen_call_stack_observed=false` is correct.
+- `LD_PRELOAD` intentionally **changes dynamic symbol resolution** for this experiment. Although the uninstrumented control exhibits the same mapping transition, these exact traced calls/flags were observed **with instrumentation**; do not generalize all callsites' behavior to an unmodified loader without qualification.
+- No physical key/device was passed through, `NotAllowedError` without a key is expected, and **no hardware USB/CTAP authentication was performed**.
+- No complete direct/indirect dynamic loader graph, cross-build conditional feature/FFI closure, actual user EndeavourOS/Hyprland ABI, or source-pruning authority follows from this one successfully verified path.
+
+`ci/m3-original-browser-webauthn-webdriver.sh` has an explicit **`usb-dlopen-trace` mode** and requires source-pinned return PCs `0x9936652`/`0x9936667` with flags/outcomes `0x105 miss` then `0x101 hit` for at least one original-browser PID; the instrumented report retains `source_pruning_authorized=false`, `whole_dynamic_loader_graph_proven=false`, `physical_security_key_authentication_verified=false`, `m3_sixth_gate_closed=false`. All probes remain **manual-dispatch only** after the successful evidence capture, never routine build gates.
+
+**Progress remains overall 61%; M3 5/6 = 83%; Δ+0 percentage points, no source removed and no measured byte savings.**
+
 ## Actual archived original-browser evidence
 
 [**Source-pinned no-device USB backend CI 41371647131 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41371647131), [**workflow lint 41371647074 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41371647074). **Artifact 13109247679 downloaded and its original JSON file independently inspected** (`m3-original-browser-usb-nodevice-loader.json`). Preliminary [41371450487](https://github.com/sguzman/vulpra/actions/runs/41371450487) also passed and printed `libudev mapping observed=true`, but omitted its artifact due to a wrong upload path; the corrected second run fixes the path, requires the mapping to be `true`, and requires artifact upload rather than silently ignoring a missing file.
