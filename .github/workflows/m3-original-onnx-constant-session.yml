@@ -1,12 +1,9 @@
 # Source-pinned original ONNX Runtime in-memory Constant graph session and Run.
 # No model download, user data, GPU, browser profile or host internet.
 name: M3 Original ONNX Constant Session and Inner Dlopen
+# Pinned original package CI 41526796993 already passed. Manual-only
+# avoids re-extracting the large historical browser when changing this harness.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-onnx-constant-session.yml
-      - ci/m3-original-onnx-constant-session.rs
   workflow_dispatch:
 permissions:
   contents: read

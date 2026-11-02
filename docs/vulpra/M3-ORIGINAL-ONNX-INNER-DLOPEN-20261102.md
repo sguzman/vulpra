@@ -1,5 +1,29 @@
 # M3 — Original packaged ONNX Runtime internal dlopen origin under isolated API activation (2026-11-02)
 
+## Real in-memory ONNX CPU inference session verified (2026-11-02)
+
+[**Original source-pinned native CPU inference CI 41526796993 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41526796993) and [**workflow lint 41526797290 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41526797290). The bounded report artifact **13180431757**, \`m3-original-onnx-cpu-constant-session.json\`, was independently downloaded and inspected. It attests the identical immutable **original compiled source \`b1482404dfb8b01342990ee99ea3df0f9756b5f7\`** and **full-normal archive SHA-256 \`7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a\`**.
+
+This advances beyond the preceding \`OrtGetApiBase\`/version-only test. A new std-only Rust fixture, \`ci/m3-original-onnx-constant-session.rs\`, builds **one small generated in-memory ONNX \`Constant\` operator graph** (tensor float32 \`[1]\`, configured constant \`1.25\`), using only bounded protobuf fields; it does not read, download or save any model. The probe loads the **actual packaged original \`libonnxruntime.so\`**, negotiates the stable public \`OrtApi\` v1 ABI prefix, creates an environment, disables ONNX telemetry, creates session options, **successfully calls \`CreateSessionFromArray\`**, and **successfully calls \`Run\` with no input tensors**, receiving a **nonnull output \`OrtValue\`**. The test itself does **not read or assert the numerical value** of that \`OrtValue\`: model construction, session creation, runtime execution and nonnull output are observed, not numerical-output correctness.
+
+| Exact original CPU session observation | Native result |
+| --- | --- |
+| Real original compiled \`libonnxruntime.so\` + generated Constant graph, without observer | **Session created and \`Run\` succeeded** |
+| Same native code and graph with diagnostic observer | **Session created and \`Run\` succeeded** |
+| ONNX-origin intercepted \`dlopen\` calls during real CPU session and \`Run\` | **0** |
+| Outer probe/other-origin intercepted \`dlopen\` calls | **1** |
+| Execution of previously identified internal compiled ONNX \`dlopen\` branch | **Not observed** |
+| External ONNX model, network or GPU provider activation | **None** |
+| Browser ML frontend or actual target workstation exercised | **No** |
+
+Both native experiments occurred in isolated Linux network namespaces; the optional \`LD_PRELOAD\` diagnostic was applied to **the probe process only**, not the timeout wrapper. The existing interceptor was independently tested using real compiled positive and negative ELF fixtures in [41524996253](https://github.com/sguzman/vulpra/actions/runs/41524996253). The one external probe-origin load was distinguished from zero internal calls; instrumentation changes symbol resolution and cannot certify uninstrumented module call stacks. **The previously observed ONNX internal loader branch may be associated with some optional execution provider, plugin, or other session feature that this constant CPU graph does not exercise.** A zero observation in this workload does not demonstrate that branch is dead or removable.
+
+The new fixture's public-C-ABI prefix is based on the documented append-only \`OrtApi\` layout (see Microsoft's upstream ONNX Runtime header v1.22.0, original Git blob \`b01b7e48dc87bbeeb026c61fb06c591053853ad1\`); it accesses only the initial functions used here. This is a **one-shot disposable CI process** that leaves lifetime object reclamation to process exit rather than trying to guess release-function offsets beyond its partial ABI struct. No production browser code or runtime library bytes were modified.
+
+After the successful expensive original-package replay the new workflow is **manual-only**. This result strengthens the feature-specific native runtime evidence; it **does not complete all optional provider, FFI, dynamic-loading, networking, graphical frontend, device or generated-build dependencies**. No original source removal, new package-size savings, security simplification or M3 sixth-gate credit is justified.
+
+**M3 sixth gate OPEN (5/6 = 83%); overall Vulpra 61%; session Δ +0 percentage points.**
+
 ## Verified original native runtime result
 
 [**Original ONNX internal-loader CI 41524996253 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41524996253) produced **artifact 13178887819**, independently downloaded and inspected. Its bounded `m3-onnx-inner-dlopen-bounded.json` identifies original immutable compiled Vulpra source `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and checksum-authenticated full-normal browser archive SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`.
