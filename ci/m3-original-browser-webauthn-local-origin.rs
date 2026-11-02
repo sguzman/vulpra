@@ -28,7 +28,7 @@ document.getElementById("create").addEventListener("click",function(){
   rp:{id:"localhost",name:"Private original-browser QA"},
   user:{id:new Uint8Array([1,2,3]),name:"disposable",displayName:"Disposable"},
   pubKeyCredParams:[{type:"public-key",alg:-7}],timeout:10000,
-  authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"discouraged"}
+  authenticatorSelection:{authenticatorAttachment:"cross-platform",residentKey:"discouraged",userVerification:"discouraged"}
  };
  window.__vulpraResult.create={state:"started"};
  navigator.credentials.create({publicKey:options}).then(function(c){
