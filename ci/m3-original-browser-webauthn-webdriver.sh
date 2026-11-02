@@ -63,7 +63,7 @@ for _ in {1..45}; do
  sleep 0.4
 done
 [[ "$ready" == true ]] || { echo 'Offline driver/origin not ready' >&2; tail -n 30 "$work/driver.log" >&2; exit 1; }
-caps="$(jq -nc --arg bin "$browser" '{capabilities:{alwaysMatch:{browserName:"firefox",
+caps="$(jq -nc --arg bin "$browser" '{capabilities:{alwaysMatch:{browserName:"firefox","webauthn:virtualAuthenticators":true,
  "moz:firefoxOptions":{binary:$bin,args:[],
  prefs:{"security.webauth.webauthn":true,"security.webauth.webauthn_enable_softtoken":true,
  "security.webauth.webauthn_enable_usbtoken":false,"security.webauthn.ctap2":true}}}}}')"
@@ -89,40 +89,44 @@ authid="$(jq -er '.value|select(type=="string" and length>0)' <<<"$auth")" || {
  echo 'Virtual authenticator was not accepted' >&2
  jq -c '{error:.value.error,message:(.value.message|tostring|.[0:150])}' <<<"$auth" >&2; exit 1
 }
-create_js='
-const done=arguments[arguments.length-1];
-navigator.credentials.create({publicKey:{
-challenge:new Uint8Array(32).fill(7),rp:{id:"localhost",name:"Private QA"},
-user:{id:new Uint8Array([1,2,3]),name:"disposable",displayName:"Disposable"},
-pubKeyCredParams:[{type:"public-key",alg:-7}],timeout:10000,
-authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"discouraged"}
-}}).then(c=>{window.__vulpraM3Cred=new Uint8Array(c.rawId);
-done({ok:true,type:c.type,size:c.rawId.byteLength})})
-.catch(e=>done({ok:false,error:e.name}));
-'
-created="$(api POST "/session/$session/execute/async" "$(jq -nc --arg script "$create_js" '{script:$script,args:[]}')")"
-jq -e '.value.ok==true and .value.type=="public-key" and .value.size>0' <<<"$created" >/dev/null || {
- echo 'Actual browser WebAuthn create failed' >&2; jq -c '.value' <<<"$created" | head -c 300 >&2; exit 1
+# WebDriver element click is a genuine browser input event and carries user
+# activation, unlike a bare execute/async WebAuthn call in a script context.
+click_button(){
+ local selector="$1" found element_id
+ found="$(api POST "/session/$session/element" "$(jq -nc --arg css "$selector" '{using:"css selector",value:$css}')")"
+ element_id="$(jq -er '.value."element-6066-11e4-a52e-4f735466cecf" // .value.ELEMENT' <<<"$found")" || {
+   echo 'Original browser clickable WebAuthn element missing' >&2; exit 1;
+ }
+ api POST "/session/$session/element/$element_id/click" '{}' | jq -e '.value==null' >/dev/null
 }
-# Verify the created key lives in the WebDriver virtual authenticator,
-# not merely a separate softtoken; never disclose credential or private bytes.
+poll_result(){
+ local which="$1" response
+ for _ in {1..55}; do
+   response="$(api POST "/session/$session/execute/sync" \
+     "$(jq -nc --arg script "return window.__vulpraResult.$which;" '{script:$script,args:[]}')")"
+   if jq -e '.value.state=="complete"' <<<"$response" >/dev/null 2>&1; then
+     printf '%s\n' "$response"; return 0
+   fi
+   sleep 0.35
+ done
+ echo 'Original browser WebAuthn click result timed out' >&2; return 1
+}
+click_button '#create'
+created="$(poll_result create)"
+jq -e '.value.state=="complete" and .value.ok==true and .value.type=="public-key" and .value.size>0' <<<"$created" >/dev/null || {
+ echo 'Original browser click WebAuthn registration failed' >&2
+ jq -c '.value|{ok,error}' <<<"$created" >&2; exit 1
+}
+# Require a real virtual device credential. Never log the credential/private bytes.
 credentials="$(curl --noproxy '*' -sS --max-time 20 "$base/session/$session/webauthn/authenticator/$authid/credentials")"
 jq -e '.value|type=="array" and length>=1' <<<"$credentials" >/dev/null || {
- echo 'Virtual authenticator did not contain the created browser credential' >&2; exit 1;
+ echo 'Browser-created key not stored on WebDriver virtual authenticator' >&2; exit 1
 }
-get_js='
-const done=arguments[arguments.length-1],id=window.__vulpraM3Cred;
-if(!(id instanceof Uint8Array)){done({ok:false,error:"NoCreatedCredential"});return;}
-navigator.credentials.get({publicKey:{
-challenge:new Uint8Array(32).fill(13),rpId:"localhost",timeout:10000,
-allowCredentials:[{type:"public-key",id:id,transports:["internal"]}],userVerification:"discouraged"
-}}).then(c=>done({ok:true,type:c.type,data:c.response.authenticatorData.byteLength,
-sig:c.response.signature.byteLength}))
-.catch(e=>done({ok:false,error:e.name}));
-'
-assertion="$(api POST "/session/$session/execute/async" "$(jq -nc --arg script "$get_js" '{script:$script,args:[]}')")"
-jq -e '.value.ok==true and .value.type=="public-key" and .value.data>0 and .value.sig>0' <<<"$assertion" >/dev/null || {
- echo 'Actual browser WebAuthn get assertion failed' >&2; jq -c '.value' <<<"$assertion" | head -c 300 >&2; exit 1
+click_button '#get'
+assertion="$(poll_result get)"
+jq -e '.value.state=="complete" and .value.ok==true and .value.type=="public-key" and .value.data>0 and .value.sig>0' <<<"$assertion" >/dev/null || {
+ echo 'Original browser click WebAuthn assertion failed' >&2
+ jq -c '.value|{ok,error}' <<<"$assertion" >&2; exit 1
 }
 libudev=false; browser_count=0
 for proc in /proc/[0-9]*/comm; do
