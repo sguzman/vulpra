@@ -106,6 +106,79 @@ fn constant_model() -> Vec<u8> {
     model
 }
 
+// These seven function-pointer offsets are pinned against the actual public
+// ONNX Runtime v1.22.0 C header by CI offsetof(OrtApi, ...) assertions.
+// Never read past a bounded and header-verified index in the real native table.
+const IS_TENSOR: usize = 50;
+const TENSOR_MUTABLE_DATA: usize = 51;
+const TENSOR_ELEMENT_TYPE: usize = 60;
+const TENSOR_DIMENSIONS_COUNT: usize = 61;
+const TENSOR_DIMENSIONS: usize = 62;
+const TENSOR_ELEMENT_COUNT: usize = 64;
+const TENSOR_TYPE_AND_SHAPE: usize = 65;
+const TENSOR_FLOAT32: c_int = 1;
+
+unsafe fn api_function<T: Copy>(api: *const OrtApiV1Prefix, index: usize) -> T {
+    assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*const c_void>());
+    assert!(index <= TENSOR_TYPE_AND_SHAPE);
+    // SAFETY: CI verifies these offsets from the pinned upstream C header,
+    // and OrtApi's stable v1 function table is never shortened in later APIs.
+    let raw = unsafe { *api.cast::<*const c_void>().add(index) };
+    assert!(!raw.is_null());
+    unsafe { std::mem::transmute_copy(&raw) }
+}
+
+fn verify_actual_tensor(api: *const OrtApiV1Prefix, output: *mut c_void) -> Result<(), String> {
+    type IsTensor = unsafe extern "C" fn(*const c_void, *mut c_int) -> *mut c_void;
+    type GetTypeAndShape = unsafe extern "C" fn(*const c_void, *mut *mut c_void) -> *mut c_void;
+    type GetElementType = unsafe extern "C" fn(*const c_void, *mut c_int) -> *mut c_void;
+    type GetDimensionsCount = unsafe extern "C" fn(*const c_void, *mut usize) -> *mut c_void;
+    type GetDimensions = unsafe extern "C" fn(*const c_void, *mut i64, usize) -> *mut c_void;
+    type GetElementCount = unsafe extern "C" fn(*const c_void, *mut usize) -> *mut c_void;
+    type GetMutableData = unsafe extern "C" fn(*mut c_void, *mut *mut c_void) -> *mut c_void;
+
+    let prefix = unsafe { &*api };
+    let is_tensor: IsTensor = unsafe { api_function(api, IS_TENSOR) };
+    let get_type_shape: GetTypeAndShape = unsafe { api_function(api, TENSOR_TYPE_AND_SHAPE) };
+    let get_element_type: GetElementType = unsafe { api_function(api, TENSOR_ELEMENT_TYPE) };
+    let get_dimensions_count: GetDimensionsCount =
+        unsafe { api_function(api, TENSOR_DIMENSIONS_COUNT) };
+    let get_dimensions: GetDimensions = unsafe { api_function(api, TENSOR_DIMENSIONS) };
+    let get_element_count: GetElementCount = unsafe { api_function(api, TENSOR_ELEMENT_COUNT) };
+    let get_mutable_data: GetMutableData = unsafe { api_function(api, TENSOR_MUTABLE_DATA) };
+
+    let mut is_tensor_value = 0;
+    require_status(prefix, unsafe { is_tensor(output, &mut is_tensor_value) }, "IsTensor")?;
+    if is_tensor_value != 1 { return Err("ONNX output was not a tensor".into()); }
+
+    let mut shape = ptr::null_mut();
+    require_status(prefix, unsafe { get_type_shape(output, &mut shape) }, "GetTensorTypeAndShape")?;
+    if shape.is_null() { return Err("ONNX shape information was null".into()); }
+
+    let mut elem_type = 0;
+    require_status(prefix, unsafe { get_element_type(shape, &mut elem_type) }, "GetTensorElementType")?;
+    if elem_type != TENSOR_FLOAT32 { return Err("ONNX output was not float32".into()); }
+    let mut dimensions_count = 0;
+    require_status(prefix, unsafe { get_dimensions_count(shape, &mut dimensions_count) }, "GetDimensionsCount")?;
+    if dimensions_count != 1 { return Err("ONNX output rank was not one".into()); }
+    let mut dimensions = [0i64; 1];
+    require_status(prefix, unsafe { get_dimensions(shape, dimensions.as_mut_ptr(), 1) }, "GetDimensions")?;
+    if dimensions != [1] { return Err("ONNX output shape was not [1]".into()); }
+    let mut elements = 0;
+    require_status(prefix, unsafe { get_element_count(shape, &mut elements) }, "GetTensorShapeElementCount")?;
+    if elements != 1 { return Err("ONNX output was not one element".into()); }
+
+    let mut raw: *mut c_void = ptr::null_mut();
+    require_status(prefix, unsafe { get_mutable_data(output, &mut raw) }, "GetTensorMutableData")?;
+    if raw.is_null() { return Err("ONNX output data was null".into()); }
+    // The validated float32[1] shape permits reading exactly one f32.
+    let result = unsafe { *(raw.cast::<f32>()) };
+    if !result.is_finite() || result.to_bits() != 1.25f32.to_bits() {
+        return Err("ONNX output did not equal exact expected 1.25 float32".into());
+    }
+    Ok(())
+}
+
 fn require_status(api: &OrtApiV1Prefix, status: *mut c_void, op: &'static str) -> Result<(), String> {
     if status.is_null() { return Ok(()); }
     // Status details might reveal untrusted native absolute paths. Do not
@@ -165,10 +238,11 @@ fn run() -> Result<(), String> {
         )
     }, "Run")?;
     if output.is_null() { return Err("ONNX Constant operator returned null output".into()); }
+    verify_actual_tensor(api, output)?;
     // Intentional process-lifetime cleanup in this one-shot isolated CI probe:
     // v1 API release function pointers occur beyond the prefix used here.
     // No long-lived service or user process is started.
-    println!("PASS: exact original packaged ONNX Runtime created in-memory Constant session and executed Run on CPU");
+    println!("PASS: exact original packaged ONNX Runtime CPU Constant output equals float32[1] value 1.25");
     Ok(())
 }
 
@@ -189,6 +263,17 @@ mod tests {
         assert!(bytes.windows(8).any(|w| w == b"Constant"));
         assert!(bytes.windows(5).any(|w| w == b"value"));
         assert!(!bytes.windows(6).any(|w| w == b"http:/"));
+    }
+    #[test]
+    fn api_field_offsets_are_strict_and_sequential_for_target_slots() {
+        assert_eq!(IS_TENSOR, 50);
+        assert_eq!(TENSOR_MUTABLE_DATA, 51);
+        assert_eq!(TENSOR_ELEMENT_TYPE, 60);
+        assert_eq!(TENSOR_DIMENSIONS_COUNT, 61);
+        assert_eq!(TENSOR_DIMENSIONS, 62);
+        assert_eq!(TENSOR_ELEMENT_COUNT, 64);
+        assert_eq!(TENSOR_TYPE_AND_SHAPE, 65);
+        assert_eq!(1.25f32.to_bits(), 0x3fa00000);
     }
     #[test]
     fn varint_encoding_boundary() {

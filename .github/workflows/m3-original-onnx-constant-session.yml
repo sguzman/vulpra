@@ -1,9 +1,14 @@
 # Source-pinned original ONNX Runtime in-memory Constant graph session and Run.
 # No model download, user data, GPU, browser profile or host internet.
 name: M3 Original ONNX Constant Session and Inner Dlopen
-# Pinned original package CI 41526796993 already passed. Manual-only
-# avoids re-extracting the large historical browser when changing this harness.
+# One source-pinned original package replay for numerical output checks.
+# Return this to manual-only when independently verified.
 on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-onnx-constant-session.rs
+      - .github/workflows/m3-original-onnx-constant-session.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -40,6 +45,28 @@ jobs:
           rustc --edition=2021 -C opt-level=1 \
             ci/m3-original-onnx-constant-session.rs \
             -o "$RUNNER_TEMP/onnx-session"
+          # Authenticate exact public MIT C header and compile layout
+          # checks instead of assuming Rust function-pointer slot offsets.
+          gh api repos/microsoft/onnxruntime/git/blobs/b01b7e48dc87bbeeb026c61fb06c591053853ad1 \
+            --jq .content | base64 -d >"$RUNNER_TEMP/onnxruntime_c_api.h"
+          test "$(git hash-object "$RUNNER_TEMP/onnxruntime_c_api.h")" = \
+            b01b7e48dc87bbeeb026c61fb06c591053853ad1
+          cat >"$RUNNER_TEMP/onnx-api-offsets.c" <<'C'
+          #include <stddef.h>
+          #include "onnxruntime_c_api.h"
+          #define CHECK(name,slot) _Static_assert(offsetof(OrtApi,name)==(slot)*sizeof(void*), "mismatched OrtApi field: " #name)
+          CHECK(IsTensor, 50);
+          CHECK(GetTensorMutableData, 51);
+          CHECK(GetTensorElementType, 60);
+          CHECK(GetDimensionsCount, 61);
+          CHECK(GetDimensions, 62);
+          CHECK(GetTensorShapeElementCount, 64);
+          CHECK(GetTensorTypeAndShape, 65);
+          int main(void) { return 0; }
+          C
+          cc -std=c11 -O2 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
+            "$RUNNER_TEMP/onnx-api-offsets.c" -o "$RUNNER_TEMP/onnx-api-offsets"
+          "$RUNNER_TEMP/onnx-api-offsets"
           cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -fno-omit-frame-pointer \
             -shared ci/m3-original-onnx-inner-dlopen-observe.c \
             -o "$RUNNER_TEMP/onnx-inner-observer.so" -ldl
@@ -51,7 +78,7 @@ jobs:
               .head_sha==$sha and
               .path==".github/workflows/m3-original-onnx-inner-dlopen.yml"
             ' >/dev/null
-          echo 'PASS: ONNX protobuf unit fixtures, exact C ABI v1 prefix probe compiled and authenticated original observer'
+          echo 'PASS: ONNX protobuf and real upstream compiled C header ABI offsets verified; probe and observer built'
       - name: Authenticate immutable original full-normal ONNX library
         shell: bash
         env:
@@ -89,7 +116,7 @@ jobs:
             timeout --signal=TERM --kill-after=3s 35s \
             "$probe" "$pkg/libonnxruntime.so" |
             tee "$RUNNER_TEMP/onnx-control.stdout" >/dev/null
-          grep -Fxq 'PASS: exact original packaged ONNX Runtime created in-memory Constant session and executed Run on CPU' \
+          grep -Fxq 'PASS: exact original packaged ONNX Runtime CPU Constant output equals float32[1] value 1.25' \
             "$RUNNER_TEMP/onnx-control.stdout"
           sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
             LD_LIBRARY_PATH="$pkg" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
@@ -97,7 +124,7 @@ jobs:
             env LD_PRELOAD="$observer" M3_ONNX_INNER_DLOPEN_REPORT="$report" \
             "$probe" "$pkg/libonnxruntime.so" |
             tee "$RUNNER_TEMP/onnx-observed.stdout" >/dev/null
-          grep -Fxq 'PASS: exact original packaged ONNX Runtime created in-memory Constant session and executed Run on CPU' \
+          grep -Fxq 'PASS: exact original packaged ONNX Runtime CPU Constant output equals float32[1] value 1.25' \
             "$RUNNER_TEMP/onnx-observed.stdout"
           test -s "$report"
           sudo chmod 0644 "$report"
@@ -129,7 +156,13 @@ jobs:
               original_onnx_internal_dlopen_observed:($o.onnx_origin_dlopen_calls>0),
               isolated_cpu_inference_session_proven:true,
               generated_model_run_output_nonnull_proven:true,
-              numerical_output_value_checked:false,
+              numerical_output_value_checked:true,
+              onnx_output_float32_rank:1,
+              onnx_output_shape:[1],
+              onnx_output_expected_float32_bits:"0x3fa00000",
+              onnx_output_numerical_equality_checked:true,
+              independent_upstream_c_header_git_blob:"b01b7e48dc87bbeeb026c61fb06c591053853ad1",
+              onnx_c_abi_output_slots_compile_time_verified:true,
               original_browser_ml_frontend_exercised:false,
               GPU_or_external_execution_provider_exercised:false,
               all_future_onnx_conditional_dynamic_loading_proven:false,
@@ -152,7 +185,13 @@ jobs:
             (.original_onnx_internal_dlopen_origin_calls|type)=="number" and
             .original_onnx_internal_dlopen_origin_calls==
               (.original_onnx_internal_dlopen_successes+.original_onnx_internal_dlopen_failures) and
-            .numerical_output_value_checked==false and
+            .numerical_output_value_checked==true and
+            .onnx_output_float32_rank==1 and
+            .onnx_output_shape==[1] and
+            .onnx_output_expected_float32_bits=="0x3fa00000" and
+            .onnx_output_numerical_equality_checked==true and
+            .independent_upstream_c_header_git_blob=="b01b7e48dc87bbeeb026c61fb06c591053853ad1" and
+            .onnx_c_abi_output_slots_compile_time_verified==true and
             .original_browser_ml_frontend_exercised==false and
             .GPU_or_external_execution_provider_exercised==false and
             .all_future_onnx_conditional_dynamic_loading_proven==false and
@@ -161,7 +200,7 @@ jobs:
             .installed_browser_or_user_profile_accessed==false and
             .source_pruning_authorized==false and .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/m3-original-onnx-cpu-constant-session.json" >/dev/null
-          echo 'PASS: actual source-pinned original ONNX CPU Constant session CreateSessionFromArray+Run, not full ML feature graph'
+          echo 'PASS: original compiled ONNX CPU Constant Run float32[1] == 1.25, ABI-checked; not full ML feature graph'
       - name: Upload only sanitized bounded original ONNX CPU session result
         uses: actions/upload-artifact@v4
         with:
