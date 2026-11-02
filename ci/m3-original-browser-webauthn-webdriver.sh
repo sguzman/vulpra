@@ -6,10 +6,20 @@ browser="$(realpath -e -- "$1")"
 origin="$(realpath -e -- "$2")"
 report="$3"
 mode="${VULPRA_M3_ORIGINAL_WEBAUTHN_MODE:-virtual}"
-[[ "$mode" == virtual || "$mode" == usb-no-device ]] || { echo 'Unsupported WebAuthn CI mode' >&2; exit 2; }
-if [[ "$mode" == usb-no-device ]]; then
+[[ "$mode" == virtual || "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]] || { echo 'Unsupported WebAuthn CI mode' >&2; exit 2; }
+if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
   [[ "${VULPRA_M3_NO_USB_PASSTHROUGH:-}" == 1 ]] || { echo 'USB probe must explicitly disallow device passthrough' >&2; exit 2; }
   for dev in /dev/hidraw*; do [[ ! -e "$dev" ]] || { echo 'USB probe unexpectedly has physical hidraw device' >&2; exit 2; }; done
+fi
+# CI-only diagnostic LD_PRELOAD changes the target's dynamic resolution.
+# Require exact tracer path and a real ELF binary for the dedicated trace
+# mode. The previous uninstrumented run 41371647131 is the control.
+if [[ "$mode" == usb-dlopen-trace ]]; then
+  [[ "${LD_PRELOAD:-}" == /audit/libudev-trace.so ]] || { echo 'Unexpected tracer location' >&2; exit 2; }
+  [[ "${VULPRA_M3_LIBUDEV_DLOPEN_TRACE:-}" == /tmp/vulpra-m3-libudev-dlopen.trace ]] || {
+    echo 'Missing bounded libudev callsite trace output' >&2; exit 2;
+  }
+  [[ -r "$LD_PRELOAD" ]] || { echo 'Missing tracing shared object' >&2; exit 2; }
 fi
 [[ -x "$browser" && -x "$origin" && "$(basename "$browser")" == vulpra ]] || exit 2
 [[ "$MOZ_DISABLE_NONLOCAL_CONNECTIONS" == 1 && "$VULPRA_OFFLINE_CONTAINER_ONLY" == 1 ]] || exit 2
@@ -72,7 +82,7 @@ for _ in {1..45}; do
  sleep 0.4
 done
 [[ "$ready" == true ]] || { echo 'Offline driver/origin not ready' >&2; tail -n 30 "$work/driver.log" >&2; exit 1; }
-caps="$(jq -nc --arg bin "$browser" --argjson usb "$([[ "$mode" == usb-no-device ]] && echo true || echo false)" '{capabilities:{alwaysMatch:{browserName:"firefox","webauthn:virtualAuthenticators":true,
+caps="$(jq -nc --arg bin "$browser" --argjson usb "$([[ "$mode" != virtual ]] && echo true || echo false)" '{capabilities:{alwaysMatch:{browserName:"firefox","webauthn:virtualAuthenticators":true,
  "moz:firefoxOptions":{binary:$bin,args:[],
  prefs:{"security.webauth.webauthn":true,"security.webauth.webauthn_enable_softtoken":($usb|not),
  "security.webauth.webauthn_enable_usbtoken":$usb,"security.webauthn.ctap2":true}}}}}')"
@@ -96,7 +106,7 @@ jq -e '.value.origin=="http://localhost:18888" and .value.secure==true and .valu
 # Source-matched physical USB transport diagnostic without a real device.
 # Independently assert browser prefs in the original Chrome service, then
 # click real WebAuthn registration. No virtual authenticator may be created.
-if [[ "$mode" == usb-no-device ]]; then
+if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
   # The normal / route is source-matched cross-platform WebAuthn registration;
   # with these original runtime prefs authrs_bridge takes usb_token_manager.
   chrome_reply="$(api POST "/session/$session/moz/context" '{"context":"chrome"}')"
@@ -146,9 +156,38 @@ if [[ "$mode" == usb-no-device ]]; then
     exit 1
   fi
   if browser_maps_udev; then mapped_during=true; fi
-  jq -n --argjson initial "$preloaded" --argjson mapped "$mapped_during" '{
+  callsites_verified=false
+  if [[ "$mode" == usb-dlopen-trace ]]; then
+    trace_path="$VULPRA_M3_LIBUDEV_DLOPEN_TRACE"
+    [[ -f "$trace_path" ]] || { echo 'Original libxul produced no interposed dlopen trace' >&2; exit 1; }
+    # The interposer has already filtered to libudev.so.1, caller ELF libxul.so,
+    # and moved the return PCs relative to that original ELF's ASLR base.
+    # Require one PID to have both exact source-pinned machine callsites:
+    # 0x993664f -> return PC 0x9936652, NOLOAD miss with 0x105;
+    # 0x9936664 -> return PC 0x9936667, normal dlopen hit with 0x101.
+    if ! awk -F '\t' '
+      NF!=4 {exit 4}
+      $1!~/^[0-9]+$/ {exit 5}
+      $2=="0x9936652" && $3=="0x105" && $4=="miss" {first[$1]=1}
+      $2=="0x9936667" && $3=="0x101" && $4=="hit" {second[$1]=1}
+      END {for (pid in first) if (second[pid]) found=1; if(!found) exit 6}
+    ' "$trace_path"; then
+      echo 'Original pinned libxul callsite/flags/outcome did not reconcile' >&2
+      # Never print the unsanitized trace; it contains transient PIDs.
+      exit 1
+    fi
+    [[ "$mapped_during" == true && "$preloaded" == false ]] || {
+      echo 'Instrumentation did not reproduce the uninstrumented libudev mapping transition' >&2; exit 1;
+    }
+    callsites_verified=true
+  fi
+  status="original_browser_usb_backend_no_device_negative_probe"
+  if [[ "$mode" == usb-dlopen-trace ]]; then status="original_browser_usb_libudev_interposed_callsite_verified"; fi
+  jq -n --argjson initial "$preloaded" --argjson mapped "$mapped_during" \
+    --argjson verified "$callsites_verified" --arg status "$status" '{
+
     schema_version:1,
-    status:"original_browser_usb_backend_no_device_negative_probe",
+    status:$status,
     original_source_commit:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
     original_archive_sha256:"7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a",
     original_native_browser_executed:true,
@@ -160,6 +199,11 @@ if [[ "$mode" == usb-no-device ]]; then
     credential_create_result:"NotAllowedError",
     libudev_mapped_before_attempt:$initial,
     libudev_mapped_during_or_after_attempt:$mapped,
+    instrumented_dlopen_symbol_interposition:$verified,
+    source_pinned_libxul_noload_miss_at_return_pc_0x9936652:$verified,
+    source_pinned_libxul_normal_load_hit_at_return_pc_0x9936667:$verified,
+    exact_two_machine_callsite_and_flags_outcomes_reconciled:$verified,
+    original_browser_uninstrumented_control_ci:41371647131,
     actual_original_dlopen_call_stack_observed:false,
     original_browser_libudev_runtime_dependency_proven:false,
     source_pruning_authorized:false,
