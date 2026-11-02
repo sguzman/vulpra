@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Isolated, no-network original Vulpra WebAudio -> PulseAudio null sink.
 set -euo pipefail
+probe_stage='preflight'
+trap 'printf "Original Pulse probe failed at stage=%s line=%s\n" "$probe_stage" "$LINENO" >&2' ERR
 [[ $# -eq 3 ]] || exit 2
 browser="$(realpath -e "$1")"; origin="$(realpath -e "$2")"; report="$3"
 [[ -x "$browser" && -x "$origin" && "$(basename "$browser")" == vulpra ]] || exit 2
@@ -23,12 +25,14 @@ cleanup(){
   rm -rf -- "$work"
 }
 trap cleanup EXIT
+probe_stage='private-weston'
 weston --backend=headless-backend.so --renderer=pixman --idle-time=0 \
   --socket="$WAYLAND_DISPLAY" --log="$work/weston.log" >"$work/weston.out" 2>&1 &
 weston_pid=$!
 for _ in {1..40}; do [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] && break; kill -0 "$weston_pid"; sleep 0.25; done
 [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] || exit 1
 wayland-info | grep -Fq xdg_wm_base
+probe_stage='private-pulse'
 pulseaudio -n --daemonize=no --exit-idle-time=-1 --log-level=error \
   --load=module-native-protocol-unix --load='module-null-sink sink_name=vulpra_m3_null' \
   >"$work/pulse.log" 2>&1 &
@@ -39,6 +43,7 @@ for _ in {1..50}; do
  kill -0 "$pulse_pid" || exit 1; sleep 0.2
 done
 [[ "$ready" == true && -z "$(pactl list short sink-inputs)" ]] || exit 1
+probe_stage='browser-startup'
 "$origin" vulpra-original-pulse-offline >"$work/origin.log" 2>&1 & origin_pid=$!
 geckodriver --host 127.0.0.1 --port 4444 --log error >"$work/driver.log" 2>&1 & driver_pid=$!
 ready=false
@@ -48,6 +53,7 @@ for _ in {1..45}; do
  kill -0 "$driver_pid" || exit 1; sleep 0.4
 done
 [[ "$ready" == true ]] || exit 1
+probe_stage='webdriver-session'
 caps="$(jq -nc --arg bin "$browser" '{capabilities:{alwaysMatch:{browserName:"firefox","moz:firefoxOptions":{binary:$bin,args:[],prefs:{"media.autoplay.default":0}}}}}')"
 reply="$(api POST /session "$caps")"
 session="$(jq -er '.value.sessionId // .sessionId' <<<"$reply")" || exit 1
@@ -65,6 +71,7 @@ pulse_mapped(){
  return 1
 }
 pre=false; pulse_mapped && pre=true
+probe_stage='clicked-webaudio'
 button="$(api POST "/session/$session/element" '{"using":"css selector","value":"#play"}')"
 button_id="$(jq -er '.value."element-6066-11e4-a52e-4f735466cecf" // .value.ELEMENT' <<<"$button")"
 api POST "/session/$session/element/$button_id/click" '{}' | jq -e '.value==null' >/dev/null
@@ -81,9 +88,16 @@ for _ in {1..60}; do
  sleep 0.15
 done
 [[ "$sink" == true && "$mapped" == true && "$running" == true ]] || { echo "Audio witness missing: $sink $mapped $running" >&2; exit 1; }
+probe_stage='native-backend-about-support'
+echo 'Pulse stream, mapping and browser WebAudio confirmed; querying native backend' >&2
 # Read the native cubeb backend ID via the *original* about:support media
 # diagnostics pipeline. This is actual browser state, not a source guess.
-api POST "/session/$session/url" '{"url":"about:support"}' | jq -e '.value==null' >/dev/null
+support_reply="$(api POST "/session/$session/url" '{"url":"about:support"}')"
+if ! jq -e '.value==null' <<<"$support_reply" >/dev/null; then
+  jq -r '.value.error // "unexpected about:support navigation response"' <<<"$support_reply" >&2
+  exit 1
+fi
+probe_stage='native-backend-row'
 backend=''
 for _ in {1..60}; do
   result="$(api POST "/session/$session/execute/sync" '{"script":"const row=[...document.querySelectorAll(\"#media-info-tbody tr\")].find(r=>r.querySelector(\"th\")?.getAttribute(\"data-l10n-id\")===\"audio-backend\");return {uri:document.documentURI,backend:row?.querySelector(\"td\")?.textContent?.trim()||null};","args":[]}' )"
@@ -97,6 +111,7 @@ done
   echo 'Native about:support cubeb backend ID was not available' >&2
   exit 1
 }
+echo "Original browser native cubeb backend=$backend" >&2
 is_rust=false
 [[ "$backend" == pulse-rust ]] && is_rust=true
 jq -n --argjson pre "$pre" --arg backend "$backend" --argjson rust "$is_rust" '{
