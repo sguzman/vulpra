@@ -1,0 +1,140 @@
+# Source-pinned original packaged Vulpra live WebAudio -> PulseAudio null sink.
+# No physical audio device, microphone, host Pulse/PipeWire or network.
+name: M3 Original Browser Pulse Null Sink
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-browser-pulse-local-origin.rs
+      - ci/m3-original-browser-pulse-webdriver.sh
+      - .github/workflows/m3-original-browser-pulse-null-sink.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-pulse-null-sink:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout small audio diagnostic only
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-pulse-local-origin.rs
+            ci/m3-original-browser-pulse-webdriver.sh
+      - name: Checkout original cubeb backend source contracts
+        uses: actions/checkout@v4
+        with:
+          path: original-source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            media/libcubeb/src/cubeb.c
+            media/libcubeb/src/moz.build
+            toolkit/library/rust/shared/Cargo.toml
+      - name: Authenticate source backend boundary and immutable browser package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE_SHA"
+          grep -Fq 'pulse_rust_init(cubeb **' original-source/media/libcubeb/src/cubeb.c
+          grep -Fq '      pulse_rust_init,' original-source/media/libcubeb/src/cubeb.c
+          grep -Fq "DEFINES['USE_PULSE_RUST'] = True" original-source/media/libcubeb/src/moz.build
+          grep -Fq 'pulse-dlopen' original-source/toolkit/library/rust/shared/Cargo.toml
+          grep -Fq 'new AudioContext(' diagnostics/ci/m3-original-browser-pulse-local-origin.rs
+          bash -n diagnostics/ci/m3-original-browser-pulse-webdriver.sh
+          rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-pulse-local-origin.rs \
+            -o "$RUNNER_TEMP/m3-original-pulse-local-origin"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/reports"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          test -x "$RUNNER_TEMP/package/vulpra/vulpra"
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/package/vulpra/application.ini"
+      - name: Build disposable Arch PulseAudio and Weston runtime
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/audio-container"
+          cat >"$RUNNER_TEMP/audio-container/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            bash coreutils curl jq grep findutils procps-ng util-linux iproute2 \
+            geckodriver gtk3 dbus-glib alsa-lib nss weston wayland-utils \
+            mesa libglvnd ttf-dejavu pulseaudio libpulse \
+            && command -v pactl && command -v pulseaudio && command -v setpriv \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t vulpra-m3-pulse:ci "$RUNNER_TEMP/audio-container"
+      - name: Execute original browser audio into only private null sink
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --shm-size 256m \
+            --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
+            --security-opt no-new-privileges --pids-limit 512 --memory 4g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
+            -v "$RUNNER_TEMP/package/vulpra:/original:ro" \
+            -v "$RUNNER_TEMP/m3-original-pulse-local-origin:/audit/local-origin:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-pulse-webdriver.sh:/audit/webdriver.sh:ro" \
+            -v "$RUNNER_TEMP/reports:/reports:rw" \
+            -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
+            -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
+            -e VULPRA_M3_NO_AUDIO_DEVICE=1 \
+            vulpra-m3-pulse:ci /bin/bash -c '
+              set -euo pipefail
+              test ! -e /dev/snd
+              ip link set lo up
+              exec setpriv --reuid "$CI_UID" --regid "$CI_GID" --clear-groups \
+                /bin/bash /audit/webdriver.sh /original/vulpra /audit/local-origin \
+                /reports/m3-original-browser-pulse-null-sink.json
+            '
+      - name: Accept only bounded audio stream evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_browser_webaudio_pulse_null_sink_stream_verified" and
+            .source_commit==$src and .archive_sha256==$sha and
+            .original_native_browser_executed==true and
+            .real_user_click_audio_context_running==true and
+            .pulse_null_sink_created==true and
+            .pulse_sink_had_no_inputs_before_browser_audio==true and
+            .pulse_sink_input_observed_during_browser_audio==true and
+            (.libpulse_mapped_before_click|type=="boolean") and
+            .libpulse_mapped_during_audio==true and
+            .compiled_rust_pulse_callsite_proven==false and
+            .physical_audio_or_microphone_used==false and
+            .network_egress_allowed==false and
+            .target_endeavouros_verified==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/reports/m3-original-browser-pulse-null-sink.json" >/dev/null
+          echo 'PASS: original browser live audio reached isolated Pulse null sink; no real device or full loader closure'
+      - name: Upload only privacy-safe PulseAudio summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-browser-pulse-null-sink
+          path: ${{ runner.temp }}/reports/m3-original-browser-pulse-null-sink.json
+          if-no-files-found: error
+          retention-days: 14
