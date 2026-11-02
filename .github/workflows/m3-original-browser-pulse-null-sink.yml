@@ -1,13 +1,8 @@
 # Source-pinned original packaged Vulpra live WebAudio -> PulseAudio null sink.
 # No physical audio device, microphone, host Pulse/PipeWire or network.
+# CI 41483634953 passed; keep expensive native experiment manual-only.
 name: M3 Original Browser Pulse Null Sink
 on:
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-browser-pulse-local-origin.rs
-      - ci/m3-original-browser-pulse-webdriver.sh
-      - .github/workflows/m3-original-browser-pulse-null-sink.yml
   workflow_dispatch:
 permissions:
   contents: read
