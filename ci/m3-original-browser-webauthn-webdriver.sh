@@ -8,6 +8,13 @@ report="$3"
 [[ -x "$browser" && -x "$origin" && "$(basename "$browser")" == vulpra ]] || exit 2
 [[ "$MOZ_DISABLE_NONLOCAL_CONNECTIONS" == 1 && "$VULPRA_OFFLINE_CONTAINER_ONLY" == 1 ]] || exit 2
 for cmd in geckodriver curl jq grep; do command -v "$cmd" >/dev/null || exit 2; done
+# setup capabilities must be gone before any driver/browser/HTTP service.
+cap_eff="$(awk '/^CapEff:/ {print $2}' /proc/self/status)"
+cap_prm="$(awk '/^CapPrm:/ {print $2}' /proc/self/status)"
+[[ "$cap_eff" == 0000000000000000 && "$cap_prm" == 0000000000000000 ]] || {
+  echo 'Offline browser user retained Linux capabilities' >&2; exit 2;
+}
+
 work="$(mktemp -d /tmp/vulpra-m3-webauthn.XXXXXX)"
 export HOME="$work/home" XDG_DATA_HOME="$work/data" MOZ_HEADLESS=1 MOZ_CRASHREPORTER_DISABLE=1
 mkdir -m 0700 "$HOME" "$XDG_DATA_HOME"
