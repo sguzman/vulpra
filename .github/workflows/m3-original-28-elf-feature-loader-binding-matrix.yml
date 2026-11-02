@@ -1,0 +1,145 @@
+# Read-only synthesis across FIVE independently verified immutable original
+# browser build/loader/runtime binding report artifacts. No browser or compiler.
+name: M3 Original 28 ELF Feature/Loader/Binding Matrix
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-28-elf-feature-loader-binding-matrix.yml
+      - ci/m3-original-28-elf-feature-loader-binding-matrix.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile-original-28:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SRC: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout only bounded matrix verifier
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-28-elf-feature-loader-binding-matrix.jq
+      - name: Confirm five immutable original reports from successful independent runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          jq --version
+          while IFS=' ' read -r id commit path artifact; do
+            test -n "$id" || continue
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" |
+              jq -e --arg sha "$commit" --arg path "$path" '
+                .status=="completed" and .conclusion=="success" and
+                .head_sha==$sha and .path==$path' >/dev/null
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/artifacts?per_page=40" |
+              jq -e --arg name "$artifact" '
+                [.artifacts[]|select(.name==$name and .expired==false and
+                  .size_in_bytes>0)]|length==1' >/dev/null
+          done <<'RUNS'
+          41209703132 52ce889ff6e4e569db4689fa6b097e528e459c5b .github/workflows/m3-original-all-28-elf-build-manifests.yml m3-original-all-28-elf-source-build-declarations
+          41207364061 68f05ab747249c95edeb92cc12c2d7ec8ec911d7 .github/workflows/m3-original-native-all-elf-loader-list.yml m3-original-all-28-elf-glibc-loader-list
+          41211418491 7d2443f4ce732852afb6a8b1891ac14ac2e91d60 .github/workflows/m3-original-native-arch-loader-list.yml m3-original-archlinux-all-28-elf-loader-list
+          41206458805 62e9854c7e06b9c9b2448bb7a8f5d3b424a164c4 .github/workflows/m3-original-all-28-runtime-requester-union.yml m3-original-all-28-elf-requester-binding-witnesses
+          41206028051 1c5dc963a43c220d14dbee2f25ca1d6f8032a0b9 .github/workflows/m3-original-real-binding-ten-requester-union.yml m3-original-ten-requester-binding-reconciliation
+          RUNS
+      - name: Fetch only five sanitized historical evidence artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for group in \
+            '41209703132 m3-original-all-28-elf-source-build-declarations manifest' \
+            '41207364061 m3-original-all-28-elf-glibc-loader-list ubuntu' \
+            '41211418491 m3-original-archlinux-all-28-elf-loader-list arch' \
+            '41206458805 m3-original-all-28-elf-requester-binding-witnesses runtime' \
+            '41206028051 m3-original-ten-requester-binding-reconciliation ten'; do
+            read -r id artifact folder <<<"$group"
+            mkdir -p "$RUNNER_TEMP/$folder"
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" \
+              --name "$artifact" --dir "$RUNNER_TEMP/$folder"
+          done
+          test -s "$RUNNER_TEMP/manifest/m3-original-all-28-build-manifests.json"
+          test -s "$RUNNER_TEMP/ubuntu/m3-original-all-elf-loader-list.json"
+          test -s "$RUNNER_TEMP/arch/original-arch-platform-audit.json"
+          test -s "$RUNNER_TEMP/runtime/m3-original-all-28-elf-requester-binding-witnesses.json"
+          test -s "$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json"
+      - name: Independently crosscheck every ELF owner, Ubuntu providers, Arch resolution and runtime binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          audit() {
+            jq -n --arg source "$SRC" --arg archive "$ARCHIVE" \
+              --slurpfile manifest "$RUNNER_TEMP/manifest/m3-original-all-28-build-manifests.json" \
+              --slurpfile ubuntu "$RUNNER_TEMP/ubuntu/m3-original-all-elf-loader-list.json" \
+              --slurpfile arch "$RUNNER_TEMP/arch/original-arch-platform-audit.json" \
+              --slurpfile runtime "$RUNNER_TEMP/runtime/m3-original-all-28-elf-requester-binding-witnesses.json" \
+              --slurpfile ten "$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json" \
+              -f ci/m3-original-28-elf-feature-loader-binding-matrix.jq
+          }
+          audit >"$RUNNER_TEMP/m3-original-28-elf-feature-loader-binding-matrix.json"
+          jq -e --arg sha "$ARCHIVE" --arg src "$SRC" '
+            .schema_version==1 and
+            .status=="original_28_elf_source_loader_runtime_binding_matrix_crosschecked" and
+            .original_archive_sha256==$sha and .original_source_commit==$src and
+            .source_manifest_owners==28 and .ubuntu_direct_needed_edges==268 and
+            .ubuntu_direct_needed_resolved==268 and .arch_container_direct_needed_resolved==268 and
+            .ubuntu_per_elf_loader_provider_occurrences==586 and
+            .ubuntu_distinct_provider_names==91 and .arch_container_distinct_provider_names==90 and
+            .observed_original_runtime_binding_requesters==28 and
+            .headless_startup_only_requesters==18 and
+            .both_headless_and_selected_requesters==3 and
+            .selected_feature_only_requesters==7 and
+            (.rows|length)==28 and
+            ([.rows[].ubuntu_direct_needed_count]|add)==268 and
+            ([.rows[].ubuntu_loader_provider_count]|add)==586 and
+            ([.rows[].elf]|unique|length)==28 and
+            .per_elf_arch_provider_mapping_available==false and
+            .complete_lazy_and_future_dynamic_loading_map_proven==false and
+            .runtime_observation_does_not_prove_all_features==true and
+            .evaluated_source_build_graph_per_elf_proven==false and
+            .no_native_compilation_or_application_execution_performed==true and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-28-elf-feature-loader-binding-matrix.json" >/dev/null
+          # Independently refuse mutually inconsistent provenance, file identity
+          # and loader statistics; never accept a partially joined 28-row map.
+          cp "$RUNNER_TEMP/manifest/m3-original-all-28-build-manifests.json" "$RUNNER_TEMP/manifest/real.json"
+          jq '.original_archive_sha256="0000000000000000000000000000000000000000000000000000000000000000"' \
+            "$RUNNER_TEMP/manifest/real.json" \
+            >"$RUNNER_TEMP/manifest/m3-original-all-28-build-manifests.json"
+          if audit >/dev/null 2>&1; then
+            echo 'FAIL: forged archive identity accepted' >&2; exit 1
+          fi
+          mv "$RUNNER_TEMP/manifest/real.json" "$RUNNER_TEMP/manifest/m3-original-all-28-build-manifests.json"
+          cp "$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json" "$RUNNER_TEMP/ten/real.json"
+          jq '.original_elf_requester_basenames=["libxul.so"]' \
+            "$RUNNER_TEMP/ten/real.json" >"$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json"
+          if audit >/dev/null 2>&1; then
+            echo 'FAIL: tampered feature-workload requester set accepted' >&2; exit 1
+          fi
+          mv "$RUNNER_TEMP/ten/real.json" "$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json"
+          cp "$RUNNER_TEMP/ubuntu/m3-original-all-elf-loader-list.json" "$RUNNER_TEMP/ubuntu/real.json"
+          jq '.per_original_elf["libxul.so"].declared_direct_needed_count+=1' \
+            "$RUNNER_TEMP/ubuntu/real.json" >"$RUNNER_TEMP/ubuntu/m3-original-all-elf-loader-list.json"
+          if audit >/dev/null 2>&1; then
+            echo 'FAIL: modified native ELF direct dependency count accepted' >&2; exit 1
+          fi
+          mv "$RUNNER_TEMP/ubuntu/real.json" "$RUNNER_TEMP/ubuntu/m3-original-all-elf-loader-list.json"
+          echo 'PASS: 28/28 original ELFs joined across source, Ubuntu/Arch loader and real symbol-binding workload evidence; forged reports rejected'
+      - name: Upload only bounded original 28-ELF crosswalk
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-28-elf-feature-loader-binding-matrix
+          path: ${{ runner.temp }}/m3-original-28-elf-feature-loader-binding-matrix.json
+          if-no-files-found: error
+          retention-days: 14
