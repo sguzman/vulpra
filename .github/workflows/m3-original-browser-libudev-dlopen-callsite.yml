@@ -1,0 +1,173 @@
+# CI-only exact-original browser libudev dlopen return-PC/flags instrumentation.
+# LD_PRELOAD changes symbol resolution; uninstrumented control 41371647131
+# establishes the original library mapping without this diagnostic shim.
+name: M3 Original Browser Libudev Dlopen Callsite Trace
+# Bounded experimental original-browser USB backend diagnostic. A negative
+# request response is expected with no physical authenticator; actual mapped
+# libudev evidence is measured independently. This is not sixth-gate closure.
+# A source-pinned original-browser mapping transition passed 41371647131.
+# This expensive experiment is manually dispatchable, not a regular push gate.
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-libudev-dlopen-callsite.c
+      - ci/m3-original-browser-webauthn-webdriver.sh
+      - .github/workflows/m3-original-browser-libudev-dlopen-callsite.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-native-browser-usb-no-device:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      ORIGINAL_RUN: '40997075527'
+    steps:
+      - name: Checkout only CI Rust local-origin and WebDriver test
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-webauthn-local-origin.rs
+            ci/m3-original-browser-webauthn-webdriver.sh
+            ci/m3-original-libudev-dlopen-callsite.c
+      - name: Checkout original source WebAuthn virtual-authenticator regression
+        uses: actions/checkout@v4
+        with:
+          path: original-source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/webauthn/tests/test_webauthn_webdriver_virtual_authenticator.html
+            dom/webauthn/tests/browser/browser.toml
+            dom/webauthn/authrs_bridge/src/lib.rs
+      - name: Authenticate immutable original native browser and offline test code
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE_SHA"
+          grep -Fq 'addVirtualAuthenticator()' original-source/dom/webauthn/tests/test_webauthn_webdriver_virtual_authenticator.html
+          grep -Fq 'security.webauth.webauthn_enable_usbtoken=false' original-source/dom/webauthn/tests/browser/browser.toml
+          grep -Fq 'We disable the USB transport in tests that use virtual devices.' original-source/dom/webauthn/authrs_bridge/src/lib.rs
+          grep -Fq 'self.usb_token_manager.lock().unwrap().register(' original-source/dom/webauthn/authrs_bridge/src/lib.rs
+          grep -Fq 'if static_prefs::pref!("security.webauth.webauthn_enable_usbtoken")' original-source/dom/webauthn/authrs_bridge/src/lib.rs
+          grep -Fq 'authenticatorAttachment:"cross-platform"' diagnostics/ci/m3-original-browser-webauthn-local-origin.rs
+          grep -Fq 'usb-dlopen-trace' diagnostics/ci/m3-original-browser-webauthn-webdriver.sh
+          bash -n diagnostics/ci/m3-original-browser-webauthn-webdriver.sh
+          cc -std=c11 -Wall -Wextra -Werror -O2 -fPIC -shared \
+            diagnostics/ci/m3-original-libudev-dlopen-callsite.c \
+            -o "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so" -ldl
+          test "$(nm -D --defined-only "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so" | awk '$3=="dlopen"{n++} END{print n+0}')" -eq 1
+          if readelf -d "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so" | grep -F '[libudev.so.1]'; then
+            echo 'Diagnostic interposer incorrectly links libudev eagerly' >&2; exit 1
+          fi
+          rustc --edition=2021 -O diagnostics/ci/m3-original-browser-webauthn-local-origin.rs \
+            -o "$RUNNER_TEMP/m3-original-local-origin"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
+            jq -e --arg src "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$src' >/dev/null
+          mkdir -p "$RUNNER_TEMP/original-archive" "$RUNNER_TEMP/packaged" "$RUNNER_TEMP/reports"
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original-archive"
+          (cd "$RUNNER_TEMP/original-archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original-archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/original-archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/packaged"
+          test -x "$RUNNER_TEMP/packaged/vulpra/vulpra"
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/packaged/vulpra/application.ini"
+      - name: Build disposable Arch userspace with WebDriver and original browser dependencies
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-webauthn"
+          cat >"$RUNNER_TEMP/arch-webauthn/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            bash coreutils curl jq grep findutils procps-ng util-linux \
+            iproute2 geckodriver gtk3 dbus-glib alsa-lib nss weston wayland-utils \
+            mesa libglvnd ttf-dejavu \
+            && command -v geckodriver && command -v ip && command -v setpriv \
+            && command -v weston && command -v wayland-info \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t vulpra-m3-original-webauthn:ci "$RUNNER_TEMP/arch-webauthn"
+      - name: Trace original libxul USB libudev dlopen callsites during no-device registration
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          # NETWORK NONE: no internet or bridge. Grant NET_ADMIN only to
+          # transient root namespace setup so private loopback can be raised.
+          # Drop it before executing geckodriver, original browser and test.
+          docker run --rm --network none --read-only --shm-size 256m \
+            --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
+            --security-opt no-new-privileges --pids-limit 512 --memory 4g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
+            -v "$RUNNER_TEMP/packaged/vulpra:/original:ro" \
+            -v "$RUNNER_TEMP/m3-original-local-origin:/audit/local-origin:ro" \
+            -v "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so:/audit/libudev-trace.so:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-webauthn-webdriver.sh:/audit/webdriver.sh:ro" \
+            -v "$RUNNER_TEMP/reports:/reports:rw" \
+            -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
+            -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
+            -e VULPRA_M3_ORIGINAL_WEBAUTHN_MODE=usb-dlopen-trace \
+            -e LD_PRELOAD=/audit/libudev-trace.so \
+            -e VULPRA_M3_LIBUDEV_DLOPEN_TRACE=/tmp/vulpra-m3-libudev-dlopen.trace \
+            -e VULPRA_M3_NO_USB_PASSTHROUGH=1 \
+            vulpra-m3-original-webauthn:ci /bin/bash -c '
+              set -euo pipefail
+              ip link set lo up
+              exec setpriv --reuid "$CI_UID" --regid "$CI_GID" \
+                --clear-groups \
+                /bin/bash /audit/webdriver.sh /original/vulpra /audit/local-origin \
+                /reports/m3-original-browser-libudev-dlopen-callsite.json
+            '
+      - name: Accept exact original libxul callsites and runtime loader flags but not a complete stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_browser_usb_libudev_interposed_callsite_verified" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .original_native_browser_executed==true and
+            .real_browser_usbtoken_pref==true and
+            .real_browser_softtoken_pref==false and
+            .real_original_web_authn_create_called_from_user_click==true and
+            .virtual_authenticator_registered==false and
+            .physical_usb_device_passthrough==false and
+            .credential_create_result=="NotAllowedError" and
+            .libudev_mapped_before_attempt==false and
+            .libudev_mapped_during_or_after_attempt==true and
+            .instrumented_dlopen_symbol_interposition==true and
+            .source_pinned_libxul_noload_miss_at_return_pc_0x9936652==true and
+            .source_pinned_libxul_normal_load_hit_at_return_pc_0x9936667==true and
+            .exact_two_machine_callsite_and_flags_outcomes_reconciled==true and
+            .original_browser_uninstrumented_control_ci==41371647131 and
+            .actual_original_dlopen_call_stack_observed==false and
+            .original_browser_libudev_runtime_dependency_proven==false and
+            .physical_security_key_authentication_verified==false and
+            .network_egress_allowed==false and
+            .real_user_profile_or_browser_accessed==false and
+            .whole_dynamic_loader_graph_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/reports/m3-original-browser-usb-nodevice-loader.json" >/dev/null
+          echo 'PASS: original browser exact libxul dlopen return PCs, flags, outcomes; no stack/hardware/full closure'
+      - name: Upload only sanitized browser feature observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-browser-libudev-dlopen-callsite
+          path: ${{ runner.temp }}/reports/m3-original-browser-usb-nodevice-loader.json
+          if-no-files-found: error
+          retention-days: 14
