@@ -17,6 +17,11 @@ __attribute__((noinline)) int cubeb_init(int n) {
 EOF
 cc -std=c11 -Wall -Wextra -Werror -fPIC -shared -O2 -Wl,-Bsymbolic \
   "$work/positive.c" -o "$work/libxul.so"
+echo 'Synthetic compiled cubeb_init instructions (fixture only):'
+objdump -d --no-show-raw-insn --disassemble=cubeb_init "$work/libxul.so" | tail -n 28
+echo 'Synthetic linked cubeb and pulse symbols (fixture only):'
+nm --defined-only --no-demangle --format=posix "$work/libxul.so" |
+  grep -E '^(cubeb_init|pulse_rust_init) '
 bash "$auditor" "$source_sha" "$work/libxul.so" "$work/positive.json"
 jq -e '.source_to_native_ffi_address_reference_proven==true and
         .cubeb_init_address_takes_pulse_rust_init>=1 and
