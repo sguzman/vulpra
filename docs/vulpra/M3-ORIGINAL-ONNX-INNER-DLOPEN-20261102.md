@@ -1,5 +1,27 @@
 # M3 — Original packaged ONNX Runtime internal dlopen origin under isolated API activation (2026-11-02)
 
+## Exact ONNX CPU output numerical correctness (2026-11-02)
+
+**[Updated original source-pinned native CI 41528669862 — PASS](https://github.com/sguzman/vulpra/actions/runs/41528669862)** and **[workflow lint 41528669790 — PASS](https://github.com/sguzman/vulpra/actions/runs/41528669790)**. The sanitized original-native artifact **13180313981**, `m3-original-onnx-cpu-constant-session.json`, was **downloaded and independently inspected**; it authenticates the compiled full-normal original package SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` and exact source Git `b1482404dfb8b01342990ee99ea3df0f9756b5f7`.
+
+This strengthens the previous non-null-output-only result. The same generated in-memory `Constant` graph ran on the original compiled `libonnxruntime.so` in **both** ordinary and CI-interposed isolated no-egress modes, successfully calling `CreateSessionFromArray` then `Run`. A new narrowly scoped Rust C API reader now checks **`IsTensor==1`**, then `GetTensorTypeAndShape`, **float32 element type**, **rank 1**, **dimensions `[1]`**, **one element**, and `GetTensorMutableData`. It reads **exactly one validated float32** and compares its bits against the configured constant **1.25f32 / `0x3fa00000`**. Any unexpected type, rank, shape, null pointer, nonfinite or unequal value fails closed.
+
+To avoid guessing the expanded native ONNX `OrtApi` function-table layout, CI fetched the upstream **MIT-licensed ONNX Runtime v1.22.0 C header pinned to Git blob `b01b7e48dc87bbeeb026c61fb06c591053853ad1`** and compiled seven C `offsetof(OrtApi,...)` static assertions against the exact Rust indexes for `IsTensor`, `GetTensorMutableData`, `GetTensorElementType`, `GetDimensionsCount`, `GetDimensions`, `GetTensorShapeElementCount`, and `GetTensorTypeAndShape`. Header Git hash, Rust unit tests, original package integrity and both native executions all passed.
+
+| Checked scope | Outcome |
+| --- | --- |
+| Original CPU in-memory ONNX `Constant` inference | **PASS** |
+| Original output `OrtValue` type | **Tensor** |
+| Output tensor type and shape | **float32 `[1]`**, 1 element |
+| Read actual output value, compare exact IEEE-754 bits | **1.25 = `0x3fa00000`, PASS** |
+| Non-interposed and optional `LD_PRELOAD` runs | **Both PASS** |
+| ONNX-library-origin internal `dlopen` calls in this CPU run | **0** |
+| External probe-origin `dlopen` calls | **1** |
+
+**Limits unchanged:** This verifies the one chosen CPU `Constant` graph and the displayed float32 output; it does not prove general ML model numerical accuracy, GPU or alternative execution-provider registration, an original browser ML frontend, every conditional future load, exact uninstrumented stacks, user EndeavourOS/Hyprland device behavior, code removals, or new savings. The `LD_PRELOAD` observation is explicitly instrumented. The new full-native replay ran **once** for this improved acceptance check; its workflow is restored to **manual-only** after successful evidence capture.
+
+**M3 remains 5/6 (83%) and overall Vulpra 61%, Δ +0 percentage points.**
+
 ## Real in-memory ONNX CPU inference session verified (2026-11-02)
 
 [**Original source-pinned native CPU inference CI 41526796993 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41526796993) and [**workflow lint 41526797290 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41526797290). The bounded report artifact **13180431757**, \`m3-original-onnx-cpu-constant-session.json\`, was independently downloaded and inspected. It attests the identical immutable **original compiled source \`b1482404dfb8b01342990ee99ea3df0f9756b5f7\`** and **full-normal archive SHA-256 \`7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a\`**.

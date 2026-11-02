@@ -1,14 +1,9 @@
 # Source-pinned original ONNX Runtime in-memory Constant graph session and Run.
 # No model download, user data, GPU, browser profile or host internet.
 name: M3 Original ONNX Constant Session and Inner Dlopen
-# One source-pinned original package replay for numerical output checks.
-# Return this to manual-only when independently verified.
+# Original full-normal package numerical replay 41528669862 passed, and its
+# output artifact was independently inspected. Avoid automatic repeats.
 on:
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-onnx-constant-session.rs
-      - .github/workflows/m3-original-onnx-constant-session.yml
   workflow_dispatch:
 permissions:
   contents: read
