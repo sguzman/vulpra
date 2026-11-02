@@ -88,7 +88,7 @@ jobs:
           # transient root namespace setup so private loopback can be raised.
           # Drop it before executing geckodriver, original browser and test.
           docker run --rm --network none --read-only --shm-size 256m \
-            --cap-drop ALL --cap-add NET_ADMIN \
+            --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
             --security-opt no-new-privileges --pids-limit 128 --memory 2g \
             --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
             -v "$RUNNER_TEMP/packaged/vulpra:/original:ro" \
@@ -102,7 +102,7 @@ jobs:
               set -euo pipefail
               ip link set lo up
               exec setpriv --reuid "$CI_UID" --regid "$CI_GID" \
-                --clear-groups --bounding-set=-net_admin \
+                --clear-groups --bounding-set=-net_admin,-setuid,-setgid \
                 /bin/bash /audit/webdriver.sh /original/vulpra /audit/local-origin \
                 /reports/m3-original-browser-webauthn-virtual.json
             '
