@@ -133,7 +133,7 @@ jobs:
             .physical_usb_device_passthrough==false and
             .credential_create_result=="NotAllowedError" and
             (.libudev_mapped_before_attempt|type)=="boolean" and
-            (.libudev_mapped_during_or_after_attempt|type)=="boolean" and
+            .libudev_mapped_during_or_after_attempt==true and
             .actual_original_dlopen_call_stack_observed==false and
             .original_browser_libudev_runtime_dependency_proven==false and
             .physical_security_key_authentication_verified==false and
@@ -149,6 +149,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-original-browser-usb-nodevice-loader
-          path: ${{ runner.temp }}/reports/m3-original-browser-webauthn-virtual.json
-          if-no-files-found: warn
+          path: ${{ runner.temp }}/reports/m3-original-browser-usb-nodevice-loader.json
+          if-no-files-found: error
           retention-days: 14
