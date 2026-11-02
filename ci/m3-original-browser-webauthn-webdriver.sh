@@ -17,6 +17,9 @@ cap_prm="$(awk '/^CapPrm:/ {print $2}' /proc/self/status)"
 
 work="$(mktemp -d /tmp/vulpra-m3-webauthn.XXXXXX)"
 export HOME="$work/home" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/runtime" MOZ_CRASHREPORTER_DISABLE=1 XRE_START_OFFLINE=1
+# Exact Vulpra/Firefox Marionette requirement for chrome context; ONLY this
+# disposable, no-network, unprivileged WebDriver test, never an installed profile.
+export MOZ_REMOTE_ALLOW_SYSTEM_ACCESS=1
 export WAYLAND_DISPLAY=wayland-vulpra-m3 XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1
 unset MOZ_HEADLESS DISPLAY
 mkdir -m 0700 "$HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
