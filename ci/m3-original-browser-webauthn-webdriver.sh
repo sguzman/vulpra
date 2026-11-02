@@ -89,6 +89,19 @@ authid="$(jq -er '.value|select(type=="string" and length>0)' <<<"$auth")" || {
  echo 'Virtual authenticator was not accepted' >&2
  jq -c '{error:.value.error,message:(.value.message|tostring|.[0:150])}' <<<"$auth" >&2; exit 1
 }
+# Probe the ACTUAL original browser's internal virtual-authenticator DB.
+# A driver HTTP 200 alone does not prove its Gecko service registered a key.
+api POST "/session/$session/moz/context" '{"context":"chrome"}' | jq -e '.value==null' >/dev/null || {
+ echo 'Marionette privileged WebAuthn registry inspection unavailable' >&2; exit 1;
+}
+auth_js='const s=Components.classes["@mozilla.org/webauthn/service;1"].getService(Components.interfaces.nsIWebAuthnService);return s.hasVirtualAuthenticator(arguments[0]);'
+registered="$(api POST "/session/$session/execute/sync" \
+ "$(jq -nc --arg script "$auth_js" --arg authid "$authid" '{script:$script,args:[$authid]}')")"
+api POST "/session/$session/moz/context" '{"context":"content"}' | jq -e '.value==null' >/dev/null
+jq -e '.value==true' <<<"$registered" >/dev/null || {
+ echo 'Virtual authenticator absent from original Gecko nsIWebAuthnService' >&2
+ jq -c '{error:.value.error,message:(.value.message|tostring|.[0:140]),result:.value}' <<<"$registered" >&2; exit 1;
+}
 # WebDriver element click is a genuine browser input event and carries user
 # activation, unlike a bare execute/async WebAuthn call in a script context.
 click_button(){
@@ -140,7 +153,7 @@ for proc in /proc/[0-9]*/comm; do
 done
 [[ "$browser_count" -gt 0 ]] || { echo 'Original browser native process not observed' >&2; exit 1; }
 jq -n --argjson libudev "$libudev" '{
-schema_version:1,status:"original_browser_real_webauthn_virtual_usb_create_get",
+schema_version:1,status:"original_browser_real_webauthn_virtual_internal_create_get",
 original_source_commit:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
 original_archive_sha256:"7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a",
 original_native_browser_executed:true,localhost_secure_origin:true,
