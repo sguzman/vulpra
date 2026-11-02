@@ -6,6 +6,12 @@ name: M3 Original Browser Offline Virtual WebAuthn
 # NotAllowedError for a registered virtual authenticator in this isolated
 # configuration. Keep callable on demand, not as a failing main push gate.
 on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-browser-webauthn-local-origin.rs
+      - ci/m3-original-browser-webauthn-webdriver.sh
+      - .github/workflows/m3-original-browser-webauthn-offline.yml
   workflow_dispatch:
 permissions:
   contents: read
