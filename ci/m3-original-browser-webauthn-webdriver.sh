@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# CI-only original browser WebAuthn virtual CTAP2 USB create+get, offline.
+# CI-only real original browser virtual WebAuthn and physical-USB-backend no-device probes, offline.
 set -euo pipefail
 [[ $# -eq 3 ]] || exit 2
 browser="$(realpath -e -- "$1")"
 origin="$(realpath -e -- "$2")"
 report="$3"
+mode="${VULPRA_M3_ORIGINAL_WEBAUTHN_MODE:-virtual}"
+[[ "$mode" == virtual || "$mode" == usb-no-device ]] || { echo 'Unsupported WebAuthn CI mode' >&2; exit 2; }
+if [[ "$mode" == usb-no-device ]]; then
+  [[ "${VULPRA_M3_NO_USB_PASSTHROUGH:-}" == 1 ]] || { echo 'USB probe must explicitly disallow device passthrough' >&2; exit 2; }
+  for dev in /dev/hidraw*; do [[ ! -e "$dev" ]] || { echo 'USB probe unexpectedly has physical hidraw device' >&2; exit 2; }; done
+fi
 [[ -x "$browser" && -x "$origin" && "$(basename "$browser")" == vulpra ]] || exit 2
 [[ "$MOZ_DISABLE_NONLOCAL_CONNECTIONS" == 1 && "$VULPRA_OFFLINE_CONTAINER_ONLY" == 1 ]] || exit 2
 for cmd in geckodriver curl jq grep; do command -v "$cmd" >/dev/null || exit 2; done
@@ -66,10 +72,10 @@ for _ in {1..45}; do
  sleep 0.4
 done
 [[ "$ready" == true ]] || { echo 'Offline driver/origin not ready' >&2; tail -n 30 "$work/driver.log" >&2; exit 1; }
-caps="$(jq -nc --arg bin "$browser" '{capabilities:{alwaysMatch:{browserName:"firefox","webauthn:virtualAuthenticators":true,
+caps="$(jq -nc --arg bin "$browser" --argjson usb "$([[ "$mode" == usb-no-device ]] && echo true || echo false)" '{capabilities:{alwaysMatch:{browserName:"firefox","webauthn:virtualAuthenticators":true,
  "moz:firefoxOptions":{binary:$bin,args:[],
- prefs:{"security.webauth.webauthn":true,"security.webauth.webauthn_enable_softtoken":true,
- "security.webauth.webauthn_enable_usbtoken":false,"security.webauthn.ctap2":true}}}}}')"
+ prefs:{"security.webauth.webauthn":true,"security.webauth.webauthn_enable_softtoken":($usb|not),
+ "security.webauth.webauthn_enable_usbtoken":$usb,"security.webauthn.ctap2":true}}}}}')"
 resp="$(api POST /session "$caps")"
 session="$(jq -er '.value.sessionId // .sessionId' <<<"$resp")" || {
  echo 'Original browser WebDriver session failed' >&2
@@ -87,6 +93,85 @@ state="$(api POST "/session/$session/execute/sync" "$(jq -nc --arg script "$js" 
 jq -e '.value.origin=="http://localhost:18888" and .value.secure==true and .value.create=="function" and .value.get=="function"' <<<"$state" >/dev/null || {
  echo 'Original browser secure-origin WebAuthn API unavailable' >&2; jq -c '.value' <<<"$state" >&2; exit 1
 }
+# Source-matched physical USB transport diagnostic without a real device.
+# Independently assert browser prefs in the original Chrome service, then
+# click real WebAuthn registration. No virtual authenticator may be created.
+if [[ "$mode" == usb-no-device ]]; then
+  # The normal / route is source-matched cross-platform WebAuthn registration;
+  # with these original runtime prefs authrs_bridge takes usb_token_manager.
+  chrome_reply="$(api POST "/session/$session/moz/context" '{"context":"chrome"}')"
+  jq -e '.value==null or .value=="chrome"' <<<"$chrome_reply" >/dev/null || {
+    echo 'No privileged original browser pref verification' >&2; exit 1;
+  }
+  pref_js='const s=Components.classes["@mozilla.org/preferences-service;1"].getService(Components.interfaces.nsIPrefBranch);return {usb:s.getBoolPref("security.webauth.webauthn_enable_usbtoken"),soft:s.getBoolPref("security.webauth.webauthn_enable_softtoken")};'
+  prefs="$(api POST "/session/$session/execute/sync" "$(jq -nc --arg script "$pref_js" '{script:$script,args:[]}')")"
+  restored="$(api POST "/session/$session/moz/context" '{"context":"content"}')"
+  jq -e '.value==null or .value=="content"' <<<"$restored" >/dev/null
+  jq -e '.value.usb==true and .value.soft==false' <<<"$prefs" >/dev/null || {
+    echo 'Original browser USB backend not enabled as intended' >&2; exit 1;
+  }
+  browser_maps_udev(){
+    local proc name maps
+    for proc in /proc/[0-9]*/comm; do
+      [[ -r "$proc" ]] || continue
+      name="$(cat "$proc" 2>/dev/null || true)"
+      [[ "$name" == vulpra || "$name" == vulpra-bin ]] || continue
+      maps="${proc%/comm}/maps"
+      [[ -r "$maps" ]] || continue
+      grep -Fq 'libudev.so.1' "$maps" && return 0
+    done
+    return 1
+  }
+  preloaded=false
+  if browser_maps_udev; then preloaded=true; fi
+  found="$(api POST "/session/$session/element" '{"using":"css selector","value":"#create"}')"
+  button_id="$(jq -er '.value."element-6066-11e4-a52e-4f735466cecf" // .value.ELEMENT' <<<"$found")"
+  api POST "/session/$session/element/$button_id/click" '{}' | jq -e '.value==null' >/dev/null
+  mapped_during=false
+  completed=false
+  create_state=''
+  for _ in {1..65}; do
+    if browser_maps_udev; then mapped_during=true; fi
+    create_state="$(api POST "/session/$session/execute/sync" '{"script":"return window.__vulpraResult.create;","args":[]}')"
+    if jq -e '.value.state=="complete"' <<<"$create_state" >/dev/null 2>&1; then
+      completed=true; break
+    fi
+    sleep 0.18
+  done
+  # Do not turn an absent key into a successful WebAuthn credential assertion;
+  # a no-device NotAllowedError is the expected bounded negative result.
+  if [[ "$completed" != true ]] || ! jq -e '.value.ok==false and .value.error=="NotAllowedError"' <<<"$create_state" >/dev/null; then
+    echo 'Original USB no-device request did not terminate with expected NotAllowedError' >&2
+    jq -c '.value|{state,ok,error}' <<<"$create_state" >&2 || true
+    exit 1
+  fi
+  if browser_maps_udev; then mapped_during=true; fi
+  jq -n --argjson initial "$preloaded" --argjson mapped "$mapped_during" '{
+    schema_version:1,
+    status:"original_browser_usb_backend_no_device_negative_probe",
+    original_source_commit:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+    original_archive_sha256:"7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a",
+    original_native_browser_executed:true,
+    real_browser_usbtoken_pref:true,
+    real_browser_softtoken_pref:false,
+    real_original_web_authn_create_called_from_user_click:true,
+    virtual_authenticator_registered:false,
+    physical_usb_device_passthrough:false,
+    credential_create_result:"NotAllowedError",
+    libudev_mapped_before_attempt:$initial,
+    libudev_mapped_during_or_after_attempt:$mapped,
+    actual_original_dlopen_call_stack_observed:false,
+    original_browser_libudev_runtime_dependency_proven:false,
+    source_pruning_authorized:false,
+    whole_dynamic_loader_graph_proven:false,
+    physical_security_key_authentication_verified:false,
+    real_user_profile_or_browser_accessed:false,
+    network_egress_allowed:false,
+    m3_sixth_gate_closed:false
+  }' >"$report"
+  echo "PASS: original browser USB backend no-device attempt recorded; libudev mapping observed=$mapped_during (not a completed USB authenticator)"
+  exit 0
+fi
 auth="$(api POST "/session/$session/webauthn/authenticator" '{"protocol":"ctap2_1","transport":"internal","hasResidentKey":true,"hasUserVerification":true,"isUserConsenting":true,"isUserVerified":true}')"
 authid="$(jq -er '.value|select(type=="string" and length>0)' <<<"$auth")" || {
  echo 'Virtual authenticator was not accepted' >&2
