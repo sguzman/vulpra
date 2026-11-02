@@ -7,15 +7,10 @@ name: M3 Original Browser Libudev Dlopen Callsite Trace
 # libudev evidence is measured independently. This is not sixth-gate closure.
 # A source-pinned original-browser mapping transition passed 41371647131.
 # This expensive experiment is manually dispatchable, not a regular push gate.
-# Exact-original instrumented callsite CI 41374201977 PASS; keep this
+# Instrumented original-browser callsite CI 41374201977 and bounded
+# unwind CI 41481619331 both passed; keep this
 # expensive source-pinned native browser experiment manually dispatchable.
 on:
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-libudev-dlopen-callsite.c
-      - ci/m3-original-browser-webauthn-webdriver.sh
-      - .github/workflows/m3-original-browser-libudev-dlopen-callsite.yml
   workflow_dispatch:
 permissions:
   contents: read
