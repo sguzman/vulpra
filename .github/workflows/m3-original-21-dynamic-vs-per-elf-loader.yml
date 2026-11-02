@@ -1,0 +1,140 @@
+# Honest bridge between a genuine original Firefox graphical glibc dynamic
+# request trace and independent ordinary loader metadata for all 28 ELFs.
+name: M3 Original Graphical Dynamic Requests vs ELF Loader Sets
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-21-dynamic-vs-per-elf-loader.yml
+      - ci/m3-original-21-dynamic-vs-per-elf-loader.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-21-observed-dynamic-requests:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout only bounded read-only original dynamic request reconciler
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-21-dynamic-vs-per-elf-loader.jq
+      - name: Authenticate three exact-source original compiled historical reports
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          jq --version
+          while read -r id sha path artifact; do
+            test -n "$id" || continue
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" |
+              jq -e --arg sha "$sha" --arg path "$path" '
+                .status=="completed" and .conclusion=="success" and
+                .head_sha==$sha and .path==$path
+              ' >/dev/null
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/artifacts?per_page=40" |
+              jq -e --arg artifact "$artifact" '
+                [.artifacts[]|select(.name==$artifact and .expired==false and
+                  .size_in_bytes>0)]|length==1
+              ' >/dev/null
+          done <<'RUNS'
+          41149955223 f39403ce50bd550b0123a9d68e45b3be947b38d7 .github/workflows/m3-native-wayland-loader-observation.yml m3-private-weston-wayland-loader-observed
+          41269693997 62c08f15e0efb57ffe2dd8d6a3900f84822854a8 .github/workflows/m3-original-nss-security-dlopen-source.yml m3-original-21-observed-dynamic-source-candidates
+          41515803526 cda3fb08d1d55fd94f4063921b6d4cc9644b225c .github/workflows/m3-original-ubuntu-arch-per-elf-crosswalk.yml m3-original-per-elf-ubuntu-arch-source-loader-crosswalk
+          RUNS
+      - name: Download three immutable sanitized original native observation artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/native" "$RUNNER_TEMP/source" "$RUNNER_TEMP/platforms"
+          gh run download 41149955223 --repo "$GITHUB_REPOSITORY" \
+            --name m3-private-weston-wayland-loader-observed --dir "$RUNNER_TEMP/native"
+          gh run download 41269693997 --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-21-observed-dynamic-source-candidates --dir "$RUNNER_TEMP/source"
+          gh run download 41515803526 --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-per-elf-ubuntu-arch-source-loader-crosswalk --dir "$RUNNER_TEMP/platforms"
+          test -s "$RUNNER_TEMP/native/m3-wayland-native-loader-observed.json"
+          test -s "$RUNNER_TEMP/source/m3-original-21-observed-source-candidates.json"
+          test -s "$RUNNER_TEMP/platforms/original-28-per-elf-ubuntu-arch-crosswalk.json"
+      - name: Crosscheck all 21 original graphical conditional requests against two ordinary loader sets
+        shell: bash
+        run: |
+          set -euo pipefail
+          native="$RUNNER_TEMP/native/m3-wayland-native-loader-observed.json"
+          source="$RUNNER_TEMP/source/m3-original-21-observed-source-candidates.json"
+          platform="$RUNNER_TEMP/platforms/original-28-per-elf-ubuntu-arch-crosswalk.json"
+          out="$RUNNER_TEMP/m3-original-21-dynamic-vs-per-elf-loader.json"
+          audit() {
+            jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+              --slurpfile native "$1" --slurpfile source "$2" \
+              --slurpfile map "$3" \
+              -f ci/m3-original-21-dynamic-vs-per-elf-loader.jq
+          }
+          audit "$native" "$source" "$platform" >"$out"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_graphical_21_dynamic_requests_outside_both_per_elf_loader_lists" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .observed_graphical_loader_dynamic_request_edges==21 and
+            .original_packaged_dynamic_request_targets==18 and
+            .conditional_host_library_targets==3 and
+            .conditional_host_library_names==["libavcodec.so.60","libgbm.so.1","libpulse.so.0"] and
+            .original_bootstrap_manifest_source_candidate_edges==14 and
+            .other_original_source_candidate_edges==7 and
+            .observed_requester_basename_counts=={
+              "vulpra":14,"libnspr4.so":5,"libxul.so":2
+            } and
+            .observed_dynamic_edges_already_listed_under_requester_ubuntu==0 and
+            .observed_dynamic_edges_already_listed_under_requester_arch==0 and
+            (.rows|length)==21 and
+            ([.rows[]|select(.requested_library_is_packaged_original_elf==true)]|length)==18 and
+            all(.rows[];
+              .actual_runtime_dynamic_request_observed==true and
+              .requested_library_in_requester_ubuntu_glibc_list==false and
+              .requested_library_in_requester_arch_glibc_list==false and
+              .uninstrumented_exact_native_callsite_proven==false) and
+            .per_elf_glibc_metadata_cannot_substitute_for_conditional_loader_map==true and
+            .dynamic_request_source_candidate_is_not_exact_callsite==true and
+            .no_additional_original_native_browser_run==true and
+            .original_trace_is_one_bounded_graphical_workload==true and
+            .complete_future_dlopen_ffi_or_feature_graph_proven==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false
+          ' "$out" >/dev/null
+          # Report mutation checks must fail closed on incomplete original
+          # graph, forged source evidence, and invented glibc provider overlap.
+          jq '.loader_reported_dynamic_initialized_edges |= .[:-1]' "$native" \
+            >"$RUNNER_TEMP/mutated-native.json"
+          if audit "$RUNNER_TEMP/mutated-native.json" "$source" "$platform" >/dev/null 2>&1; then
+            echo 'ERROR: incomplete 20-edge actual native trace accepted' >&2; exit 1
+          fi
+          jq '.independently_source_supported_other_dynamic_edges=8' "$source" \
+            >"$RUNNER_TEMP/mutated-source.json"
+          if audit "$native" "$RUNNER_TEMP/mutated-source.json" "$platform" >/dev/null 2>&1; then
+            echo 'ERROR: false source candidate edge count accepted' >&2; exit 1
+          fi
+          jq '(.rows[]|select(.elf=="libxul.so")|.arch_loader_provider_basenames)+=["libpulse.so.0"] |
+              (.rows[]|select(.elf=="libxul.so")|.arch_loader_provider_count)+=1' "$platform" \
+            >"$RUNNER_TEMP/mutated-platform.json"
+          if audit "$native" "$source" "$RUNNER_TEMP/mutated-platform.json" >/dev/null 2>&1; then
+            echo 'ERROR: invented native ordinary provider overlap accepted' >&2; exit 1
+          fi
+          echo 'PASS: all 21 independently source-supported actual dynamic requests are additional to original requester ordinary Ubuntu/Arch loader lists'
+      - name: Upload only bounded original 21-edge source-owner/loader classification
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-21-conditional-vs-per-elf-loader
+          path: ${{ runner.temp }}/m3-original-21-dynamic-vs-per-elf-loader.json
+          if-no-files-found: error
+          retention-days: 14
