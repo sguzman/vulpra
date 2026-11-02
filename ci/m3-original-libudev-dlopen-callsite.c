@@ -34,7 +34,11 @@ void *dlopen(const char *filename, int flags) {
                              (unsigned int)flags, result ? "hit" : "miss");
           if (len > 0 && len < (int)sizeof(line)) {
             int fd = open(out, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0600);
-            if (fd >= 0) { (void)write(fd, line, (size_t)len); (void)close(fd); }
+            if (fd >= 0) {
+              ssize_t wrote = write(fd, line, (size_t)len);
+              if (wrote != len) { /* The downstream fail-closed check rejects an incomplete trace. */ }
+              (void)close(fd);
+            }
           }
         }
       }
