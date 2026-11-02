@@ -91,13 +91,19 @@ authid="$(jq -er '.value|select(type=="string" and length>0)' <<<"$auth")" || {
 }
 # Probe the ACTUAL original browser's internal virtual-authenticator DB.
 # A driver HTTP 200 alone does not prove its Gecko service registered a key.
-api POST "/session/$session/moz/context" '{"context":"chrome"}' | jq -e '.value==null' >/dev/null || {
- echo 'Marionette privileged WebAuthn registry inspection unavailable' >&2; exit 1;
+chrome_reply="$(api POST "/session/$session/moz/context" '{"context":"chrome"}')"
+jq -e '.value==null or .value=="chrome"' <<<"$chrome_reply" >/dev/null || {
+ echo 'Marionette privileged WebAuthn context unavailable' >&2
+ jq -c '{error:.value.error,message:(.value.message|tostring|.[0:150]),context:.value}' <<<"$chrome_reply" >&2
+ exit 1
 }
 auth_js='const s=Components.classes["@mozilla.org/webauthn/service;1"].getService(Components.interfaces.nsIWebAuthnService);return s.hasVirtualAuthenticator(arguments[0]);'
 registered="$(api POST "/session/$session/execute/sync" \
  "$(jq -nc --arg script "$auth_js" --arg authid "$authid" '{script:$script,args:[$authid]}')")"
-api POST "/session/$session/moz/context" '{"context":"content"}' | jq -e '.value==null' >/dev/null
+content_reply="$(api POST "/session/$session/moz/context" '{"context":"content"}')"
+jq -e '.value==null or .value=="content"' <<<"$content_reply" >/dev/null || {
+ echo 'Marionette original browser content context restore failed' >&2; exit 1;
+}
 jq -e '.value==true' <<<"$registered" >/dev/null || {
  echo 'Virtual authenticator absent from original Gecko nsIWebAuthnService' >&2
  jq -c '{error:.value.error,message:(.value.message|tostring|.[0:140]),result:.value}' <<<"$registered" >&2; exit 1;
