@@ -1,0 +1,174 @@
+# Source-pinned original ONNX Runtime in-memory Constant graph session and Run.
+# No model download, user data, GPU, browser profile or host internet.
+name: M3 Original ONNX Constant Session and Inner Dlopen
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-onnx-constant-session.yml
+      - ci/m3-original-onnx-constant-session.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-compiled-onnx-constant-inference:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      ORIGINAL_RUN: '40997075527'
+      OBSERVER_RUN: '41524996253'
+      OBSERVER_HEAD: 4806a2b5da13ad63fd4197e0896b52cea61999fb
+    steps:
+      - name: Checkout minimal Rust session fixture and already verified C observer
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-onnx-constant-session.rs
+            ci/m3-original-onnx-inner-dlopen-observe.c
+      - name: Validate compact ONNX model bytes, native ABI prefix, and observer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-original-onnx-constant-session.rs \
+            -o "$RUNNER_TEMP/onnx-session-tests"
+          "$RUNNER_TEMP/onnx-session-tests"
+          rustc --edition=2021 -C opt-level=1 \
+            ci/m3-original-onnx-constant-session.rs \
+            -o "$RUNNER_TEMP/onnx-session"
+          cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -fno-omit-frame-pointer \
+            -shared ci/m3-original-onnx-inner-dlopen-observe.c \
+            -o "$RUNNER_TEMP/onnx-inner-observer.so" -ldl
+          test "$(nm -D --defined-only "$RUNNER_TEMP/onnx-inner-observer.so" |
+            awk '$3=="dlopen"{n++} END{print n+0}')" -eq 1
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$OBSERVER_RUN" |
+            jq -e --arg sha "$OBSERVER_HEAD" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha and
+              .path==".github/workflows/m3-original-onnx-inner-dlopen.yml"
+            ' >/dev/null
+          echo 'PASS: ONNX protobuf unit fixtures, exact C ABI v1 prefix probe compiled and authenticated original observer'
+      - name: Authenticate immutable original full-normal ONNX library
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
+            jq -e --arg src "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$src
+            ' >/dev/null
+          mkdir -p "$RUNNER_TEMP/original" "$RUNNER_TEMP/package"
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline \
+            --dir "$RUNNER_TEMP/original"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          test -s "$RUNNER_TEMP/package/vulpra/libonnxruntime.so"
+          nm -D --defined-only "$RUNNER_TEMP/package/vulpra/libonnxruntime.so" |
+            grep -Eq ' OrtGetApiBase(@|$)'
+      - name: Execute CPU Constant ONNX session and Run twice under isolated no-egress
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          pkg="$RUNNER_TEMP/package/vulpra"
+          probe="$RUNNER_TEMP/onnx-session"
+          observer="$RUNNER_TEMP/onnx-inner-observer.so"
+          report="$RUNNER_TEMP/observed-onnx-inner-dlopen.json"
+          # No LD_PRELOAD in control or timeout supervisor; do not misattribute
+          # the external harness load to original ONNX's internal callsites.
+          sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            LD_LIBRARY_PATH="$pkg" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 35s \
+            "$probe" "$pkg/libonnxruntime.so" |
+            tee "$RUNNER_TEMP/onnx-control.stdout" >/dev/null
+          grep -Fxq 'PASS: exact original packaged ONNX Runtime created in-memory Constant session and executed Run on CPU' \
+            "$RUNNER_TEMP/onnx-control.stdout"
+          sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            LD_LIBRARY_PATH="$pkg" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 35s \
+            env LD_PRELOAD="$observer" M3_ONNX_INNER_DLOPEN_REPORT="$report" \
+            "$probe" "$pkg/libonnxruntime.so" |
+            tee "$RUNNER_TEMP/onnx-observed.stdout" >/dev/null
+          grep -Fxq 'PASS: exact original packaged ONNX Runtime created in-memory Constant session and executed Run on CPU' \
+            "$RUNNER_TEMP/onnx-observed.stdout"
+          test -s "$report"
+          sudo chmod 0644 "$report"
+          jq -e '
+            .schema_version==1 and
+            .diagnostic_interposition_used==true and
+            .target_origin_basename=="libonnxruntime.so" and
+            .all_interposed_dlopen_calls>=1 and
+            .all_interposed_dlopen_calls==(.onnx_origin_dlopen_calls+.other_origin_dlopen_calls) and
+            .onnx_origin_dlopen_calls==(.onnx_origin_successful_dlopen_calls+.onnx_origin_failed_dlopen_calls) and
+            .raw_caller_addresses_or_library_names_retained==false and
+            .complete_native_loader_graph_proven==false
+          ' "$report" >/dev/null
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --slurpfile report "$report" '
+            ($report[0]) as $o |
+            {
+              schema_version:1,
+              status:"exact_original_onnx_cpu_constant_session_run_with_internal_loader_observation",
+              exact_original_source_commit:$src,
+              original_compiled_package_sha256:$sha,
+              synthetic_in_memory_onnx_model_generated_with_no_external_assets:true,
+              onnx_cpu_constant_session_create_and_run_without_interposition:true,
+              onnx_cpu_constant_session_create_and_run_with_interposition:true,
+              original_onnx_internal_dlopen_origin_calls:$o.onnx_origin_dlopen_calls,
+              original_onnx_internal_dlopen_successes:$o.onnx_origin_successful_dlopen_calls,
+              original_onnx_internal_dlopen_failures:$o.onnx_origin_failed_dlopen_calls,
+              outer_or_other_origin_dlopen_calls:$o.other_origin_dlopen_calls,
+              original_onnx_internal_dlopen_observed:($o.onnx_origin_dlopen_calls>0),
+              isolated_cpu_inference_session_proven:true,
+              generated_model_run_output_nonnull_proven:true,
+              numerical_output_value_checked:false,
+              original_browser_ml_frontend_exercised:false,
+              GPU_or_external_execution_provider_exercised:false,
+              all_future_onnx_conditional_dynamic_loading_proven:false,
+              interposition_changes_symbol_resolution:true,
+              uninstrumented_actual_onnx_internal_call_stack_proven:false,
+              no_external_network_egress:true,
+              installed_browser_or_user_profile_accessed:false,
+              source_pruning_authorized:false,
+              m3_sixth_gate_closed:false
+            }' >"$RUNNER_TEMP/m3-original-onnx-cpu-constant-session.json"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="exact_original_onnx_cpu_constant_session_run_with_internal_loader_observation" and
+            .exact_original_source_commit==$src and .original_compiled_package_sha256==$sha and
+            .synthetic_in_memory_onnx_model_generated_with_no_external_assets==true and
+            .onnx_cpu_constant_session_create_and_run_without_interposition==true and
+            .onnx_cpu_constant_session_create_and_run_with_interposition==true and
+            .isolated_cpu_inference_session_proven==true and
+            .generated_model_run_output_nonnull_proven==true and
+            (.original_onnx_internal_dlopen_origin_calls|type)=="number" and
+            .original_onnx_internal_dlopen_origin_calls==
+              (.original_onnx_internal_dlopen_successes+.original_onnx_internal_dlopen_failures) and
+            .numerical_output_value_checked==false and
+            .original_browser_ml_frontend_exercised==false and
+            .GPU_or_external_execution_provider_exercised==false and
+            .all_future_onnx_conditional_dynamic_loading_proven==false and
+            .interposition_changes_symbol_resolution==true and
+            .no_external_network_egress==true and
+            .installed_browser_or_user_profile_accessed==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-onnx-cpu-constant-session.json" >/dev/null
+          echo 'PASS: actual source-pinned original ONNX CPU Constant session CreateSessionFromArray+Run, not full ML feature graph'
+      - name: Upload only sanitized bounded original ONNX CPU session result
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-onnx-cpu-constant-session
+          path: ${{ runner.temp }}/m3-original-onnx-cpu-constant-session.json
+          if-no-files-found: error
+          retention-days: 14
