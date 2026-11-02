@@ -53,6 +53,10 @@ caps="$(jq -nc --arg bin "$browser" '{capabilities:{alwaysMatch:{browserName:"fi
 resp="$(api POST /session "$caps")"
 session="$(jq -er '.value.sessionId // .sessionId' <<<"$resp")" || {
  echo 'Original browser WebDriver session failed' >&2
+ # Only transient, sanitized diagnostic lines: no browser/user profile paths,
+ # PIDs, full startup traces or virtual credential bytes in public CI logs.
+ grep -Ei 'marionette|sandbox|fatal|error|abort|crash|exited|failed|gtk' "$work/driver.log" \
+   | sed -E 's@/[^[:space:]":]+@<path>@g' | cut -c 1-220 | tail -n 14 >&2 || true
  jq -c '{error:.value.error,message:(.value.message|tostring|.[0:150])}' <<<"$resp" >&2
  exit 1
 }
