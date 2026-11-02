@@ -73,9 +73,10 @@ jobs:
           FROM archlinux:base
           RUN pacman -Syu --noconfirm --needed \
             bash coreutils curl jq grep findutils procps-ng util-linux \
-            iproute2 geckodriver gtk3 dbus-glib alsa-lib nss \
+            iproute2 geckodriver gtk3 dbus-glib alsa-lib nss weston wayland-utils \
             mesa libglvnd ttf-dejavu \
             && command -v geckodriver && command -v ip && command -v setpriv \
+            && command -v weston && command -v wayland-info \
             && rm -rf /var/cache/pacman/pkg/*
           EOF
           docker build --pull --no-cache -t vulpra-m3-original-webauthn:ci "$RUNNER_TEMP/arch-webauthn"
