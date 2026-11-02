@@ -52,7 +52,7 @@ def insist($ok; $msg): if $ok then true else error($msg) end;
         all($selected[]; $native[.]!=null and $owners[.]!=null);
         "exact seven original feature-only native ELF identities drifted"),
  insist(([$d.rows[].requester]|unique|sort)==["libnspr4.so","libxul.so","vulpra"] and
-        all($selected[] as $n;
+        all($selected[]; . as $n |
             all($d.rows[]; .requester!=$n and .requested_library!=$n));
         "feature-only ELF unexpectedly observed in bounded graphical dynamic trace")
 ] as $auth |
