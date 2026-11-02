@@ -16,7 +16,7 @@ cap_prm="$(awk '/^CapPrm:/ {print $2}' /proc/self/status)"
 }
 
 work="$(mktemp -d /tmp/vulpra-m3-webauthn.XXXXXX)"
-export HOME="$work/home" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/runtime" MOZ_CRASHREPORTER_DISABLE=1
+export HOME="$work/home" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/runtime" MOZ_CRASHREPORTER_DISABLE=1 XRE_START_OFFLINE=1
 export WAYLAND_DISPLAY=wayland-vulpra-m3 XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1
 unset MOZ_HEADLESS DISPLAY
 mkdir -m 0700 "$HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
@@ -64,7 +64,7 @@ for _ in {1..45}; do
 done
 [[ "$ready" == true ]] || { echo 'Offline driver/origin not ready' >&2; tail -n 30 "$work/driver.log" >&2; exit 1; }
 caps="$(jq -nc --arg bin "$browser" '{capabilities:{alwaysMatch:{browserName:"firefox",
- "moz:firefoxOptions":{binary:$bin,args:["-no-remote","-new-instance"],
+ "moz:firefoxOptions":{binary:$bin,args:[],
  prefs:{"security.webauth.webauthn":true,"security.webauth.webauthn_enable_softtoken":false,
  "security.webauth.webauthn_enable_usbtoken":true,"security.webauthn.ctap2":true}}}}}')"
 resp="$(api POST /session "$caps")"
