@@ -90,7 +90,7 @@ jobs:
           # Drop it before executing geckodriver, original browser and test.
           docker run --rm --network none --read-only --shm-size 256m \
             --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
-            --security-opt no-new-privileges --pids-limit 128 --memory 2g \
+            --security-opt no-new-privileges --pids-limit 512 --memory 4g \
             --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
             -v "$RUNNER_TEMP/packaged/vulpra:/original:ro" \
             -v "$RUNNER_TEMP/m3-original-local-origin:/audit/local-origin:ro" \
