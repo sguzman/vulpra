@@ -161,13 +161,13 @@ jobs:
             .whole_dynamic_loader_graph_proven==false and
             .source_pruning_authorized==false and
             .m3_sixth_gate_closed==false
-          ' "$RUNNER_TEMP/reports/m3-original-browser-usb-nodevice-loader.json" >/dev/null
+          ' "$RUNNER_TEMP/reports/m3-original-browser-libudev-dlopen-callsite.json" >/dev/null
           echo 'PASS: original browser exact libxul dlopen return PCs, flags, outcomes; no stack/hardware/full closure'
       - name: Upload only sanitized browser feature observations
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: m3-original-browser-libudev-dlopen-callsite
-          path: ${{ runner.temp }}/reports/m3-original-browser-usb-nodevice-loader.json
+          path: ${{ runner.temp }}/reports/m3-original-browser-libudev-dlopen-callsite.json
           if-no-files-found: error
           retention-days: 14
