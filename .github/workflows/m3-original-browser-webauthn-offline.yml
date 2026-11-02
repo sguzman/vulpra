@@ -1,4 +1,4 @@
-# Real original compiled Vulpra binary, WebDriver virtual CTAP2 USB
+# Real original compiled Vulpra binary, WebDriver virtual CTAP2 internal
 # WebAuthn create/get, private localhost server and disconnected namespace.
 # This never uses a physical key or changes installed/user Firefox profiles.
 name: M3 Original Browser Offline Virtual WebAuthn
@@ -80,7 +80,7 @@ jobs:
             && rm -rf /var/cache/pacman/pkg/*
           EOF
           docker build --pull --no-cache -t vulpra-m3-original-webauthn:ci "$RUNNER_TEMP/arch-webauthn"
-      - name: Execute real original native browser virtual USB WebAuthn with namespace-only loopback
+      - name: Execute real original native browser virtual internal WebAuthn with namespace-only loopback
         shell: bash
         timeout-minutes: 6
         run: |
@@ -119,7 +119,7 @@ jobs:
             .localhost_secure_origin==true and
             .actual_browser_navigator_credentials_create_succeeded==true and
             .actual_browser_navigator_credentials_get_succeeded==true and
-            .virtual_ctap2_usb_authenticator_used==true and
+            .virtual_ctap2_internal_authenticator_used==true and
             .virtual_credential_is_ephemeral==true and
             .user_usb_hardware_or_authenticator_accessed==false and
             (.original_browser_libudev_mapped_at_end|type)=="boolean" and
