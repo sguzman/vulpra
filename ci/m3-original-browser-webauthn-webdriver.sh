@@ -65,8 +65,8 @@ done
 [[ "$ready" == true ]] || { echo 'Offline driver/origin not ready' >&2; tail -n 30 "$work/driver.log" >&2; exit 1; }
 caps="$(jq -nc --arg bin "$browser" '{capabilities:{alwaysMatch:{browserName:"firefox",
  "moz:firefoxOptions":{binary:$bin,args:[],
- prefs:{"security.webauth.webauthn":true,"security.webauth.webauthn_enable_softtoken":false,
- "security.webauth.webauthn_enable_usbtoken":true,"security.webauthn.ctap2":true}}}}}')"
+ prefs:{"security.webauth.webauthn":true,"security.webauth.webauthn_enable_softtoken":true,
+ "security.webauth.webauthn_enable_usbtoken":false,"security.webauthn.ctap2":true}}}}}')"
 resp="$(api POST /session "$caps")"
 session="$(jq -er '.value.sessionId // .sessionId' <<<"$resp")" || {
  echo 'Original browser WebDriver session failed' >&2
@@ -84,7 +84,7 @@ state="$(api POST "/session/$session/execute/sync" "$(jq -nc --arg script "$js" 
 jq -e '.value.origin=="http://localhost:18888" and .value.secure==true and .value.create=="function" and .value.get=="function"' <<<"$state" >/dev/null || {
  echo 'Original browser secure-origin WebAuthn API unavailable' >&2; jq -c '.value' <<<"$state" >&2; exit 1
 }
-auth="$(api POST "/session/$session/webauthn/authenticator" '{"protocol":"ctap2_1","transport":"usb","hasResidentKey":true,"hasUserVerification":true,"isUserConsenting":true,"isUserVerified":true}')"
+auth="$(api POST "/session/$session/webauthn/authenticator" '{"protocol":"ctap2_1","transport":"internal","hasResidentKey":true,"hasUserVerification":true,"isUserConsenting":true,"isUserVerified":true}')"
 authid="$(jq -er '.value|select(type=="string" and length>0)' <<<"$auth")" || {
  echo 'Virtual authenticator was not accepted' >&2
  jq -c '{error:.value.error,message:(.value.message|tostring|.[0:150])}' <<<"$auth" >&2; exit 1
@@ -95,7 +95,7 @@ navigator.credentials.create({publicKey:{
 challenge:new Uint8Array(32).fill(7),rp:{id:"localhost",name:"Private QA"},
 user:{id:new Uint8Array([1,2,3]),name:"disposable",displayName:"Disposable"},
 pubKeyCredParams:[{type:"public-key",alg:-7}],timeout:10000,
-authenticatorSelection:{authenticatorAttachment:"cross-platform",userVerification:"discouraged"}
+authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"discouraged"}
 }}).then(c=>{window.__vulpraM3Cred=new Uint8Array(c.rawId);
 done({ok:true,type:c.type,size:c.rawId.byteLength})})
 .catch(e=>done({ok:false,error:e.name}));
@@ -104,12 +104,18 @@ created="$(api POST "/session/$session/execute/async" "$(jq -nc --arg script "$c
 jq -e '.value.ok==true and .value.type=="public-key" and .value.size>0' <<<"$created" >/dev/null || {
  echo 'Actual browser WebAuthn create failed' >&2; jq -c '.value' <<<"$created" | head -c 300 >&2; exit 1
 }
+# Verify the created key lives in the WebDriver virtual authenticator,
+# not merely a separate softtoken; never disclose credential or private bytes.
+credentials="$(curl --noproxy '*' -sS --max-time 20 "$base/session/$session/webauthn/authenticator/$authid/credentials")"
+jq -e '.value|type=="array" and length>=1' <<<"$credentials" >/dev/null || {
+ echo 'Virtual authenticator did not contain the created browser credential' >&2; exit 1;
+}
 get_js='
 const done=arguments[arguments.length-1],id=window.__vulpraM3Cred;
 if(!(id instanceof Uint8Array)){done({ok:false,error:"NoCreatedCredential"});return;}
 navigator.credentials.get({publicKey:{
 challenge:new Uint8Array(32).fill(13),rpId:"localhost",timeout:10000,
-allowCredentials:[{type:"public-key",id:id,transports:["usb"]}],userVerification:"discouraged"
+allowCredentials:[{type:"public-key",id:id,transports:["internal"]}],userVerification:"discouraged"
 }}).then(c=>done({ok:true,type:c.type,data:c.response.authenticatorData.byteLength,
 sig:c.response.signature.byteLength}))
 .catch(e=>done({ok:false,error:e.name}));
@@ -136,7 +142,7 @@ original_archive_sha256:"7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb2
 original_native_browser_executed:true,localhost_secure_origin:true,
 actual_browser_navigator_credentials_create_succeeded:true,
 actual_browser_navigator_credentials_get_succeeded:true,
-virtual_ctap2_usb_authenticator_used:true,virtual_credential_is_ephemeral:true,
+virtual_ctap2_internal_authenticator_used:true,virtual_credential_is_ephemeral:true,
 user_usb_hardware_or_authenticator_accessed:false,
 original_browser_libudev_mapped_at_end:$libudev,
 original_browser_dynamic_libudev_load_proven:false,
@@ -145,4 +151,4 @@ real_user_profile_or_browser_accessed:false,user_endeavouros_hyprland_verified:f
 full_dynamic_loader_graph_proven:false,source_pruning_authorized:false,
 m3_sixth_gate_closed:false
 }' >"$report"
-echo 'PASS: original native browser virtual USB WebAuthn create/get offline'
+echo 'PASS: original native browser virtual internal WebAuthn create/get offline'
