@@ -16,9 +16,11 @@ cap_prm="$(awk '/^CapPrm:/ {print $2}' /proc/self/status)"
 }
 
 work="$(mktemp -d /tmp/vulpra-m3-webauthn.XXXXXX)"
-export HOME="$work/home" XDG_DATA_HOME="$work/data" MOZ_HEADLESS=1 MOZ_CRASHREPORTER_DISABLE=1
-mkdir -m 0700 "$HOME" "$XDG_DATA_HOME"
-server_pid='' driver_pid='' session=''
+export HOME="$work/home" XDG_DATA_HOME="$work/data" XDG_RUNTIME_DIR="$work/runtime" MOZ_CRASHREPORTER_DISABLE=1
+export WAYLAND_DISPLAY=wayland-vulpra-m3 XDG_SESSION_TYPE=wayland GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1
+unset MOZ_HEADLESS DISPLAY
+mkdir -m 0700 "$HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
+server_pid='' driver_pid='' weston_pid='' session=''
 base='http://127.0.0.1:4444'
 api(){
  local method="$1" path="$2" data="$3"
@@ -29,9 +31,24 @@ cleanup(){
  [[ -z "$session" ]] || api DELETE "/session/$session" '{}' >/dev/null 2>&1 || true
  if [[ -n "$driver_pid" ]]; then kill "$driver_pid" 2>/dev/null || true; wait "$driver_pid" 2>/dev/null || true; fi
  if [[ -n "$server_pid" ]]; then kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; fi
+ if [[ -n "$weston_pid" ]]; then kill "$weston_pid" 2>/dev/null || true; wait "$weston_pid" 2>/dev/null || true; fi
  rm -rf -- "$work"
 }
 trap cleanup EXIT
+# Identical private Weston backend/renderer as the already proven original
+# browser Wayland frame harness; no host display or X11 fallback.
+weston --backend=headless-backend.so --renderer=pixman --idle-time=0 \
+ --socket="$WAYLAND_DISPLAY" --log="$work/weston.log" >"$work/weston.stdout" 2>&1 &
+weston_pid=$!
+weston_ready=false
+for _ in {1..40}; do
+ if [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then weston_ready=true; break; fi
+ kill -0 "$weston_pid" 2>/dev/null || { echo 'Private Weston exited early' >&2; exit 1; }
+ sleep 0.25
+done
+[[ "$weston_ready" == true ]] || { echo 'Private Weston socket unavailable' >&2; exit 1; }
+wayland-info >"$work/wayland-info.log" 2>&1
+grep -Fq xdg_wm_base "$work/wayland-info.log" || { echo 'Private Weston lacks xdg_wm_base' >&2; exit 1; }
 "$origin" vulpra-original-offline-webauthn >"$work/origin.log" 2>&1 &
 server_pid=$!
 geckodriver --host 127.0.0.1 --port 4444 --log error >"$work/driver.log" 2>&1 &
@@ -47,7 +64,7 @@ for _ in {1..45}; do
 done
 [[ "$ready" == true ]] || { echo 'Offline driver/origin not ready' >&2; tail -n 30 "$work/driver.log" >&2; exit 1; }
 caps="$(jq -nc --arg bin "$browser" '{capabilities:{alwaysMatch:{browserName:"firefox",
- "moz:firefoxOptions":{binary:$bin,args:["-headless","-no-remote","-new-instance"],
+ "moz:firefoxOptions":{binary:$bin,args:["-no-remote","-new-instance"],
  prefs:{"security.webauth.webauthn":true,"security.webauth.webauthn_enable_softtoken":false,
  "security.webauth.webauthn_enable_usbtoken":true,"security.webauthn.ctap2":true}}}}}')"
 resp="$(api POST /session "$caps")"
