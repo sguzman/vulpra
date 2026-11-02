@@ -113,7 +113,7 @@ jobs:
           set -euo pipefail
           jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
             .schema_version==1 and
-            .status=="original_browser_real_webauthn_virtual_usb_create_get" and
+            .status=="original_browser_real_webauthn_virtual_internal_create_get" and
             .original_source_commit==$src and .original_archive_sha256==$sha and
             .original_native_browser_executed==true and
             .localhost_secure_origin==true and
