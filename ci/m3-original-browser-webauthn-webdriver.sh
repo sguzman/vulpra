@@ -149,7 +149,14 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
   phase_during_saved=false
   completed=false
   create_state=''
-  for _ in {1..65}; do
+  # Source-pinned page requests a 10s WebAuthn timeout; the original short
+  # poll budget can race its asynchronous NotAllowedError under LD_PRELOAD.
+  # Expand only the opt-in provider-instrumented diagnostic, not other modes.
+  request_poll_limit=65
+  if [[ "$mode" == usb-dlopen-trace && -n "${VULPRA_M3_LIBUDEV_DLSYM_TRACE:-}" ]]; then
+    request_poll_limit=150
+  fi
+  for ((poll_attempt=0; poll_attempt<request_poll_limit; poll_attempt++)); do
     if browser_maps_udev; then
       mapped_during=true
       if [[ "$phase_maps" == true && "$phase_during_saved" == false ]]; then
