@@ -34,7 +34,7 @@ check(
      (.elf|type)=="string" and .elf!="" and
      (.source_manifest|type)=="string" and
      (.source_manifest|contains("..")|not) and
-     (.arch_loader_provider_basenames|safe) and
+     safe(.arch_loader_provider_basenames) and
      (.arch_loader_provider_basenames|length)==.arch_loader_provider_count and
      .direct_needed_cross_distro_count_matches==true);
   "28-ELF original per-binary manifest+provider crosswalk invalid") |
@@ -48,8 +48,8 @@ check(
   $w.time_bounded_snapshot_not_all_runtime_libraries==true and
   $w.complete_browser_feature_or_ffi_dependency_closure==false and
   $w.source_removal_authorized==false and $w.m3_sixth_gate_closed==false and
-  ($w.package_mapped_library_basenames|safe) and
-  ($w.host_mapped_library_basenames|safe) and
+  safe($w.package_mapped_library_basenames) and
+  safe($w.host_mapped_library_basenames) and
   (["libxul.so","libmozgtk.so","libmozwayland.so"]-$w.package_mapped_library_basenames|length)==0;
   "original Wayland startup browser residency missing or unauthenticated") |
 check(
@@ -62,8 +62,8 @@ check(
   $a.raw_paths_or_process_ids_exported==false and
   $a.time_bounded_phase_not_full_dlopen_graph==true and
   $a.source_pruning_authorized==false and $a.m3_sixth_gate_closed==false and
-  ($a.package_mapped_shared_library_basenames|safe) and
-  ($a.host_mapped_shared_library_basenames|safe) and
+  safe($a.package_mapped_shared_library_basenames) and
+  safe($a.host_mapped_shared_library_basenames) and
   (["libxul.so","libmozgtk.so"]-$a.package_mapped_shared_library_basenames|length)==0 and
   $a.libpulse_mapped_in_original_browser==true and
   any($a.host_mapped_shared_library_basenames[];family(.)=="libpulse.so.0") and
@@ -90,8 +90,8 @@ check(
   $u.raw_paths_or_process_ids_exported==false and
   $u.time_bounded_phase_not_full_dlopen_graph==true and
   $u.source_pruning_authorized==false and $u.m3_sixth_gate_closed==false and
-  ($u.package_mapped_shared_library_basenames|safe) and
-  ($u.host_mapped_shared_library_basenames|safe) and
+  safe($u.package_mapped_shared_library_basenames) and
+  safe($u.host_mapped_shared_library_basenames) and
   (["libxul.so","libmozgtk.so"]-$u.package_mapped_shared_library_basenames|length)==0 and
   $u.libudev_mapped_in_original_browser==true and
   any($u.host_mapped_shared_library_basenames[];family(.)=="libudev.so.1") and
@@ -112,12 +112,14 @@ check(
 ($w.host_mapped_library_basenames) as $wh |
 ($a.host_mapped_shared_library_basenames) as $ah |
 ($u.host_mapped_shared_library_basenames) as $uh |
-([$m.rows[]|
-  {elf,source_manifest,source_declaration_class,
-   arch_loader_provider_count,
-   in_wayland_startup_mapped_elf:($wp|index(.elf)!=null),
-   in_webaudio_during_stream_mapped_elf:($apkg|index(.elf)!=null),
-   in_webauthn_usb_during_attempt_mapped_elf:($upkg|index(.elf)!=null)}
+([$m.rows[] as $item |
+  {elf:$item.elf,
+   source_manifest:$item.source_manifest,
+   source_declaration_class:$item.source_declaration_class,
+   arch_loader_provider_count:$item.arch_loader_provider_count,
+   in_wayland_startup_mapped_elf:($wp|index($item.elf)!=null),
+   in_webaudio_during_stream_mapped_elf:($apkg|index($item.elf)!=null),
+   in_webauthn_usb_during_attempt_mapped_elf:($upkg|index($item.elf)!=null)}
  ]) as $rows |
 # Guard against silently forgetting a mapped original library or conflating
 # package-mapped names with host files / executable non-ELF artifacts.
