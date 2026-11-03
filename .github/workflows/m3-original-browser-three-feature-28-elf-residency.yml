@@ -1,13 +1,12 @@
 # Source-pinned join of already accepted original browser native evidence.
 # The 28-row matrix is source/build and glibc list metadata; the three
 # feature workloads are bounded /proc/maps samples, not full loader closure.
+# Accepted original cross-run CI 41717623238, lint 41717623231:
+# 19/28 packaged original ELF mapped in at least one workload, nine not
+# observed in these three samples, 94 host library basenames, six mutants.
+# Now manual-only; neither absence nor loader list implies removal safety.
 name: M3 Original 28 ELF Three Browser Feature Residency Reconciliation
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-three-feature-28-elf-residency.yml
-      - ci/m3-original-browser-feature-residency-28-elf.jq
   workflow_dispatch:
 permissions:
   contents: read
