@@ -202,11 +202,10 @@ jobs:
             '.updater_executable_never_allowed_to_exec=false' \
             '.actual_updater_process_executed=true' \
             '.missing_mar_fixture_confirmed=false' \
-            '.original_archive_sha256="fake"' \
+            '.archive_sha256="fake"' \
             '.browser_installation_read_only=false' \
             '.source_pruning_authorized=true'; do
-            # The wrong-archive mutation targets the actual top-level name.
-            jq "$mutation" "$report" >"$RUNNER_TEMP/reports/mutated.json"
+              jq "$mutation" "$report" >"$RUNNER_TEMP/reports/mutated.json"
             if verify "$RUNNER_TEMP/reports/mutated.json"; then
               echo 'FAIL: tampered original updater execv summary was accepted' >&2; exit 1
             fi
