@@ -109,6 +109,7 @@ fn constant_model() -> Vec<u8> {
 // These seven function-pointer offsets are pinned against the actual public
 // ONNX Runtime v1.22.0 C header by CI offsetof(OrtApi, ...) assertions.
 // Never read past a bounded and header-verified index in the real native table.
+const REGISTER_CUSTOM_OPS_LIBRARY: usize = 29;
 const IS_TENSOR: usize = 50;
 const TENSOR_MUTABLE_DATA: usize = 51;
 const TENSOR_ELEMENT_TYPE: usize = 60;
@@ -187,9 +188,46 @@ fn require_status(api: &OrtApiV1Prefix, status: *mut c_void, op: &'static str) -
     Err(format!("original native ONNX {op} returned a non-null status"))
 }
 
+// Optional original ONNX-controlled dynamic library registration, NOT
+// execution-provider activation. The only permitted library is a disposable
+// compiled CI fixture with a single no-op RegisterCustomOps callback.
+fn test_custom_ops_plugin(
+    api: *const OrtApiV1Prefix,
+    session_options: *mut c_void,
+    plugin_path: &str,
+) -> Result<(), String> {
+    type Register = unsafe extern "C" fn(
+        *mut c_void, *const c_char, *mut *mut c_void,
+    ) -> *mut c_void;
+    if !plugin_path.starts_with('/') ||
+        !plugin_path.ends_with("/libvulpra-onnx-test-customops.so") ||
+        plugin_path.contains('\0') || plugin_path.contains("..") {
+        return Err("unsupported original ONNX plugin fixture path".into());
+    }
+    let name = CString::new(plugin_path).map_err(|_| "invalid plugin fixture path")?;
+    let register: Register = unsafe { api_function(api, REGISTER_CUSTOM_OPS_LIBRARY) };
+    let mut plugin_handle: *mut c_void = ptr::null_mut();
+    require_status(
+        unsafe { &*api },
+        unsafe { register(session_options, name.as_ptr(), &mut plugin_handle) },
+        "RegisterCustomOpsLibrary",
+    )?;
+    if plugin_handle.is_null() {
+        return Err("original ONNX did not return a plugin library handle".into());
+    }
+    let callback_counter = unsafe { dlsym(plugin_handle, c"m3_customops_callback_count".as_ptr()) };
+    if callback_counter.is_null() ||
+        unsafe { *(callback_counter.cast::<u32>()) } != 1 {
+        return Err("original ONNX did not invoke the inert custom-ops callback once".into());
+    }
+    // Keep plugin alive for the lifetime of session options, environment and
+    // session. The one-shot restricted process will release it at exit.
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 2 || !args[1].starts_with('/') ||
+    if !(args.len() == 2 || args.len() == 3) || !args[1].starts_with('/') ||
         !args[1].ends_with("/libonnxruntime.so") || args[1].contains('\0') {
         return Err("expected exactly one original packaged ONNX ELF absolute path".into());
     }
@@ -218,6 +256,9 @@ fn run() -> Result<(), String> {
     let mut opts = ptr::null_mut();
     require_status(api, unsafe { (api.create_session_options)(&mut opts) }, "CreateSessionOptions")?;
     if opts.is_null() { return Err("ONNX session options null".into()); }
+    if args.len() == 3 {
+        test_custom_ops_plugin(api, opts, &args[2])?;
+    }
     let model = constant_model();
     if model.len() > 4096 || model.len() < 45 {
         return Err("synthetic in-memory model size invalid".into());
@@ -242,7 +283,11 @@ fn run() -> Result<(), String> {
     // Intentional process-lifetime cleanup in this one-shot isolated CI probe:
     // v1 API release function pointers occur beyond the prefix used here.
     // No long-lived service or user process is started.
-    println!("PASS: exact original packaged ONNX Runtime CPU Constant output equals float32[1] value 1.25");
+    if args.len() == 3 {
+        println!("PASS: original ONNX custom ops plugin callback invoked and CPU Constant output equals float32[1] value 1.25");
+    } else {
+        println!("PASS: exact original packaged ONNX Runtime CPU Constant output equals float32[1] value 1.25");
+    }
     Ok(())
 }
 
@@ -266,6 +311,7 @@ mod tests {
     }
     #[test]
     fn api_field_offsets_are_strict_and_sequential_for_target_slots() {
+        assert_eq!(REGISTER_CUSTOM_OPS_LIBRARY, 29);
         assert_eq!(IS_TENSOR, 50);
         assert_eq!(TENSOR_MUTABLE_DATA, 51);
         assert_eq!(TENSOR_ELEMENT_TYPE, 60);
