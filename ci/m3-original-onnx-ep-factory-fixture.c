@@ -94,7 +94,8 @@ M3_EXPORT OrtStatus *CreateEpFactories(
     const char *registered_name, const OrtApiBase *api_base,
     OrtEpFactory **factories, size_t max_factories, size_t *num_factories) {
   fputs("M3_EP_CALLBACK=entered_factory_init\n", stderr);
-  fflush(stderr);\n  const OrtApi *fallback = api_base != NULL ? api_base->GetApi(1) : NULL;
+  fflush(stderr);
+  const OrtApi *fallback = api_base != NULL ? api_base->GetApi(1) : NULL;
   if (num_factories != NULL) {
     *num_factories = 0;
   }
@@ -106,7 +107,8 @@ M3_EXPORT OrtStatus *CreateEpFactories(
                : NULL;
   }
   fputs("M3_EP_CALLBACK=before_api22\n", stderr);
-  fflush(stderr);\n  const OrtApi *api22 = api_base->GetApi(ORT_API_VERSION);
+  fflush(stderr);
+  const OrtApi *api22 = api_base->GetApi(ORT_API_VERSION);
   if (api22 == NULL) {
     return fallback != NULL
                ? fallback->CreateStatus(ORT_NOT_IMPLEMENTED,
