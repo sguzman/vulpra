@@ -41,12 +41,12 @@ check(($l|length)>=2 and ($l|length)<=2000 and
    (.[3]=="hit" or .[3]=="miss"));
  "invalid instrumented browser dlopen trace") |
 check(($s|length)>=1 and ($s|length)<=2000 and
- all($s[];
+ all($s[]; . as $row |
     length==5 and
     (.[0]|test("^[0-9]{1,12}$")) and
     (.[1]|test("^0x[0-9a-f]+$")) and
     (.[2]|test("^udev_[a-z0-9_]{1,90}$")) and
-    (($declared|index(.[2]))!=null) and
+    (($declared|index($row[2]))!=null) and
     (.[3]=="hit" or .[3]=="miss") and
     (if .[3]=="hit" then (.[4]|provider) else .[4]=="none" end));
  "not source-declared original libxul dlsym or unexpected resolved provider") |
