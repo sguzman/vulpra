@@ -92,6 +92,18 @@ pre="$(api POST "/session/$session/execute/sync" \
 jq -e '.value=="function"' <<<"$pre" >/dev/null || {
   echo 'Original browser fatal-abort API unavailable; refusing unverified crash route' >&2; exit 1;
 }
+# Read only booleans from the ORIGINAL browser's privileged crash service
+# and inherited environment. Do not blindly infer reporter policy from the
+# invoking test shell; geckodriver can provide its own child environment.
+state_js='const a=Components.classes["@mozilla.org/xre/app-info;1"].getService(Components.interfaces.nsIXULAppInfo);const e=Components.classes["@mozilla.org/process/environment;1"].getService(Components.interfaces.nsIEnvironment);return {enabled:a.crashReporterEnabled,disable:e.get("MOZ_CRASHREPORTER_DISABLE").length>0,noReport:e.get("MOZ_CRASHREPORTER_NO_REPORT").length>0,report:e.get("MOZ_CRASHREPORTER").length>0};'
+observed="$(api POST "/session/$session/execute/sync" \
+  "$(jq -nc --arg script "$state_js" '{script:$script,args:[]}')")"
+if ! jq -e '.value.enabled==true and .value.disable==false and .value.noReport==false and .value.report==true' <<<"$observed" >/dev/null 2>&1; then
+  jq -c '{crashReporterEnabled:.value.enabled,geckodriverDisabled:.value.disable,reportDialogSuppressed:.value.noReport,reportEnvPresent:.value.report}' <<<"$observed" >&2 || true
+  echo 'Original browser crash reporter was not safely enabled; refusing abort' >&2
+  exit 1
+fi
+echo 'M3_ORIGINAL_BROWSER_CRASH_REPORTER_PREFLIGHT=PASS enabled=true disabled=false noReport=false'
 kill -0 "$observer_pid" 2>/dev/null || {
   echo 'Original reporter witness exited before trigger' >&2; exit 1;
 }
