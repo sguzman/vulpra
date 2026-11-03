@@ -24,6 +24,14 @@ fn is_elf_library(s: &str) -> bool {
             v.as_bytes().first().is_some_and(|b| b.is_ascii_digit())
         })
 }
+fn is_pulse_library(name: &str) -> bool {
+    name=="libpulse.so.0" ||
+        name.strip_prefix("libpulse.so.0.").is_some_and(|suffix| {
+            !suffix.is_empty() &&
+                suffix.bytes().all(|b| b.is_ascii_digit() || b==b'.') &&
+                suffix.as_bytes().last().is_some_and(|b|b.is_ascii_digit())
+        })
+}
 fn in_package(p: &str) -> bool {
     p.strip_prefix(PACKAGE).is_some_and(|s| s.starts_with('/'))
 }
@@ -89,7 +97,9 @@ fn run() -> Result<(),String>{
         return Err("usage: on-demand-map before|during /original /reports/<name>.json".into());
     }
     let (processes,unreadable,package,host)=census()?;
-    let pulse=host.contains("libpulse.so.0");
+    // /proc/maps records the fully versioned backing ELF filename,
+    // not necessarily the libpulse.so.0 SONAME used by dlopen callers.
+    let pulse=host.iter().any(|name|is_pulse_library(name));
     if a[1]=="during" && !pulse {
         return Err("WebAudio stream did not map libpulse.so.0 in original browser".into())
     }
@@ -135,6 +145,12 @@ mod tests{
         assert!(!is_elf_library("ld.so.cache"));
         assert!(!is_elf_library("libpulse.so.debug"));
         assert!(!is_elf_library("audio-device"));
+    }
+    #[test]fn pulse_soname_vs_mapped_filename(){
+        assert!(is_pulse_library("libpulse.so.0"));
+        assert!(is_pulse_library("libpulse.so.0.24.3"));
+        assert!(!is_pulse_library("libpulse.so.0.debug"));
+        assert!(!is_pulse_library("libpulse-trace.so"));
     }
     #[test]fn parser_ignores_unrelated(){
         let input="123-456 r-xp 00000000 00:00 1 /original/libxul.so\n\

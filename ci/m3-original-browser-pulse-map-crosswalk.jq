@@ -3,6 +3,9 @@
 # LD_PRELOAD interposition is used by the existing cubeb probe; this census
 # does NOT claim uninfluenced library load order, full FFI or path ownership.
 def check($ok;$why): if $ok then . else error($why) end;
+def pulse_file:
+  type=="string" and (.=="libpulse.so.0" or
+  test("^libpulse\\.so\\.0\\.[0-9]+(\\.[0-9]+)*$"));
 def safe($xs):
  ($xs|type)=="array" and ($xs|unique|length)==($xs|length) and
  all($xs[]; type=="string" and test("^[A-Za-z0-9][A-Za-z0-9_.+-]{0,110}$"));
@@ -52,8 +55,8 @@ check($b.original_browser_processes_observed>=1 and
 check((["libxul.so","libmozgtk.so"] - $pkg_before |length)==0 and
  (["libxul.so","libmozgtk.so"] - $pkg_during |length)==0 and
  $d.libpulse_mapped_in_original_browser==true and
- ($host_during|index("libpulse.so.0"))!=null and
- $b.libpulse_mapped_in_original_browser==($host_before|index("libpulse.so.0")!=null) and
+ any($host_during[]; pulse_file) and
+ $b.libpulse_mapped_in_original_browser==any($host_before[]; pulse_file) and
  $a.libpulse_mapped_before_click==$b.libpulse_mapped_in_original_browser;
  "real PulseAudio host mapping and before-click state inconsistent") |
 {
@@ -72,6 +75,8 @@ check((["libxul.so","libmozgtk.so"] - $pkg_before |length)==0 and
  no_longer_mapped_package_library_basenames:($pkg_before-$pkg_during),
  no_longer_mapped_host_library_basenames:($host_before-$host_during),
  pulse_already_mapped_before_click:$b.libpulse_mapped_in_original_browser,
+ pre_click_pulse_mapped_filenames:[$host_before[]|select(pulse_file)],
+ during_audio_pulse_mapped_filenames:[$host_during[]|select(pulse_file)],
  pulse_mapped_during_real_audio:true,
  native_backend_pulse_rust_verified:true,
  real_private_null_sink_audio_confirmed:true,
