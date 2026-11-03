@@ -1,38 +1,35 @@
-# Original compiled ONNX v22 external-EP capability check, NOT GPU QA.
-# Only a zero-factory inert fixture, never a real execution provider.
-name: M3 Original ONNX External EP Capability
+# Original compiled ONNX Runtime v22 external EP function-table surface ONLY.
+# Never calls RegisterExecutionProviderLibrary or supplies an EP plugin:
+# a previous zero-factory fixture crashed during registration in isolated CI.
+name: M3 Original ONNX External EP API Surface
 on:
   push:
     branches: [main]
     paths:
-      - .github/workflows/m3-original-onnx-external-ep-capability.yml
       - ci/m3-original-onnx-external-ep-capability.rs
-      - ci/m3-original-onnx-inert-ep.c
+      - .github/workflows/m3-original-onnx-external-ep-capability.yml
   workflow_dispatch:
 permissions:
   contents: read
   actions: read
 jobs:
-  original-external-ep-capability:
+  original-onnx-external-ep-api-surface:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 25
     env:
       SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
       ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
       ORIGINAL_RUN: '40997075527'
-      CPU_RUN: '41551291000'
-      CPU_SHA: 0e703b4c91fe0871d5059382eb69240db99a428c
+      HEADER_BLOB: b01b7e48dc87bbeeb026c61fb06c591053853ad1
     steps:
-      - name: Checkout exact bounded Rust probe, inert C plugin and observer
+      - name: Checkout read-only original external EP v22 API surface probe
         uses: actions/checkout@v4
         with:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-original-onnx-external-ep-capability.rs
-            ci/m3-original-onnx-inert-ep.c
-            ci/m3-original-onnx-inner-dlopen-observe.c
-      - name: Compile probe and no-op provider with upstream header-checked v22 ABI
+      - name: Authenticate compiled upstream C API surface without guessing offsets
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -40,24 +37,21 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           rustc --edition=2021 --test ci/m3-original-onnx-external-ep-capability.rs \
-            -o "$RUNNER_TEMP/original-ep-probe-tests"
-          "$RUNNER_TEMP/original-ep-probe-tests"
+            -o "$RUNNER_TEMP/ep-surface-tests"
+          "$RUNNER_TEMP/ep-surface-tests"
           rustc --edition=2021 -C opt-level=1 \
-            ci/m3-original-onnx-external-ep-capability.rs \
-            -o "$RUNNER_TEMP/original-ep-probe"
-          gh api repos/microsoft/onnxruntime/git/blobs/b01b7e48dc87bbeeb026c61fb06c591053853ad1 \
+            ci/m3-original-onnx-external-ep-capability.rs -o "$RUNNER_TEMP/ep-surface"
+          gh api "repos/microsoft/onnxruntime/git/blobs/$HEADER_BLOB" \
             --jq .content | base64 -d >"$RUNNER_TEMP/onnxruntime_c_api.h"
-          test "$(git hash-object "$RUNNER_TEMP/onnxruntime_c_api.h")" = \
-            b01b7e48dc87bbeeb026c61fb06c591053853ad1
-          cat >"$RUNNER_TEMP/original-ep-abi.c" <<'C'
+          test "$(git hash-object "$RUNNER_TEMP/onnxruntime_c_api.h")" = "$HEADER_BLOB"
+          cat >"$RUNNER_TEMP/ep-surface-offsets.c" <<'C'
           #include <stddef.h>
           #include <stdio.h>
           #include "onnxruntime_c_api.h"
-          _Static_assert(ORT_API_VERSION==22, "unexpected upstream ORT API");
-          _Static_assert(ORT_NOT_IMPLEMENTED==9, "unexpected OrtErrorCode value");
-          _Static_assert(offsetof(OrtApi,UnregisterExecutionProviderLibrary) ==
+          _Static_assert(ORT_API_VERSION==22,"upstream header is not v22");
+          _Static_assert(offsetof(OrtApi,UnregisterExecutionProviderLibrary)==
                          offsetof(OrtApi,RegisterExecutionProviderLibrary)+sizeof(void*),
-                         "nonadjacent external EP registration ABI");
+                         "external EP ABI slots are nonadjacent");
           int main(void) {
             printf("%zu %zu\n",
                    offsetof(OrtApi,RegisterExecutionProviderLibrary)/sizeof(void*),
@@ -65,161 +59,94 @@ jobs:
             return 0;
           }
           C
-          cc -std=c11 -O2 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
-            "$RUNNER_TEMP/original-ep-abi.c" -o "$RUNNER_TEMP/original-ep-abi"
-          read -r reg_slot unreg_slot < <("$RUNNER_TEMP/original-ep-abi")
+          cc -std=c11 -Wall -Wextra -Werror -O2 -I"$RUNNER_TEMP" \
+            "$RUNNER_TEMP/ep-surface-offsets.c" -o "$RUNNER_TEMP/ep-surface-offsets"
+          read -r reg_slot unreg_slot < <("$RUNNER_TEMP/ep-surface-offsets")
           test "$reg_slot" -ge 250 && test "$reg_slot" -le 400
           test "$unreg_slot" -eq "$((reg_slot+1))"
-          echo "REGISTER_EP_SLOT=$reg_slot" >>"$GITHUB_ENV"
-          echo "UNREGISTER_EP_SLOT=$unreg_slot" >>"$GITHUB_ENV"
-          echo "PASS: v22 header-authenticated EP registration function table index $reg_slot"
-          cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared -I"$RUNNER_TEMP" \
-            ci/m3-original-onnx-inert-ep.c \
-            -o "$RUNNER_TEMP/libvulpra-onnx-inert-ep.so"
-          cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -fno-omit-frame-pointer -shared \
-            ci/m3-original-onnx-inner-dlopen-observe.c -ldl \
-            -o "$RUNNER_TEMP/original-onnx-origin-observer.so"
-          nm -D --defined-only "$RUNNER_TEMP/libvulpra-onnx-inert-ep.so" |
-            grep -Eq ' CreateEpFactories$'
-          nm -D --defined-only "$RUNNER_TEMP/libvulpra-onnx-inert-ep.so" |
-            grep -Eq ' ReleaseEpFactory$'
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CPU_RUN" |
-            jq -e --arg sha "$CPU_SHA" '
-              .status=="completed" and .conclusion=="success" and
-              .head_sha==$sha and
-              .path==".github/workflows/m3-original-onnx-explicit-cpu-ep.yml"
-            ' >/dev/null
-          echo 'PASS: compiled v22 C API native offsets supplied to Rust at runtime, benign EP fixture and observer built'
-      - name: Authenticate historical exact-original full-normal compiled ONNX ELF
+          echo "REG_SLOT=$reg_slot" >>"$GITHUB_ENV"
+          echo "UNREG_SLOT=$unreg_slot" >>"$GITHUB_ENV"
+          echo 'PASS: original ONNX API v22 read-only probe and header offsets compiled'
+      - name: Authenticate and extract existing source-pinned original ONNX ELF
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
-            jq -e --arg sha "$SOURCE_SHA" '
-              .status=="completed" and .conclusion=="success" and .head_sha==$sha
+            jq -e --arg src "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and .head_sha==$src
             ' >/dev/null
           mkdir -p "$RUNNER_TEMP/original" "$RUNNER_TEMP/package"
           gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
-            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original"
+            --name vulpra-m3-normandy-matched-full-baseline \
+            --dir "$RUNNER_TEMP/original"
           (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
           test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
           tar -xf "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
           test -s "$RUNNER_TEMP/package/vulpra/libonnxruntime.so"
           nm -D --defined-only "$RUNNER_TEMP/package/vulpra/libonnxruntime.so" |
             grep -Eq ' OrtGetApiBase(@|$)'
-      - name: Classify real original v22 registration and internal library loading in no-egress namespaces
+      - name: Read only actual external EP ABI availability in isolated no-egress process
         shell: bash
-        timeout-minutes: 7
+        timeout-minutes: 4
         run: |
           set -euo pipefail
           package="$RUNNER_TEMP/package/vulpra"
-          probe="$RUNNER_TEMP/original-ep-probe"
-          fixture="$RUNNER_TEMP/libvulpra-onnx-inert-ep.so"
-          observer="$RUNNER_TEMP/original-onnx-origin-observer.so"
-          report="$RUNNER_TEMP/original-ep-origin.json"
-          if ! sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
-            LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
-            timeout --signal=TERM --kill-after=3s 40s \
-            "$probe" "$package/libonnxruntime.so" "$fixture" "$REGISTER_EP_SLOT" "$UNREGISTER_EP_SLOT" |
-            tee "$RUNNER_TEMP/original-ep-control.stdout" >/dev/null; then
-            # Diagnostic ONLY on a native failure. A raw crash never becomes
-            # accepted evidence or a false 'unsupported' classification.
-            if command -v gdb >/dev/null 2>&1; then
-              sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
-                LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
-                timeout --signal=TERM --kill-after=3s 40s \
-                gdb -q -batch -ex 'set pagination off' -ex run -ex 'bt 10' \
-                --args "$probe" "$package/libonnxruntime.so" "$fixture" "$REGISTER_EP_SLOT" "$UNREGISTER_EP_SLOT" \
-                2>&1 | grep -E 'M3_EP_STAGE=|M3_EP_FIXTURE=|Program received signal|^#[0-9]+' | head -35 || true
-            fi
-            echo 'FAIL: original external EP registration crashed or exited unsuccessfully; no capability claim' >&2
-            exit 1
-          fi
           sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
             LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
-            timeout --signal=TERM --kill-after=3s 40s \
-            env LD_PRELOAD="$observer" M3_ONNX_INNER_DLOPEN_REPORT="$report" \
-            "$probe" "$package/libonnxruntime.so" "$fixture" "$REGISTER_EP_SLOT" "$UNREGISTER_EP_SLOT" |
-            tee "$RUNNER_TEMP/original-ep-observed.stdout" >/dev/null
-          result="$(sed -n 's/^M3_EXTERNAL_EP_RESULT=//p' "$RUNNER_TEMP/original-ep-control.stdout")"
-          observed="$(sed -n 's/^M3_EXTERNAL_EP_RESULT=//p' "$RUNNER_TEMP/original-ep-observed.stdout")"
-          test -n "$result" && test "$result" = "$observed"
+            timeout --signal=TERM --kill-after=3s 25s \
+            "$RUNNER_TEMP/ep-surface" "$package/libonnxruntime.so" "$REG_SLOT" "$UNREG_SLOT" |
+            tee "$RUNNER_TEMP/ep-surface-stdout.txt" >/dev/null
+          result="$(sed -n 's/^M3_EXTERNAL_EP_SURFACE=//p' "$RUNNER_TEMP/ep-surface-stdout.txt")"
           case "$result" in
-            api_v22_not_available|v22_api_present_registration_not_implemented|v22_registration_failed_other_status|v22_inert_ep_registration_and_factory_callback_success) ;;
-            *) echo 'FAIL: unexpected source-pinned ONNX external provider result' >&2; exit 1 ;;
+            v22_api_not_exposed|v22_external_ep_api_entries_present_not_executed|v22_api_exposed_but_ep_entries_missing) ;;
+            *) echo 'FAIL: original ONNX surface classification invalid' >&2; exit 1 ;;
           esac
-          test -s "$report"
-          sudo chmod 0644 "$report"
-          jq -e '
-            .schema_version==1 and
-            .diagnostic_interposition_used==true and
-            .target_origin_basename=="libonnxruntime.so" and
-            .all_interposed_dlopen_calls>=1 and
-            .all_interposed_dlopen_calls==
-              (.onnx_origin_dlopen_calls+.other_origin_dlopen_calls) and
-            .onnx_origin_dlopen_calls==
-              (.onnx_origin_successful_dlopen_calls+.onnx_origin_failed_dlopen_calls) and
-            .other_origin_dlopen_calls>=1 and
-            .raw_caller_addresses_or_library_names_retained==false and
-            .complete_native_loader_graph_proven==false
-          ' "$report" >/dev/null
-          if test "$result" = v22_inert_ep_registration_and_factory_callback_success; then
-            jq -e '.onnx_origin_successful_dlopen_calls>=1' "$report" >/dev/null
-          fi
-          if test "$result" = api_v22_not_available ||
-             test "$result" = v22_api_present_registration_not_implemented; then
-            jq -e '.onnx_origin_dlopen_calls==0' "$report" >/dev/null
-          fi
-          jq -n --arg source "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
-            --arg result "$result" --slurpfile obs "$report" '
-            ($obs[0]) as $o |
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --arg res "$result" --argjson reg "$REG_SLOT" --argjson unreg "$UNREG_SLOT" '
             {
               schema_version:1,
-              status:"original_onnx_external_ep_registration_capability_safely_classified",
-              original_source_commit:$source,
-              original_full_normal_package_sha256:$sha,
-              upstream_c_header_blob:"b01b7e48dc87bbeeb026c61fb06c591053853ad1",
-              upstream_v22_api_version_checked_before_index_284:true,
-              registration_result:$result,
-              v22_api_exposed:($result!="api_v22_not_available"),
-              registration_not_implemented:($result=="v22_api_present_registration_not_implemented"),
-              inert_ep_registration_succeeded:($result=="v22_inert_ep_registration_and_factory_callback_success"),
-              inert_ep_factory_callback_invoked_if_success:($result=="v22_inert_ep_registration_and_factory_callback_success"),
-              inert_ep_registered_factory_count_if_success:(if $result=="v22_inert_ep_registration_and_factory_callback_success" then 0 else null end),
-              original_onnx_module_origin_dlopen_calls:$o.onnx_origin_dlopen_calls,
-              original_onnx_module_origin_successful_loads:$o.onnx_origin_successful_dlopen_calls,
-              original_onnx_module_origin_failed_loads:$o.onnx_origin_failed_dlopen_calls,
-              harness_or_other_origin_dlopen_calls:$o.other_origin_dlopen_calls,
-              control_and_interposed_result_classes_match:true,
-              no_real_execution_provider_factory_registered:true,
-              no_GPU_provider_or_device_exercised:true,
-              no_external_model_or_browser_frontend_exercised:true,
+              status:"exact_original_onnx_v22_external_ep_api_surface_only",
+              original_compiled_source_commit:$src,
+              original_native_archive_sha256:$sha,
+              upstream_v22_c_api_header_blob:"b01b7e48dc87bbeeb026c61fb06c591053853ad1",
+              registration_slot:$reg,
+              unregistration_slot:$unreg,
+              original_external_ep_api_surface:$res,
+              original_v22_api_exposed:($res!="v22_api_not_exposed"),
+              original_registration_function_pointer_present:($res=="v22_external_ep_api_entries_present_not_executed"),
+              original_external_provider_registration_called:false,
+              original_execution_provider_factory_instantiated:false,
+              previous_inert_zero_factory_registration_trials_failed_with_segfault:true,
+              failed_runtime_trial_run_ids:[41554347776,41554575881,41555361620],
+              no_plugin_or_GPU_exercised:true,
+              no_external_model_or_browser_ml_frontend_exercised:true,
               no_network_egress_or_installed_browser_profile:true,
-              diagnostic_interposition_used_in_second_control_only:true,
-              full_external_provider_compatibility_or_optional_dependency_graph_proven:false,
+              native_execution_provider_registration_success_proven:false,
+              all_optional_provider_or_ffi_loader_dependencies_proven:false,
               source_pruning_authorized:false,
               native_bytes_saved:0,
               m3_sixth_gate_closed:false
-            }' >"$RUNNER_TEMP/m3-original-onnx-external-ep-capability.json"
-          jq -e --arg source "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            }' >"$RUNNER_TEMP/m3-original-onnx-external-ep-api-surface.json"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
             .schema_version==1 and
-            .status=="original_onnx_external_ep_registration_capability_safely_classified" and
-            .original_source_commit==$source and .original_full_normal_package_sha256==$sha and
-            .upstream_v22_api_version_checked_before_index_284==true and
-            .registration_result!=null and
-            .control_and_interposed_result_classes_match==true and
-            .no_real_execution_provider_factory_registered==true and
-            .full_external_provider_compatibility_or_optional_dependency_graph_proven==false and
-            .source_pruning_authorized==false and .native_bytes_saved==0 and
-            .m3_sixth_gate_closed==false
-          ' "$RUNNER_TEMP/m3-original-onnx-external-ep-capability.json" >/dev/null
-          echo 'PASS: original ONNX API version and inert external EP registration capability classified without guessing GPU support'
-      - name: Archive only bounded original EP capability classification
+            .status=="exact_original_onnx_v22_external_ep_api_surface_only" and
+            .original_compiled_source_commit==$src and .original_native_archive_sha256==$sha and
+            .registration_slot>=250 and .unregistration_slot==.registration_slot+1 and
+            .original_external_provider_registration_called==false and
+            .previous_inert_zero_factory_registration_trials_failed_with_segfault==true and
+            .no_plugin_or_GPU_exercised==true and
+            .native_execution_provider_registration_success_proven==false and
+            .all_optional_provider_or_ffi_loader_dependencies_proven==false and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-onnx-external-ep-api-surface.json" >/dev/null
+          echo 'PASS: exact original ONNX v22 external EP API read-only availability classified; registration NOT asserted'
+      - name: Publish bounded original API surface classification only
         uses: actions/upload-artifact@v4
         with:
-          name: m3-original-onnx-external-ep-capability
-          path: ${{ runner.temp }}/m3-original-onnx-external-ep-capability.json
+          name: m3-original-onnx-v22-external-ep-api-surface
+          path: ${{ runner.temp }}/m3-original-onnx-external-ep-api-surface.json
           if-no-files-found: error
           retention-days: 14

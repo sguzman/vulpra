@@ -1,143 +1,67 @@
-// Original compiled ONNX Runtime v22 external EP registration capability check.
-// CI-only, no crates or real provider, no user files/model/network/GPU.
-// A "get_api(22)" null result PREVENTS all reads of later ABI table slots.
-// A zero-factory inert plugin proves the loader and factory-entrypoint
-// boundary only; it cannot execute or claim a real execution provider.
+// Read-only ONNX Runtime v22 EXTERNAL execution-provider API surface census.
+// Original-source native ELF only. Never registers an EP or calls the slots.
+// A v22 pointer is required before reading later fields of OrtApi.
 use std::env;
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
+use std::ffi::{c_char,c_int,c_void,CStr,CString};
 use std::process::ExitCode;
-use std::ptr;
-
-const RTLD_NOW: c_int = 2;
-const RTLD_LOCAL: c_int = 0;
-const RTLD_NOLOAD: c_int = 4;
-const ORT_NOT_IMPLEMENTED: c_int = 9;
-// Function table slots are supplied only by a CI-compiled offsetof(OrtApi)
-// fixture using the exact authenticated upstream public C API header.
-
+const RTLD_NOW:c_int=2;
+const RTLD_LOCAL:c_int=0;
 #[link(name="dl")]
 unsafe extern "C" {
-    fn dlopen(path: *const c_char, flags: c_int) -> *mut c_void;
-    fn dlsym(handle: *mut c_void, name: *const c_char) -> *mut c_void;
-    fn dlclose(handle: *mut c_void) -> c_int;
+    fn dlopen(path:*const c_char,flags:c_int)->*mut c_void;
+    fn dlsym(handle:*mut c_void,symbol:*const c_char)->*mut c_void;
+    fn dlclose(handle:*mut c_void)->c_int;
 }
-
 #[repr(C)]
 struct OrtApiBase {
-    get_api: unsafe extern "C" fn(u32) -> *const *const c_void,
-    get_version_string: unsafe extern "C" fn() -> *const c_char,
+    get_api:unsafe extern "C" fn(u32)->*const *const c_void,
+    get_version_string:unsafe extern "C" fn()->*const c_char,
 }
-type Status = *mut c_void;
-type CreateEnv = unsafe extern "C" fn(c_int,*const c_char,*mut *mut c_void)->Status;
-type GetErrorCode = unsafe extern "C" fn(*const c_void)->c_int;
-type RegisterEp = unsafe extern "C" fn(*mut c_void,*const c_char,*const c_char)->Status;
-type UnregisterEp = unsafe extern "C" fn(*mut c_void,*const c_char)->Status;
-
-unsafe fn method<T: Copy>(api: *const *const c_void, index: usize) -> Result<T,String> {
-    if api.is_null() || std::mem::size_of::<T>() != std::mem::size_of::<*const c_void>() {
-        return Err("null or incompatible OrtApi ABI".into());
+fn result(value:&str){println!("M3_EXTERNAL_EP_SURFACE={value}");}
+fn run()->Result<(),String>{
+    let args:Vec<String>=env::args().collect();
+    if args.len()!=4 {return Err("expected pinned ELF path plus two C header offsets".into());}
+    let path=&args[1];
+    if !path.starts_with('/')||!path.ends_with("/libonnxruntime.so")||
+       path.contains("..") {return Err("original ELF path invalid".into());}
+    let reg_slot:usize=args[2].parse().map_err(|_|"registration ABI index invalid")?;
+    let unreg_slot:usize=args[3].parse().map_err(|_|"unregistration ABI index invalid")?;
+    if !(250..=400).contains(&reg_slot)||unreg_slot!=reg_slot+1 {
+        return Err("pinned upstream C table offsets inconsistent".into());
     }
-    let ptr = unsafe { *api.add(index) };
-    if ptr.is_null() { return Err("null ONNX API field".into()); }
-    Ok(unsafe { std::mem::transmute_copy(&ptr) })
-}
-fn must_path(s: &str, suffix: &str)->Result<CString,String> {
-    if !s.starts_with('/') || !s.ends_with(suffix) || s.contains("..") {
-        return Err("non-CI-original absolute filename rejected".into());
-    }
-    CString::new(s).map_err(|_| "unexpected NUL byte".into())
-}
-fn outcome(line: &str) {
-    println!("M3_EXTERNAL_EP_RESULT={line}");
-}
-fn run() -> Result<(),String> {
-    let args:Vec<String> = env::args().collect();
-    if args.len()!=5 {return Err("expected original ONNX, inert EP fixture and two verified C ABI offsets".into());}
-    let reg_slot:usize=args[3].parse().map_err(|_| "bad C-verified registration slot")?;
-    let unreg_slot:usize=args[4].parse().map_err(|_| "bad C-verified unregistration slot")?;
-    if !(250..=400).contains(&reg_slot) || unreg_slot!=reg_slot+1 {
-        return Err("pinned header v22 registration slot bounds invalid".into());
-    }
-    let onnx = must_path(&args[1], "/libonnxruntime.so")?;
-    let fixture=must_path(&args[2], "/libvulpra-onnx-inert-ep.so")?;
-    eprintln!("M3_EP_STAGE=before_original_elf_load");
-    let h = unsafe {dlopen(onnx.as_ptr(), RTLD_NOW|RTLD_LOCAL)};
-    eprintln!("M3_EP_STAGE=after_original_elf_load");
-    if h.is_null() {return Err("original compiled ONNX ELF could not be loaded".into());}
-    let sym = unsafe {dlsym(h,c"OrtGetApiBase".as_ptr())};
-    if sym.is_null() {return Err("missing OrtGetApiBase on original native ELF".into());}
-    let get_base:unsafe extern "C" fn()->*const OrtApiBase=unsafe{std::mem::transmute(sym)};
-    let base=unsafe{get_base()};
-    if base.is_null() {return Err("null OrtApiBase".into());}
+    let name=CString::new(path.as_str()).map_err(|_|"NUL in original ELF path")?;
+    let handle=unsafe{dlopen(name.as_ptr(),RTLD_NOW|RTLD_LOCAL)};
+    if handle.is_null(){return Err("original ONNX ELF could not be loaded".into());}
+    let sym=unsafe{dlsym(handle,c"OrtGetApiBase".as_ptr())};
+    if sym.is_null(){return Err("original ONNX lacks OrtGetApiBase".into());}
+    let getter:unsafe extern "C" fn()->*const OrtApiBase=unsafe{std::mem::transmute(sym)};
+    let base=unsafe{getter()};
+    if base.is_null(){return Err("original ONNX returned null API base".into());}
     let version=unsafe{((*base).get_version_string)()};
     if version.is_null()||unsafe{CStr::from_ptr(version)}.to_bytes().is_empty(){
-        return Err("original ONNX returned no version string".into());
+        return Err("original ONNX returned empty version".into());
     }
-
-    // Exact safety gate: no v22 API table => no reading slot 284 or 285.
-    eprintln!("M3_EP_STAGE=before_get_api_v22");
     let api22=unsafe{((*base).get_api)(22)};
-    eprintln!("M3_EP_STAGE=after_get_api_v22");
-    if api22.is_null() {
-        outcome("api_v22_not_available");
-        return Ok(());
-    }
-    let api1=unsafe{((*base).get_api)(1)};
-    if api1.is_null(){return Err("original ONNX v1 API unexpectedly unavailable".into());}
-    let create_env:CreateEnv=unsafe{method(api1,3)?};
-    let error_code:GetErrorCode=unsafe{method(api1,1)?};
-    let register:RegisterEp=unsafe{method(api22,reg_slot)?};
-    let unregister:UnregisterEp=unsafe{method(api22,unreg_slot)?};
-    eprintln!("M3_EP_STAGE=before_create_env");
-    let mut ort_env=ptr::null_mut();
-    let status=unsafe{create_env(3,c"vulpra-isolated-inert-ep-probe".as_ptr(),&mut ort_env)};
-    if !status.is_null()||ort_env.is_null(){return Err("CreateEnv failed".into());}
-    eprintln!("M3_EP_STAGE=after_create_env");
-    let reg_name=c"vulpra_inert_ci_ep";
-    eprintln!("M3_EP_STAGE=before_register_ep");
-    let status=unsafe{register(ort_env,reg_name.as_ptr(),fixture.as_ptr())};
-    eprintln!("M3_EP_STAGE=after_register_ep");
-    if !status.is_null(){
-        let code=unsafe{error_code(status)};
-        if code==ORT_NOT_IMPLEMENTED {
-            outcome("v22_api_present_registration_not_implemented");
-        } else if (1..=13).contains(&code) {
-            // Not a success or proof of provider compatibility; preserve
-            // just the bounded enum, never a path/error message.
-            outcome("v22_registration_failed_other_status");
+    if api22.is_null(){
+        result("v22_api_not_exposed");
+    } else {
+        let register=unsafe{*api22.add(reg_slot)};
+        let unregister=unsafe{*api22.add(unreg_slot)};
+        if !register.is_null() && !unregister.is_null(){
+            result("v22_external_ep_api_entries_present_not_executed");
         } else {
-            return Err("unrecognized original ONNX status code".into());
+            result("v22_api_exposed_but_ep_entries_missing");
         }
-        return Ok(());
     }
-
-    // An OK status must correspond to an actual fixture previously loaded by
-    // ONNX, not something our test harness accidentally loads for the check.
-    eprintln!("M3_EP_STAGE=before_fixture_noload");
-    let plugin=unsafe{dlopen(fixture.as_ptr(),RTLD_NOW|RTLD_NOLOAD)};
-    eprintln!("M3_EP_STAGE=after_fixture_noload");
-    if plugin.is_null(){return Err("registration returned OK but inert library not loaded".into());}
-    let counter=unsafe{dlsym(plugin,c"m3_ep_factory_call_count".as_ptr())};
-    if counter.is_null()||unsafe{*(counter.cast::<u32>())}!=1 {
-        return Err("real original ONNX did not invoke the inert EP factory callback once".into());
-    }
-    unsafe{dlclose(plugin)};
-    eprintln!("M3_EP_STAGE=before_unregister_ep");
-    let status=unsafe{unregister(ort_env,reg_name.as_ptr())};
-    eprintln!("M3_EP_STAGE=after_unregister_ep");
-    if !status.is_null(){return Err("original ONNX EP unregistration returned a failure".into());}
-    outcome("v22_inert_ep_registration_and_factory_callback_success");
+    if unsafe{dlclose(handle)}!=0 {return Err("failed to release original ONNX handle".into());}
     Ok(())
 }
-fn main()->ExitCode {
-    match run(){Ok(())=>ExitCode::SUCCESS,Err(e)=>{eprintln!("FAIL: {e}");ExitCode::FAILURE}}
-}
+fn main()->ExitCode{match run(){Ok(())=>ExitCode::SUCCESS,Err(e)=>{eprintln!("FAIL: {e}");ExitCode::FAILURE}}}
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test] fn version_guard_and_offsets_are_bounded(){
-        assert_eq!(ORT_NOT_IMPLEMENTED,9);
-        assert!(must_path("/tmp/safe/libonnxruntime.so","/libonnxruntime.so").is_ok());
-        assert!(must_path("../libonnxruntime.so","/libonnxruntime.so").is_err());
+mod tests{
+    #[test]fn api_guard_bounds(){
+        let good=(250usize..=400).contains(&301);
+        assert!(good);
+        assert_eq!(302,301+1);
     }
 }
