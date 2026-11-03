@@ -2,7 +2,7 @@
 
 ## Accepted actual-original native browser result
 
-[**Original packaged browser crashhelper live-launch CI 41720817778 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41720817778), job `126212785812`, sanitized artifact **13272281706** (`m3-original-browser-owned-crashhelper-launch`). [Corrected GitHub workflow actionlint **41721043209 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41721043209).
+[**Original packaged browser crashhelper live-launch CI 41720817778 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41720817778), job `126212785812`, sanitized artifact **13272281706** (`m3-original-browser-owned-crashhelper-launch`). [**Corrected original-browser replay 41721043285 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41721043285), artifact **13272336871**, independently reconfirmed all original native checks. [Corrected GitHub workflow actionlint **41721043209 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41721043209).
 
 The real original full-normal Vulpra package was authenticated against immutable source commit `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and archive SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` before execution. No native browser code was rebuilt or changed. A disposable, read-only, no-network Docker Arch Linux userspace launched the actual packaged `/original/vulpra` executable with the unchanged private Weston/Wayland frame/profile smoke test. The isolated browser initialized its dedicated private profile, remained alive **10 seconds**, and emitted a real non-null Wayland buffer attach and commit on the same surface. No real user, installed Firefox, or installed browser profile was touched.
 
