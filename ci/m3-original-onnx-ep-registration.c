@@ -8,7 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Session implementation is kept in a separate, focused C translation unit.
+// Session and Linux loader inventory live in separate focused C translation units.
+int m3_ci_loader_init(const char *original, const char *plugin);
+int m3_ci_loader_snapshot(const char *stage);
 int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
                                   const OrtEpDevice *device);
 int m3_probe_external_ep_compute_session(const OrtApi *api, OrtEnv *env,
@@ -44,10 +46,19 @@ int main(int argc, char **argv) {
     fputs("both library paths must be absolute\n", stderr);
     return 2;
   }
+  if (m3_ci_loader_init(argv[1], argv[2]) != 0 ||
+      m3_ci_loader_snapshot("before_dlopen") != 0) {
+    fputs("M3_EP_ERROR_STAGE=before_dlopen_loader_map\n", stderr);
+    return 11;
+  }
   void *handle = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
   if (handle == NULL) {
     fputs("M3_EP_ERROR_STAGE=load_original_elf\n", stderr);
     return 3;
+  }
+  if (m3_ci_loader_snapshot("after_dlopen") != 0) {
+    dlclose(handle);
+    return 11;
   }
   const OrtApiBase *(*get_api_base)(void) =
       (const OrtApiBase *(*)(void))dlsym(handle, "OrtGetApiBase");
@@ -87,6 +98,12 @@ int main(int argc, char **argv) {
     return 6;
   }
   puts("M3_EP_STAGE=registration_succeeded"); fflush(stdout);
+  if (m3_ci_loader_snapshot("registered") != 0) {
+    api->UnregisterExecutionProviderLibrary(env, "vulpra-ci-fixture");
+    api->ReleaseEnv(env);
+    dlclose(handle);
+    return 11;
+  }
   const char *device_mode = getenv("VULPRA_CI_ONNX_EP_DEVICE_PROBE");
   const char *session_mode = getenv("VULPRA_CI_ONNX_EP_CPU_FALLBACK");
   int run_cpu_fallback = session_mode != NULL && strcmp(session_mode, "1") == 0;
@@ -159,6 +176,7 @@ int main(int argc, char **argv) {
       fflush(stdout);
     }
   }
+  if (m3_ci_loader_snapshot("session_released") != 0) return 11;
   puts("M3_EP_STAGE=unregister"); fflush(stdout);
   int unregistered = check_status(
       api, api->UnregisterExecutionProviderLibrary(
@@ -167,9 +185,10 @@ int main(int argc, char **argv) {
     puts("M3_EP_STAGE=unregistration_succeeded"); fflush(stdout);
   }
   api->ReleaseEnv(env);
-  if (dlclose(handle) != 0 || !unregistered) {
-    return 7;
-  }
+  if (unregistered && m3_ci_loader_snapshot("unregistered") != 0) return 11;
+  int closed = dlclose(handle);
+  if (closed == 0 && m3_ci_loader_snapshot("after_dlclose") != 0) return 11;
+  if (closed != 0 || !unregistered) return 7;
   puts("PASS: original ONNX registered and unregistered CI-only factory");
   return 0;
 }

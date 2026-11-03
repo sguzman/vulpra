@@ -8,6 +8,14 @@
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
+  # TEMPORARY, bounded native loader-map test; restore manual-only on pass.
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-onnx-ep-registration.c
+      - ci/m3-original-onnx-ep-session.c
+      - ci/m3-original-onnx-ep-loader-snapshot.c
+      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read
@@ -33,6 +41,7 @@ jobs:
             ci/m3-original-onnx-ep-compute.c
             ci/m3-original-onnx-ep-registration.c
             ci/m3-original-onnx-ep-session.c
+            ci/m3-original-onnx-ep-loader-snapshot.c
       - name: Pin upstream v30 headers and verify test fixture ABI
         shell: bash
         env:
@@ -66,6 +75,7 @@ jobs:
           cc -std=c11 -g -O0 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
             ci/m3-original-onnx-ep-registration.c \
             ci/m3-original-onnx-ep-session.c \
+            ci/m3-original-onnx-ep-loader-snapshot.c \
             -o "$RUNNER_TEMP/original-ep-registration" -ldl
       - name: Authenticate source-pinned original full-native package
         shell: bash
@@ -173,7 +183,8 @@ jobs:
           grep -Fxq 'M3_EP_STAGE=unregistration_succeeded' "$RUNNER_TEMP/m3-ep-native-compute.log"
           # Single graph: external plugin Mul(x,z) followed by builtin CPU Add(mid,b).
           if ! sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
-            VULPRA_CI_ONNX_EP_MIXED_COMPUTE=1 LD_LIBRARY_PATH="$pkg" \
+            VULPRA_CI_ONNX_EP_MIXED_COMPUTE=1 VULPRA_CI_ONNX_EP_MAP=1 \
+            LD_LIBRARY_PATH="$pkg" \
             MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             timeout --signal=TERM --kill-after=3s 35s \
             "$RUNNER_TEMP/original-ep-registration" "$pkg/libonnxruntime.so" \
@@ -193,6 +204,27 @@ jobs:
             M3_EP_STAGE=unregistration_succeeded; do
             grep -Fxq "$marker" "$RUNNER_TEMP/m3-ep-mixed-compute.log"
           done
+          for required in \
+            "M3_EP_MAP stage=after_dlopen kind=package name=libonnxruntime.so" \
+            "M3_EP_MAP stage=registered kind=plugin name=libvulpra-onnx-ci-ep.so" \
+            "M3_EP_MAP stage=session_created kind=plugin name=libvulpra-onnx-ci-ep.so" \
+            "M3_EP_MAP stage=after_run kind=package name=libonnxruntime.so" \
+            "M3_EP_MAP stage=after_run kind=plugin name=libvulpra-onnx-ci-ep.so"; do
+            grep -Fxq "$required" "$RUNNER_TEMP/m3-ep-mixed-compute.log"
+          done
+          for stage in before_dlopen after_dlopen registered session_created after_run session_released unregistered after_dlclose; do
+            grep -q "^M3_EP_MAP_SUMMARY stage=$stage " "$RUNNER_TEMP/m3-ep-mixed-compute.log"
+          done
+          ! grep -q '^M3_EP_MAP_ERROR=' "$RUNNER_TEMP/m3-ep-mixed-compute.log"
+          jq -R -s '
+            [split("\n")[] | select(startswith("M3_EP_MAP stage=")) |
+             capture("^M3_EP_MAP stage=(?<stage>[a-z_]+) kind=(?<kind>package|plugin|host) name=(?<name>[A-Za-z0-9._+-]{1,111})$")]
+            | unique
+          ' "$RUNNER_TEMP/m3-ep-mixed-compute.log" >"$RUNNER_TEMP/m3-ep-mapped-libraries.json"
+          jq -e 'length>0 and length<=2048 and
+            any(.[]; .stage=="after_run" and .kind=="package" and .name=="libonnxruntime.so") and
+            any(.[]; .stage=="after_run" and .kind=="plugin" and .name=="libvulpra-onnx-ci-ep.so")' \
+            "$RUNNER_TEMP/m3-ep-mapped-libraries.json" >/dev/null
           jq -n --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
             '{schema_version:1, status:"source_pinned_original_external_ep_factory_lifecycle_pass",
               original_source_commit:$source, original_archive_sha256:$archive,
@@ -214,6 +246,10 @@ jobs:
               mixed_external_mul_and_builtin_cpu_add_executed:true,
               mixed_graph_result_float32:3.5625,
               mixed_cpu_add_not_claimed_by_external_ep:true,
+              live_loader_map_original_onnx_and_plugin_verified:true,
+              live_loader_map_stages:8,
+              live_loader_map_pathless_basename_only:true,
+              live_loader_map_complete_dependencies_proven:false,
               external_ep_test_scope:"single_float32_1_element_cpu_mul",
               actual_model_executed:true,
               original_library_registration_succeeded:true,
@@ -227,6 +263,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-original-onnx-external-ep-factory-lifecycle
-          path: ${{ runner.temp }}/m3-ep-lifecycle.json
+          path: |
+            ${{ runner.temp }}/m3-ep-lifecycle.json
+            ${{ runner.temp }}/m3-ep-mapped-libraries.json
           if-no-files-found: error
           retention-days: 14

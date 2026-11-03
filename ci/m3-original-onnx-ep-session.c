@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 
+// Optional pathless runtime library inventory (no-op unless explicit opt-in).
+int m3_ci_loader_snapshot(const char *stage);
+
 #if ORT_API_VERSION != 30
 #error "This source requires the pinned ONNX Runtime v30 C API"
 #endif
@@ -177,6 +180,7 @@ static int m3_probe_session(const OrtApi *api, OrtEnv *env,
                    env, model.data, model.len, opts, &session), "create_session") ||
       session == NULL) goto done;
   puts("M3_EP_STAGE=external_ep_session_created"); fflush(stdout);
+  if (m3_ci_loader_snapshot("session_created") != 0) goto done;
   if (!checked(api, api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault,
                                                 &memory), "cpu_memory_info") ||
       memory == NULL) goto done;
@@ -236,6 +240,7 @@ static int m3_probe_session(const OrtApi *api, OrtEnv *env,
   }
   if (mixed) {
     puts("M3_EP_STAGE=mixed_native_cpu_numerical_result_3_5625"); fflush(stdout);
+    if (m3_ci_loader_snapshot("after_run") != 0) goto done;
   } else if (plugin_mul) {
     puts("M3_EP_STAGE=external_ep_numerical_result_1_5625"); fflush(stdout);
   } else {
