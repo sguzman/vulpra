@@ -30,9 +30,10 @@ fn reporter_args(bytes:&[u8])->bool{
       parts[1].starts_with(b"/")&&parts[1].ends_with(b".dmp")&&
       !parts[1].contains(&b'\n')&&parts[1].len()<=4096
 }
-fn scan(uid:u32)->Result<(usize,usize),String>{
+fn scan(uid:u32)->Result<(usize,usize,usize),String>{
     let mut browsers=0;
     let mut reporters=0;
+    let mut original_reporter_executables=0;
     let mut count=0;
     for entry in fs::read_dir("/proc").map_err(|_|"private proc unavailable")?{
         let entry=entry.map_err(|_|"process scan failed")?;
@@ -46,12 +47,13 @@ fn scan(uid:u32)->Result<(usize,usize),String>{
         if fs::metadata(&p).ok().map(|m|m.uid())!=Some(uid){continue}
         if exe==Path::new(BROWSER){browsers+=1;}
         if exe==Path::new(REPORTER){
+            original_reporter_executables+=1;
             let Ok(args)=fs::read(p.join("cmdline"))else{continue};
             if reporter_args(&args){reporters+=1;}
         }
     }
     if browsers>128||reporters>16{return Err("unexpected native process count".into())}
-    Ok((browsers,reporters))
+    Ok((browsers,reporters,original_reporter_executables))
 }
 fn run()->Result<(),String>{
     let args=env::args().collect::<Vec<_>>();
@@ -65,7 +67,7 @@ fn run()->Result<(),String>{
     let start=Instant::now();
     let mut before_browser=false;
     while start.elapsed()<Duration::from_secs(35)&&!Path::new(FLAG).exists(){
-        let (b,r)=scan(uid)?;
+        let (b,r,_all)=scan(uid)?;
         before_browser|=b>0;
         if r>0{return Err("reporter appeared before explicit isolated fatal abort".into())}
         thread::sleep(Duration::from_millis(15));
@@ -77,9 +79,11 @@ fn run()->Result<(),String>{
     let mut reporter_samples=0usize;
     let mut browser_gone=false;
     let mut max_reporters=0usize;
+    let mut any_packaged_reporter=false;
     let after=Instant::now();
     while after.elapsed()<Duration::from_secs(22){
-        let (browser,reporter)=scan(uid)?;
+        let (browser,reporter,any)=scan(uid)?;
+        any_packaged_reporter|=any>0;
         scans+=1;
         if reporter>0{
             reporter_samples+=1;
@@ -93,8 +97,8 @@ fn run()->Result<(),String>{
         // Counts and booleans only. These diagnostics contain no private
         // process IDs, minidump paths, raw argument bytes or profile data.
         return Err(format!(
-            "runtime observation incomplete: reporter_seen={} browser_exit_seen={} samples={} before_browser_seen={}",
-            reporter_samples>0,browser_gone,scans,before_browser
+            "runtime observation incomplete: reporter_with_expected_args={} packaged_reporter_executable_any={} browser_exit_seen={} samples={} before_browser_seen={}",
+            reporter_samples>0,any_packaged_reporter,browser_gone,scans,before_browser
         ))
     }
     let out=format!(concat!(
