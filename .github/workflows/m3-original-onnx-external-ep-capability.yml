@@ -2,12 +2,10 @@
 # Never calls RegisterExecutionProviderLibrary or supplies an EP plugin:
 # a previous zero-factory fixture crashed during registration in isolated CI.
 name: M3 Original ONNX External EP API Surface
+# Read-only original package v22 surface CI 41555767577 passed and its
+# artifact was independently inspected. Manual-only to avoid needless
+# repeats of the large archived native package extraction.
 on:
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-onnx-external-ep-capability.rs
-      - .github/workflows/m3-original-onnx-external-ep-capability.yml
   workflow_dispatch:
 permissions:
   contents: read

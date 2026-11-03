@@ -1,5 +1,29 @@
 # M3 — Original packaged ONNX Runtime internal dlopen origin under isolated API activation (2026-11-02)
 
+## Original compiled ONNX v22 external execution-provider API surface: read-only proof and failed inert registration (2026-11-03 UTC)
+
+**[Source-pinned original native API-surface CI 41555767577 — PASS](https://github.com/sguzman/vulpra/actions/runs/41555767577)**, **[workflow lint 41555767549 — PASS](https://github.com/sguzman/vulpra/actions/runs/41555767549)**. Bounded report artifact **13194656363**, `m3-original-onnx-external-ep-api-surface.json`, was downloaded and independently inspected. It authenticates the original compiled source `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, original full-normal package SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`, and upstream public MIT ONNX Runtime v1.22.0 C header Git blob `b01b7e48dc87bbeeb026c61fb06c591053853ad1`.
+
+The exact original packaged `libonnxruntime.so` successfully loads in a disposable **no-egress** CI Linux namespace; `OrtGetApiBase` returns a nonempty version and **`GetApi(22)` returns a non-null table**. C `offsetof` assertions compiled against the SHA-pinned upstream header derive the **actual** `OrtApi.RegisterExecutionProviderLibrary` table index **301** and adjacent `UnregisterExecutionProviderLibrary` index **302**. Both function pointers are non-null in the original compiled library. This is a proven **API surface**, **not** proof that a usable external execution provider can be registered or used.
+
+The first trial ([41554078873](https://github.com/sguzman/vulpra/actions/runs/41554078873)) stopped at a correct C `offsetof` assertion: an initially assumed function-table offset was wrong. After replacing guessed offsets with **compiled pinned-header offsets**, trial [41554347776](https://github.com/sguzman/vulpra/actions/runs/41554347776) reached the original library but **segfaulted** in the isolated native registration call. A bounded native stage trace on trial [41554575881](https://github.com/sguzman/vulpra/actions/runs/41554575881) confirmed successful original ELF loading, v22 API access and ONNX environment creation before the registration call. After correcting a `-Werror` diagnostic fixture compilation issue, trial [41555361620](https://github.com/sguzman/vulpra/actions/runs/41555361620) confirmed that the original ONNX registration path actually **loaded the CI-only inert `libvulpra-onnx-inert-ep.so`** and **invoked its `CreateEpFactories` callback**, but subsequently segfaulted **before the original registration call returned**.
+
+That intentionally inert fixture returned zero execution-provider factories and represented **no actual CPU, GPU or accelerator provider**. The segmentation fault is an **unresolved result of this narrow, deliberately empty test fixture**, not proof that the production browser or ONNX's legitimate external providers are broken. There is no independently verified complete registration, functional external provider, provider-device enumeration, or fallback behavior from those attempts. **The crashing experiment was replaced** with a new read-only Rust v22 API-surface inspector that never calls `RegisterExecutionProviderLibrary`, `UnregisterExecutionProviderLibrary`, or any plugin callback. Its only native operations are loading and querying the original library's API table and unloading the handle; it made no network calls and did not touch user/browser profiles.
+
+| Exact original compiled ONNX external EP question | Observed |
+| --- | --- |
+| `GetApi(22)` supported | **Yes** |
+| Pinned original `OrtApi` function-table indices for registration/removal | **301 / 302** |
+| Both function pointers non-null | **Yes** |
+| Original library loaded the zero-factory CI fixture and entered its `CreateEpFactories` callback | **Yes, in failed registration trial** |
+| That deliberately zero-factory trial returned successfully | **No — native process segfaulted** |
+| Any functioning real external provider or GPU feature validated | **No** |
+| Complete optional provider, FFI and `dlopen` dependency graph closed | **No** |
+
+Next step for true registration proof would require a separately reviewed, well-formed `OrtEpFactory` fixture implementing the complete required factory/device ABI and safe teardown, with exact-source C header pinning and isolated native crash diagnostics, **not** another zero-factory attempt. The earlier accepted genuine CPU provider and custom-operator loader evidence remains separate and valid. The read-only source-pinned replay is restored to **manual-only** after acceptance.
+
+**No application source was pruned or native bytes saved. M3 sixth gate remains OPEN (5/6=83%), Vulpra overall 61%, session Δ +0 percentage points.**
+
 ## Exact original ONNX CPU execution-provider registration, separated from optional dynamic plugin loading (2026-11-03 UTC)
 
 **[Source-pinned original ONNX CPU provider CI 41551291000 — PASS](https://github.com/sguzman/vulpra/actions/runs/41551291000)** and **[workflow lint 41551290931 — PASS](https://github.com/sguzman/vulpra/actions/runs/41551290931)**. Sanitized runtime artifact **13191721752**, `m3-original-onnx-explicit-cpu-ep.json`, was independently downloaded and inspected. Exact original source Git `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, native full-normal package SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` and upstream MIT ONNX C API v1.22.0 header Git blob `b01b7e48dc87bbeeb026c61fb06c591053853ad1` were independently authenticated.
