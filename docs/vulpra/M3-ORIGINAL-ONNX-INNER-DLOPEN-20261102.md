@@ -1,5 +1,27 @@
 # M3 — Original packaged ONNX Runtime internal dlopen origin under isolated API activation (2026-11-02)
 
+## Exact original ONNX CPU execution-provider registration, separated from optional dynamic plugin loading (2026-11-03 UTC)
+
+**[Source-pinned original ONNX CPU provider CI 41551291000 — PASS](https://github.com/sguzman/vulpra/actions/runs/41551291000)** and **[workflow lint 41551290931 — PASS](https://github.com/sguzman/vulpra/actions/runs/41551290931)**. Sanitized runtime artifact **13191721752**, `m3-original-onnx-explicit-cpu-ep.json`, was independently downloaded and inspected. Exact original source Git `b1482404dfb8b01342990ee99ea3df0f9756b5f7`, native full-normal package SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` and upstream MIT ONNX C API v1.22.0 header Git blob `b01b7e48dc87bbeeb026c61fb06c591053853ad1` were independently authenticated.
+
+This test **explicitly selects the real CPU execution provider**, rather than merely observing that ONNX's CPU provider is implicitly present by default. The std-only Rust probe now has a narrowly scoped `--explicit-cpu` mode that calls the original `OrtApi.GetAvailableProviders` (function pointer slot **125**) and `OrtApi.ReleaseAvailableProviders` (slot **126**), validates a bounded provider list and requires the precise **`CPUExecutionProvider`** name. It then uses `dlsym` on the **actual compiled original `libonnxruntime.so`** to require its exported `OrtSessionOptionsAppendExecutionProvider_CPU` function and calls that C API explicitly with a CPU arena enabled. Both entry points and the actual registration status were verified as successful, followed by real in-memory `Constant` CPU session and `Run`, producing **an exact validated `float32[1] = 1.25` numerical result**.
+
+| Original source-pinned compiled ONNX CPU execution-provider check | Verified result |
+| --- | --- |
+| Original `GetAvailableProviders` reports the CPU execution-provider name | **Yes** |
+| `OrtSessionOptionsAppendExecutionProvider_CPU` exported from the original ELF | **Yes** |
+| Explicit CPU execution-provider registration returns success | **Yes** |
+| Separate noninterposed control and CI-interposed CPU inference both pass exact value | **Yes; float32[1] = 1.25** |
+| Original `libonnxruntime.so`-origin internal `dlopen` in this explicitly selected CPU workload | **0** |
+| Separately counted outer Rust probe `dlopen` | **1** |
+| Actual CUDA or optional GPU execution-provider registration, runtime plugin, device, or shader | **Not exercised** |
+
+The two new public ONNX C API field offsets were independently compiled with `offsetof(OrtApi,...)` static assertions against the pinned upstream header. The new no-egress CI uses the same original package as the previously accepted numerical CPU and custom-ops loader tests. The original CPU execution provider is not proven to require dynamic loading: in fact **the bounded observer reports zero ONNX-origin internal `dlopen` calls during explicit CPU registration**. This is distinct from the [earlier real `RegisterCustomOpsLibrary` test 41549851976](https://github.com/sguzman/vulpra/actions/runs/41549851976), which did cause one genuine ONNX-origin dynamic load for a harmless CI-owned custom-operator plugin. These paths must not be conflated.
+
+The API returns a list of provider names; this experiment **only requires CPU membership**, and makes **no claim** about the number of other providers, CUDA availability, their registration, model compatibility, fallback behavior, or GPU loading. A successful CPU registration/inference does **not** close all optional execution-provider / generated-build / FFI / `dlopen` graphs, prove an original graphical browser ML frontend, or exercise the user's physical EndeavourOS/Hyprland machine. Both ordinary control and observer runs are isolated; `LD_PRELOAD` changes native resolution and supplies no uninstrumented full caller stack. The expensive source-pinned native archive replay was restored to **manual dispatch only** after its verified acceptance.
+
+**No code was pruned, no package bytes saved. M3 sixth gate remains OPEN (5/6=83%), Vulpra overall 61%, session Δ +0 percentage points.**
+
 ## Original ONNX Runtime internal dynamic load successfully exercised — custom-ops path (2026-11-02)
 
 **[Original compiled native custom-ops registration CI 41549851976 — PASS](https://github.com/sguzman/vulpra/actions/runs/41549851976)**, **[workflow lint 41549851930 — PASS](https://github.com/sguzman/vulpra/actions/runs/41549851930)**. The bounded artifact **13191140584**, `m3-original-onnx-customops-runtime-boundary.json`, was independently downloaded and inspected. Both exact original source `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and full-normal compiled native package SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` were authenticated.

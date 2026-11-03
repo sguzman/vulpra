@@ -1,12 +1,10 @@
 # Exact-original compiled ONNX: list real execution providers, explicitly
 # register CPU EP and run numeric CPU Constant. Not a GPU/provider plugin test.
 name: M3 Original ONNX Explicit CPU Provider Registration
+# Source-pinned original native CPU EP run 41551291000 passed, and its
+# artifact 13191721752 was independently inspected. Manual-only to avoid
+# another needless extraction of the complete historical package.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-onnx-explicit-cpu-ep.yml
-      - ci/m3-original-onnx-constant-session.rs
   workflow_dispatch:
 permissions:
   contents: read
