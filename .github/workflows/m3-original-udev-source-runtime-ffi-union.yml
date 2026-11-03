@@ -1,0 +1,151 @@
+# Correlate prior source-pinned original native results; do not rerun browser.
+# The original source, isolated ABI/wrapper, instrumented and untouched
+# browser observations are independent workloads, NOT a causal FFI trace.
+name: M3 Original Libudev Source Runtime FFI Reconciliation
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-udev-source-runtime-ffi-union.yml
+      - ci/m3-original-udev-source-runtime-ffi-union.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-source-to-compiled-native-and-observed-browser-evidence:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      SRC: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      LIBXUL: d6d1af9d377cab1f31bda6cfe05c52b945b21f0c37295636d0aca99fef4272cf
+    steps:
+      - name: Checkout only exact-source evidence verifier
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-udev-source-runtime-ffi-union.jq
+      - name: Authenticate five successful exact-commit original native reports
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          while read -r run head workflow artifact; do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e --arg sha "$head" --arg path ".github/workflows/$workflow" '
+                .status=="completed" and .conclusion=="success" and
+                .head_sha==$sha and .path==$path' >/dev/null
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts?per_page=50" |
+              jq -e --arg name "$artifact" '
+                [.artifacts[]|select(.name==$name and .expired==false and .size_in_bytes>0)]|length==1' >/dev/null
+          done <<'PINNED'
+          41357321586 5f7437f957e45201149ce42ecad6c662b16d19bf m3-original-webauthn-libudev-source-native.yml m3-original-webauthn-libudev-source-machine
+          41358205206 3243200db85c6d75e4847b1e2b34ec3ee92e7673 m3-original-webauthn-libudev-host-abi.yml m3-original-webauthn-libudev-two-host-abi
+          41365492654 2deb3873697c21b3d059c0979d3bc4f726f01eb8 m3-original-webauthn-libudev-wrapper-smoke.yml m3-original-webauthn-libudev-real-wrapper-first-use
+          41481619331 1eec6c924e7be6e48977aed7d3e8332192c40b01 m3-original-browser-libudev-dlopen-callsite.yml m3-original-browser-libudev-dlopen-callsite
+          41674689904 e1c4442ff053cd39017d72124a30cf93b9072075 m3-original-browser-usb-nodevice-loader.yml m3-original-browser-usb-nodevice-loader
+          PINNED
+      - name: Fetch only sanitized original evidence artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/source" "$RUNNER_TEMP/abi" "$RUNNER_TEMP/wrapper" \
+            "$RUNNER_TEMP/trace" "$RUNNER_TEMP/maps" "$RUNNER_TEMP/crosswalk"
+          while read -r id artifact directory; do
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" \
+              --name "$artifact" --dir "$RUNNER_TEMP/$directory"
+          done <<'ARCHIVES'
+          41357321586 m3-original-webauthn-libudev-source-machine source
+          41358205206 m3-original-webauthn-libudev-two-host-abi abi
+          41365492654 m3-original-webauthn-libudev-real-wrapper-first-use wrapper
+          41481619331 m3-original-browser-libudev-dlopen-callsite trace
+          41674689904 m3-original-browser-usb-nodevice-loader maps
+          ARCHIVES
+          for entry in \
+            source/m3-original-webauthn-libudev-source-native.json \
+            abi/m3-original-udev-ubuntu.json abi/m3-original-udev-arch.json \
+            wrapper/m3-original-udev-wrapper-ubuntu.json \
+            wrapper/m3-original-udev-wrapper-arch.json \
+            trace/m3-original-browser-libudev-dlopen-callsite.json \
+            maps/m3-original-webauthn-usb-maps-crosswalk.json \
+            maps/m3-original-browser-usb-nodevice-loader.json; do
+            test -s "$RUNNER_TEMP/$entry"
+            test "$(stat -c '%s' "$RUNNER_TEMP/$entry")" -le 16384
+          done
+      - name: Check original source-machine/ABI/Rust wrapper and actual browser together
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/source/m3-original-webauthn-libudev-source-native.json"
+          ubuntu_abi="$RUNNER_TEMP/abi/m3-original-udev-ubuntu.json"
+          arch_abi="$RUNNER_TEMP/abi/m3-original-udev-arch.json"
+          ubuntu_wrapper="$RUNNER_TEMP/wrapper/m3-original-udev-wrapper-ubuntu.json"
+          arch_wrapper="$RUNNER_TEMP/wrapper/m3-original-udev-wrapper-arch.json"
+          trace="$RUNNER_TEMP/trace/m3-original-browser-libudev-dlopen-callsite.json"
+          maps="$RUNNER_TEMP/maps/m3-original-webauthn-usb-maps-crosswalk.json"
+          feature="$RUNNER_TEMP/maps/m3-original-browser-usb-nodevice-loader.json"
+          out="$RUNNER_TEMP/crosswalk/original-libudev-source-runtime-ffi-evidence.json"
+          audit() {
+            jq -n --arg src "$SRC" --arg archive "$ARCHIVE" --arg libxul "$LIBXUL" \
+              --slurpfile source "$1" --slurpfile abi_ubuntu "$ubuntu_abi" \
+              --slurpfile abi_arch "$2" --slurpfile wrap_ubuntu "$3" \
+              --slurpfile wrap_arch "$arch_wrapper" --slurpfile trace "$4" \
+              --slurpfile maps "$5" --slurpfile feature "$6" \
+              -f ci/m3-original-udev-source-runtime-ffi-union.jq
+          }
+          audit "$src" "$arch_abi" "$ubuntu_wrapper" "$trace" "$maps" "$feature" >"$out"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_webauthn_libudev_source_machine_abi_wrapper_runtime_union_verified" and
+            .source_rust_loader_soname=="libudev.so.1" and
+            .native_register_dlopen_addresses_hex==["0x993664f","0x9936664"] and
+            .observed_instrumented_libxul_return_pcs==["0x9936652","0x9936667"] and
+            .source_declared_udev_ffi_symbols==49 and
+            .ubuntu_and_arch_resolved_udev_symbols==[49,49] and
+            .original_source_rust_wrapper_udev_new_unref_executed_in_both_hosts==true and
+            .real_uninstrumented_browser_host_library_newly_mapped=="libudev.so.1.7.15" and
+            .cross_run_evidence_corroborates_conditional_libudev_dependency==true and
+            .full_uninstrumented_rust_to_dlopen_call_chain_proven==false and
+            .symbols_dlsym_resolved_in_real_browser_proven==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false' "$out" >/dev/null
+          # Mutate actual evidence, never assert a fabricated positive outcome.
+          jq '.native_first_call_register_r14_address+=1' "$src" >"$RUNNER_TEMP/mutant.json"
+          if audit "$RUNNER_TEMP/mutant.json" "$arch_abi" "$ubuntu_wrapper" "$trace" "$maps" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: original machine register call drift accepted' >&2; exit 1
+          fi
+          jq '.host_resolved_udev_symbol_count=48' "$arch_abi" >"$RUNNER_TEMP/mutant.json"
+          if audit "$src" "$RUNNER_TEMP/mutant.json" "$ubuntu_wrapper" "$trace" "$maps" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: missing Arch libudev FFI symbol accepted' >&2; exit 1
+          fi
+          jq '.libudev_noload_post_first_use=false' "$ubuntu_wrapper" >"$RUNNER_TEMP/mutant.json"
+          if audit "$src" "$arch_abi" "$RUNNER_TEMP/mutant.json" "$trace" "$maps" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: original Rust first-use regression accepted' >&2; exit 1
+          fi
+          jq '.source_pinned_libxul_normal_load_hit_at_return_pc_0x9936667=false' "$trace" >"$RUNNER_TEMP/mutant.json"
+          if audit "$src" "$arch_abi" "$ubuntu_wrapper" "$RUNNER_TEMP/mutant.json" "$maps" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: instrumented native callsite drift accepted' >&2; exit 1
+          fi
+          jq '.during_udev_mapped_filenames=[]' "$maps" >"$RUNNER_TEMP/mutant.json"
+          if audit "$src" "$arch_abi" "$ubuntu_wrapper" "$trace" "$RUNNER_TEMP/mutant.json" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: missing actual browser udev mapped ELF accepted' >&2; exit 1
+          fi
+          jq '.instrumented_dlopen_symbol_interposition=true' "$feature" >"$RUNNER_TEMP/mutant.json"
+          if audit "$src" "$arch_abi" "$ubuntu_wrapper" "$trace" "$maps" "$RUNNER_TEMP/mutant.json" >/dev/null 2>&1; then
+            echo 'FAIL: misleading uninterposed control accepted' >&2; exit 1
+          fi
+          echo 'PASS: five original native evidence runs reconciled, six negative mutants rejected; sixth M3 gate open'
+      - name: Archive only privacy-safe bounded cross-run conclusion
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-libudev-source-machine-abi-runtime-union
+          path: ${{ runner.temp }}/crosswalk/original-libudev-source-runtime-ffi-evidence.json
+          if-no-files-found: error
+          retention-days: 14
