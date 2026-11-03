@@ -65,13 +65,20 @@ check(
  $f.network_egress_allowed==false and
  $f.source_pruning_authorized==false and $f.m3_sixth_gate_closed==false;
  "original source-defined ABI or real no-device WebAuthn feature not authenticated") |
+# The loader sees all libudev consumers in the browser process.
+# The exact original WebAuthn libudev-sys source declares 49 functions, but
+# this workload also uses udev_monitor_filter_update from a different,
+# UNATTRIBUTED consumer. Never claim it belongs to the WebAuthn Rust crate.
+($g.original_browser_resolved_udev_symbol_names - $a.source_declared_udev_symbols) as $extra |
+($g.original_browser_resolved_udev_symbol_names - $extra) as $source_matches |
 check(
- all($g.original_browser_resolved_udev_symbol_names[]; . as $symbol |
-   ($a.source_declared_udev_symbols|index($symbol))!=null and
-   ($symbol|test("^udev_[a-z0-9_]+$"))) and
+ $extra==["udev_monitor_filter_update"] and
+ ($source_matches|length)==15 and
+ ($source_matches|index("udev_new"))!=null and
+ all($g.original_browser_resolved_udev_symbol_names[]; test("^udev_[a-z0-9_]+$")) and
  all($g.original_browser_udev_provider_basenames[]; provider) and
  ($g.original_browser_udev_provider_basenames|length)>=1;
- "glibc resolver returned undeclared symbol or unexpected provider") |
+ "native libudev symbol outside source-declared WebAuthn and pinned unowned-symbol boundary") |
 {
  schema_version:1,
  status:"original_browser_source_pinned_glibc_no_preload_udev_binding_reconciled",
@@ -80,6 +87,11 @@ check(
  source_declared_udev_ffi_symbols:49,
  native_glibc_binding_event_count:$g.original_browser_libudev_binding_event_count,
  native_glibc_unique_udev_symbol_count:$g.original_browser_unique_udev_symbol_count,
+ native_glibc_source_declared_web_authn_symbol_count:($source_matches|length),
+ native_glibc_source_declared_web_authn_symbol_names:$source_matches,
+ native_glibc_unattributed_external_symbol_count:($extra|length),
+ native_glibc_unattributed_external_symbol_names:$extra,
+ extra_symbol_original_caller_ownership_proven:false,
  native_glibc_resolved_udev_names:$g.original_browser_resolved_udev_symbol_names,
  native_glibc_provider_basenames:$g.original_browser_udev_provider_basenames,
  original_libxul_loaded_pid_traces_with_udev_bindings:$g.original_libxul_and_libudev_binding_same_trace_count,
