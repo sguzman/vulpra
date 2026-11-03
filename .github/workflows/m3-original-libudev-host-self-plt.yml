@@ -126,6 +126,14 @@ jobs:
               --slurpfile glibc "$3" --slurpfile abi "$4" \
               -f ci/m3-original-libudev-host-self-plt.jq
           }
+          # Ground the actual Arch relocation kind/version, rather than
+          # assuming Ubuntu and Arch builds emit the same JUMP_SLOT shape.
+          # Limit output to static ELF metadata; never emit raw browser logs.
+          echo 'M3_ARCH_LIBUDEV_RELOCATION_LINES_BEGIN'
+          grep -F 'udev_monitor_filter_update' "$elf/relocations.private.txt" | head -n 5 || true
+          echo 'M3_ARCH_LIBUDEV_SYMBOL_LINES_BEGIN'
+          grep -F 'udev_monitor_filter_update' "$elf/dynsym.private.txt" | head -n 5 || true
+          echo 'M3_ARCH_LIBUDEV_METADATA_END'
           audit "$elf/relocations.private.txt" "$elf/dynsym.private.txt" "$archive" "$abi" "$name" "$sha" > "$out"
           jq -e '
             .schema_version==1 and
