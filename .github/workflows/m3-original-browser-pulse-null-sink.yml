@@ -8,13 +8,12 @@
 # LD_PRELOAD modifies symbol resolution; no uninstrumented full FFI stack.
 # Source-pinned before/during browser proc-map crosswalk PASS: 41668827940;
 # no new mapped library basenames across phases, Pulse backing ELF already resident.
-# Four negative mutations rejected; retain manual-only expensive native workflow.
+# Four negative mutations rejected. Shared dual-mode WebDriver regression
+# reaccepted original instrumented workflow in CI 41715173756 (2 libxul
+# libpulse dlopen successes, pulse-rust null-sink playback, four map mutants).
+# Expensive native workflow restored manual-only.
 name: M3 Original Browser Pulse Null Sink
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-pulse-null-sink.yml
   workflow_dispatch:
 permissions:
   contents: read
