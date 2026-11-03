@@ -11,14 +11,11 @@ name: M3 Original Browser USB Backend No-Device Loader Probe
 # original browser provider and 15 source-matching / 1 unattributed symbol
 # accepted in CI 41692027881, four negative mutations rejected. Same
 # glibc libudev request/provider evidence and seven native negative tests
-# accepted in CI 41694350808. Manual-only expensive native workflow.
+# accepted in CI 41694350808. Original-browser mapped host ELF SHA and
+# independent Arch ELF byte-identity plus four negative mutations accepted
+# in native CI 41712441426; workflow lint 41712441350. Expensive
+# diagnostic is manual-only again.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-usb-nodevice-loader.yml
-      - ci/m3-original-browser-libudev-host-fingerprint.rs
-      - ci/m3-original-browser-libudev-hash-crosswalk.jq
   workflow_dispatch:
 permissions:
   contents: read
