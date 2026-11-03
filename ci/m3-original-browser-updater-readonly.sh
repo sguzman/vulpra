@@ -79,7 +79,7 @@ jq -e '.value==null or .value=="chrome"' <<<"$context" >/dev/null || exit 1
 # These XPCOM members have been individually checked against the immutable
 # original source. Do NOT request canApplyUpdates/canUsuallyApplyUpdates:
 # their supposedly read-only getter actually creates and removes test files.
-script='const S=ChromeUtils.importESModule("resource://gre/modules/Services.sys.mjs").Services;const stub=Components.classes["@mozilla.org/updates/update-service-stub;1"].getService(Components.interfaces.nsIApplicationUpdateServiceStub);const upd=Components.classes["@mozilla.org/updates/update-service;1"].getService(Components.interfaces.nsIApplicationUpdateService);return {prefTestingDisabled:S.prefs.getBoolPref("app.update.disabledForTesting",false),prefAuto:S.prefs.getBoolPref("app.update.auto",true),prefBackground:S.prefs.getBoolPref("app.update.background.enabled",true),prefStaging:S.prefs.getBoolPref("app.update.staging.enabled",true),stubTestingDisabled:stub.updateDisabledForTesting,stubDisabled:stub.updateDisabled,serviceDisabled:upd.disabled,usuallyCanCheck:upd.canUsuallyCheckForUpdates,idle:upd.currentState===Components.interfaces.nsIApplicationUpdateService.STATE_IDLE,stateName:upd.getStateName(upd.currentState)};'
+script='const result={};function safe(key,get){try{result[key]=get();}catch(e){result[key+"Error"]=String(e.name||"exception").slice(0,32);}};const stub=()=>Components.classes["@mozilla.org/updates/update-service-stub;1"].getService(Components.interfaces.nsIApplicationUpdateServiceStub);const upd=()=>Components.classes["@mozilla.org/updates/update-service;1"].getService(Components.interfaces.nsIApplicationUpdateService);safe("prefTestingDisabled",()=>ChromeUtils.importESModule("resource://gre/modules/Services.sys.mjs").Services.prefs.getBoolPref("app.update.disabledForTesting",false));safe("prefAuto",()=>ChromeUtils.importESModule("resource://gre/modules/Services.sys.mjs").Services.prefs.getBoolPref("app.update.auto",true));safe("prefBackground",()=>ChromeUtils.importESModule("resource://gre/modules/Services.sys.mjs").Services.prefs.getBoolPref("app.update.background.enabled",true));safe("prefStaging",()=>ChromeUtils.importESModule("resource://gre/modules/Services.sys.mjs").Services.prefs.getBoolPref("app.update.staging.enabled",true));safe("stubTestingDisabled",()=>stub().updateDisabledForTesting);safe("stubDisabled",()=>stub().updateDisabled);safe("serviceDisabled",()=>upd().disabled);safe("usuallyCanCheck",()=>upd().canUsuallyCheckForUpdates);safe("idle",()=>upd().currentState===Components.interfaces.nsIApplicationUpdateService.STATE_IDLE);safe("stateName",()=>upd().getStateName(upd().currentState));return result;'
 payload="$(jq -nc --arg script "$script" '{script:$script,args:[]}')"
 predicate='.value.prefTestingDisabled==true and
  .value.prefAuto==false and .value.prefBackground==false and
@@ -90,7 +90,14 @@ predicate='.value.prefTestingDisabled==true and
 echo "M3_UPDATE_STAGE=first_browser_readonly_query"
 first="$(api POST "/session/$session/execute/sync" "$payload")"
 jq -e "$predicate" <<<"$first" >/dev/null || {
-  echo 'Original browser did not return disabled/idle updater service' >&2; exit 1;
+  echo 'Original browser did not return disabled/idle updater service' >&2
+  # Emit only the explicitly named boolean flags and short exception types.
+  jq -c '.value|{prefTestingDisabled,prefAuto,prefBackground,prefStaging,
+     stubTestingDisabled,stubDisabled,serviceDisabled,usuallyCanCheck,idle,stateName,
+     stubTestingDisabledError,stubDisabledError,serviceDisabledError,
+     usuallyCanCheckError,idleError,stateNameError,
+     prefTestingDisabledError,prefAutoError,prefBackgroundError,prefStagingError}' <<<"$first" >&2 || true
+  exit 1
 }
 sleep 2
 echo "M3_UPDATE_STAGE=second_browser_readonly_query"
