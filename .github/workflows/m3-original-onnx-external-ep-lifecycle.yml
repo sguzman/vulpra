@@ -1,13 +1,8 @@
-# Transient push test for one source-pinned native lifecycle experiment.
-# After its evidence is inspected, restore this expensive workflow to manual-only.
+# Source-pinned, expensive manual-only native lifecycle regression.
+# Original runtime and one zero-device factory verified in run 41559011764;
+# not evidence of real accelerator use, GPU inference or full loader closure.
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-onnx-ep-factory-fixture.c
-      - ci/m3-original-onnx-ep-registration.c
-      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
   workflow_dispatch:
 permissions:
   contents: read
