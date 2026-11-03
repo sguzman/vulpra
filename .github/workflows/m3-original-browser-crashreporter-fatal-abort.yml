@@ -1,0 +1,187 @@
+# Exact original Vulpra, *disposable CI browser only*: test real parent
+# crash callback -> original packaged crashreporter exec, with no network.
+# This intentionally crashes one throwaway browser in a no-egress Arch
+# container, not an installed browser, real profile or user session.
+name: M3 Original Browser Fatal Abort to Crashreporter Exec
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-crashreporter-fatal-abort.yml
+      - ci/m3-original-browser-controlled-fatal-abort.sh
+      - ci/m3-original-browser-crashreporter-exec-witness.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-browser-fatal-abort-real-reporter:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout only the explicit disposable crash probe
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-controlled-fatal-abort.sh
+            ci/m3-original-browser-crashreporter-exec-witness.rs
+      - name: Checkout immutable original crash XPCOM and callback source
+        uses: actions/checkout@v4
+        with:
+          path: original-source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            xpcom/base/nsIDebug2.idl
+            toolkit/crashreporter/nsExceptionHandler.cpp
+            toolkit/crashreporter/client/app/src/main.rs
+      - name: Source-authenticate original crash contract and compile/test Rust observer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE_SHA"
+          bash -n diagnostics/ci/m3-original-browser-controlled-fatal-abort.sh
+          grep -Fq 'void abort(in string aFile,' original-source/xpcom/base/nsIDebug2.idl
+          grep -Fq 'void* context, bool succeeded)' original-source/toolkit/crashreporter/nsExceptionHandler.cpp || \
+            grep -Fq 'const phc::AddrInfo* addrInfo, bool succeeded)' original-source/toolkit/crashreporter/nsExceptionHandler.cpp
+          grep -Fq 'returnValue = LaunchProgram(crashReporterPath.c_str(), minidumpPath);' \
+            original-source/toolkit/crashreporter/nsExceptionHandler.cpp
+          grep -Fq '(void)execl(aProgramPath, aProgramPath, aMinidumpPath, nullptr);' \
+            original-source/toolkit/crashreporter/nsExceptionHandler.cpp
+          grep -Fq 'fn report_main()' original-source/toolkit/crashreporter/client/app/src/main.rs
+          rustc --edition=2021 -D warnings --test \
+            diagnostics/ci/m3-original-browser-crashreporter-exec-witness.rs \
+            -o "$RUNNER_TEMP/original-reporter-tests"
+          "$RUNNER_TEMP/original-reporter-tests"
+          rustc --edition=2021 -D warnings -O \
+            diagnostics/ci/m3-original-browser-crashreporter-exec-witness.rs \
+            -o "$RUNNER_TEMP/original-reporter-witness"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/reports"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          for name in vulpra crashhelper crashreporter; do
+            test -x "$RUNNER_TEMP/package/vulpra/$name"
+            test "$(head -c 4 "$RUNNER_TEMP/package/vulpra/$name" | od -An -tx1 | tr -d ' \n')" = 7f454c46
+          done
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/package/vulpra/application.ini"
+      - name: Build separate no-network Arch original-browser fatal-abort test image
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-original-reporter"
+          cat >"$RUNNER_TEMP/arch-original-reporter/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            bash coreutils curl jq grep findutils procps-ng util-linux \
+            iproute2 geckodriver gtk3 dbus-glib alsa-lib nss weston wayland-utils \
+            mesa libglvnd ttf-dejavu \
+            && command -v geckodriver && command -v setpriv \
+            && command -v weston && command -v wayland-info \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t m3-original-arch-reporter:ci \
+            "$RUNNER_TEMP/arch-original-reporter"
+      - name: Crash only disposable original browser and require original reporter executable
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          # NETWORK NONE and no real profiles. Brief root capabilities only to
+          # raise private loopback, dropped before browser/driver/Rust observer.
+          # No host X11, device passthrough, or desktop is mounted.
+          docker run --rm --network none --read-only --shm-size 256m \
+            --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
+            --security-opt no-new-privileges --pids-limit 512 --memory 4g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
+            -v "$RUNNER_TEMP/package/vulpra:/original:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-controlled-fatal-abort.sh:/audit/original-abort.sh:ro" \
+            -v "$RUNNER_TEMP/original-reporter-witness:/audit/crashreporter-witness:ro" \
+            -v "$RUNNER_TEMP/reports:/reports:rw" \
+            -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
+            -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
+            -e VULPRA_M3_DISPOSABLE_FATAL_ABORT=1 \
+            m3-original-arch-reporter:ci /bin/bash -c '
+              set -euo pipefail
+              ip link set lo up
+              exec setpriv --reuid "$CI_UID" --regid "$CI_GID" --clear-groups \
+                /bin/bash /audit/original-abort.sh /original/vulpra \
+                  /reports/m3-original-browser-crashreporter-exec.json
+            '
+          report="$RUNNER_TEMP/reports/m3-original-browser-crashreporter-exec.json"
+          jq -e --arg sha "$ARCHIVE_SHA" --arg src "$SOURCE_SHA" '
+            .schema_version==1 and
+            .status=="real_original_browser_fatal_abort_spawned_original_crashreporter" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .live_original_browser_seen_before_test_abort==true and
+            .private_explicit_fatal_abort_trigger_observed==true and
+            .real_original_browser_exited_after_abort==true and
+            .actual_packaged_reporter_executable_observed==true and
+            .original_reporter_single_minidump_argument_verified==true and
+            .original_reporter_samples>=1 and
+            .max_simultaneous_original_reporter_executables>=1 and
+            .post_trigger_process_scans>=1 and
+            .no_original_reporter_before_trigger==true and
+            .direct_browser_crashreporter_launch_callback_source_verified==true and
+            .crash_report_uploaded_or_submitted==false and
+            .crash_reporter_ui_success_proven==false and
+            .minidump_correctness_or_contents_examined==false and
+            .crashhelper_rendezvous_during_signal_proven==false and
+            .user_browser_or_profile_touched==false and
+            .network_egress_allowed==false and
+            .raw_minidumps_argv_pids_paths_or_profiles_exported==false and
+            .full_crash_or_updater_lifecycle_proven==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false' "$report" >/dev/null
+          verify() {
+            jq -e --arg sha "$ARCHIVE_SHA" --arg src "$SOURCE_SHA" '
+              .status=="real_original_browser_fatal_abort_spawned_original_crashreporter" and
+              .original_source_commit==$src and .original_archive_sha256==$sha and
+              .actual_packaged_reporter_executable_observed==true and
+              .original_reporter_single_minidump_argument_verified==true and
+              .real_original_browser_exited_after_abort==true and
+              .original_reporter_samples>=1 and
+              .network_egress_allowed==false and
+              .crash_report_uploaded_or_submitted==false and
+              .source_pruning_authorized==false
+            ' "$1" >/dev/null
+          }
+          for mutation in \
+            '.actual_packaged_reporter_executable_observed=false' \
+            '.original_reporter_single_minidump_argument_verified=false' \
+            '.real_original_browser_exited_after_abort=false' \
+            '.original_archive_sha256="false-archive"' \
+            '.network_egress_allowed=true' \
+            '.crash_report_uploaded_or_submitted=true'; do
+            jq "$mutation" "$report" >"$RUNNER_TEMP/reports/rejected-mutation.json"
+            if verify "$RUNNER_TEMP/reports/rejected-mutation.json" >/dev/null 2>&1; then
+              echo 'FAIL: fabricated crash-to-reporter evidence accepted' >&2; exit 1
+            fi
+          done
+          echo 'M3_ORIGINAL_REAL_FATAL_ABORT_TO_REPORTER_EXEC=PASS 6 tamper cases rejected'
+          rm -f -- "$RUNNER_TEMP/reports/rejected-mutation.json"
+      - name: Upload only sanitized original crash-to-reporter observation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-browser-fatal-abort-reporter-exec
+          path: ${{ runner.temp }}/reports/m3-original-browser-crashreporter-exec.json
+          if-no-files-found: warn
+          retention-days: 14
