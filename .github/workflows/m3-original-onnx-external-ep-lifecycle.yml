@@ -7,6 +7,15 @@
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
+  # TEMPORARY native test for mixed-node path; restore manual-only after pass.
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-onnx-ep-factory-fixture.c
+      - ci/m3-original-onnx-ep-compute.c
+      - ci/m3-original-onnx-ep-session.c
+      - ci/m3-original-onnx-ep-registration.c
+      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read
@@ -170,6 +179,28 @@ jobs:
           grep -Fxq 'M3_EP_STAGE=external_ep_numerical_result_1_5625' "$RUNNER_TEMP/m3-ep-native-compute.log"
           grep -Fxq 'M3_EP_CALLBACK=plugin_release_compute_infos' "$RUNNER_TEMP/m3-ep-native-compute.log"
           grep -Fxq 'M3_EP_STAGE=unregistration_succeeded' "$RUNNER_TEMP/m3-ep-native-compute.log"
+          # Single graph: external plugin Mul(x,z) followed by builtin CPU Add(mid,b).
+          if ! sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            VULPRA_CI_ONNX_EP_MIXED_COMPUTE=1 LD_LIBRARY_PATH="$pkg" \
+            MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 35s \
+            "$RUNNER_TEMP/original-ep-registration" "$pkg/libonnxruntime.so" \
+            "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" 2>&1 | \
+            tee "$RUNNER_TEMP/m3-ep-mixed-compute.log"; then
+            echo 'M3_EP_DIAGNOSTIC=mixed_compute_failed'
+            exit 1
+          fi
+          for marker in \
+            M3_EP_CALLBACK=plugin_declined_add \
+            M3_EP_CALLBACK=plugin_claimed_mul \
+            M3_EP_CALLBACK=plugin_compile_mul \
+            M3_EP_CALLBACK=plugin_compute_mul \
+            M3_EP_STAGE=mixed_native_cpu_numerical_result_3_5625 \
+            M3_EP_CALLBACK=plugin_release_compute_infos \
+            M3_EP_STAGE=mixed_ep_cpu_model_pass \
+            M3_EP_STAGE=unregistration_succeeded; do
+            grep -Fxq "$marker" "$RUNNER_TEMP/m3-ep-mixed-compute.log"
+          done
           jq -n --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
             '{schema_version:1, status:"source_pinned_original_external_ep_factory_lifecycle_pass",
               original_source_commit:$source, original_archive_sha256:$archive,
@@ -188,6 +219,9 @@ jobs:
               external_ep_compute_invoked:true,
               external_ep_expected_numeric_float:1.5625,
               external_ep_inference_executed:true,
+              mixed_external_mul_and_builtin_cpu_add_executed:true,
+              mixed_graph_result_float32:3.5625,
+              mixed_cpu_add_not_claimed_by_external_ep:true,
               external_ep_test_scope:"single_float32_1_element_cpu_mul",
               actual_model_executed:true,
               original_library_registration_succeeded:true,

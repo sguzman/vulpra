@@ -13,6 +13,8 @@ int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
                                   const OrtEpDevice *device);
 int m3_probe_external_ep_compute_session(const OrtApi *api, OrtEnv *env,
                                          const OrtEpDevice *device);
+int m3_probe_mixed_ep_cpu_session(const OrtApi *api, OrtEnv *env,
+                                  const OrtEpDevice *device);
 
 #if ORT_API_VERSION != 30
 #error "This probe requires exactly ORT C API v30"
@@ -90,7 +92,9 @@ int main(int argc, char **argv) {
   int run_cpu_fallback = session_mode != NULL && strcmp(session_mode, "1") == 0;
   const char *compute_mode = getenv("VULPRA_CI_ONNX_EP_NATIVE_COMPUTE");
   int run_native_compute = compute_mode != NULL && strcmp(compute_mode, "1") == 0;
-  if (run_cpu_fallback || run_native_compute ||
+  const char *mixed_mode = getenv("VULPRA_CI_ONNX_EP_MIXED_COMPUTE");
+  int run_mixed_compute = mixed_mode != NULL && strcmp(mixed_mode, "1") == 0;
+  if (run_cpu_fallback || run_native_compute || run_mixed_compute ||
       (device_mode != NULL && strcmp(device_mode, "1") == 0)) {
     const OrtEpDevice *const *ep_devices = NULL;
     size_t ep_count = 0;
@@ -131,13 +135,17 @@ int main(int argc, char **argv) {
       return 8;
     }
     puts("M3_EP_STAGE=cpu_ep_device_enumerated"); fflush(stdout);
-    if (run_cpu_fallback || run_native_compute) {
-      int result = run_native_compute
-                       ? m3_probe_external_ep_compute_session(api, env, matched_device)
-                       : m3_probe_cpu_fallback_session(api, env, matched_device);
+    if (run_cpu_fallback || run_native_compute || run_mixed_compute) {
+      int result = run_mixed_compute
+                       ? m3_probe_mixed_ep_cpu_session(api, env, matched_device)
+                       : (run_native_compute
+                          ? m3_probe_external_ep_compute_session(api, env, matched_device)
+                          : m3_probe_cpu_fallback_session(api, env, matched_device));
       if (result != 0) {
-        fputs(run_native_compute ? "M3_EP_ERROR_STAGE=native_compute_session\n"
-                                 : "M3_EP_ERROR_STAGE=cpu_fallback_session\n", stderr);
+        fputs(run_mixed_compute ? "M3_EP_ERROR_STAGE=mixed_compute_session\n"
+                                : (run_native_compute
+                                   ? "M3_EP_ERROR_STAGE=native_compute_session\n"
+                                   : "M3_EP_ERROR_STAGE=cpu_fallback_session\n"), stderr);
         OrtStatus *cleanup = api->UnregisterExecutionProviderLibrary(
             env, "vulpra-ci-fixture");
         if (cleanup != NULL) api->ReleaseStatus(cleanup);
@@ -145,8 +153,9 @@ int main(int argc, char **argv) {
         dlclose(handle);
         return 9;
       }
-      puts(run_native_compute ? "M3_EP_STAGE=external_ep_model_pass"
-                              : "M3_EP_STAGE=cpu_fallback_model_pass");
+      puts(run_mixed_compute ? "M3_EP_STAGE=mixed_ep_cpu_model_pass"
+                              : (run_native_compute ? "M3_EP_STAGE=external_ep_model_pass"
+                                                    : "M3_EP_STAGE=cpu_fallback_model_pass"));
       fflush(stdout);
     }
   }

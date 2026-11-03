@@ -246,8 +246,10 @@ M3_EXPORT OrtStatus *CreateEpFactories(
   enable_ci_cpu_fallback_session =
       session_mode != NULL && strcmp(session_mode, "1") == 0;
   const char *compute_mode = getenv("VULPRA_CI_ONNX_EP_NATIVE_COMPUTE");
+  const char *mixed_mode = getenv("VULPRA_CI_ONNX_EP_MIXED_COMPUTE");
   enable_ci_native_compute =
-      compute_mode != NULL && strcmp(compute_mode, "1") == 0;
+      (compute_mode != NULL && strcmp(compute_mode, "1") == 0) ||
+      (mixed_mode != NULL && strcmp(mixed_mode, "1") == 0);
   enumerate_ci_cpu_device =
       (device_mode != NULL && strcmp(device_mode, "1") == 0) ||
       enable_ci_cpu_fallback_session || enable_ci_native_compute;

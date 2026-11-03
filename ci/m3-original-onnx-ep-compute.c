@@ -30,20 +30,35 @@ OrtStatus *m3_ci_compute_get_capability(const OrtApi *api,
   size_t count = 0;
   OrtStatus *st = api->Graph_GetNumNodes(graph, &count);
   if (st != NULL) return st;
-  if (count != 1) return NULL; // Do not claim partial or unknown graphs.
-  const OrtNode *node = NULL;
-  st = api->Graph_GetNodes(graph, &node, 1);
+  // Claim just Mul in the two-node mixed graph; Add remains for builtin CPU.
+  if (count == 0 || count > 2) return NULL;
+  const OrtNode *nodes[2] = {NULL, NULL};
+  st = api->Graph_GetNodes(graph, nodes, count);
   if (st != NULL) return st;
-  const char *op = NULL, *domain = NULL;
-  st = api->Node_GetOperatorType(node, &op);
-  if (st != NULL) return st;
-  st = api->Node_GetDomain(node, &domain);
-  if (st != NULL) return st;
-  if (op == NULL || strcmp(op, "Mul") != 0 ||
-      (domain != NULL && domain[0] != '\0')) {
-    return NULL;
+  const OrtNode *mul = NULL;
+  size_t add_count = 0;
+  for (size_t i = 0; i < count; ++i) {
+    if (nodes[i] == NULL) return ci_status(ORT_FAIL, "null graph node");
+    const char *op = NULL, *domain = NULL;
+    st = api->Node_GetOperatorType(nodes[i], &op);
+    if (st != NULL) return st;
+    st = api->Node_GetDomain(nodes[i], &domain);
+    if (st != NULL) return st;
+    if (op == NULL || (domain != NULL && domain[0] != '\0')) return NULL;
+    if (strcmp(op, "Mul") == 0) {
+      if (mul != NULL) return NULL; // Do not claim duplicate Mul nodes.
+      mul = nodes[i];
+    } else if (strcmp(op, "Add") == 0) {
+      ++add_count;
+    } else {
+      return NULL;
+    }
   }
-  const OrtNode *selected[1] = {node};
+  if (mul == NULL || add_count != count - 1) return NULL;
+  if (add_count == 1) {
+    fputs("M3_EP_CALLBACK=plugin_declined_add\n", stderr); fflush(stderr);
+  }
+  const OrtNode *selected[1] = {mul};
   st = ep_api->EpGraphSupportInfo_AddNodesToFuse(support, selected, 1, NULL);
   if (st == NULL) {
     fputs("M3_EP_CALLBACK=plugin_claimed_mul\n", stderr); fflush(stderr);
