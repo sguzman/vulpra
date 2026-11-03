@@ -44,7 +44,7 @@ jobs:
             -DM3_EP_FIXTURE_SELFTEST ci/m3-original-onnx-ep-factory-fixture.c \
             -o "$RUNNER_TEMP/factory-selftest"
           "$RUNNER_TEMP/factory-selftest"
-          cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -fno-omit-frame-pointer \
+          cc -std=c11 -g -O0 -Wall -Wextra -Werror -fPIC -fno-omit-frame-pointer \
             -fvisibility=hidden -shared -I"$RUNNER_TEMP" \
             ci/m3-original-onnx-ep-factory-fixture.c \
             -o "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so"
@@ -52,7 +52,7 @@ jobs:
             grep -Eq ' CreateEpFactories$'
           nm -D --defined-only "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" |
             grep -Eq ' ReleaseEpFactory$'
-          cc -std=c11 -O2 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
+          cc -std=c11 -g -O0 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
             ci/m3-original-onnx-ep-registration.c \
             -o "$RUNNER_TEMP/original-ep-registration" -ldl
       - name: Authenticate source-pinned original full-native package
@@ -80,12 +80,28 @@ jobs:
           set -euo pipefail
           ulimit -c 0
           pkg="$RUNNER_TEMP/package/vulpra"
-          sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+          if ! sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
             LD_LIBRARY_PATH="$pkg" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             timeout --signal=TERM --kill-after=3s 35s \
             "$RUNNER_TEMP/original-ep-registration" "$pkg/libonnxruntime.so" \
             "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" 2>&1 |
-            tee "$RUNNER_TEMP/m3-ep-lifecycle.log"
+            tee "$RUNNER_TEMP/m3-ep-lifecycle.log"; then
+            echo 'M3_EP_DIAGNOSTIC=registration_failed'
+            if command -v gdb >/dev/null 2>&1; then
+              sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+                LD_LIBRARY_PATH="$pkg" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+                timeout --signal=TERM --kill-after=3s 35s \
+                gdb --batch --quiet --nx \
+                  -ex 'set pagination off' -ex 'set print frame-arguments none' \
+                  -ex 'run' -ex 'bt 15' --args \
+                  "$RUNNER_TEMP/original-ep-registration" "$pkg/libonnxruntime.so" \
+                  "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" 2>&1 |
+                  tail -n 90 || true
+            else
+              echo 'M3_EP_DIAGNOSTIC=gdb_unavailable'
+            fi
+            exit 1
+          fi
           grep -Fxq 'M3_EP_CALLBACK=factory_created' "$RUNNER_TEMP/m3-ep-lifecycle.log"
           grep -Fxq 'M3_EP_CALLBACK=factory_released' "$RUNNER_TEMP/m3-ep-lifecycle.log"
           grep -Fxq 'M3_EP_STAGE=registration_succeeded' "$RUNNER_TEMP/m3-ep-lifecycle.log"
