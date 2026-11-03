@@ -1,10 +1,10 @@
-# Compare a current isolated Arch libudev ELF's internal PLT relocation
+# Compare a current isolated Arch libudev ELF's GLOB_DAT self-reference relocation
 # with independently source-pinned Vulpra original-browser glibc trace.
 # A matched backing filename is NOT an identical ELF SHA across CI runs.
 def check($v;$message): if $v then . else error($message) end;
 def ishash: type=="string" and test("^[0-9a-f]{64}$");
 ($glibc[0]) as $g | ($abi[0]) as $a |
-($relocs | split("\n") | map(select(contains("udev_monitor_filter_update") and contains("R_X86_64_JUMP_SLOT")))) as $r |
+($relocs | split("\n") | map(select(contains("udev_monitor_filter_update") and contains("R_X86_64_GLOB_DAT")))) as $r |
 ($dynsym | split("\n") | map(select(contains("udev_monitor_filter_update") and test("[[:space:]]FUNC[[:space:]]+GLOBAL[[:space:]]+DEFAULT[[:space:]]")))) as $s |
 check(
  $g.status=="original_browser_source_pinned_glibc_no_preload_udev_binding_reconciled" and
@@ -27,18 +27,18 @@ check(
 check(
  $arch_backing_name=="libudev.so.1.7.15" and ($arch_elf_sha256|ishash) and
  ($r|length)==1 and ($s|length)==1 and
- ($r[0]|test("^[[:space:]]*[0-9a-fA-F]+[[:space:]]+[0-9a-fA-F]+[[:space:]]+R_X86_64_JUMP_SLOT[[:space:]]+[0-9a-fA-F]+[[:space:]]+udev_monitor_filter_update@@LIBUDEV_183[[:space:]]+\\+[[:space:]]+0[[:space:]]*$")) and
+ ($r[0]|test("^[[:space:]]*[0-9a-fA-F]+[[:space:]]+[0-9a-fA-F]+[[:space:]]+R_X86_64_GLOB_DAT[[:space:]]+[0-9a-fA-F]+[[:space:]]+udev_monitor_filter_update@@LIBUDEV_183[[:space:]]+\\+[[:space:]]+0[[:space:]]*$")) and
  ($s[0]|test("^[[:space:]]*[0-9]+:[[:space:]]+[0-9a-fA-F]+[[:space:]]+[0-9]+[[:space:]]+FUNC[[:space:]]+GLOBAL[[:space:]]+DEFAULT[[:space:]]+[0-9]+[[:space:]]+udev_monitor_filter_update@@LIBUDEV_183[[:space:]]*$"));
- "isolated Arch ELF self-PLT relocation or versioned global export missing") |
+ "isolated Arch ELF self GLOB_DAT relocation or versioned global export missing") |
 ($r[0]|capture("^[[:space:]]*(?<offset>[0-9a-fA-F]+)[[:space:]]+")) as $slot |
 {
  schema_version:1,
- status:"arch_libudev_internal_versioned_plt_self_binding_correlated_with_original_vulpra_runtime",
+ status:"arch_libudev_versioned_glob_dat_self_relocation_correlated_with_original_vulpra_runtime",
  original_source_commit:$source,
  original_browser_archive_sha256:$archive,
  compared_arch_host_elf_backing_name:$arch_backing_name,
  compared_arch_host_elf_sha256:$arch_elf_sha256,
- host_relocation_kind:"R_X86_64_JUMP_SLOT",
+ host_relocation_kind:"R_X86_64_GLOB_DAT",
  host_relocation_symbol:"udev_monitor_filter_update",
  host_relocation_version:"LIBUDEV_183",
  host_relocation_offset_hex:("0x"+$slot.offset),
