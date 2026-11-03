@@ -100,6 +100,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/shim"
           # Shell variables are expanded inside the disposable container,
           # never in this GitHub runner; packaged launcher stays unchanged.
+          # shellcheck disable=SC2016
           printf '%s\n' \
             '#!/usr/bin/env bash' \
             'set -euo pipefail' \
