@@ -136,7 +136,7 @@ jobs:
             .exact_synthetic_localhost_only_payload==true and
             .local_synthetic_payload_not_deleted==true and
             .original_browser_remained_responsive==true and
-            .normal_telemetry_upload_and_policy_disabled==true and
+            .actual_upload_permission_disabled==true and
             .real_telemetry_submission_proven==false and
             .private_network_has_no_egress==true and
             .original_installation_read_only==true and
@@ -159,7 +159,7 @@ jobs:
               .native_original_elf_loader_witness.actual_original_packaged_pingsender_executable_loaded==true and
               .native_original_elf_loader_witness.exact_synthetic_localhost_only_argv==true and
               .local_synthetic_payload_not_deleted==true and
-              .normal_telemetry_upload_and_policy_disabled==true and
+              .actual_upload_permission_disabled==true and
               .real_telemetry_submission_proven==false and
               .original_installation_read_only==true and
               .source_pruning_authorized==false
@@ -171,7 +171,7 @@ jobs:
             '.native_original_elf_loader_witness.actual_original_packaged_pingsender_executable_loaded=false' \
             '.native_original_elf_loader_witness.exact_synthetic_localhost_only_argv=false' \
             '.local_synthetic_payload_not_deleted=false' \
-            '.normal_telemetry_upload_and_policy_disabled=false' \
+            '.actual_upload_permission_disabled=false' \
             '.real_telemetry_submission_proven=true' \
             '.original_installation_read_only=false' \
             '.original_archive_sha256="forged"' \
