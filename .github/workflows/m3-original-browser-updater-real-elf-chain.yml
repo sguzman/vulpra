@@ -1,0 +1,248 @@
+# Real uninterrupted ORIGINAL compiled browser -> packaged updater ELF.
+# Synthetic status "pending" and missing MAR, separate writable fixture and
+# empty staged destination only; original package RO; network NONE.
+# CI-only Rust LD_PRELOAD interposer forwards exact original-browser execv
+# and ELF constructor proves the real original updater loader ran under the
+# original browser process with unchanged kernel command-line. No install.
+name: M3 Original Browser To Actual Updater Missing MAR
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-updater-real-elf-chain.yml
+      - ci/m3-original-browser-updater-execv-forward-guard.rs
+      - ci/m3-original-browser-updater-real-elf-chain.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-browser-to-updater-execv-denied:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      ORIGINAL_RUN: '40997075527'
+    steps:
+      - name: Checkout disposable original-browser actual updater-chain fixture
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-updater-execv-forward-guard.rs
+            ci/m3-original-browser-updater-real-elf-chain.sh
+      - name: Checkout immutable original C++ staging and Linux update root source
+        uses: actions/checkout@v4
+        with:
+          path: original-source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/xre/nsUpdateDriver.cpp
+            toolkit/xre/nsUpdateDriver.h
+            toolkit/xre/nsXREDirProvider.cpp
+            toolkit/mozapps/update/nsIUpdateService.idl
+            toolkit/mozapps/update/UpdateService.sys.mjs
+            toolkit/mozapps/update/updater/updater.cpp
+            toolkit/mozapps/update/updater/archivereader.cpp
+            toolkit/mozapps/update/common/updatererrors.h
+      - name: Authenticate source and source-pinned executable and forward-only staging guard
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE"
+          bash -n diagnostics/ci/m3-original-browser-updater-real-elf-chain.sh
+          grep -Fq 'GetFile(dir, "update.version"_ns, result)' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'GetFile(dir, "update.status"_ns, result)' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'const char kNull[] = "null";' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'const char kPending[] = "pending";' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'ApplyUpdate(greDir, updatesDir, appDir, argc, argv, restart, false, pid);' \
+            original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'pid.AssignLiteral("-1");' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'argv[1] = const_cast<char*>("3");' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'argv[5] = const_cast<char*>("first");' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq '*outpid = fork();' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'int execResult = execv(updaterPath.get(), argv);' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'return NS_NewNamedThread("UpdateProcessor"' original-source/toolkit/xre/nsUpdateDriver.cpp
+          grep -Fq 'rv = GetUpdateRootDir(getter_AddRefs(file));' original-source/toolkit/xre/nsXREDirProvider.cpp
+          grep -Fq 'rv = appFile->GetParent(getter_AddRefs(updRoot));' original-source/toolkit/xre/nsXREDirProvider.cpp
+          grep -Fq 'void processUpdate();' original-source/toolkit/mozapps/update/nsIUpdateService.idl
+          grep -Fq 'createInstance(Ci.nsIUpdateProcessor)' original-source/toolkit/mozapps/update/UpdateService.sys.mjs
+          grep -Fq '#define READ_ERROR 6' original-source/toolkit/mozapps/update/common/updatererrors.h
+          grep -Fq 'rv = gArchiveReader.Open(dataFile);' original-source/toolkit/mozapps/update/updater/updater.cpp
+          grep -Fq 'mar_open(path, &mArchive)' original-source/toolkit/mozapps/update/updater/archivereader.cpp
+          grep -Fq 'WriteStatusFile(rv);' original-source/toolkit/mozapps/update/updater/updater.cpp
+          rustc --edition=2021 -D warnings --test \
+            diagnostics/ci/m3-original-browser-updater-execv-forward-guard.rs \
+            -o "$RUNNER_TEMP/forward-tests"
+          "$RUNNER_TEMP/forward-tests"
+          rustc --edition=2021 -D warnings -C opt-level=2 --crate-type cdylib \
+            diagnostics/ci/m3-original-browser-updater-execv-forward-guard.rs \
+            -o "$RUNNER_TEMP/original-updater-execv-forward.so"
+          test -s "$RUNNER_TEMP/original-updater-execv-forward.so"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
+            jq -e --arg sha "$SOURCE" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/reports"
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          for name in vulpra updater; do
+            test -x "$RUNNER_TEMP/package/vulpra/$name"
+            test "$(head -c 4 "$RUNNER_TEMP/package/vulpra/$name" | od -An -tx1 | tr -d ' \n')" = 7f454c46
+          done
+          sha256sum "$RUNNER_TEMP/package/vulpra/vulpra" "$RUNNER_TEMP/package/vulpra/updater" \
+            >"$RUNNER_TEMP/original-native-file-hashes.before"
+          # This EXTRA empty mountpoint is not in the original archive. The
+          # actual original ELF files remain byte-for-byte the same.
+          mkdir -p "$RUNNER_TEMP/package/vulpra/updates" "$RUNNER_TEMP/fixture/updates"
+          test ! -e "$RUNNER_TEMP/package/vulpra/updated"
+          test ! -e "$RUNNER_TEMP/fixture/updates/0"
+      - name: Build disposable original browser + original updater runtime
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          # Separate empty writable mounts are never part of the original
+          # precompiled package; they are only disposable update fixtures.
+          mkdir -p "$RUNNER_TEMP/package/vulpra/updated" \
+            "$RUNNER_TEMP/fixture/updated" \
+            "$RUNNER_TEMP/fixture/updates" \
+            "$RUNNER_TEMP/arch-updater-real-chain"
+          test -z "$(find "$RUNNER_TEMP/fixture/updated" -mindepth 1 -print -quit)"
+          test ! -e "$RUNNER_TEMP/fixture/updates/0"
+          cat >"$RUNNER_TEMP/arch-updater-real-chain/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            bash coreutils curl jq grep findutils procps-ng util-linux \
+            iproute2 geckodriver gtk3 dbus-glib alsa-lib nss \
+            weston wayland-utils mesa libglvnd ttf-dejavu \
+            && command -v geckodriver && command -v weston \
+            && command -v setpriv && command -v wayland-info \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t m3-original-updater-real-chain:ci \
+            "$RUNNER_TEMP/arch-updater-real-chain"
+      - name: Require original browser really executed original packaged updater and got missing MAR rejection
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          # Original binaries mounted read-only. Only nested /original/updates
+          # and /original/updated can be written. No update.mar exists or can
+          # be downloaded; no network and no user files or host devices.
+          docker run --rm --network none --read-only --shm-size 256m \
+            --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
+            --security-opt no-new-privileges --pids-limit 512 --memory 4g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
+            -v "$RUNNER_TEMP/package/vulpra:/original:ro" \
+            -v "$RUNNER_TEMP/fixture/updates:/original/updates:rw" \
+            -v "$RUNNER_TEMP/fixture/updated:/original/updated:rw" \
+            -v "$RUNNER_TEMP/original-updater-execv-forward.so:/audit/execv-forward.so:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-updater-real-elf-chain.sh:/audit/test.sh:ro" \
+            -v "$RUNNER_TEMP/reports:/reports:rw" \
+            -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
+            -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
+            -e VULPRA_M3_DISPOSABLE_UPDATER_EXECV_FORWARD=1 \
+            m3-original-updater-real-chain:ci /bin/bash -c '
+              set -euo pipefail
+              ip link set lo up
+              exec setpriv --reuid "$CI_UID" --regid "$CI_GID" \
+                --clear-groups /bin/bash /audit/test.sh \
+                /original/vulpra /reports/m3-original-browser-updater-real-elf-chain.json
+            '
+          (cd "$RUNNER_TEMP" && sha256sum -c original-native-file-hashes.before)
+          test ! -e "$RUNNER_TEMP/fixture/updates/0/update.mar"
+          test -z "$(find "$RUNNER_TEMP/fixture/updated" -mindepth 1 -print -quit)"
+          test "$(tr -d '\r\n' <"$RUNNER_TEMP/fixture/updates/0/update.status")" = 'failed: 6'
+          report="$RUNNER_TEMP/reports/m3-original-browser-updater-real-elf-chain.json"
+          jq -e --arg src "$SOURCE" --arg sha "$ARCHIVE" '
+            .schema_version==1 and
+            .status=="source_pinned_original_browser_to_actual_updater_executed_missing_mar" and
+            .source_commit==$src and .archive_sha256==$sha and
+            .original_browser_launched_directly_and_still_responsive==true and
+            .original_browser_update_root_is_exact_disposable_package==true and
+            .synthetic_pending_status_created_after_browser_start==true and
+            .original_update_processor_issued_from_live_browser==true and
+            .real_original_browser_native_execv_called==true and
+            .actual_updater_elf_loaded_with_original_browser_parent==true and
+            .actual_original_updater_executed_in_same_process_chain==true and
+            .actual_original_updater_status=="failed: 6" and
+            .original_updater_expected_read_error==6 and
+            .original_updater_missing_mar_failure_path_confirmed==true and
+            .missing_mar_still_absent==true and
+            .separate_writable_staging_fixture_remained_empty==true and
+            .original_binary_installation_read_only==true and
+            .private_container_network_disabled==true and
+            .no_real_browser_profile_or_hardware_touched==true and
+            .browser_to_updater_interposer_allows_only_exact_staging_command==true and
+            .no_mar_download_or_install_attempted==true and
+            .normal_update_success_or_mar_signature_validation_proven==false and
+            .normal_auto_update_workflow_proven==false and
+            .production_browser_loader_or_dependency_closure_proven==false and
+            .native_execv_witness.status=="authentic_original_browser_staging_execv_forwarded" and
+            .native_execv_witness.caller_original_browser==true and
+            .native_execv_witness.exact_original_updater_path==true and
+            .native_execv_witness.source_declared_seven_argument_stage_shape==true and
+            .native_execv_witness.test_only_missing_mar_confirmed==true and
+            .native_execv_witness.forward_to_libc_execve_attempted==true and
+            .native_real_updater_loader_witness.status=="real_original_updater_elf_loaded_from_original_browser_parent" and
+            .native_real_updater_loader_witness.actual_proc_exe_is_original_packaged_updater==true and
+            .native_real_updater_loader_witness.kernel_arg_vector_matches_original_source==true and
+            .native_real_updater_loader_witness.parent_proc_exe_is_original_browser==true and
+            .native_real_updater_loader_witness.updater_loader_initialized_after_actual_exec==true and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false
+          ' "$report" >/dev/null
+          verify() {
+            jq -e --arg src "$SOURCE" --arg sha "$ARCHIVE" '
+              .source_commit==$src and .archive_sha256==$sha and
+              .actual_original_updater_executed_in_same_process_chain==true and
+              .actual_original_updater_status=="failed: 6" and
+              .native_execv_witness.source_declared_seven_argument_stage_shape==true and
+              .native_execv_witness.caller_original_browser==true and
+              .native_real_updater_loader_witness.actual_proc_exe_is_original_packaged_updater==true and
+              .native_real_updater_loader_witness.parent_proc_exe_is_original_browser==true and
+              .native_real_updater_loader_witness.kernel_arg_vector_matches_original_source==true and
+              .missing_mar_still_absent==true and
+              .original_binary_installation_read_only==true and
+              .source_pruning_authorized==false
+            ' "$1" >/dev/null
+          }
+          for mutation in \
+            '.actual_original_updater_executed_in_same_process_chain=false' \
+            '.actual_original_updater_status="succeeded"' \
+            '.actual_original_updater_status="failed: 20"' \
+            '.native_execv_witness.source_declared_seven_argument_stage_shape=false' \
+            '.native_execv_witness.caller_original_browser=false' \
+            '.native_real_updater_loader_witness.actual_proc_exe_is_original_packaged_updater=false' \
+            '.native_real_updater_loader_witness.parent_proc_exe_is_original_browser=false' \
+            '.native_real_updater_loader_witness.kernel_arg_vector_matches_original_source=false' \
+            '.missing_mar_still_absent=false' \
+            '.original_binary_installation_read_only=false' \
+            '.archive_sha256="forged"' \
+            '.source_pruning_authorized=true'; do
+            jq "$mutation" "$report" >"$RUNNER_TEMP/reports/forged.json"
+            if verify "$RUNNER_TEMP/reports/forged.json"; then
+              echo 'FAIL: forged original browser-to-updater evidence accepted' >&2; exit 1
+            fi
+          done
+          rm -f "$RUNNER_TEMP/reports/forged.json"
+          echo 'M3_ORIGINAL_REAL_BROWSER_UPDATER_CHAIN=PASS actual original updater ELF loaded from original browser parent, failed:6, 12 fabricated summaries rejected'
+      - name: Upload sanitized original-browser updater real-exec failure chain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-browser-updater-real-elf-chain
+          path: ${{ runner.temp }}/reports/m3-original-browser-updater-real-elf-chain.json
+          if-no-files-found: warn
+          retention-days: 14
