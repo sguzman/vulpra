@@ -6,6 +6,15 @@
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
+  # TEMPORARY, original-runtime validation only; return to manual-only on pass.
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-onnx-ep-factory-fixture.c
+      - ci/m3-original-onnx-ep-compute.c
+      - ci/m3-original-onnx-ep-session.c
+      - ci/m3-original-onnx-ep-registration.c
+      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read
@@ -28,6 +37,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-original-onnx-ep-factory-fixture.c
+            ci/m3-original-onnx-ep-compute.c
             ci/m3-original-onnx-ep-registration.c
             ci/m3-original-onnx-ep-session.c
       - name: Pin upstream v30 headers and verify test fixture ABI
@@ -48,11 +58,13 @@ jobs:
           test "$(git hash-object "$RUNNER_TEMP/onnxruntime_error_code.h")" = "$ERROR_HEADER_BLOB"
           cc -std=c11 -O2 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
             -DM3_EP_FIXTURE_SELFTEST ci/m3-original-onnx-ep-factory-fixture.c \
+            ci/m3-original-onnx-ep-compute.c \
             -o "$RUNNER_TEMP/factory-selftest"
           "$RUNNER_TEMP/factory-selftest"
           cc -std=c11 -g -O0 -Wall -Wextra -Werror -fPIC -fno-omit-frame-pointer \
             -fvisibility=hidden -shared -I"$RUNNER_TEMP" \
             ci/m3-original-onnx-ep-factory-fixture.c \
+            ci/m3-original-onnx-ep-compute.c \
             -o "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so"
           nm -D --defined-only "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" |
             grep -Eq ' CreateEpFactories$'
@@ -149,6 +161,23 @@ jobs:
           grep -Fxq 'M3_EP_STAGE=cpu_fallback_numerical_result_1_25' "$RUNNER_TEMP/m3-ep-cpu-fallback.log"
           grep -Fxq 'M3_EP_CALLBACK=release_ep' "$RUNNER_TEMP/m3-ep-cpu-fallback.log"
           grep -Fxq 'M3_EP_STAGE=unregistration_succeeded' "$RUNNER_TEMP/m3-ep-cpu-fallback.log"
+          # Opt-in actual external-provider computation, not CPU fallback.
+          if ! sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            VULPRA_CI_ONNX_EP_NATIVE_COMPUTE=1 LD_LIBRARY_PATH="$pkg" \
+            MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 35s \
+            "$RUNNER_TEMP/original-ep-registration" "$pkg/libonnxruntime.so" \
+            "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" 2>&1 | \
+            tee "$RUNNER_TEMP/m3-ep-native-compute.log"; then
+            echo 'M3_EP_DIAGNOSTIC=native_compute_failed'
+            exit 1
+          fi
+          grep -Fxq 'M3_EP_CALLBACK=plugin_claimed_mul' "$RUNNER_TEMP/m3-ep-native-compute.log"
+          grep -Fxq 'M3_EP_CALLBACK=plugin_compile_mul' "$RUNNER_TEMP/m3-ep-native-compute.log"
+          grep -Fxq 'M3_EP_CALLBACK=plugin_compute_mul' "$RUNNER_TEMP/m3-ep-native-compute.log"
+          grep -Fxq 'M3_EP_STAGE=external_ep_numerical_result_1_5625' "$RUNNER_TEMP/m3-ep-native-compute.log"
+          grep -Fxq 'M3_EP_CALLBACK=plugin_release_compute_infos' "$RUNNER_TEMP/m3-ep-native-compute.log"
+          grep -Fxq 'M3_EP_STAGE=unregistration_succeeded' "$RUNNER_TEMP/m3-ep-native-compute.log"
           jq -n --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
             '{schema_version:1, status:"source_pinned_original_external_ep_factory_lifecycle_pass",
               original_source_commit:$source, original_archive_sha256:$archive,
@@ -161,7 +190,12 @@ jobs:
               capability_query_declined_all_nodes:true,
               model_executed_on_builtin_cpu_fallback:true,
               expected_numeric_float:1.25,
-              external_ep_claimed_nodes:0, external_ep_inference_executed:false,
+              fallback_external_ep_claimed_nodes:0,
+              external_ep_claimed_mul_node:true,
+              external_ep_compile_invoked:true,
+              external_ep_compute_invoked:true,
+              external_ep_expected_numeric_float:1.5625,
+              external_ep_inference_executed:true,
               actual_model_executed:true,
               original_library_registration_succeeded:true,
               original_library_unregistration_succeeded:true,

@@ -16,6 +16,14 @@ static const OrtApi *runtime_api;
 static const OrtEpApi *runtime_ep_api;
 static int enumerate_ci_cpu_device;
 static int enable_ci_cpu_fallback_session;
+static int enable_ci_native_compute;
+
+OrtStatus *m3_ci_compute_get_capability(const OrtApi *, const OrtEpApi *,
+                                        const OrtGraph *, OrtEpGraphSupportInfo *);
+OrtStatus *ORT_API_CALL m3_ci_compute_compile(OrtEp *, const OrtGraph **,
+    const OrtNode **, size_t, OrtNodeComputeInfo **, OrtNode **);
+void ORT_API_CALL m3_ci_compute_release_infos(OrtEp *, OrtNodeComputeInfo **,
+                                               size_t);
 static const char provider_name[] = "VulpraCIProbeEP";
 static const char vendor_name[] = "Vulpra CI fixture";
 static const char fixture_version[] = "0.0.1";
@@ -96,7 +104,7 @@ static OrtStatus *ORT_API_CALL get_supported_devices(
   return runtime_api->CreateStatus(ORT_FAIL, "No discovered CPU hardware device");
 }
 
-// Session-only fixture: it declines every graph node, leaving inference to ORT CPU.
+// Session fixture: fallback declines all nodes; opt-in compute claims one Mul.
 static const char *ORT_API_CALL ep_get_name(const OrtEp *ep) {
   (void)ep;
   return provider_name;
@@ -105,13 +113,16 @@ static const char *ORT_API_CALL ep_get_name(const OrtEp *ep) {
 static OrtStatus *ORT_API_CALL ep_get_capability(
     OrtEp *ep, const OrtGraph *graph, OrtEpGraphSupportInfo *support) {
   (void)ep;
+  if (enable_ci_native_compute) {
+    return m3_ci_compute_get_capability(runtime_api, runtime_ep_api, graph, support);
+  }
   (void)graph;
-  (void)support;  // No node grouping added: this EP executes nothing.
+  (void)support;  // CPU fallback mode does not claim anything.
   fputs("M3_EP_CALLBACK=get_capability_no_nodes\n", stderr); fflush(stderr);
   return NULL;
 }
 
-// Session mode exposes a non-executing OrtEp; other modes reject CreateEp.
+// Session modes expose either a non-executing fallback EP or a bounded scalar-Mul EP.
 static OrtStatus *ORT_API_CALL create_ep(
     OrtEpFactory *factory, const OrtHardwareDevice *const *devices,
     const OrtKeyValuePairs *const *metadata, size_t device_count,
@@ -127,7 +138,7 @@ static OrtStatus *ORT_API_CALL create_ep(
   if (ep != NULL) {
     *ep = NULL;
   }
-  if (!enable_ci_cpu_fallback_session || ep == NULL) {
+  if ((!enable_ci_cpu_fallback_session && !enable_ci_native_compute) || ep == NULL) {
     return runtime_api != NULL
                ? runtime_api->CreateStatus(ORT_NOT_IMPLEMENTED,
                                            "CI fixture does not execute models")
@@ -140,6 +151,10 @@ static OrtStatus *ORT_API_CALL create_ep(
   instance->ort_version_supported = ORT_API_VERSION;
   instance->GetName = ep_get_name;
   instance->GetCapability = ep_get_capability;
+  if (enable_ci_native_compute) {
+    instance->Compile = m3_ci_compute_compile;
+    instance->ReleaseNodeComputeInfos = m3_ci_compute_release_infos;
+  }
   *ep = instance;
   fputs("M3_EP_CALLBACK=session_ep_created\n", stderr); fflush(stderr);
   return NULL;
@@ -230,9 +245,12 @@ M3_EXPORT OrtStatus *CreateEpFactories(
   const char *session_mode = getenv("VULPRA_CI_ONNX_EP_CPU_FALLBACK");
   enable_ci_cpu_fallback_session =
       session_mode != NULL && strcmp(session_mode, "1") == 0;
+  const char *compute_mode = getenv("VULPRA_CI_ONNX_EP_NATIVE_COMPUTE");
+  enable_ci_native_compute =
+      compute_mode != NULL && strcmp(compute_mode, "1") == 0;
   enumerate_ci_cpu_device =
       (device_mode != NULL && strcmp(device_mode, "1") == 0) ||
-      enable_ci_cpu_fallback_session;
+      enable_ci_cpu_fallback_session || enable_ci_native_compute;
   runtime_ep_api = api30->GetEpApi != NULL ? api30->GetEpApi() : NULL;
   if (enumerate_ci_cpu_device && runtime_ep_api == NULL) {
     free(factory);

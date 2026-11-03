@@ -1,5 +1,5 @@
-// CI-only ONNX v30 external-EP session + built-in CPU fallback numerical test.
-// Builds a dynamic Identity(x)->y model in memory. No model files or network.
+// CI-only ONNX v30 external-EP session and numerical tests.
+// Builds runtime-input Identity (CPU fallback) or Mul (native external EP).
 #include "onnxruntime_c_api.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -48,11 +48,12 @@ static void field_sub(M3Buf *b, uint64_t field, const M3Buf *sub) {
   if (!sub->ok) { b->ok = 0; return; }
   field_bytes(b, field, sub->data, sub->len);
 }
-static M3Buf identity_model(void) {
+static M3Buf input_model(int plugin_mul) {
   M3Buf node = buf_new();
   field_bytes(&node, 1, "x", 1);
+  if (plugin_mul) field_bytes(&node, 1, "x", 1);
   field_bytes(&node, 2, "y", 1);
-  field_bytes(&node, 4, "Identity", 8);
+  field_bytes(&node, 4, plugin_mul ? "Mul" : "Identity", plugin_mul ? 3 : 8);
 
   M3Buf dim = buf_new(); field_var(&dim, 1, 1);
   M3Buf shape = buf_new(); field_sub(&shape, 1, &dim);
@@ -90,8 +91,8 @@ static int checked(const OrtApi *api, OrtStatus *status, const char *stage) {
   return 0;
 }
 
-int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
-                                  const OrtEpDevice *device) {
+static int m3_probe_session(const OrtApi *api, OrtEnv *env,
+                            const OrtEpDevice *device, int plugin_mul) {
   if (api == NULL || env == NULL || device == NULL) return 1;
   int ok = 0;
   OrtSessionOptions *opts = NULL;
@@ -109,7 +110,7 @@ int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
                    opts, env, selected, 1, NULL, NULL, 0), "append_fixture_ep"))
     goto done;
   puts("M3_EP_STAGE=external_ep_appended"); fflush(stdout);
-  M3Buf model = identity_model();
+  M3Buf model = input_model(plugin_mul);
   if (!model.ok || model.len < 45 || model.len > 512) {
     fputs("M3_EP_ERROR_STAGE=model_encoding\n", stderr);
     goto done;
@@ -132,7 +133,8 @@ int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
   const char *output_names[1] = {"y"};
   if (!checked(api, api->Run(session, NULL, input_names, input_values, 1,
                              output_names, 1, &output),
-               "cpu_fallback_run") || output == NULL) goto done;
+               plugin_mul ? "native_ep_run" : "cpu_fallback_run") ||
+      output == NULL) goto done;
   if (!checked(api, api->GetTensorTypeAndShape(output, &shape),
                "output_shape") || shape == NULL) goto done;
   ONNXTensorElementDataType type = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
@@ -148,11 +150,17 @@ int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
       ptr == NULL) goto done;
   float value = 0.0f;
   memcpy(&value, ptr, sizeof(value));
-  if (value != 1.25f) {
-    fprintf(stderr, "M3_EP_ERROR_STAGE=wrong_numeric_result value=%f\n", value);
+  float expected = plugin_mul ? 1.5625f : 1.25f;
+  if (value != expected) {
+    fprintf(stderr, "M3_EP_ERROR_STAGE=wrong_numeric_result value=%f expected=%f\n",
+            value, expected);
     goto done;
   }
-  puts("M3_EP_STAGE=cpu_fallback_numerical_result_1_25"); fflush(stdout);
+  if (plugin_mul) {
+    puts("M3_EP_STAGE=external_ep_numerical_result_1_5625"); fflush(stdout);
+  } else {
+    puts("M3_EP_STAGE=cpu_fallback_numerical_result_1_25"); fflush(stdout);
+  }
   ok = 1;
 done:
   if (shape != NULL) api->ReleaseTensorTypeAndShapeInfo(shape);
@@ -162,4 +170,14 @@ done:
   if (session != NULL) api->ReleaseSession(session);
   if (opts != NULL) api->ReleaseSessionOptions(opts);
   return ok ? 0 : 1;
+}
+
+int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
+                                  const OrtEpDevice *device) {
+  return m3_probe_session(api, env, device, 0);
+}
+
+int m3_probe_external_ep_compute_session(const OrtApi *api, OrtEnv *env,
+                                         const OrtEpDevice *device) {
+  return m3_probe_session(api, env, device, 1);
 }
