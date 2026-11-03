@@ -11,7 +11,8 @@
 __attribute__((constructor))
 static void m3_ep_loaded_marker(void) {
   static const char msg[] = "M3_EP_FIXTURE=loaded\n";
-  (void)write(2, msg, sizeof(msg) - 1);
+  ssize_t bytes_written = write(2, msg, sizeof(msg) - 1);
+  (void)bytes_written;
 }
 
 __attribute__((visibility("default")))
@@ -24,7 +25,8 @@ OrtStatus* CreateEpFactories(const char* registration_name,
                              size_t max_factories,
                              size_t* num_factories) {
   static const char msg[] = "M3_EP_FIXTURE=create_ep_factories_called\n";
-  (void)write(2, msg, sizeof(msg) - 1);
+  ssize_t bytes_written = write(2, msg, sizeof(msg) - 1);
+  (void)bytes_written;
   if (registration_name == 0 || base == 0 || factories == 0 ||
       max_factories == 0 || num_factories == 0 ||
       m3_ep_factory_call_count != 0) {
