@@ -2,6 +2,8 @@
 # staging args as verified in browser-owned native execv CI 41731162834.
 # Synthetic missing MAR only; private no-egress Arch, original install RO.
 # This is a DIRECT CI replay, NOT actual original browser launching updater.
+# Separate writable /original/updated staging fixture permits reaching the
+# original archive-open rejection, while source/package ELF remains read-only.
 name: M3 Original Updater Missing MAR Failure Replay
 on:
   push:
@@ -82,9 +84,10 @@ jobs:
           done
           grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/package/vulpra/application.ini"
           (cd "$RUNNER_TEMP" && sha256sum package/vulpra/vulpra package/vulpra/updater >original-native-ELF.sha256)
-          mkdir -p "$RUNNER_TEMP/package/vulpra/updates"
           test ! -e "$RUNNER_TEMP/package/vulpra/updated"
+          mkdir -p "$RUNNER_TEMP/package/vulpra/updates" "$RUNNER_TEMP/package/vulpra/updated" "$RUNNER_TEMP/fixture/updated"
           test ! -e "$RUNNER_TEMP/fixture/updates/0"
+          test -z "$(find "$RUNNER_TEMP/fixture/updated" -mindepth 1 -print -quit)"
       - name: Build disposable no-egress original updater native Linux runtime
         shell: bash
         timeout-minutes: 15
@@ -112,6 +115,7 @@ jobs:
             --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
             -v "$RUNNER_TEMP/package/vulpra:/original:ro" \
             -v "$RUNNER_TEMP/fixture/updates:/original/updates:rw" \
+            -v "$RUNNER_TEMP/fixture/updated:/original/updated:rw" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-updater-missing-mar-replay.sh:/audit/replay.sh:ro" \
             -v "$RUNNER_TEMP/reports:/reports:rw" \
             -e VULPRA_M3_DISPOSABLE_MISSING_MAR_REPLAY=1 \
@@ -119,7 +123,8 @@ jobs:
             m3-original-updater-no-mar:ci \
             /bin/bash /audit/replay.sh /reports/m3-original-updater-missing-mar-replay.json
           (cd "$RUNNER_TEMP" && sha256sum -c original-native-ELF.sha256)
-          test ! -e "$RUNNER_TEMP/package/vulpra/updated"
+          test -d "$RUNNER_TEMP/package/vulpra/updated"
+          test -z "$(find "$RUNNER_TEMP/fixture/updated" -mindepth 1 -print -quit)"
           test ! -e "$RUNNER_TEMP/fixture/updates/0/update.mar"
           test "$(tr -d '\r\n' <"$RUNNER_TEMP/fixture/updates/0/update.status")" = 'failed: 6'
           report="$RUNNER_TEMP/reports/m3-original-updater-missing-mar-replay.json"
@@ -136,7 +141,8 @@ jobs:
             .original_updater_open_missing_mar_failure_confirmed==true and
             .no_mar_payload_created_or_available==true and
             .original_install_read_only==true and
-            .original_staging_target_unwritable_and_absent==true and
+            .isolated_staging_target_separate_writable_mount==true and
+            .isolated_staging_target_remained_empty==true and
             .original_updater_error_status_written_in_disposable_fixture==true and
             .no_real_user_profile_or_device_accessed==true and
             .network_egress_allowed==false and
@@ -158,6 +164,7 @@ jobs:
               .actual_original_update_status=="failed: 6" and
               .no_mar_payload_created_or_available==true and
               .original_install_read_only==true and
+              .isolated_staging_target_remained_empty==true and
               .browser_controlled_actual_updater_exec_proven==false and
               .source_pruning_authorized==false
             ' "$1" >/dev/null
@@ -170,6 +177,7 @@ jobs:
             '.actual_original_update_status="failed: 20"' \
             '.no_mar_payload_created_or_available=false' \
             '.original_install_read_only=false' \
+            '.isolated_staging_target_remained_empty=false' \
             '.browser_controlled_actual_updater_exec_proven=true' \
             '.archive_sha256="fake"' \
             '.source_pruning_authorized=true'; do
@@ -180,7 +188,7 @@ jobs:
             fi
           done
           rm -f "$RUNNER_TEMP/reports/forged.json"
-          echo 'M3_ORIGINAL_MISSING_MAR_NATIVE=PASS exact source READ_ERROR 6, 10 forged outputs rejected'
+          echo 'M3_ORIGINAL_MISSING_MAR_NATIVE=PASS exact source READ_ERROR 6, 11 forged outputs rejected'
       - name: Upload only sanitized original updater failure status
         if: always()
         uses: actions/upload-artifact@v4
