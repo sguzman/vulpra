@@ -39,6 +39,12 @@ if [[ "$rc" != 1 ]]; then
 fi
 status="$(tr -d '\r\n' </original/updates/0/update.status)"
 if [[ "$status" != 'failed: 6' ]]; then
+  if [[ "$status" =~ ^failed:\ [0-9]{1,3}$ || "$status" == applying || "$status" == pending || "$status" == succeeded ]]; then
+    # Bounded original updater status code only, no raw profile or trace.
+    printf 'M3_MISSING_MAR_REPLAY_OBSERVED_STATUS=%s\n' "$status" >&2
+  else
+    echo 'M3_MISSING_MAR_REPLAY_OBSERVED_STATUS=unexpected_format' >&2
+  fi
   echo 'M3_MISSING_MAR_REPLAY_FAILURE=expected_SOURCE_READ_ERROR_6_not_observed' >&2
   exit 1
 fi
