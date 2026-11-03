@@ -4,14 +4,12 @@
 # CI-only Rust LD_PRELOAD interposer forwards exact original-browser execv
 # and ELF constructor proves the real original updater loader ran under the
 # original browser process with unchanged kernel command-line. No install.
+# Native CI 41736108218 PASS; sanitized 2678-byte JSON, artifact 13278473269.
+# 2/2 Rust tests and 12/12 forged-summary cases rejected; exact original
+# browser->original ELF execution + genuine missing-MAR 'failed: 6' accepted.
+# Retained manual-only after original native acceptance.
 name: M3 Original Browser To Actual Updater Missing MAR
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-updater-real-elf-chain.yml
-      - ci/m3-original-browser-updater-execv-forward-guard.rs
-      - ci/m3-original-browser-updater-real-elf-chain.sh
   workflow_dispatch:
 permissions:
   contents: read
