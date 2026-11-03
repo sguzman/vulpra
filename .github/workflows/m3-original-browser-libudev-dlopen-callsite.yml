@@ -8,19 +8,11 @@ name: M3 Original Browser Libudev Dlopen Callsite Trace
 # A source-pinned original-browser mapping transition passed 41371647131.
 # This expensive experiment is manually dispatchable, not a regular push gate.
 # Instrumented original-browser callsite CI 41374201977 and bounded
-# unwind CI 41481619331 both passed; keep this
-# expensive source-pinned native browser experiment manually dispatchable.
+# unwind CI 41481619331 both passed. Original libxul dlsym→real libudev
+# pointer provider 13 symbols and four negative mutants accepted in
+# native CI 41682006070. Expensive test remains manual-only.
 on:
   workflow_dispatch:
-  # TEMPORARY native browser symbol-resolution acceptance test; restore manual-only.
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-libudev-dlopen-callsite.yml
-      - ci/m3-original-libudev-dlopen-callsite.c
-      - ci/m3-original-browser-libudev-dlsym-provider.jq
-      - ci/m3-original-browser-libudev-dlsym-verify.sh
-      - ci/m3-original-browser-webauthn-webdriver.sh
 permissions:
   contents: read
   actions: read
