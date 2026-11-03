@@ -99,7 +99,8 @@ int main(int argc, char **argv) {
   }
   puts("M3_EP_STAGE=registration_succeeded"); fflush(stdout);
   if (m3_ci_loader_snapshot("registered") != 0) {
-    api->UnregisterExecutionProviderLibrary(env, "vulpra-ci-fixture");
+    OrtStatus *cleanup = api->UnregisterExecutionProviderLibrary(env, "vulpra-ci-fixture");
+    if (cleanup != NULL) api->ReleaseStatus(cleanup);
     api->ReleaseEnv(env);
     dlclose(handle);
     return 11;
