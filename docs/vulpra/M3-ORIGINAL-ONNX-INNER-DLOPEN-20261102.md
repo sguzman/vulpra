@@ -1,5 +1,15 @@
 # M3 — Original packaged ONNX Runtime internal dlopen origin under isolated API activation (2026-11-02)
 
+## Original ONNX Runtime 1.30 external CPU EP-device enumeration — verified (2026-11-03 UTC)
+
+**[Original native CI 41560348027 — PASS](https://github.com/sguzman/vulpra/actions/runs/41560348027)** and **[workflow lint 41560348229 — PASS](https://github.com/sguzman/vulpra/actions/runs/41560348229)**. Native job 125669201769 authenticated the original full-normal archive and pinned v30 API headers, compiled the C fixtures, executed the original runtime in two isolated no-egress processes, and uploaded bounded artifact **13196981996**.
+
+The existing factory with **zero advertised devices** passed again. A separate opt-in mode, `VULPRA_CI_ONNX_EP_DEVICE_PROBE=1`, enumerated an **actual ONNX-discovered CPU hardware device**, used `OrtEpApi::CreateEpDevice` to create **one** CI-owned `OrtEpDevice`, and returned it to the original runtime. The independent C test queried `OrtApi::GetEpDevices`, matched exactly one `VulpraCIProbeEP` device of CPU hardware type, and unregistered cleanly. Logged native stages: `get_supported_devices` → `cpu_ep_device_created` → `create_data_transfer` → `registration_succeeded` → `cpu_ep_device_enumerated` → `factory_released` → `unregistration_succeeded`.
+
+Source and package remain pinned to original compiled Vulpra source b1482404dfb8b01342990ee99ea3df0f9756b5f7 and archive SHA-256 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a. The same ONNX v30 header hashes as the prior test were validated. This test does **not** fabricate a GPU, exercise an accelerator, or use the host's installed Firefox.
+
+**Limits:** `CreateEp` deliberately returns `ORT_NOT_IMPLEMENTED`, so no external-EP session selection or model execution was tested. This is genuine device creation/enumeration and teardown, **not** functional provider inference, GPU support, complete feature/build/FFI/dynamic-dependency closure, or evidence authorizing pruning. The expensive workflow is restored to **manual-only**. No source deletion or native-package savings. **M3 stays 5/6=83%, Vulpra overall 61%, Δ +0 percentage points.**
+
 
 ## Original compiled ONNX Runtime 1.30 external factory registration and cleanup — verified (2026-11-03 UTC)
 

@@ -1,16 +1,9 @@
 # Source-pinned, expensive manual-only native lifecycle regression.
-# Original runtime and one zero-device factory verified in run 41559011764;
-# not evidence of real accelerator use, GPU inference or full loader closure.
+# Original zero-device registration PASS: 41559011764; CPU EP device enumeration PASS: 41560348027.
+# Neither probe executes a model through the external provider or establishes GPU support.
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
-  # TEMPORARY validation trigger; restore manual-only after verified evidence.
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-onnx-ep-factory-fixture.c
-      - ci/m3-original-onnx-ep-registration.c
-      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read
