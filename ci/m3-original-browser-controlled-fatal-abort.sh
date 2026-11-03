@@ -77,6 +77,7 @@ done
 caps="$(jq -nc --arg bin "$1" '{
   capabilities:{alwaysMatch:{browserName:"firefox",
     "moz:firefoxOptions":{binary:$bin,args:["--no-remote","--new-instance"],
+     env:{"MOZ_CRASHREPORTER":"1","MOZ_CRASHREPORTER_NO_REPORT":""},
      prefs:{"browser.shell.checkDefaultBrowser":false}}}}
 }')"
 resp="$(api POST /session "$caps")"
@@ -95,7 +96,7 @@ jq -e '.value=="function"' <<<"$pre" >/dev/null || {
 # Read only booleans from the ORIGINAL browser's privileged crash service
 # and inherited environment. Do not blindly infer reporter policy from the
 # invoking test shell; geckodriver can provide its own child environment.
-state_js='const a=Components.classes["@mozilla.org/xre/app-info;1"].getService(Components.interfaces.nsIXULAppInfo);const e=Components.classes["@mozilla.org/process/environment;1"].getService(Components.interfaces.nsIEnvironment);return {enabled:a.crashReporterEnabled,disable:e.get("MOZ_CRASHREPORTER_DISABLE").length>0,noReport:e.get("MOZ_CRASHREPORTER_NO_REPORT").length>0,report:e.get("MOZ_CRASHREPORTER").length>0};'
+state_js='const a=Components.classes["@mozilla.org/xre/app-info;1"].getService(Components.interfaces.nsICrashReporter);const e=Components.classes["@mozilla.org/process/environment;1"].getService(Components.interfaces.nsIEnvironment);return {enabled:a.crashReporterEnabled,disable:e.get("MOZ_CRASHREPORTER_DISABLE").length>0,noReport:e.get("MOZ_CRASHREPORTER_NO_REPORT").length>0,report:e.get("MOZ_CRASHREPORTER").length>0};'
 observed="$(api POST "/session/$session/execute/sync" \
   "$(jq -nc --arg script "$state_js" '{script:$script,args:[]}')")"
 if ! jq -e '.value.enabled==true and .value.disable==false and .value.noReport==false and .value.report==true' <<<"$observed" >/dev/null 2>&1; then
