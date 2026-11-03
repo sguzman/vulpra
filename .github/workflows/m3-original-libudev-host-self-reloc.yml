@@ -1,13 +1,10 @@
 # Source-pinned original WebAuthn glibc requester/provider and current Arch
 # libudev's own versioned GLOB_DAT. Separate host ELF build from original CI:
 # same filename is not proof of byte-for-byte identical host library.
+# 41707399519 PASS: versioned native Arch R_X86_64_GLOB_DAT self relocation,
+# 6 negative mutations rejected; expensive optional diagnostic is manual-only.
 name: M3 Original Libudev Host GLOB_DAT Self Relocation Crosswalk
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-libudev-host-self-reloc.yml
-      - ci/m3-original-libudev-host-self-reloc.jq
   workflow_dispatch:
 permissions:
   contents: read
