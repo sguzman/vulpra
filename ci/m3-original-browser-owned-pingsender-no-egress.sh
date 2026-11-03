@@ -93,6 +93,12 @@ pre="$(api POST "/session/$session/execute/sync" \
 jq -e '.value.method=="function" and .value.suppress==false and
   .value.enabled==false and .value.upload==false and
   .value.bin=="/original"' <<<"$pre" >/dev/null || {
+  # Explicit approved scalar fields only. Never emit browser profile paths,
+  # raw WebDriver error strings or unbounded browser data.
+  jq -c '{method:(.value.method // null),suppress:(.value.suppress // null),
+    enabled:(.value.enabled // null),upload:(.value.upload // null),
+    original_bin:(.value.bin=="/original"),
+    webdriver_error:(.value.error!=null)}' <<<"$pre" >&2 || true
   echo 'M3_PINGSENDER_FAILURE=browser_module_or_upload_policy_not_safe' >&2
   exit 1
 }
