@@ -1,14 +1,10 @@
 # Original source-pinned browser: WebAudio -> private PulseAudio null sink.
 # Non-LD_PRELOAD glibc binding/provider observation, not full Rust caller proof.
-# This expensive workflow is temporarily push-triggered only for native acceptance.
+# Native CI 41714793962 PASS: 312 pa_* binding events, 197 distinct symbols,
+# live original-browser pulse-rust audio and five rejected corrupted-data cases.
+# The costly native workflow is manual-only after acceptance.
 name: M3 Original Browser WebAudio Noninterposing Glibc Bindings
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-pulse-glibc-bindings.yml
-      - ci/m3-original-pulse-glibc-bindings.rs
-      - ci/m3-original-pulse-glibc-crosswalk.jq
   workflow_dispatch:
 permissions:
   contents: read
