@@ -1,4 +1,5 @@
-// Bounded original ONNX v30 EP registration/teardown test; never runs an EP.
+// Bounded original ONNX v30 EP registration/teardown and optional CPU fallback test.
+// The CI-owned external EP implements no kernels and never executes model nodes.
 // A separate, source-pinned manual CI workflow supplies the original ELF.
 #include "onnxruntime_c_api.h"
 #include <dlfcn.h>

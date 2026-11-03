@@ -1,4 +1,5 @@
-// CI-only ONNX Runtime 1.30 EP factory. No devices, kernels, or production EP.
+// CI-only ONNX Runtime 1.30 EP factory. CPU discovery and fallback are opt-in;
+// it implements no kernels, accelerator devices, or production EP.
 // Compile against the SHA-pinned v1.30.0 onnxruntime_c_api.h and ep_c_api.h in the workflow.
 #include "onnxruntime_c_api.h"
 #include <stddef.h>
@@ -110,7 +111,7 @@ static OrtStatus *ORT_API_CALL ep_get_capability(
   return NULL;
 }
 
-// Required API callback; mode-specific test implementation.
+// Session mode exposes a non-executing OrtEp; other modes reject CreateEp.
 static OrtStatus *ORT_API_CALL create_ep(
     OrtEpFactory *factory, const OrtHardwareDevice *const *devices,
     const OrtKeyValuePairs *const *metadata, size_t device_count,

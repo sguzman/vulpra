@@ -29,6 +29,8 @@ The milestones are ordered by engineering dependencies, not by arbitrary source-
 
 ## ✂️ M3 — User-specific debloating
 
+- [x] [Original ONNX v30 external-provider session and built-in CPU fallback **41562244114 PASS**](https://github.com/sguzman/vulpra/actions/runs/41562244114): source- and archive-pinned original native library; `SessionOptionsAppendExecutionProvider_V2` followed by real `CreateEp`, observed `GetCapability` declining all nodes, input-driven `Identity` inference by built-in CPU yielding exactly float32[1] = 1.25, cleanup before unregister. Old registration and device-enumeration tests passed again. [Scope/limits](M3-ORIGINAL-ONNX-INNER-DLOPEN-20261102.md): **not** external EP model execution, GPU, full dependency closure, source pruning or savings. Workflow restored to manual-only; **M3 5/6=83%, overall 61%, Δ0pp.**
+
 - [x] [Original compiled ONNX Runtime 1.30 external CPU EP-device enumeration **41560348027 PASS**](https://github.com/sguzman/vulpra/actions/runs/41560348027), [lint **41560348229 PASS**](https://github.com/sguzman/vulpra/actions/runs/41560348229): the original native runtime created and enumerated one CI-owned EP device for a discovered CPU hardware device and unregistered cleanly. Prior zero-device registration also passed. [Evidence and limits](M3-ORIGINAL-ONNX-INNER-DLOPEN-20261102.md). No external-EP inference, GPU, pruning, native savings or full closure. M3 5/6=83%, overall 61%, Δ0pp.
 
 ### ⚙️ Actual original emitted native compiler-source membership (2026-10-31)
