@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # CI-only actual original updater binary run, with source-shaped stage arguments
-# and intentionally ABSENT MAR in isolated read-only/no-egress environment.
+# and intentionally ABSENT MAR in an offline container with read-only install.
+# The staging destination itself is a separate empty writable fixture mount.
 # This is a direct CI REPLAY, not a browser-started executable claim.
 set -euo pipefail
 [[ $# == 1 && "$1" == /reports/m3-original-updater-missing-mar-replay.json ]] || exit 2
@@ -10,7 +11,7 @@ set -euo pipefail
    "$(awk '/^CapPrm:/ {print $2}' /proc/self/status)" == 0000000000000000 ]] || exit 2
 [[ -x /original/updater && -x /original/vulpra &&
    -d /original/updates && ! -e /original/updates/0 &&
-   ! -e /original/updated && ! -e "$1" ]] || exit 2
+   -d /original/updated && ! -e "$1" ]] || exit 2
 for executable in timeout jq sha256sum; do command -v "$executable" >/dev/null || exit 2; done
 work="$(mktemp -d /tmp/vulpra-m3-missing-mar.XXXXXX)"
 trap 'rm -rf -- "$work"' EXIT
@@ -21,7 +22,7 @@ mkdir -m 0700 /original/updates/0
 printf 'null\n' > /original/updates/0/update.version
 printf 'pending\n' > /original/updates/0/update.status
 test ! -e /original/updates/0/update.mar
-test ! -e /original/updated
+test -z "$(find /original/updated -mindepth 1 -print -quit)"
 # These EXACT seven native Linux arguments were observed at the real original
 # browser's fork->execv boundary in accepted CI 41731162834.
 # No browser, UI, callback, network or installation code is invoked by this
@@ -48,7 +49,8 @@ if [[ "$status" != 'failed: 6' ]]; then
   echo 'M3_MISSING_MAR_REPLAY_FAILURE=expected_SOURCE_READ_ERROR_6_not_observed' >&2
   exit 1
 fi
-if [[ -e /original/updates/0/update.mar || -e /original/updated || -e "$HOME/.mozilla" ]]; then
+if [[ -e /original/updates/0/update.mar ||
+      -n "$(find /original/updated -mindepth 1 -print -quit)" || -e "$HOME/.mozilla" ]]; then
   echo 'M3_MISSING_MAR_REPLAY_FAILURE=unexpected_payload_or_install_tree' >&2
   exit 1
 fi
@@ -70,7 +72,8 @@ jq -n \
   original_updater_open_missing_mar_failure_confirmed:true,
   no_mar_payload_created_or_available:true,
   original_install_read_only:true,
-  original_staging_target_unwritable_and_absent:true,
+  isolated_staging_target_separate_writable_mount:true,
+  isolated_staging_target_remained_empty:true,
   original_updater_error_status_written_in_disposable_fixture:true,
   no_real_user_profile_or_device_accessed:true,
   network_egress_allowed:false,
@@ -84,4 +87,4 @@ jq -n \
   native_bytes_saved:0,
   m3_sixth_gate_closed:false
 }' >"$1"
-echo 'M3_ORIGINAL_UPDATER_MISSING_MAR=PASS original binary executed, rc=1, READ_ERROR=6, no MAR, install immutable'
+echo 'M3_ORIGINAL_UPDATER_MISSING_MAR=PASS original binary executed, rc=1, READ_ERROR=6, no MAR, original install immutable, isolated stage empty'
