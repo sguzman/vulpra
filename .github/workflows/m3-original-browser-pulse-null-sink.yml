@@ -171,7 +171,11 @@ jobs:
             .source_pruning_authorized==false and
             .native_bytes_saved==0 and
             .m3_sixth_gate_closed==false' "$out" >/dev/null
-          jq '.host_mapped_shared_library_basenames -= ["libpulse.so.0"]' \
+          # /proc/maps exposes a versioned backing filename (e.g. libpulse.so.0.24.3),
+          # not necessarily the libpulse.so.0 SONAME. Remove every such mapped
+          # basename from the mutant, or the negative assertion is a false pass.
+          jq '.host_mapped_shared_library_basenames |=
+                map(select(startswith("libpulse.so.0") | not))' \
             "$during" >"$RUNNER_TEMP/reports/m3-mutant-maps.json"
           if crosswalk "$before" "$RUNNER_TEMP/reports/m3-mutant-maps.json" "$audio" \
              >/dev/null 2>&1; then
