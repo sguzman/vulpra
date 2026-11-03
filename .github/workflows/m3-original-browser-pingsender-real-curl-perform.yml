@@ -2,14 +2,13 @@
 # genuine libcurl curl_easy_perform function invocation and non-success
 # localhost:9 result. Private no-egress Arch/Weston and synthetic JSON.
 # Original package read-only; Rust pointer interposer forwards to real libcurl.
+# Accepted source-pinned native original CI 41741770814 PASS,
+# job 126284758605, artifact 13281756134 (sanitized 2283-byte JSON).
+# Actual original browser-owned pingsender real curl_easy_perform forwarded
+# to libc/libcurl and returned CURLcode 7; 4 Rust tests and 14/14
+# deliberately forged evidence reports rejected. Manual-only after PASS.
 name: M3 Original Browser Pingsender Real Curl Perform No Egress
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-pingsender-real-curl-perform.yml
-      - ci/m3-original-browser-pingsender-real-curl-perform.sh
-      - ci/m3-original-browser-pingsender-libcurl-perform.rs
   workflow_dispatch:
 permissions:
   contents: read
