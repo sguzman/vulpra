@@ -9,6 +9,12 @@
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
+  # TEMPORARY source-pinned native crosswalk test: restore manual-only on pass.
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-onnx-mapped-needed-crosswalk.jq
+      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read
@@ -35,6 +41,7 @@ jobs:
             ci/m3-original-onnx-ep-registration.c
             ci/m3-original-onnx-ep-session.c
             ci/m3-original-onnx-ep-loader-snapshot.c
+            ci/m3-original-onnx-mapped-needed-crosswalk.jq
       - name: Pin upstream v30 headers and verify test fixture ABI
         shell: bash
         env:
@@ -237,6 +244,73 @@ jobs:
             any(.[]; .stage=="after_run" and .kind=="package" and .name=="libonnxruntime.so") and
             any(.[]; .stage=="after_run" and .kind=="plugin" and .name=="libvulpra-onnx-ci-ep.so")' \
             "$RUNNER_TEMP/m3-ep-mapped-libraries.json" >/dev/null
+          # Static ELF direct SONAME requirements, reconciled with the eight
+          # sampled original-runtime mappings. No raw readelf or absolute paths
+          # are persisted in exported evidence.
+          extract_needed() {
+            local obj="$1" dest="$2"
+            test -s "$obj"
+            readelf -Wd "$obj" |
+              awk -F '[][]' '/\(NEEDED\)/ {
+                if (NF < 3) exit 12
+                print $2
+                n++
+              } END { if (n == 0) exit 13 }' >"$dest"
+            test -s "$dest"
+          }
+          extract_needed "$pkg/libonnxruntime.so" "$RUNNER_TEMP/m3-onnx-needed.txt"
+          extract_needed "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" "$RUNNER_TEMP/m3-plugin-needed.txt"
+          crosswalk() {
+            local original="$1" observed="$2" destination="$3"
+            jq -n --rawfile original_needed "$original" \
+              --rawfile plugin_needed "$RUNNER_TEMP/m3-plugin-needed.txt" \
+              --slurpfile map_records "$observed" \
+              --arg src "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
+              -f ci/m3-original-onnx-mapped-needed-crosswalk.jq >"$destination"
+          }
+          crosswalk "$RUNNER_TEMP/m3-onnx-needed.txt" \
+            "$RUNNER_TEMP/m3-ep-mapped-libraries.json" \
+            "$RUNNER_TEMP/m3-ep-static-live-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_onnx_ep_live_mapping_direct_needed_basename_crosswalk_pass" and
+            .original_direct_needed_count>0 and .plugin_direct_needed_count>0 and
+            (.direct_needed_entries|length)==(.original_direct_needed_count+.plugin_direct_needed_count) and
+            .static_direct_needed_names_matched_at_snapshot_by_basename==true and
+            .dlopen_transitive_and_lazy_graph_complete==false and
+            .all_28_browser_elf_mapping_or_ffi_proven==false and
+            .further_source_removal_authorized==false and
+            .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-ep-static-live-crosswalk.json" >/dev/null
+          # Fail-closed mutation tests: fabricated NEEDED, absent mapped
+          # provider, and duplicated map line must all be rejected.
+          cp "$RUNNER_TEMP/m3-onnx-needed.txt" "$RUNNER_TEMP/m3-bad-needed.txt"
+          printf 'libunmapped-m3-negative.so\n' >>"$RUNNER_TEMP/m3-bad-needed.txt"
+          if crosswalk "$RUNNER_TEMP/m3-bad-needed.txt" \
+            "$RUNNER_TEMP/m3-ep-mapped-libraries.json" \
+            "$RUNNER_TEMP/m3-mutant-output.json" 2>/dev/null; then
+            echo 'M3_EP_DIAGNOSTIC=missing_declared_needed_accepted'
+            exit 1
+          fi
+          jq '[.[]|select(.name!="libc.so.6")]' \
+            "$RUNNER_TEMP/m3-ep-mapped-libraries.json" >"$RUNNER_TEMP/m3-bad-mapped.json"
+          if crosswalk "$RUNNER_TEMP/m3-onnx-needed.txt" \
+            "$RUNNER_TEMP/m3-bad-mapped.json" \
+            "$RUNNER_TEMP/m3-mutant-output.json" 2>/dev/null; then
+            echo 'M3_EP_DIAGNOSTIC=missing_mapping_accepted'
+            exit 1
+          fi
+          jq '. + [.[0]]' "$RUNNER_TEMP/m3-ep-mapped-libraries.json" \
+            >"$RUNNER_TEMP/m3-duplicated-mapped.json"
+          if crosswalk "$RUNNER_TEMP/m3-onnx-needed.txt" \
+            "$RUNNER_TEMP/m3-duplicated-mapped.json" \
+            "$RUNNER_TEMP/m3-mutant-output.json" 2>/dev/null; then
+            echo 'M3_EP_DIAGNOSTIC=duplicate_mapping_accepted'
+            exit 1
+          fi
+          echo 'M3_EP_CROSSWALK=direct_needed_basename_mapped_all_negative_mutants_rejected'
+
           jq -n --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
             '{schema_version:1, status:"source_pinned_original_external_ep_factory_lifecycle_pass",
               original_source_commit:$source, original_archive_sha256:$archive,
@@ -264,6 +338,9 @@ jobs:
               live_loader_map_stages:8,
               live_loader_map_pathless_basename_only:true,
               live_loader_map_complete_dependencies_proven:false,
+              direct_elf_needed_vs_sampled_mapping_crosswalk_verified:true,
+              direct_elf_needed_negative_mutations_rejected:3,
+              direct_elf_needed_basenames_not_abi_provider_proof:true,
               external_ep_test_scope:"single_float32_1_element_cpu_mul",
               actual_model_executed:true,
               original_library_registration_succeeded:true,
@@ -280,5 +357,6 @@ jobs:
           path: |
             ${{ runner.temp }}/m3-ep-lifecycle.json
             ${{ runner.temp }}/m3-ep-mapped-libraries.json
+            ${{ runner.temp }}/m3-ep-static-live-crosswalk.json
           if-no-files-found: error
           retention-days: 14
