@@ -2,14 +2,13 @@
 # crash callback -> original packaged crashreporter exec, with no network.
 # This intentionally crashes one throwaway browser in a no-egress Arch
 # container, not an installed browser, real profile or user session.
+# Accepted native original compiled browser CI 41724548163 PASS,
+# observer 2/2 tests, no-egress direct browser Marionette attachment,
+# 5 reporter /proc samples across 74 scans, exact original ELF and .dmp arg,
+# 6 fabricated safe summary tests rejected, artifact 13273831086.
+# Manual-only after acceptance; no recurring deliberately crashed browsers.
 name: M3 Original Browser Fatal Abort to Crashreporter Exec
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-crashreporter-fatal-abort.yml
-      - ci/m3-original-browser-controlled-fatal-abort.sh
-      - ci/m3-original-browser-crashreporter-exec-witness.rs
   workflow_dispatch:
 permissions:
   contents: read
