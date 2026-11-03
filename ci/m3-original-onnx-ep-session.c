@@ -1,5 +1,5 @@
 // CI-only ONNX v30 external-EP session + built-in CPU fallback numerical test.
-// Builds one 1.25f Constant model in memory. No external data or model file I/O.
+// Builds a dynamic Identity(x)->y model in memory. No model files or network.
 #include "onnxruntime_c_api.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -48,36 +48,30 @@ static void field_sub(M3Buf *b, uint64_t field, const M3Buf *sub) {
   if (!sub->ok) { b->ok = 0; return; }
   field_bytes(b, field, sub->data, sub->len);
 }
-static M3Buf constant_model(void) {
-  const uint8_t f32_le[] = {0x00, 0x00, 0xa0, 0x3f}; // IEEE-754 1.25
-  M3Buf tensor = buf_new();
-  field_var(&tensor, 1, 1); // dims
-  field_var(&tensor, 2, 1); // FLOAT
-  field_bytes(&tensor, 9, f32_le, sizeof(f32_le)); // raw_data
-
-  M3Buf attr = buf_new();
-  field_bytes(&attr, 1, "value", 5);
-  field_sub(&attr, 5, &tensor);
-  field_var(&attr, 20, 4); // TENSOR attribute
-
+static M3Buf identity_model(void) {
   M3Buf node = buf_new();
+  field_bytes(&node, 1, "x", 1);
   field_bytes(&node, 2, "y", 1);
-  field_bytes(&node, 4, "Constant", 8);
-  field_sub(&node, 5, &attr);
+  field_bytes(&node, 4, "Identity", 8);
 
   M3Buf dim = buf_new(); field_var(&dim, 1, 1);
   M3Buf shape = buf_new(); field_sub(&shape, 1, &dim);
   M3Buf tensor_ty = buf_new();
-  field_var(&tensor_ty, 1, 1);
+  field_var(&tensor_ty, 1, 1); // FLOAT
   field_sub(&tensor_ty, 2, &shape);
   M3Buf value_ty = buf_new(); field_sub(&value_ty, 1, &tensor_ty);
+
+  M3Buf input = buf_new();
+  field_bytes(&input, 1, "x", 1);
+  field_sub(&input, 2, &value_ty);
   M3Buf output = buf_new();
   field_bytes(&output, 1, "y", 1);
   field_sub(&output, 2, &value_ty);
 
   M3Buf graph = buf_new();
   field_sub(&graph, 1, &node);
-  field_bytes(&graph, 2, "single-constant", 15);
+  field_bytes(&graph, 2, "single-identity", 15);
+  field_sub(&graph, 11, &input);
   field_sub(&graph, 12, &output);
   M3Buf opset = buf_new(); field_var(&opset, 2, 13);
   M3Buf model = buf_new();
@@ -103,6 +97,8 @@ int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
   OrtSessionOptions *opts = NULL;
   OrtSession *session = NULL;
   OrtValue *output = NULL;
+  OrtValue *input = NULL;
+  OrtMemoryInfo *memory = NULL;
   OrtTensorTypeAndShapeInfo *shape = NULL;
   if (!checked(api, api->CreateSessionOptions(&opts), "session_options") || opts == NULL)
     goto done;
@@ -113,7 +109,7 @@ int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
                    opts, env, selected, 1, NULL, NULL, 0), "append_fixture_ep"))
     goto done;
   puts("M3_EP_STAGE=external_ep_appended"); fflush(stdout);
-  M3Buf model = constant_model();
+  M3Buf model = identity_model();
   if (!model.ok || model.len < 45 || model.len > 512) {
     fputs("M3_EP_ERROR_STAGE=model_encoding\n", stderr);
     goto done;
@@ -122,8 +118,20 @@ int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
                    env, model.data, model.len, opts, &session), "create_session") ||
       session == NULL) goto done;
   puts("M3_EP_STAGE=external_ep_session_created"); fflush(stdout);
-  const char *names[1] = {"y"};
-  if (!checked(api, api->Run(session, NULL, NULL, NULL, 0, names, 1, &output),
+  if (!checked(api, api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault,
+                                                &memory), "cpu_memory_info") ||
+      memory == NULL) goto done;
+  int64_t dims[1] = {1};
+  float input_value = 1.25f;
+  if (!checked(api, api->CreateTensorWithDataAsOrtValue(
+                   memory, &input_value, sizeof(input_value),
+                   dims, 1, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input),
+               "input_tensor") || input == NULL) goto done;
+  const char *input_names[1] = {"x"};
+  const OrtValue *input_values[1] = {input};
+  const char *output_names[1] = {"y"};
+  if (!checked(api, api->Run(session, NULL, input_names, input_values, 1,
+                             output_names, 1, &output),
                "cpu_fallback_run") || output == NULL) goto done;
   if (!checked(api, api->GetTensorTypeAndShape(output, &shape),
                "output_shape") || shape == NULL) goto done;
@@ -149,6 +157,8 @@ int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
 done:
   if (shape != NULL) api->ReleaseTensorTypeAndShapeInfo(shape);
   if (output != NULL) api->ReleaseValue(output);
+  if (input != NULL) api->ReleaseValue(input);
+  if (memory != NULL) api->ReleaseMemoryInfo(memory);
   if (session != NULL) api->ReleaseSession(session);
   if (opts != NULL) api->ReleaseSessionOptions(opts);
   return ok ? 0 : 1;
