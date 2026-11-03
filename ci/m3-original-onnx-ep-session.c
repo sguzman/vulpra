@@ -1,5 +1,5 @@
 // CI-only ONNX v30 external-EP session and numerical tests.
-// Builds runtime-input Identity (CPU fallback) or Mul (native external EP).
+// Builds runtime-input Identity (CPU fallback) or distinct-input Mul (native EP).
 #include "onnxruntime_c_api.h"
 #include <stdint.h>
 #include <stdio.h>

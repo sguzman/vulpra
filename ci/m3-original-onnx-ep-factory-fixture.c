@@ -1,5 +1,5 @@
-// CI-only ONNX Runtime 1.30 EP factory. CPU discovery and fallback are opt-in;
-// it implements no kernels, accelerator devices, or production EP.
+// CI-only ONNX Runtime 1.30 EP factory. All device/session/compute modes opt-in;
+// one separate scalar CPU Mul test implementation, no accelerator or production EP.
 // Compile against the SHA-pinned v1.30.0 onnxruntime_c_api.h and ep_c_api.h in the workflow.
 #include "onnxruntime_c_api.h"
 #include <stddef.h>

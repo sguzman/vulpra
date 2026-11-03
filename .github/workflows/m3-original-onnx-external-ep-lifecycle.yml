@@ -1,20 +1,12 @@
 # Source-pinned, expensive manual-only native lifecycle regression.
 # Zero-device PASS: 41559011764; CPU device enumeration PASS: 41560348027;
-# CPU fallback model/session PASS: 41562244114.
-# The opt-in CPU fallback probe exercises a real model, but the external EP claims no nodes.
+# CPU fallback model/session PASS: 41562244114;
+# actual external EP Mul inference PASS: 41563943117.
+# The opt-in fallback probe declines nodes; a separate opt-in CPU-only Mul probe executes inside the EP.
 # The fixture is not an accelerator or production execution provider.
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
-  # TEMPORARY, original-runtime validation only; return to manual-only on pass.
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-onnx-ep-factory-fixture.c
-      - ci/m3-original-onnx-ep-compute.c
-      - ci/m3-original-onnx-ep-session.c
-      - ci/m3-original-onnx-ep-registration.c
-      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read
@@ -196,6 +188,7 @@ jobs:
               external_ep_compute_invoked:true,
               external_ep_expected_numeric_float:1.5625,
               external_ep_inference_executed:true,
+              external_ep_test_scope:"single_float32_1_element_cpu_mul",
               actual_model_executed:true,
               original_library_registration_succeeded:true,
               original_library_unregistration_succeeded:true,
