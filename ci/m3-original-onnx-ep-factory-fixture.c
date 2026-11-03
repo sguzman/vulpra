@@ -88,6 +88,17 @@ static void ORT_API_CALL release_ep(OrtEpFactory *factory, OrtEp *ep) {
   fputs("M3_EP_CALLBACK=release_ep\n", stderr); fflush(stderr);
 }
 
+static OrtStatus *ORT_API_CALL create_data_transfer(
+    OrtEpFactory *factory, OrtDataTransferImpl **transfer) {
+  (void)factory;
+  fputs("M3_EP_CALLBACK=create_data_transfer\n", stderr);
+  fflush(stderr);
+  if (transfer != NULL) {
+    *transfer = NULL;  // This factory has no hardware or transport.
+  }
+  return NULL;
+}
+
 static OrtEpFactory *make_factory(void) {
   OrtEpFactory *factory = (OrtEpFactory *)calloc(1, sizeof(*factory));
   if (factory == NULL) {
@@ -101,6 +112,7 @@ static OrtEpFactory *make_factory(void) {
   factory->GetSupportedDevices = get_supported_devices;
   factory->CreateEp = create_ep;
   factory->ReleaseEp = release_ep;
+  factory->CreateDataTransfer = create_data_transfer;
   return factory;
 }
 
@@ -172,7 +184,7 @@ int main(void) {
       factory->GetName == NULL || factory->GetVendor == NULL ||
       factory->GetVendorId == NULL || factory->GetVersion == NULL ||
       factory->GetSupportedDevices == NULL || factory->CreateEp == NULL ||
-      factory->ReleaseEp == NULL ||
+      factory->ReleaseEp == NULL || factory->CreateDataTransfer == NULL ||
       strcmp(factory->GetName(factory), provider_name) != 0 ||
       strcmp(factory->GetVendor(factory), vendor_name) != 0 ||
       factory->GetVendorId(factory) != 0 ||
