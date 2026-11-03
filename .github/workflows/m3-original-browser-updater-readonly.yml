@@ -1,0 +1,202 @@
+# Original full-normal compiled browser, no-network private Arch/Weston.
+# Inspects only read-only updater XPCOM disable+idle getters; NEVER invokes
+# update checks/download/staging/processUpdate/updater executable.
+# The original canApplyUpdates() getter writes test files: intentionally skip.
+name: M3 Original Browser Update Service Readonly Isolation
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-updater-readonly.yml
+      - ci/m3-original-browser-updater-readonly.sh
+      - ci/m3-original-browser-updater-readonly-observer.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-update-service-disabled-and-idle:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ORIGINAL_SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ORIGINAL_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      ORIGINAL_RUN: '40997075527'
+    steps:
+      - name: Checkout original-browser test-only isolated updater observer
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-updater-readonly.sh
+            ci/m3-original-browser-updater-readonly-observer.rs
+      - name: Checkout immutable source for exact read-only update-service contract
+        uses: actions/checkout@v4
+        with:
+          path: original-source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/mozapps/update/nsIUpdateService.idl
+            toolkit/mozapps/update/UpdateService.sys.mjs
+            toolkit/mozapps/update/UpdateServiceStub.sys.mjs
+            toolkit/mozapps/update/components.conf
+      - name: Validate source-declared update API and compile isolated Rust proc observer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$ORIGINAL_SOURCE"
+          bash -n diagnostics/ci/m3-original-browser-updater-readonly.sh
+          grep -Fq 'readonly attribute boolean updateDisabledForTesting' original-source/toolkit/mozapps/update/nsIUpdateService.idl
+          grep -Fq 'readonly attribute boolean canUsuallyCheckForUpdates' original-source/toolkit/mozapps/update/nsIUpdateService.idl
+          grep -Fq 'readonly attribute boolean disabled;' original-source/toolkit/mozapps/update/nsIUpdateService.idl
+          grep -Fq 'readonly attribute boolean canApplyUpdates;' original-source/toolkit/mozapps/update/nsIUpdateService.idl
+          grep -Fq "'@mozilla.org/updates/update-service-stub;1'" original-source/toolkit/mozapps/update/components.conf
+          grep -Fq "'@mozilla.org/updates/update-service;1'" original-source/toolkit/mozapps/update/components.conf
+          grep -Fq 'this.updateDisabledForTesting ||' original-source/toolkit/mozapps/update/UpdateServiceStub.sys.mjs
+          grep -Fq 'get canUsuallyCheckForUpdates() {' original-source/toolkit/mozapps/update/UpdateService.sys.mjs
+          grep -Fq 'get currentState() {' original-source/toolkit/mozapps/update/UpdateService.sys.mjs
+          grep -Fq 'testWriteAccess(updateTestFile, false);' original-source/toolkit/mozapps/update/UpdateService.sys.mjs
+          grep -Fq 'getCanApplyUpdates();' original-source/toolkit/mozapps/update/UpdateService.sys.mjs
+          rustc --edition=2021 -D warnings --test diagnostics/ci/m3-original-browser-updater-readonly-observer.rs \
+            -o "$RUNNER_TEMP/m3-original-updater-observer-tests"
+          "$RUNNER_TEMP/m3-original-updater-observer-tests"
+          rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-updater-readonly-observer.rs \
+            -o "$RUNNER_TEMP/m3-original-updater-observer"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
+            jq -e --arg src "$ORIGINAL_SOURCE" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$src' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/reports"
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ORIGINAL_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          for name in vulpra updater; do
+            test -x "$RUNNER_TEMP/package/vulpra/$name"
+            test "$(head -c 4 "$RUNNER_TEMP/package/vulpra/$name" | od -An -tx1 | tr -d ' \n')" = 7f454c46
+          done
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/package/vulpra/application.ini"
+      - name: Build private Arch Wayland browser with offline WebDriver and procfs tooling
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-updater"
+          cat >"$RUNNER_TEMP/arch-updater/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            bash coreutils curl jq grep findutils procps-ng util-linux \
+            iproute2 geckodriver gtk3 dbus-glib alsa-lib nss \
+            weston wayland-utils mesa libglvnd ttf-dejavu \
+            && command -v geckodriver && command -v weston \
+            && command -v setpriv && command -v wayland-info \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t m3-original-arch-updater-readonly:ci \
+            "$RUNNER_TEMP/arch-updater"
+      - name: Query actual original compiled browser update service without invoking updater
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          # Network NONE; brief root capabilities to raise loopback only.
+          # Drop every capability before executing the browser and witness.
+          docker run --rm --network none --read-only --shm-size 256m \
+            --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
+            --security-opt no-new-privileges --pids-limit 512 --memory 4g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
+            -v "$RUNNER_TEMP/package/vulpra:/original:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-updater-readonly.sh:/audit/update-test.sh:ro" \
+            -v "$RUNNER_TEMP/m3-original-updater-observer:/audit/updater-observer:ro" \
+            -v "$RUNNER_TEMP/reports:/reports:rw" \
+            -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
+            -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
+            -e VULPRA_M3_DISPOSABLE_UPDATER_READONLY=1 \
+            m3-original-arch-updater-readonly:ci /bin/bash -c '
+              set -euo pipefail
+              ip link set lo up
+              exec setpriv --reuid "$CI_UID" --regid "$CI_GID" \
+                --clear-groups /bin/bash /audit/update-test.sh \
+                /original/vulpra /reports/m3-original-browser-updater-readonly.json
+            '
+          report="$RUNNER_TEMP/reports/m3-original-browser-updater-readonly.json"
+          jq -e --arg sha "$ORIGINAL_SHA" --arg src "$ORIGINAL_SOURCE" '
+            .schema_version==1 and
+            .status=="real_original_browser_read_only_update_service_disabled_and_idle" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .update_service_stub_registered_and_invoked==true and
+            .update_service_registered_and_invoked==true and
+            .query_repeat_matches==true and
+            .real_browser_chrome_xpcom_read_only_state.prefTestingDisabled==true and
+            .real_browser_chrome_xpcom_read_only_state.prefAuto==false and
+            .real_browser_chrome_xpcom_read_only_state.prefBackground==false and
+            .real_browser_chrome_xpcom_read_only_state.prefStaging==false and
+            .real_browser_chrome_xpcom_read_only_state.stubTestingDisabled==true and
+            .real_browser_chrome_xpcom_read_only_state.stubDisabled==true and
+            .real_browser_chrome_xpcom_read_only_state.serviceDisabled==true and
+            .real_browser_chrome_xpcom_read_only_state.usuallyCanCheck==false and
+            .real_browser_chrome_xpcom_read_only_state.idle==true and
+            .real_browser_chrome_xpcom_read_only_state.stateName=="STATE_IDLE" and
+            .updater_process_sample.source_commit==$src and
+            .updater_process_sample.archive_sha256==$sha and
+            .updater_process_sample.live_original_browser_samples>=8 and
+            .updater_process_sample.total_private_process_samples>=12 and
+            .updater_process_sample.actually_observed_original_updater_executable_samples==0 and
+            .updater_process_sample.not_seen_in_samples_does_not_prove_unused==true and
+            .actual_updater_file_original_packaged_elf==true and
+            .actual_updater_executable_not_invoked_by_test==true and
+            .did_not_call_update_check_or_download_or_staging_or_apply==true and
+            .did_not_read_write_testing_update_getters==true and
+            .original_package_mounted_read_only==true and
+            .no_user_profile_modified==true and
+            .network_egress_allowed==false and
+            .normal_browser_update_when_enabled_proven==false and
+            .original_browser_controlled_updater_process_launch_proven==false and
+            .complete_update_dependency_closure_proven==false and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false
+          ' "$report" >/dev/null
+          verify() {
+            jq -e --arg sha "$ORIGINAL_SHA" --arg src "$ORIGINAL_SOURCE" '
+              .original_source_commit==$src and .original_archive_sha256==$sha and
+              .real_browser_chrome_xpcom_read_only_state.stubTestingDisabled==true and
+              .real_browser_chrome_xpcom_read_only_state.serviceDisabled==true and
+              .real_browser_chrome_xpcom_read_only_state.idle==true and
+              .updater_process_sample.actually_observed_original_updater_executable_samples==0 and
+              .did_not_read_write_testing_update_getters==true and
+              .original_browser_controlled_updater_process_launch_proven==false and
+              .source_pruning_authorized==false
+            ' "$1" >/dev/null
+          }
+          for mutation in \
+            '.real_browser_chrome_xpcom_read_only_state.stubTestingDisabled=false' \
+            '.real_browser_chrome_xpcom_read_only_state.serviceDisabled=false' \
+            '.real_browser_chrome_xpcom_read_only_state.idle=false' \
+            '.updater_process_sample.actually_observed_original_updater_executable_samples=1' \
+            '.did_not_read_write_testing_update_getters=false' \
+            '.original_browser_controlled_updater_process_launch_proven=true' \
+            '.original_archive_sha256="tampered-package"' \
+            '.source_pruning_authorized=true'; do
+            jq "$mutation" "$report" >"$RUNNER_TEMP/reports/mutated.json"
+            if verify "$RUNNER_TEMP/reports/mutated.json"; then
+              echo 'FAIL: forged original updater test evidence accepted' >&2; exit 1
+            fi
+          done
+          rm -f "$RUNNER_TEMP/reports/mutated.json"
+          jq -r '"M3_ORIGINAL_UPDATER_READONLY=PASS browser_samples=\(.updater_process_sample.live_original_browser_samples) updater_exe_seen=\(.updater_process_sample.actually_observed_original_updater_executable_samples) corrupted_cases=8"' "$report"
+      - name: Archive only bounded sanitized original updater-disabled browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-browser-updater-readonly
+          path: ${{ runner.temp }}/reports/m3-original-browser-updater-readonly.json
+          if-no-files-found: warn
+          retention-days: 14
