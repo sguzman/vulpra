@@ -1,0 +1,187 @@
+# Source-authenticated original Vulpra starts the *original* packaged
+# crashhelper while rendering a real Wayland frame in private no-egress Arch.
+# On Linux the original Rust helper double-forks: do not assert PPid==browser.
+# Instead correlate the helper argv[1] numeric launch pid with the live actual
+# original browser ELF and the helper's exact /proc/exe, no raw PIDs exported.
+name: M3 Original Browser Live Crashhelper Spawn
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-crashhelper-live-launch.yml
+      - ci/m3-original-browser-crashhelper-live-launch.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-browser-owned-crashhelper-live:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SOURCE_RUN: '40997075527'
+    steps:
+      - name: Checkout only crashhelper witness and private original graphical acceptance
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-crashhelper-live-launch.rs
+            packaging/test-wayland.sh
+      - name: Checkout immutable original Linux crash helper spawning source
+        uses: actions/checkout@v4
+        with:
+          path: source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/crashreporter/nsExceptionHandler.cpp
+            toolkit/crashreporter/crash_helper_client/src/platform/unix.rs
+      - name: Authenticate actual original source and test only bounded Rust witness
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
+          bash -n diagnostics/packaging/test-wayland.sh
+          grep -Fq 'crash_helper_launch(' source/toolkit/crashreporter/nsExceptionHandler.cpp
+          grep -Fq 'crashHelperPath.c_str(), serverSocketFd, tempPath.get(), gToolkitBuildID' source/toolkit/crashreporter/nsExceptionHandler.cpp
+          grep -Fq 'let parent_pid = getpid().to_string();' source/toolkit/crashreporter/crash_helper_client/src/platform/unix.rs
+          grep -Fq 'let pid = posix_spawn(' source/toolkit/crashreporter/crash_helper_client/src/platform/unix.rs
+          grep -Fq 'let crash_helper_pid = i32::from_ne_bytes(pid_buffer);' source/toolkit/crashreporter/crash_helper_client/src/platform/unix.rs
+          rustc --edition=2021 -D warnings --test \
+            diagnostics/ci/m3-original-browser-crashhelper-live-launch.rs \
+            -o "$RUNNER_TEMP/crashhelper-native-tests"
+          "$RUNNER_TEMP/crashhelper-native-tests"
+          rustc --edition=2021 -D warnings -O \
+            diagnostics/ci/m3-original-browser-crashhelper-live-launch.rs \
+            -o "$RUNNER_TEMP/crashhelper-live-witness"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/reports"
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline \
+            --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          for name in vulpra crashhelper crashreporter; do
+            test -x "$RUNNER_TEMP/package/vulpra/$name"
+            test "$(head -c 4 "$RUNNER_TEMP/package/vulpra/$name" | od -An -tx1 | tr -d ' \n')" = 7f454c46
+          done
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/package/vulpra/application.ini"
+      - name: Build isolated Arch container with private Weston and no X display
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-crashhelper"
+          cat >"$RUNNER_TEMP/arch-crashhelper/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            coreutils grep sed findutils bash python gtk3 dbus-glib alsa-lib nss \
+            mesa libglvnd ttf-dejavu weston wayland-utils \
+            && command -v weston && command -v wayland-info \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t m3-original-arch-crashhelper:ci \
+            "$RUNNER_TEMP/arch-crashhelper"
+      - name: Exercise actual original graphical browser and witness live launched helper
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/shim"
+          # Shell variables are expanded inside the disposable container,
+          # never in this GitHub runner; packaged launcher stays unchanged.
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'set -euo pipefail' \
+            'umask 077' \
+            'mkdir -p -m 0700 "$XDG_DATA_HOME/vulpra/default"' \
+            'exec /original/vulpra --no-remote --new-instance --profile "$XDG_DATA_HOME/vulpra/default" "$@"' \
+            >"$RUNNER_TEMP/shim/vulpra-launch"
+          chmod 0755 "$RUNNER_TEMP/shim/vulpra-launch"
+          bash -n "$RUNNER_TEMP/shim/vulpra-launch"
+          docker run --rm --network none --read-only --shm-size 256m \
+            --user "$(id -u):$(id -g)" --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /tmp:rw,nosuid,nodev,size=512m \
+            --mount type=bind,src="$RUNNER_TEMP/package/vulpra",dst=/original,readonly \
+            --mount type=bind,src="$RUNNER_TEMP/shim",dst=/shim,readonly \
+            --mount type=bind,src="$RUNNER_TEMP/crashhelper-live-witness",dst=/audit/crashhelper-witness,readonly \
+            --mount type=bind,src="$GITHUB_WORKSPACE/diagnostics/packaging/test-wayland.sh",dst=/audit/test-wayland.sh,readonly \
+            --mount type=bind,src="$RUNNER_TEMP/reports",dst=/reports \
+            -e HOME=/tmp/private-original-browser-home \
+            -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            -e VULPRA_WAYLAND_TEST_OFFLINE=1 \
+            -e VULPRA_WAYLAND_TEST_SECONDS=10 \
+            -e MOZ_CRASHREPORTER=1 \
+            -e MOZ_CRASHREPORTER_NO_REPORT=1 \
+            m3-original-arch-crashhelper:ci /bin/bash -c '
+              set -euo pipefail
+              unset MOZ_CRASHREPORTER_DISABLE
+              mkdir -m 0700 /tmp/private-original-browser-home
+              /audit/crashhelper-witness /original /reports/m3-original-browser-crashhelper-activation.json &
+              observer_pid="$!"
+              bash /audit/test-wayland.sh /shim
+              wait "$observer_pid"
+              test ! -e /tmp/private-original-browser-home/.mozilla
+              echo "PASS: original live browser launched its real packaged crashhelper, with a private committed Wayland frame"
+            '
+          result="$RUNNER_TEMP/reports/m3-original-browser-crashhelper-activation.json"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="source_pinned_original_browser_spawned_original_crashhelper_live" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .original_browser_observed_sample_count>=3 and
+            .browser_and_matched_crashhelper_concurrent_samples>=3 and
+            .max_live_original_browser_executables>=1 and
+            .max_original_helper_executables_with_live_browser_pid_arg>=1 and
+            .matching_original_helper_observations>=3 and
+            .helper_executable_path_exact_original_package==true and
+            .helper_argv_parent_pid_matches_live_original_browser==true and
+            .original_linux_posix_spawn_source_has_double_fork==true and
+            .helper_immediate_kernel_ppid_required==false and
+            .original_browser_crash_handler_enabled_for_test==true and
+            .deliberate_browser_crash_performed==false and
+            .real_crash_report_or_submission_proven==false and
+            .original_updater_execution_proven==false and
+            .raw_pids_paths_argv_or_private_profiles_exported==false and
+            .network_egress_allowed==false and
+            .test_uses_private_weston_and_temporary_profile==true and
+            .full_normal_feature_launch_or_loader_closure_proven==false and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and .m3_sixth_gate_closed==false
+          ' "$result" >/dev/null
+          # Do not accept positive-looking fabricated browser/helper claims.
+          for mutation in \
+            '.helper_argv_parent_pid_matches_live_original_browser=false' \
+            '.max_original_helper_executables_with_live_browser_pid_arg=0' \
+            '.original_archive_sha256="forged-source"' \
+            '.network_egress_allowed=true'; do
+            jq "$mutation" "$result" >"$RUNNER_TEMP/reports/forged-helper.json"
+            if jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+              .original_source_commit==$src and .original_archive_sha256==$sha and
+              .helper_argv_parent_pid_matches_live_original_browser==true and
+              .max_original_helper_executables_with_live_browser_pid_arg>=1 and
+              .network_egress_allowed==false
+            ' "$RUNNER_TEMP/reports/forged-helper.json" >/dev/null 2>&1; then
+              echo 'FAIL: rejected helper provenance mutation was accepted' >&2; exit 1
+            fi
+          done
+          echo 'M3_REAL_ORIGINAL_BROWSER_SPAWNED_CRASHHELPER=PASS four corrupted summary cases rejected'
+      - name: Upload bounded original browser-to-helper witness only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-browser-owned-crashhelper-launch
+          path: ${{ runner.temp }}/reports/m3-original-browser-crashhelper-activation.json
+          if-no-files-found: warn
+          retention-days: 14
