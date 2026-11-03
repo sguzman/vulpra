@@ -18,22 +18,26 @@ static const char fixture_version[] = "0.0.1";
 
 static const char *ORT_API_CALL get_name(const OrtEpFactory *factory) {
   (void)factory;
+  fputs("M3_EP_CALLBACK=get_name\n", stderr); fflush(stderr);
   return provider_name;
 }
 
 static const char *ORT_API_CALL get_vendor(const OrtEpFactory *factory) {
   (void)factory;
+  fputs("M3_EP_CALLBACK=get_vendor\n", stderr); fflush(stderr);
   return vendor_name;
 }
 
 // This test plugin claims NO real hardware or supported OrtEpDevice.
 static uint32_t ORT_API_CALL get_vendor_id(const OrtEpFactory *factory) {
   (void)factory;
+  fputs("M3_EP_CALLBACK=get_vendor_id\n", stderr); fflush(stderr);
   return 0;  // CI fixture, no PCI hardware vendor.
 }
 
 static const char *ORT_API_CALL get_version(const OrtEpFactory *factory) {
   (void)factory;
+  fputs("M3_EP_CALLBACK=get_version\n", stderr); fflush(stderr);
   return fixture_version;
 }
 
@@ -46,6 +50,7 @@ static OrtStatus *ORT_API_CALL get_supported_devices(
   (void)device_count;
   (void)ep_devices;
   (void)max_ep_devices;
+  fputs("M3_EP_CALLBACK=get_supported_devices\n", stderr); fflush(stderr);
   if (num_ep_devices == NULL) {
     return runtime_api != NULL
                ? runtime_api->CreateStatus(ORT_INVALID_ARGUMENT, "missing count")
@@ -67,6 +72,7 @@ static OrtStatus *ORT_API_CALL create_ep(
   (void)device_count;
   (void)session_options;
   (void)logger;
+  fputs("M3_EP_CALLBACK=create_ep\n", stderr); fflush(stderr);
   if (ep != NULL) {
     *ep = NULL;
   }
@@ -79,6 +85,7 @@ static OrtStatus *ORT_API_CALL create_ep(
 static void ORT_API_CALL release_ep(OrtEpFactory *factory, OrtEp *ep) {
   (void)factory;
   (void)ep;  // No EP can be created by this non-executing fixture.
+  fputs("M3_EP_CALLBACK=release_ep\n", stderr); fflush(stderr);
 }
 
 static OrtEpFactory *make_factory(void) {
