@@ -5,7 +5,7 @@
 // Linux stage arguments match a temporary missing-MAR fixture.
 // This is an authentic original-browser execv *attempt*, not an updater exec.
 // No raw argument bytes, PIDs, paths, profiles or user files exported.
-use std::ffi::{c_char,c_int,CStr};
+use std::ffi::{c_char,c_int,c_void,CStr};
 #[cfg(test)]
 use std::path::Path;
 #[cfg(test)]
@@ -18,8 +18,8 @@ const JSON:&[u8]=br#"{"schema_version":1,"status":"original_native_browser_stagi
 "#;
 unsafe extern "C" {
     fn readlink(path:*const c_char,out:*mut c_char,len:usize)->isize;
-    fn open(path:*const c_char,flags:c_int,mode:c_int)->c_int;
-    fn write(fd:c_int,buf:*const u8,len:usize)->isize;
+    fn open(path:*const c_char,flags:c_int,...)->c_int;
+    fn write(fd:c_int,buf:*const c_void,len:usize)->isize;
     fn close(fd:c_int)->c_int;
     fn __errno_location()->*mut c_int;
 }
@@ -41,7 +41,7 @@ unsafe fn record(){
     if fd<0{return}
     let mut left=JSON;
     while !left.is_empty(){
-        let n=unsafe{write(fd,left.as_ptr(),left.len())};
+        let n=unsafe{write(fd,left.as_ptr().cast(),left.len())};
         if n<=0{break}
         left=&left[n as usize..];
     }
