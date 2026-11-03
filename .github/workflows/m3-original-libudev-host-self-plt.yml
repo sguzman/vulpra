@@ -1,0 +1,178 @@
+# Source-pinned original WebAuthn glibc requester/provider and current Arch
+# libudev's own versioned JUMP_SLOT. Separate host ELF build from original CI:
+# same filename is not proof of byte-for-byte identical host library.
+name: M3 Original Libudev Host Internal PLT Relocation Crosswalk
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-libudev-host-self-plt.yml
+      - ci/m3-original-libudev-host-self-plt.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  arch-host-libudev-self-relocation:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout only native host ELF relocation crosswalk
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-libudev-host-self-plt.jq
+      - name: Authenticate original native browser and original Rust source artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41694350808" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="64fc84f3b0d6e6138649a467c57fb46d0c0145b7" and
+              .path==".github/workflows/m3-original-browser-usb-nodevice-loader.yml"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41358205206" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="3243200db85c6d75e4847b1e2b34ec3ee92e7673" and
+              .path==".github/workflows/m3-original-webauthn-libudev-host-abi.yml"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/original-browser-evidence" "$RUNNER_TEMP/original-source-abi" \
+            "$RUNNER_TEMP/arch-host-elf" "$RUNNER_TEMP/accepted"
+          gh run download 41694350808 --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-browser-usb-nodevice-loader --dir "$RUNNER_TEMP/original-browser-evidence"
+          gh run download 41358205206 --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-webauthn-libudev-two-host-abi --dir "$RUNNER_TEMP/original-source-abi"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_browser_source_pinned_glibc_no_preload_udev_binding_reconciled" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .native_glibc_unattributed_external_symbol_names==["udev_monitor_filter_update"] and
+            .native_glibc_unattributed_symbol_binding_events==1 and
+            .native_glibc_unattributed_symbol_glibc_requester_basenames==["libudev.so.1"] and
+            .native_glibc_unattributed_symbol_provider_basenames==["libudev.so.1"] and
+            .extra_symbol_original_caller_ownership_proven==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/original-browser-evidence/m3-original-udev-glibc-bindings-crosswalk.json" >/dev/null
+          jq -e --arg src "$SOURCE_SHA" '
+            .schema_version==1 and
+            .status=="pinned_webauthn_libudev_isolated_host_dynamic_abi" and
+            .original_source_commit==$src and .isolated_host=="archlinux-container" and
+            .source_declared_udev_symbol_count==49 and .host_resolved_udev_symbol_count==49 and
+            (.source_declared_udev_symbols|length)==49 and
+            (.source_declared_udev_symbols|index("udev_monitor_filter_update"))==null and
+            .original_browser_executed==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/original-source-abi/m3-original-udev-arch.json" >/dev/null
+      - name: Prepare disposable Arch userspace with real host libudev ELF and binutils
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-libudev-self-plt"
+          cat >"$RUNNER_TEMP/arch-libudev-self-plt/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed systemd-libs binutils coreutils bash \
+            && test -r /usr/lib/libudev.so.1 \
+            && command -v readelf && command -v sha256sum \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t vulpra-m3-arch-libudev-self-plt:ci \
+            "$RUNNER_TEMP/arch-libudev-self-plt"
+      - name: Read actual isolated Arch native ELF relocation and global symbol without network
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --pids-limit 32 --memory 256m \
+            --user "$(id -u):$(id -g)" \
+            -v "$RUNNER_TEMP/arch-host-elf:/evidence:rw" \
+            vulpra-m3-arch-libudev-self-plt:ci /bin/bash -c '
+              set -euo pipefail
+              so=$(readlink -f /usr/lib/libudev.so.1)
+              test -f "$so"
+              test "$(basename "$so")" = libudev.so.1.7.15
+              readelf -h "$so" | grep -Fq "ELF64"
+              readelf -Wr "$so" > /evidence/relocations.private.txt
+              readelf -W --dyn-syms "$so" > /evidence/dynsym.private.txt
+              sha256sum "$so" | cut -d " " -f 1 > /evidence/sha256.txt
+              basename "$so" > /evidence/backing_name.txt
+            '
+          test -s "$RUNNER_TEMP/arch-host-elf/relocations.private.txt"
+          test -s "$RUNNER_TEMP/arch-host-elf/dynsym.private.txt"
+          test -s "$RUNNER_TEMP/arch-host-elf/sha256.txt"
+          test -s "$RUNNER_TEMP/arch-host-elf/backing_name.txt"
+          test "$(stat -c %s "$RUNNER_TEMP/arch-host-elf/relocations.private.txt")" -le 1048576
+          test "$(stat -c %s "$RUNNER_TEMP/arch-host-elf/dynsym.private.txt")" -le 1048576
+      - name: Crosscheck original browser self-binding with host versioned PLT and negative mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/original-browser-evidence/m3-original-udev-glibc-bindings-crosswalk.json"
+          abi="$RUNNER_TEMP/original-source-abi/m3-original-udev-arch.json"
+          elf="$RUNNER_TEMP/arch-host-elf"
+          out="$RUNNER_TEMP/accepted/m3-original-host-libudev-self-plt-crosswalk.json"
+          name=$(cat "$elf/backing_name.txt")
+          sha=$(cat "$elf/sha256.txt")
+          audit() {
+            jq -n --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
+              --arg arch_backing_name "$5" --arg arch_elf_sha256 "$6" \
+              --rawfile relocs "$1" --rawfile dynsym "$2" \
+              --slurpfile glibc "$3" --slurpfile abi "$4" \
+              -f ci/m3-original-libudev-host-self-plt.jq
+          }
+          audit "$elf/relocations.private.txt" "$elf/dynsym.private.txt" "$archive" "$abi" "$name" "$sha" > "$out"
+          jq -e '
+            .schema_version==1 and
+            .status=="arch_libudev_internal_versioned_plt_self_binding_correlated_with_original_vulpra_runtime" and
+            .compared_arch_host_elf_backing_name=="libudev.so.1.7.15" and
+            .host_relocation_kind=="R_X86_64_JUMP_SLOT" and
+            .host_relocation_symbol=="udev_monitor_filter_update" and
+            .host_relocation_version=="LIBUDEV_183" and
+            .host_dynamic_symbol_is_defined_global_func==true and
+            .glibc_browser_observed_self_binding==true and
+            .extra_symbol_not_original_web_authn_ffi_declaration==true and
+            .independent_arch_host_elf_binaries_cryptographically_matched==false and
+            .original_browser_uninstrumented_rust_call_stack_proven==false and
+            .specific_internal_libudev_source_instruction_proven==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false
+          ' "$out" >/dev/null
+          grep -v 'udev_monitor_filter_update' "$elf/relocations.private.txt" >"$elf/mutant.private.txt"
+          if audit "$elf/mutant.private.txt" "$elf/dynsym.private.txt" "$archive" "$abi" "$name" "$sha" >/dev/null 2>&1; then
+            echo 'FAIL: missing real PLT self relocation accepted' >&2; exit 1
+          fi
+          grep -v 'udev_monitor_filter_update' "$elf/dynsym.private.txt" >"$elf/mutant.private.txt"
+          if audit "$elf/relocations.private.txt" "$elf/mutant.private.txt" "$archive" "$abi" "$name" "$sha" >/dev/null 2>&1; then
+            echo 'FAIL: missing defined versioned exported function accepted' >&2; exit 1
+          fi
+          jq '.native_glibc_unattributed_symbol_glibc_requester_basenames=["libxul.so"]' "$archive" >"$elf/mutant.json"
+          if audit "$elf/relocations.private.txt" "$elf/dynsym.private.txt" "$elf/mutant.json" "$abi" "$name" "$sha" >/dev/null 2>&1; then
+            echo 'FAIL: forged actual browser glibc self-binding accepted' >&2; exit 1
+          fi
+          jq '.source_declared_udev_symbols |=
+            (map(select(.!="udev_new"))+["udev_monitor_filter_update"])' "$abi" >"$elf/mutant.json"
+          if audit "$elf/relocations.private.txt" "$elf/dynsym.private.txt" "$archive" "$elf/mutant.json" "$name" "$sha" >/dev/null 2>&1; then
+            echo 'FAIL: inaccurate original Rust source symbol membership accepted' >&2; exit 1
+          fi
+          if audit "$elf/relocations.private.txt" "$elf/dynsym.private.txt" "$archive" "$abi" \
+             "libudev.so.1.7.10" "$sha" >/dev/null 2>&1; then
+            echo 'FAIL: mismatched compared Arch host ELF backing name accepted' >&2; exit 1
+          fi
+          if audit "$elf/relocations.private.txt" "$elf/dynsym.private.txt" "$archive" "$abi" \
+             "$name" "invalid-elf-sha" >/dev/null 2>&1; then
+            echo 'FAIL: invalid native host ELF fingerprint accepted' >&2; exit 1
+          fi
+          echo 'PASS: native Arch libudev versioned internal PLT relocation and six negative mutations, without claiming byte-identical browser host ELF or FFI closure'
+      - name: Upload only sanitized native ELF vs original browser evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-libudev-host-self-plt-crosswalk
+          path: ${{ runner.temp }}/accepted/m3-original-host-libudev-self-plt-crosswalk.json
+          if-no-files-found: error
+          retention-days: 14
