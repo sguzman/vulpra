@@ -13,6 +13,12 @@ name: M3 Original Browser USB Backend No-Device Loader Probe
 # glibc libudev request/provider evidence and seven native negative tests
 # accepted in CI 41694350808. Manual-only expensive native workflow.
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-usb-nodevice-loader.yml
+      - ci/m3-original-browser-libudev-host-fingerprint.rs
+      - ci/m3-original-browser-libudev-hash-crosswalk.jq
   workflow_dispatch:
 permissions:
   contents: read
@@ -39,6 +45,8 @@ jobs:
             ci/m3-original-webauthn-usb-maps-crosswalk.jq
             ci/m3-original-udev-glibc-bindings.rs
             ci/m3-original-udev-glibc-bindings-crosswalk.jq
+            ci/m3-original-browser-libudev-host-fingerprint.rs
+            ci/m3-original-browser-libudev-hash-crosswalk.jq
       - name: Checkout original source WebAuthn virtual-authenticator regression
         uses: actions/checkout@v4
         with:
@@ -77,6 +85,11 @@ jobs:
           "$RUNNER_TEMP/m3-original-udev-glibc-bindings-tests"
           rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-udev-glibc-bindings.rs \
             -o "$RUNNER_TEMP/m3-original-udev-glibc-observer"
+          rustc --edition=2021 -D warnings --test diagnostics/ci/m3-original-browser-libudev-host-fingerprint.rs \
+            -o "$RUNNER_TEMP/m3-original-browser-libudev-fingerprint-tests"
+          "$RUNNER_TEMP/m3-original-browser-libudev-fingerprint-tests"
+          rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-libudev-host-fingerprint.rs \
+            -o "$RUNNER_TEMP/m3-original-browser-libudev-fingerprint"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
             jq -e --arg src "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$src' >/dev/null
           mkdir -p "$RUNNER_TEMP/original-archive" "$RUNNER_TEMP/packaged" "$RUNNER_TEMP/reports"
@@ -139,6 +152,7 @@ jobs:
             -v "$RUNNER_TEMP/m3-original-local-origin:/audit/local-origin:ro" \
             -v "$RUNNER_TEMP/m3-webauthn-on-demand-maps:/audit/on-demand-maps:ro" \
             -v "$RUNNER_TEMP/m3-original-udev-glibc-observer:/audit/glibc-observer:ro" \
+            -v "$RUNNER_TEMP/m3-original-browser-libudev-fingerprint:/audit/host-libudev-fingerprint:ro" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-webauthn-webdriver.sh:/audit/webdriver.sh:ro" \
             -v "$RUNNER_TEMP/reports:/reports:rw" \
             -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
@@ -148,6 +162,7 @@ jobs:
             -e VULPRA_M3_NO_USB_PASSTHROUGH=1 \
             -e VULPRA_M3_WEBAUTHN_MAP_PHASES=1 \
             -e VULPRA_M3_GLIBC_BINDINGS=1 \
+            -e VULPRA_M3_LIBUDEV_HOST_FINGERPRINT=1 \
             vulpra-m3-original-webauthn:ci /bin/bash -c '
               set -euo pipefail
               ip link set lo up
@@ -325,12 +340,60 @@ jobs:
             echo 'FAIL: wrong native backing provider for extra symbol accepted' >&2; exit 1
           fi
           echo 'PASS: actual glibc provider and extra symbol requester distinguished; seven negative mutations rejected'
+      - name: Reconcile live original-browser libudev hash against independently inspected Arch ELF
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41707399519" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="5370275c2098cadde4c628ef82985a68829f3f46" and
+              .path==".github/workflows/m3-original-libudev-host-self-reloc.yml"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/prior-arch-elf"
+          gh run download 41707399519 --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-libudev-host-self-reloc-crosswalk --dir "$RUNNER_TEMP/prior-arch-elf"
+          live="$RUNNER_TEMP/reports/m3-original-browser-libudev-host-fingerprint.json"
+          maps="$RUNNER_TEMP/reports/m3-original-webauthn-usb-maps-crosswalk.json"
+          glibc="$RUNNER_TEMP/reports/m3-original-udev-glibc-bindings-crosswalk.json"
+          arch="$RUNNER_TEMP/prior-arch-elf/m3-original-host-libudev-self-reloc-crosswalk.json"
+          result="$RUNNER_TEMP/reports/m3-original-browser-libudev-hash-crosswalk.json"
+          test -s "$live" && test -s "$maps" && test -s "$glibc" && test -s "$arch"
+          check() {
+            jq -n --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
+              --slurpfile live "$1" --slurpfile maps "$2" \
+              --slurpfile glibc "$3" --slurpfile arch "$4" \
+              -f diagnostics/ci/m3-original-browser-libudev-hash-crosswalk.jq
+          }
+          check "$live" "$maps" "$glibc" "$arch" > "$result"
+          jq -e '.schema_version==1 and
+            .status=="source_pinned_original_browser_host_libudev_elf_fingerprint_reconciled" and
+            .mapped_file_device_and_inode_checked==true and
+            (.separate_arch_host_elf_byte_identical_to_browser_host|type)=="boolean" and
+            .byte_identity_proves_exact_instruction_or_rust_ffi_caller==false and
+            .full_native_dependency_closure_proven==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false' "$result" >/dev/null
+          for change in \
+            '.host_mapped_elf_sha256="bad-hash"' \
+            '.mapped_elf_device_and_inode_verified=false' \
+            '.original_source_commit="forged-source"' \
+            '.host_mapped_elf_backing_name="libudev.so.1.7.10"'; do
+            jq "$change" "$live" > "$RUNNER_TEMP/reports/fingerprint-mutant.json"
+            if check "$RUNNER_TEMP/reports/fingerprint-mutant.json" "$maps" "$glibc" "$arch" >/dev/null 2>&1; then
+              echo "FAIL: forged original browser host libudev fingerprint accepted" >&2; exit 1
+            fi
+          done
+          echo "PASS: original browser mapped libudev SHA evidence and four corruptions rejected"
+          jq -r '"M3_HOST_LIBUDEV_BYTE_IDENTICAL_TO_INDEPENDENT_ARCH_ELF=\(.separate_arch_host_elf_byte_identical_to_browser_host)"' "$result"
       - name: Upload only sanitized browser feature observations
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: m3-original-browser-usb-nodevice-loader
           path: |
+            ${{ runner.temp }}/reports/m3-original-browser-libudev-host-fingerprint.json
+            ${{ runner.temp }}/reports/m3-original-browser-libudev-hash-crosswalk.json
             ${{ runner.temp }}/reports/m3-original-browser-usb-nodevice-loader.json
             ${{ runner.temp }}/reports/m3-original-webauthn-usb-before-maps.json
             ${{ runner.temp }}/reports/m3-original-webauthn-usb-during-maps.json
