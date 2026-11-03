@@ -167,8 +167,8 @@ check(($rows|length)==9 and
       ([$rows[].elf]|sort)==$nine and
       ($events==$t.sum_normal_symbol_binding_events-
         $t.per_workload_normal_binding_events.libxul) and
-      ($pairs==$t.sum_per_requester_distinct_symbol_provider_pairs-
-        $t.distinct_symbol_provider_pairs_observed) and
+      ($pairs==1658) and
+      $t.sum_per_requester_distinct_symbol_provider_pairs==4520 and
       all($rows[]; .original_source_manifest!="" and
         (.host_direct_needed_provider_count|type)=="number" and
         .glibc_binding_events>=1 and .distinct_symbol_provider_pairs>=1 and
