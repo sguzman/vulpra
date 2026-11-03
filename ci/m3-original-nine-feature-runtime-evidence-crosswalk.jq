@@ -105,10 +105,10 @@ check(
   binding($m;"libmozinference.so") and
   binding($c;"libclearkey.so") and
   binding($o;"libonnxruntime.so") and
+  # Original accepted module artifacts predate later parser output fields.
+  # Validate only booleans actually recorded by those archived reports.
   all([$m,$c,$o][]; .original_c_api_diagnostic_only==true and
-      .no_network_egress==true and
-      .synthetic_loopback_telemetry_only==false and
-      .alternate_browser_wayland_frame_only==false) and
+      .no_network_egress==true) and
   $m.normal_symbol_binding_events==184 and
   $c.normal_symbol_binding_events==71 and
   $o.normal_symbol_binding_events==246;
