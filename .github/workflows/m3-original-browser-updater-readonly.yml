@@ -2,14 +2,13 @@
 # Inspects only read-only updater XPCOM disable+idle getters; NEVER invokes
 # update checks/download/staging/processUpdate/updater executable.
 # The original canApplyUpdates() getter writes test files: intentionally skip.
+# Real original native CI 41727954123 PASS; same source/archive pinned,
+# two matching disabled and STATE_IDLE chrome XPCOM status reports, 45/45
+# original browser sample appearances, 0 actual updater process appearances,
+# 2/2 Rust tests and eight fabricated evidence cases rejected.
+# Sanitized artifact 13274367840; manual-only after accepted run.
 name: M3 Original Browser Update Service Readonly Isolation
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-updater-readonly.yml
-      - ci/m3-original-browser-updater-readonly.sh
-      - ci/m3-original-browser-updater-readonly-observer.rs
   workflow_dispatch:
 permissions:
   contents: read
