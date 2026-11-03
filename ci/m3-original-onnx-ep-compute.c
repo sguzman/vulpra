@@ -26,19 +26,18 @@ OrtStatus *m3_ci_compute_get_capability(const OrtApi *api,
   if (api == NULL || ep_api == NULL || graph == NULL || support == NULL) {
     return ci_status(ORT_INVALID_ARGUMENT, "invalid compute capability arguments");
   }
-  const OrtModelEditorApi *editor = api->GetModelEditorApi();
-  if (editor == NULL) return ci_status(ORT_NOT_IMPLEMENTED, "model editor API missing");
+  // Graph introspection is part of OrtApi (not OrtModelEditorApi) in v30.
   size_t count = 0;
-  OrtStatus *st = editor->Graph_GetNumNodes(graph, &count);
+  OrtStatus *st = api->Graph_GetNumNodes(graph, &count);
   if (st != NULL) return st;
   if (count != 1) return NULL; // Do not claim partial or unknown graphs.
   const OrtNode *node = NULL;
-  st = editor->Graph_GetNodes(graph, &node, 1);
+  st = api->Graph_GetNodes(graph, &node, 1);
   if (st != NULL) return st;
   const char *op = NULL, *domain = NULL;
-  st = editor->Node_GetOperatorType(node, &op);
+  st = api->Node_GetOperatorType(node, &op);
   if (st != NULL) return st;
-  st = editor->Node_GetDomain(node, &domain);
+  st = api->Node_GetDomain(node, &domain);
   if (st != NULL) return st;
   if (op == NULL || strcmp(op, "Mul") != 0 ||
       (domain != NULL && domain[0] != '\0')) {
