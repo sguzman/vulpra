@@ -117,11 +117,13 @@ const TENSOR_DIMENSIONS_COUNT: usize = 61;
 const TENSOR_DIMENSIONS: usize = 62;
 const TENSOR_ELEMENT_COUNT: usize = 64;
 const TENSOR_TYPE_AND_SHAPE: usize = 65;
+const AVAILABLE_PROVIDERS: usize = 125;
+const RELEASE_PROVIDERS: usize = 126;
 const TENSOR_FLOAT32: c_int = 1;
 
 unsafe fn api_function<T: Copy>(api: *const OrtApiV1Prefix, index: usize) -> T {
     assert_eq!(std::mem::size_of::<T>(), std::mem::size_of::<*const c_void>());
-    assert!(index <= TENSOR_TYPE_AND_SHAPE);
+    assert!(index <= RELEASE_PROVIDERS);
     // SAFETY: CI verifies these offsets from the pinned upstream C header,
     // and OrtApi's stable v1 function table is never shortened in later APIs.
     let raw = unsafe { *api.cast::<*const c_void>().add(index) };
@@ -186,6 +188,48 @@ fn require_status(api: &OrtApiV1Prefix, status: *mut c_void, op: &'static str) -
     // retain them in CI or stderr; preserve only which C API operation failed.
     let _ = api.get_error_message;
     Err(format!("original native ONNX {op} returned a non-null status"))
+}
+
+// Original ORT execution-provider inventory and explicitly selected CPU EP.
+// No inference about optional GPU provider functionality is made from a name.
+fn verify_explicit_cpu_provider(
+    api: *const OrtApiV1Prefix, handle: *mut c_void, opts: *mut c_void
+) -> Result<(), String> {
+    type ListProviders = unsafe extern "C" fn(*mut *mut *mut c_char, *mut c_int) -> *mut c_void;
+    type ReleaseProviders = unsafe extern "C" fn(*mut *mut c_char, c_int) -> *mut c_void;
+    type AppendCpu = unsafe extern "C" fn(*mut c_void, c_int) -> *mut c_void;
+    let list: ListProviders = unsafe { api_function(api, AVAILABLE_PROVIDERS) };
+    let release: ReleaseProviders = unsafe { api_function(api, RELEASE_PROVIDERS) };
+    let mut names: *mut *mut c_char = ptr::null_mut();
+    let mut length: c_int = 0;
+    require_status(unsafe { &*api }, unsafe { list(&mut names, &mut length) }, "GetAvailableProviders")?;
+    if names.is_null() || !(1..=32).contains(&length) {
+        return Err("original ONNX returned invalid provider count".into());
+    }
+    let mut cpu_present = false;
+    for index in 0..(length as usize) {
+        let name = unsafe { *names.add(index) };
+        if name.is_null() {
+            return Err("original ONNX reported a null provider name".into());
+        }
+        let bytes = unsafe { CStr::from_ptr(name) }.to_bytes();
+        if bytes.len() > 127 || bytes.is_empty() {
+            return Err("original ONNX returned invalid provider-name length".into());
+        }
+        cpu_present |= bytes == b"CPUExecutionProvider";
+    }
+    require_status(unsafe { &*api }, unsafe { release(names, length) }, "ReleaseAvailableProviders")?;
+    if !cpu_present {
+        return Err("original ONNX has no reported CPU execution provider".into());
+    }
+
+    let append = unsafe { dlsym(handle, c"OrtSessionOptionsAppendExecutionProvider_CPU".as_ptr()) };
+    if append.is_null() {
+        return Err("original ONNX CPU append provider entry point not exported".into());
+    }
+    let append: AppendCpu = unsafe { std::mem::transmute(append) };
+    require_status(unsafe { &*api }, unsafe { append(opts, 1) }, "AppendExecutionProvider_CPU")?;
+    Ok(())
 }
 
 // Optional original ONNX-controlled dynamic library registration, NOT
@@ -257,7 +301,11 @@ fn run() -> Result<(), String> {
     require_status(api, unsafe { (api.create_session_options)(&mut opts) }, "CreateSessionOptions")?;
     if opts.is_null() { return Err("ONNX session options null".into()); }
     if args.len() == 3 {
-        test_custom_ops_plugin(api, opts, &args[2])?;
+        if args[2] == "--explicit-cpu" {
+            verify_explicit_cpu_provider(api, handle, opts)?;
+        } else {
+            test_custom_ops_plugin(api, opts, &args[2])?;
+        }
     }
     let model = constant_model();
     if model.len() > 4096 || model.len() < 45 {
@@ -283,7 +331,9 @@ fn run() -> Result<(), String> {
     // Intentional process-lifetime cleanup in this one-shot isolated CI probe:
     // v1 API release function pointers occur beyond the prefix used here.
     // No long-lived service or user process is started.
-    if args.len() == 3 {
+    if args.len() == 3 && args[2] == "--explicit-cpu" {
+        println!("PASS: original ONNX reported and registered CPU execution provider, exact float32[1] output 1.25");
+    } else if args.len() == 3 {
         println!("PASS: original ONNX custom ops plugin callback invoked and CPU Constant output equals float32[1] value 1.25");
     } else {
         println!("PASS: exact original packaged ONNX Runtime CPU Constant output equals float32[1] value 1.25");
@@ -319,6 +369,8 @@ mod tests {
         assert_eq!(TENSOR_DIMENSIONS, 62);
         assert_eq!(TENSOR_ELEMENT_COUNT, 64);
         assert_eq!(TENSOR_TYPE_AND_SHAPE, 65);
+        assert_eq!(AVAILABLE_PROVIDERS, 125);
+        assert_eq!(RELEASE_PROVIDERS, 126);
         assert_eq!(1.25f32.to_bits(), 0x3fa00000);
     }
     #[test]

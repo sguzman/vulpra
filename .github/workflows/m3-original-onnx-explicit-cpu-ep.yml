@@ -1,0 +1,186 @@
+# Exact-original compiled ONNX: list real execution providers, explicitly
+# register CPU EP and run numeric CPU Constant. Not a GPU/provider plugin test.
+name: M3 Original ONNX Explicit CPU Provider Registration
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-onnx-explicit-cpu-ep.yml
+      - ci/m3-original-onnx-constant-session.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-compiled-onnx-cpu-provider:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      ORIGINAL_RUN: '40997075527'
+      NUMERIC_RUN: '41528669862'
+      NUMERIC_HEAD: 31a3a5f7047ec367bdb050c2e3fd5dfc319f84dd
+    steps:
+      - name: Checkout original CPU provider probe and optional observer
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-onnx-constant-session.rs
+            ci/m3-original-onnx-inner-dlopen-observe.c
+      - name: Compile provider probe and authenticate actual upstream C ABI
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-original-onnx-constant-session.rs \
+            -o "$RUNNER_TEMP/onnx-cpu-ep-tests"
+          "$RUNNER_TEMP/onnx-cpu-ep-tests"
+          rustc --edition=2021 -C opt-level=1 \
+            ci/m3-original-onnx-constant-session.rs -o "$RUNNER_TEMP/onnx-cpu-ep"
+          cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -fno-omit-frame-pointer \
+            -shared ci/m3-original-onnx-inner-dlopen-observe.c \
+            -o "$RUNNER_TEMP/onnx-origin-observe.so" -ldl
+          gh api repos/microsoft/onnxruntime/git/blobs/b01b7e48dc87bbeeb026c61fb06c591053853ad1 \
+            --jq .content | base64 -d >"$RUNNER_TEMP/onnxruntime_c_api.h"
+          test "$(git hash-object "$RUNNER_TEMP/onnxruntime_c_api.h")" = \
+            b01b7e48dc87bbeeb026c61fb06c591053853ad1
+          cat >"$RUNNER_TEMP/verify-provider-offsets.c" <<'C'
+          #include <stddef.h>
+          #include "onnxruntime_c_api.h"
+          #define CHECK(field,slot) _Static_assert(offsetof(OrtApi,field)==(slot)*sizeof(void*), "OrtApi mismatch: " #field)
+          CHECK(GetAvailableProviders, 125);
+          CHECK(ReleaseAvailableProviders, 126);
+          CHECK(IsTensor, 50);
+          CHECK(GetTensorMutableData, 51);
+          CHECK(GetTensorTypeAndShape, 65);
+          int main(void) { return 0; }
+          C
+          cc -std=c11 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
+            "$RUNNER_TEMP/verify-provider-offsets.c" \
+            -o "$RUNNER_TEMP/verify-provider-offsets"
+          "$RUNNER_TEMP/verify-provider-offsets"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NUMERIC_RUN" |
+            jq -e --arg sha "$NUMERIC_HEAD" '
+              .status=="completed" and .conclusion=="success" and
+              .head_sha==$sha and
+              .path==".github/workflows/m3-original-onnx-constant-session.yml"
+            ' >/dev/null
+          echo 'PASS: original ONNX numerical probe tests and exact public C header provider list ABI offsets'
+      - name: Obtain authenticated source-pinned original full-normal ONNX library
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
+            jq -e --arg sha "$SOURCE_SHA" '
+              .status=="completed" and .conclusion=="success" and .head_sha==$sha
+            ' >/dev/null
+          mkdir -p "$RUNNER_TEMP/original" "$RUNNER_TEMP/package"
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/original"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE_SHA"
+          tar -xf "$RUNNER_TEMP/original/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          test -s "$RUNNER_TEMP/package/vulpra/libonnxruntime.so"
+          nm -D --defined-only "$RUNNER_TEMP/package/vulpra/libonnxruntime.so" |
+            grep -Eq ' OrtGetApiBase(@|$)'
+          # Do not substitute another ONNX library when the original package
+          # omits explicit CPU EP registration; fail rather than claiming it.
+          nm -D --defined-only "$RUNNER_TEMP/package/vulpra/libonnxruntime.so" |
+            grep -Eq ' OrtSessionOptionsAppendExecutionProvider_CPU(@|$)'
+      - name: Explicitly register original CPU provider in two isolated real sessions
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          pkg="$RUNNER_TEMP/package/vulpra"
+          probe="$RUNNER_TEMP/onnx-cpu-ep"
+          observer="$RUNNER_TEMP/onnx-origin-observe.so"
+          report="$RUNNER_TEMP/onnx-explicit-cpu-origin.json"
+          sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            LD_LIBRARY_PATH="$pkg" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 35s \
+            "$probe" "$pkg/libonnxruntime.so" --explicit-cpu |
+            tee "$RUNNER_TEMP/cpu-control.stdout" >/dev/null
+          grep -Fxq 'PASS: original ONNX reported and registered CPU execution provider, exact float32[1] output 1.25' \
+            "$RUNNER_TEMP/cpu-control.stdout"
+          sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            LD_LIBRARY_PATH="$pkg" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 35s \
+            env LD_PRELOAD="$observer" M3_ONNX_INNER_DLOPEN_REPORT="$report" \
+            "$probe" "$pkg/libonnxruntime.so" --explicit-cpu |
+            tee "$RUNNER_TEMP/cpu-observed.stdout" >/dev/null
+          grep -Fxq 'PASS: original ONNX reported and registered CPU execution provider, exact float32[1] output 1.25' \
+            "$RUNNER_TEMP/cpu-observed.stdout"
+          test -s "$report"
+          sudo chmod 0644 "$report"
+          jq -e '
+            .schema_version==1 and .target_origin_basename=="libonnxruntime.so" and
+            .onnx_origin_dlopen_calls>=0 and
+            .all_interposed_dlopen_calls==
+              (.onnx_origin_dlopen_calls+.other_origin_dlopen_calls) and
+            .onnx_origin_dlopen_calls==
+              (.onnx_origin_successful_dlopen_calls+.onnx_origin_failed_dlopen_calls) and
+            .raw_caller_addresses_or_library_names_retained==false and
+            .complete_native_loader_graph_proven==false
+          ' "$report" >/dev/null
+          jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+            --slurpfile obs "$report" '
+            ($obs[0]) as $o |
+            {
+              schema_version:1,
+              status:"original_onnx_explicit_cpu_execution_provider_registered_and_inference_verified",
+              original_source_commit:$src,
+              original_native_archive_sha256:$sha,
+              exact_upstream_public_ortapi_header_blob:"b01b7e48dc87bbeeb026c61fb06c591053853ad1",
+              original_provider_list_contains_cpu:true,
+              original_cpu_registration_c_export_present:true,
+              original_cpu_provider_registration_returned_success:true,
+              original_session_run_in_both_isolated_modes:true,
+              actual_output_float32_shape:[1],
+              actual_output_float32_value:"1.25",
+              original_onnx_origin_dlopen_calls:$o.onnx_origin_dlopen_calls,
+              original_onnx_origin_dlopen_successes:$o.onnx_origin_successful_dlopen_calls,
+              original_onnx_origin_dlopen_failures:$o.onnx_origin_failed_dlopen_calls,
+              other_harness_origin_dlopen_calls:$o.other_origin_dlopen_calls,
+              no_external_gpu_or_execution_provider_registration_attempted:true,
+              non_cpu_provider_names_or_counts_not_assumed:true,
+              this_cpu_execution_provider_may_be_statically_built_in:true,
+              gpu_execution_provider_registration_or_loading_proven:false,
+              provider_dynamic_loading_exhaustively_proven:false,
+              browser_ml_frontend_or_host_gpu_tested:false,
+              source_pruning_authorized:false,
+              native_bytes_saved:0,
+              m3_sixth_gate_closed:false
+            }' >"$RUNNER_TEMP/m3-original-onnx-explicit-cpu-ep.json"
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_onnx_explicit_cpu_execution_provider_registered_and_inference_verified" and
+            .original_source_commit==$src and
+            .original_native_archive_sha256==$sha and
+            .original_provider_list_contains_cpu==true and
+            .original_cpu_registration_c_export_present==true and
+            .original_cpu_provider_registration_returned_success==true and
+            .original_session_run_in_both_isolated_modes==true and
+            .actual_output_float32_shape==[1] and
+            .actual_output_float32_value=="1.25" and
+            .no_external_gpu_or_execution_provider_registration_attempted==true and
+            .gpu_execution_provider_registration_or_loading_proven==false and
+            .provider_dynamic_loading_exhaustively_proven==false and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-onnx-explicit-cpu-ep.json" >/dev/null
+          echo 'PASS: exact source-pinned original ORT C provider API explicitly registers CPU, retains numeric inference'
+      - name: Preserve bounded source-pinned CPU provider acceptance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-onnx-explicit-cpu-provider
+          path: ${{ runner.temp }}/m3-original-onnx-explicit-cpu-ep.json
+          if-no-files-found: error
+          retention-days: 14
