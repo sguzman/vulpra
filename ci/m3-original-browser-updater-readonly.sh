@@ -70,8 +70,10 @@ for _ in {1..65}; do
   sleep 0.3
 done
 [[ "$ready" == 1 ]] || { echo 'Original browser WebDriver inaccessible' >&2; exit 1; }
+echo "M3_UPDATE_STAGE=create_attached_session"
 resp="$(api POST /session '{"capabilities":{"alwaysMatch":{"browserName":"firefox"}}}')"
 session="$(jq -er '.value.sessionId // .sessionId' <<<"$resp")" || exit 1
+echo "M3_UPDATE_STAGE=chrome_context"
 context="$(api POST "/session/$session/moz/context" '{"context":"chrome"}')"
 jq -e '.value==null or .value=="chrome"' <<<"$context" >/dev/null || exit 1
 # These XPCOM members have been individually checked against the immutable
@@ -85,11 +87,13 @@ predicate='.value.prefTestingDisabled==true and
  .value.stubDisabled==true and .value.serviceDisabled==true and
  .value.usuallyCanCheck==false and .value.idle==true and
  .value.stateName=="STATE_IDLE"'
+echo "M3_UPDATE_STAGE=first_browser_readonly_query"
 first="$(api POST "/session/$session/execute/sync" "$payload")"
 jq -e "$predicate" <<<"$first" >/dev/null || {
   echo 'Original browser did not return disabled/idle updater service' >&2; exit 1;
 }
 sleep 2
+echo "M3_UPDATE_STAGE=second_browser_readonly_query"
 second="$(api POST "/session/$session/execute/sync" "$payload")"
 jq -e "$predicate" <<<"$second" >/dev/null || {
   echo 'Original browser update state did not remain disabled/idle' >&2; exit 1;
