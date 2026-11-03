@@ -47,6 +47,12 @@ int main(int argc, char **argv) {
     return 3;
   }
   const OrtApiBase *base = get_api_base();
+  if (base != NULL) {
+    fprintf(stderr, "M3_EP_ORIGINAL_VERSION=%.80s v23=%d v24=%d\n",
+            base->GetVersionString(), base->GetApi(23) != NULL,
+            base->GetApi(24) != NULL);
+    fflush(stderr);
+  }
   const OrtApi *api = base != NULL ? base->GetApi(22) : NULL;
   if (api == NULL || api->RegisterExecutionProviderLibrary == NULL ||
       api->UnregisterExecutionProviderLibrary == NULL) {

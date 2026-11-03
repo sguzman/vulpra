@@ -95,7 +95,16 @@ M3_EXPORT OrtStatus *CreateEpFactories(
     OrtEpFactory **factories, size_t max_factories, size_t *num_factories) {
   fputs("M3_EP_CALLBACK=entered_factory_init\n", stderr);
   fflush(stderr);
-  const OrtApi *fallback = api_base != NULL ? api_base->GetApi(1) : NULL;
+  /* Never dereference shifted arguments if the compiled EP ABI differs. */
+  if (max_factories > 8 || (uintptr_t)num_factories < 4096 ||
+      (uintptr_t)factories < 4096 || (uintptr_t)api_base < 4096) {
+    fputs("M3_EP_DIAGNOSTIC=plugin_callback_signature_mismatch\n", stderr);
+    fflush(stderr);
+    _Exit(77);
+  }
+  fputs("M3_EP_CALLBACK=argument_shape_plausible\n", stderr);
+  fflush(stderr);
+  const OrtApi *fallback = api_base->GetApi(1);
   if (num_factories != NULL) {
     *num_factories = 0;
   }
