@@ -1,14 +1,13 @@
 # Genuine original browser controls exact original pingsender ELF launch.
 # Only synthetic fixed JSON and literal localhost:9 in offline CI; no real
 # telemetry/profile bytes or network egress. Real browser remains original.
+# Source-pinned original native CI 41738630382 PASS, job 126274184793,
+# artifact 13279278998 (sanitized 1781-byte JSON); 2/2 Rust tests and
+# 10/10 forged evidence mutations rejected. Confirmed that upload permission
+# was false in original browser; collection pref may remain enabled.
+# Explicitly manual-only after accepted source-pinned original native run.
 name: M3 Original Browser Owns Real Pingsender ELF No Egress
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-pingsender-no-egress.yml
-      - ci/m3-original-browser-owned-pingsender-no-egress.sh
-      - ci/m3-original-browser-pingsender-elf-witness.rs
   workflow_dispatch:
 permissions:
   contents: read
