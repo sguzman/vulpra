@@ -1,13 +1,11 @@
 # Join-only: every one of nine original packaged ELFs absent from three
 # bounded browser maps has separately accepted native symbol-binding evidence.
-# No new browser execution, feature pruning or package savings are authorized.
+# Accepted join-only CI 41719403020: 9/9 original ELF members have separate
+# real glibc binding observations, 2,066 events / 1,658 summed unique pairs,
+# and eight corrupted archived-evidence cases rejected. Manual-only now.
+# No new browser execution, feature pruning or package savings authorized.
 name: M3 Original Nine Unsampled Feature ELF Native Evidence
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-nine-feature-runtime-evidence.yml
-      - ci/m3-original-nine-feature-runtime-evidence-crosswalk.jq
   workflow_dispatch:
 permissions:
   contents: read
