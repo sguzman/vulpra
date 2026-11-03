@@ -6,7 +6,9 @@
 // This is an authentic original-browser execv *attempt*, not an updater exec.
 // No raw argument bytes, PIDs, paths, profiles or user files exported.
 use std::ffi::{c_char,c_int,CStr};
+#[cfg(test)]
 use std::path::Path;
+#[cfg(test)]
 use std::fs;
 
 const ORIGINAL:&[u8]=b"/original/vulpra";
@@ -70,6 +72,7 @@ pub unsafe extern "C" fn execv(path:*const c_char,argv:*const *const c_char)->c_
     unsafe{*__errno_location()=13;} // EACCES
     -1
 }
+#[cfg(test)]
 fn verify_original_archive_not_locally_mutated()->bool{
     // Host-side workflow independently checks SHA-256 before and after.
     // This library is deliberately not entrusted with package integrity.
