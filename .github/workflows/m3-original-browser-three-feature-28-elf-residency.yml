@@ -1,0 +1,138 @@
+# Source-pinned join of already accepted original browser native evidence.
+# The 28-row matrix is source/build and glibc list metadata; the three
+# feature workloads are bounded /proc/maps samples, not full loader closure.
+name: M3 Original 28 ELF Three Browser Feature Residency Reconciliation
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-three-feature-28-elf-residency.yml
+      - ci/m3-original-browser-feature-residency-28-elf.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-28-elf-three-native-workloads:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      MATRIX_RUN: '41515803526'
+      MATRIX_HEAD: cda3fb08d1d55fd94f4063921b6d4cc9644b225c
+      WAYLAND_RUN: '41658199812'
+      WAYLAND_HEAD: 470559e1b1cea601f74bf2463d8f6c812fc29371
+      AUDIO_RUN: '41714793962'
+      AUDIO_HEAD: 050206fc1bdb10e6f9717585f42c9ea570ba4c4b
+      USB_RUN: '41712441426'
+      USB_HEAD: 647a3e03b48ea45879fa3d12d6837956a85ff559
+    steps:
+      - name: Checkout exact-source three-feature crosswalk only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-feature-residency-28-elf.jq
+      - name: Authenticate immutable original artifact-producing CI runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          for name in MATRIX WAYLAND AUDIO USB; do
+            run_var="${name}_RUN"; head_var="${name}_HEAD"
+            run="${!run_var}"; sha="${!head_var}"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e --arg sha "$sha" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          done
+          check_artifact() {
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$1/artifacts?per_page=50" |
+              jq -e --arg name "$2" '[.artifacts[]|select(.name==$name and .expired==false and .size_in_bytes>0)]|length==1' >/dev/null
+          }
+          check_artifact "$MATRIX_RUN" m3-original-per-elf-ubuntu-arch-source-loader-crosswalk
+          check_artifact "$WAYLAND_RUN" m3-original-archlinux-weston-real-native-loader-initializers
+          check_artifact "$AUDIO_RUN" m3-original-browser-pulse-glibc-bindings
+          check_artifact "$USB_RUN" m3-original-browser-usb-nodevice-loader
+      - name: Fetch four accepted evidence bundles, no new browser execution
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for kind in matrix wayland audio usb; do mkdir -p "$RUNNER_TEMP/$kind"; done
+          gh run download "$MATRIX_RUN" --repo "$GITHUB_REPOSITORY" --name m3-original-per-elf-ubuntu-arch-source-loader-crosswalk --dir "$RUNNER_TEMP/matrix"
+          gh run download "$WAYLAND_RUN" --repo "$GITHUB_REPOSITORY" --name m3-original-archlinux-weston-real-native-loader-initializers --dir "$RUNNER_TEMP/wayland"
+          gh run download "$AUDIO_RUN" --repo "$GITHUB_REPOSITORY" --name m3-original-browser-pulse-glibc-bindings --dir "$RUNNER_TEMP/audio"
+          gh run download "$USB_RUN" --repo "$GITHUB_REPOSITORY" --name m3-original-browser-usb-nodevice-loader --dir "$RUNNER_TEMP/usb"
+          for file in \
+            "$RUNNER_TEMP/matrix/original-28-per-elf-ubuntu-arch-crosswalk.json" \
+            "$RUNNER_TEMP/wayland/original-arch-browser-proc-maps.json" \
+            "$RUNNER_TEMP/audio/m3-original-pulse-during-maps.json" \
+            "$RUNNER_TEMP/audio/m3-original-pulse-glibc-crosswalk.json" \
+            "$RUNNER_TEMP/usb/m3-original-webauthn-usb-during-maps.json" \
+            "$RUNNER_TEMP/usb/m3-original-browser-libudev-hash-crosswalk.json"; do
+            test -s "$file"
+            jq -e 'type=="object"' "$file" >/dev/null
+          done
+      - name: Verify 28 ELF coverage and reject six forged native inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          m="$RUNNER_TEMP/matrix/original-28-per-elf-ubuntu-arch-crosswalk.json"
+          w="$RUNNER_TEMP/wayland/original-arch-browser-proc-maps.json"
+          a="$RUNNER_TEMP/audio/m3-original-pulse-during-maps.json"
+          ap="$RUNNER_TEMP/audio/m3-original-pulse-glibc-crosswalk.json"
+          u="$RUNNER_TEMP/usb/m3-original-webauthn-usb-during-maps.json"
+          up="$RUNNER_TEMP/usb/m3-original-browser-libudev-hash-crosswalk.json"
+          out="$RUNNER_TEMP/m3-original-28-elf-three-workload-residency.json"
+          compare() {
+            jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+              --slurpfile matrix "$1" --slurpfile wayland "$2" \
+              --slurpfile audio "$3" --slurpfile audio_proof "$4" \
+              --slurpfile usb "$5" --slurpfile usb_proof "$6" \
+              -f ci/m3-original-browser-feature-residency-28-elf.jq
+          }
+          compare "$m" "$w" "$a" "$ap" "$u" "$up" >"$out"
+          jq -e '
+            .schema_version==1 and
+            .status=="source_pinned_original_28_elf_three_actual_browser_workload_residency_crosswalk" and
+            .matrix_original_elf_members==28 and .matrix_arch_direct_needed_edges==268 and
+            (.rows|length)==28 and
+            .actually_mapped_in_at_least_one_bounded_workload_count>=3 and
+            (.actually_mapped_in_at_least_one_bounded_workload_count+
+             .not_observed_as_resident_in_these_samples_count)==28 and
+            .original_elf_wayland_sample_count>=3 and
+            .original_elf_webaudio_sample_count>=2 and
+            .original_elf_usb_sample_count>=2 and
+            (.host_pulse_backing_names|length)>=1 and
+            (.host_usb_backing_names|length)>=1 and
+            .no_source_pruning_justified_by_absence_of_a_sample==true and
+            .glibc_loader_provider_lists_are_not_runtime_mappings==true and
+            .cross_run_workloads_not_one_continuous_loader_trace==true and
+            .phases_can_miss_transient_libraries==true and
+            .full_28_elf_feature_build_ffi_and_future_dlopen_closure==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false' "$out" >/dev/null
+          jq '.rows[1].elf=.rows[0].elf' "$m" >"$RUNNER_TEMP/mutant.json"
+          if compare "$RUNNER_TEMP/mutant.json" "$w" "$a" "$ap" "$u" "$up" >/dev/null 2>&1; then echo 'FAIL: duplicate original ELF accepted' >&2; exit 1; fi
+          jq '.original_archive_sha256="wrong-original-package"' "$w" >"$RUNNER_TEMP/mutant.json"
+          if compare "$m" "$RUNNER_TEMP/mutant.json" "$a" "$ap" "$u" "$up" >/dev/null 2>&1; then echo 'FAIL: wrong original source accepted' >&2; exit 1; fi
+          jq '.host_mapped_shared_library_basenames |= map(select(startswith("libpulse.so.0")|not))' "$a" >"$RUNNER_TEMP/mutant.json"
+          if compare "$m" "$w" "$RUNNER_TEMP/mutant.json" "$ap" "$u" "$up" >/dev/null 2>&1; then echo 'FAIL: missing Pulse ELF accepted' >&2; exit 1; fi
+          jq '.real_web_audio_stream_into_private_null_sink=false' "$ap" >"$RUNNER_TEMP/mutant.json"
+          if compare "$m" "$w" "$a" "$RUNNER_TEMP/mutant.json" "$u" "$up" >/dev/null 2>&1; then echo 'FAIL: forged WebAudio activation accepted' >&2; exit 1; fi
+          jq '.host_mapped_shared_library_basenames |= map(select(startswith("libudev.so.1")|not))' "$u" >"$RUNNER_TEMP/mutant.json"
+          if compare "$m" "$w" "$a" "$ap" "$RUNNER_TEMP/mutant.json" "$up" >/dev/null 2>&1; then echo 'FAIL: missing USB ELF accepted' >&2; exit 1; fi
+          jq '.original_browser_host_libudev_sha256="bad-hash"' "$up" >"$RUNNER_TEMP/mutant.json"
+          if compare "$m" "$w" "$a" "$ap" "$u" "$RUNNER_TEMP/mutant.json" >/dev/null 2>&1; then echo 'FAIL: forged original libudev fingerprint accepted' >&2; exit 1; fi
+          jq -r '"M3_THREE_FEATURE_ORIGINAL_ELF_RESIDENCY=PASS seen=\(.actually_mapped_in_at_least_one_bounded_workload_count) unobserved=\(.not_observed_as_resident_in_these_samples_count) host=\(.original_browser_host_mapped_basename_union_count) mutants=6"' "$out"
+      - name: Export only sanitized three-feature 28-ELF summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-28-elf-three-browser-workload-residency
+          path: ${{ runner.temp }}/m3-original-28-elf-three-workload-residency.json
+          if-no-files-found: error
+          retention-days: 14
