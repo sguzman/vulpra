@@ -107,8 +107,8 @@ check(
  native_glibc_unattributed_symbol_glibc_requester_basenames:$g.unattributed_udev_monitor_filter_update_requester_basenames,
  native_glibc_unattributed_symbol_provider_basenames:$g.unattributed_udev_monitor_filter_update_provider_basenames,
  native_glibc_unattributed_symbol_requesters_are_only_its_provider:
-    (($g.unattributed_udev_monitor_filter_update_requester_basenames -
-      $g.unattributed_udev_monitor_filter_update_provider_basenames)|length)==0,
+    ((($g.unattributed_udev_monitor_filter_update_requester_basenames -
+      $g.unattributed_udev_monitor_filter_update_provider_basenames)|length)==0),
  native_glibc_binding_file_requester_not_definitive_original_caller:true,
  native_glibc_resolved_udev_names:$g.original_browser_resolved_udev_symbol_names,
  native_glibc_provider_basenames:$g.original_browser_udev_provider_basenames,
