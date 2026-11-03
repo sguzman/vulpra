@@ -3,14 +3,12 @@
 # a private nested writable directory; the full browser install is read-only.
 # Rust LD_PRELOAD denies ALL execv, recording only exact original source args.
 # Not an updater execution/installation/normal automatic update test.
+# Accepted source-authenticated original compiled browser native CI
+# 41731162834 PASS, artifact 13276437121, 2/2 Rust tests, 9/9 forged
+# summary inputs rejected, exact /original/updater staging call intercepted
+# and denied before exec. Restored to manual-only after native acceptance.
 name: M3 Original Browser Updater Execv Boundary Denied
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-updater-execv-denied.yml
-      - ci/m3-original-updater-execv-deny.rs
-      - ci/m3-original-browser-updater-execv-denied.sh
   workflow_dispatch:
 permissions:
   contents: read
