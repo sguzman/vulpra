@@ -116,7 +116,22 @@ fi
 # original /original/crashreporter executed with its sole .dmp argument.
 if ! wait "$observer_pid"; then
   echo 'Original parent crash did not produce an observed original reporter ELF' >&2
-  # Do not log private raw browser, crash, dump or command-line contents.
+  # Only the fixed-prefix diagnostic with safe booleans and event counts:
+  # never print raw browser/WebDriver logs, crash files, PIDs or argv.
+  grep '^M3_ORIGINAL_CRASHREPORTER_WITNESS_FAILURE=' "$work/witness.log" >&2 || true
+  # The WebDriver result can distinguish a fatal process disconnect from a
+  # rejected privileged XPCOM call, without exporting its exception contents.
+  if [[ -s "$work/abort-webdriver-response.json" ]]; then
+    if jq -e '.value.error' "$work/abort-webdriver-response.json" >/dev/null 2>&1; then
+      echo 'M3_ORIGINAL_ABORT_HTTP_RESULT=webdriver_error' >&2
+    elif jq -e '.value=="UNREACHABLE"' "$work/abort-webdriver-response.json" >/dev/null 2>&1; then
+      echo 'M3_ORIGINAL_ABORT_HTTP_RESULT=unexpected_return' >&2
+    else
+      echo 'M3_ORIGINAL_ABORT_HTTP_RESULT=other' >&2
+    fi
+  else
+    echo 'M3_ORIGINAL_ABORT_HTTP_RESULT=no_body' >&2
+  fi
   exit 1
 fi
 observer_pid=''
