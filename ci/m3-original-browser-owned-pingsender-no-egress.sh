@@ -91,18 +91,18 @@ preflight='const p=Components.classes["@mozilla.org/preferences-service;1"].getS
 pre="$(api POST "/session/$session/execute/sync" \
   "$(jq -nc --arg script "$preflight" '{script:$script,args:[]}')")"
 jq -e '.value.method=="function" and .value.suppress==false and
-  .value.enabled==false and .value.upload==false and
+  (.value.enabled|type)=="boolean" and .value.upload==false and
   .value.bin=="/original"' <<<"$pre" >/dev/null || {
   # Explicit approved scalar fields only. Never emit browser profile paths,
   # raw WebDriver error strings or unbounded browser data.
-  jq -c '{method:(.value.method // null),suppress:(.value.suppress // null),
-    enabled:(.value.enabled // null),upload:(.value.upload // null),
+  jq -c '{method:.value.method,suppress:.value.suppress,
+    collection_pref:.value.enabled,upload_permission:.value.upload,
     original_bin:(.value.bin=="/original"),
     webdriver_error:(.value.error!=null)}' <<<"$pre" >&2 || true
   echo 'M3_PINGSENDER_FAILURE=browser_module_or_upload_policy_not_safe' >&2
   exit 1
 }
-echo 'M3_PINGSENDER_PREFLIGHT=PASS TelemetrySend module and normal upload disabled'
+echo 'M3_PINGSENDER_PREFLIGHT=PASS original module resolved and actual upload permission disabled; collection pref separately observed'
 # Original C++ pingsender permits localhost; Docker no-network namespace
 # has no external route. Do not start any local server for this test.
 if curl --noproxy '*' -fsS --max-time 1 \
@@ -168,7 +168,8 @@ jq -n --slurpfile child "$marker" \
     exact_synthetic_localhost_only_payload:true,
     local_synthetic_payload_not_deleted:true,
     original_browser_remained_responsive:true,
-    normal_telemetry_upload_and_policy_disabled:true,
+    actual_upload_permission_disabled:true,
+    telemetry_collection_pref_may_remain_enabled:true,
     real_telemetry_submission_proven:false,
     private_network_has_no_egress:true,
     original_installation_read_only:true,
