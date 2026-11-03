@@ -2,20 +2,13 @@
 # Zero-device PASS: 41559011764; CPU device enumeration PASS: 41560348027;
 # CPU fallback model/session PASS: 41562244114;
 # actual external EP Mul inference PASS: 41563943117;
-# mixed external Mul and builtin CPU Add PASS: 41565179887.
+# mixed external Mul and builtin CPU Add PASS: 41565179887;
+# eight-stage mapped-library unload assertions PASS: 41567402153.
 # The opt-in fallback probe declines nodes; a separate opt-in CPU-only Mul probe executes inside the EP.
 # The fixture is not an accelerator or production execution provider.
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
-  # TEMPORARY, bounded native loader-map test; restore manual-only on pass.
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-onnx-ep-registration.c
-      - ci/m3-original-onnx-ep-session.c
-      - ci/m3-original-onnx-ep-loader-snapshot.c
-      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read

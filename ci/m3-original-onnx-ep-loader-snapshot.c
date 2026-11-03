@@ -1,6 +1,6 @@
 // CI-only Linux loader residency census for the pinned original ONNX EP probe.
 // Uses dl_iterate_phdr and emits ONLY bounded basenames and origin classes.
-// Not a complete dependency, symbol-binding, lifetime or dlopen closure proof.
+// Not a complete dependency, symbol-binding, browser lifetime or dlopen closure proof.
 #define _GNU_SOURCE
 #include <link.h>
 #include <stddef.h>

@@ -1,5 +1,26 @@
 # M3 — Original packaged ONNX Runtime internal dlopen origin under isolated API activation (2026-11-02)
 
+## Original ONNX Runtime external-EP mapped-library lifecycle — verified (2026-11-03 UTC)
+
+**[Original native CI 41567402153 — PASS](https://github.com/sguzman/vulpra/actions/runs/41567402153)**, job **125692124593**, with [workflow lint 41567402259 — PASS](https://github.com/sguzman/vulpra/actions/runs/41567402259). Source archive SHA-256 and upstream ONNX Runtime v30 public headers were authenticated again. All five no-egress registration, CPU-device, CPU-fallback, external-only inference, and mixed external/CPU execution workloads passed on the original packaged `libonnxruntime.so` 1.30.0. The opt-in `VULPRA_CI_ONNX_EP_MAP=1` mode adds the separate `ci/m3-original-onnx-ep-loader-snapshot.c` translation unit, which uses Linux `dl_iterate_phdr` to inventory process-mapped shared objects **at eight fixed lifecycle boundaries**. It deliberately emits **only sanitized library basenames and origin classes** (`package`, `plugin`, `host`), never absolute paths, environment contents, process identifiers, raw linker logs, or browser profiles. The bounded pathless JSON inventory is uploaded as test evidence only after all strict assertions pass.
+
+| Stage | Mapped original-package libraries | CI-owned external EP fixture | Host libraries | Total mapped objects |
+| --- | ---: | ---: | ---: | ---: |
+| Before `dlopen` | 0 | 0 | 3 | 3 |
+| After original `dlopen` | 1 | 0 | 8 | 9 |
+| External factory registered | 1 | 1 | 8 | 10 |
+| Mixed-graph session created | 1 | 1 | 8 | 10 |
+| After native `Mul` → CPU `Add` inference | 1 | 1 | 8 | 10 |
+| Session released | 1 | 1 | 8 | 10 |
+| After external factory unregistered | 1 | 0 | 8 | 9 |
+| After original `dlclose` | 0 | 0 | 4 | 4 |
+
+**Independent runtime observations:** `libonnxruntime.so` appears in the original-package class after loading; the exact test fixture `libvulpra-onnx-ci-ep.so` appears after registration and remains mapped through session release. Crucially, the strict test now **rejects** plugin residency after factory unregistration and **rejects** package-library residency before loading or after final `dlclose`. Both negative checks and all positive checks passed. The mixed-graph numerical output remained **3.5625** for external `Mul(1.25,1.25)` and built-in CPU `Add(1.5625,2)`. The one additional host mapping after final unload compared with before loading is recorded, but **not attributed to a particular origin or cause** without further loader evidence.
+
+The earlier compilation diagnostic **41567077196** was not counted: its cleanup path ignored a `warn_unused_result` ONNX status; the error was corrected in commit `3e735882`. The original new workflow assertion initially raised ShellCheck SC2251 ([lint 41567077277](https://github.com/sguzman/vulpra/actions/runs/41567077277)); a fail-closed `if grep; then exit 1` replacement passed in [41567223791](https://github.com/sguzman/vulpra/actions/runs/41567223791). A successful preliminary native test **41567160411** established stage counts; final strict unload assertions and lint passed together in **41567402153 / 41567402259**. Native CI was restored to **manual-only** after acceptance.
+
+**Scope and non-generalization:** This is a snapshot of one **isolated Linux CI process** exercising one tiny CPU inference graph from an authenticated original **full-normal** package, not a Firefox browser-process graph. `dl_iterate_phdr` records mappings at sampled times, not transient loads between samples, lazy branches, all `dlsym` calls, ELF ABI symbol binding, plugin dispatch under real browser features, all 28 packaged ELF files, Arch/Wayland runtime dependency closure, or GPU transfer. Basename class does not prove absolute-path identity for every host library and is not a complete reachable-dependency graph. **No source pruning, package savings, or M3 sixth-gate acceptance follows**. **M3 5/6 = 83%; overall 61%; Δ +0pp.**
+
 ## Original ONNX Runtime 1.30 mixed external-provider/CPU inference — verified (2026-11-03 UTC)
 
 **[Native CI 41565179887 — PASS](https://github.com/sguzman/vulpra/actions/runs/41565179887)**, job **125684867781**, artifact **13199070295**. The pinned original Firefox 159.0b5 native archive and SHA-1-pinned upstream ONNX C v30 headers were authenticated again. All **five** independent no-egress test modes passed on the real packaged `libonnxruntime.so` 1.30.0: default external factory registration, one genuine CPU `OrtEpDevice` enumeration, one-node CPU fallback, actual external-EP scalar `Mul` execution, and the new **mixed-provider dependent-node** execution.
