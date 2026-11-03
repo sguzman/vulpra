@@ -179,6 +179,10 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
         # Never infer a transient mapping from a retrospective flag:
         # capture the backing filename while /proc/maps still shows libudev.
         if /audit/on-demand-maps usb-during /original /reports/m3-original-webauthn-usb-during-maps.json; then
+          if [[ "${VULPRA_M3_LIBUDEV_HOST_FINGERPRINT:-0}" == 1 ]]; then
+            [[ -x /audit/host-libudev-fingerprint && "$mode" == usb-no-device ]] || exit 2
+            /audit/host-libudev-fingerprint /reports/m3-original-browser-libudev-host-fingerprint.json
+          fi
           phase_during_saved=true
         fi
       fi
