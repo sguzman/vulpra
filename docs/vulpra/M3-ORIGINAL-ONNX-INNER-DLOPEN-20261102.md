@@ -1,5 +1,30 @@
 # M3 — Original packaged ONNX Runtime internal dlopen origin under isolated API activation (2026-11-02)
 
+## Original ONNX Runtime internal dynamic load successfully exercised — custom-ops path (2026-11-02)
+
+**[Original compiled native custom-ops registration CI 41549851976 — PASS](https://github.com/sguzman/vulpra/actions/runs/41549851976)**, **[workflow lint 41549851930 — PASS](https://github.com/sguzman/vulpra/actions/runs/41549851930)**. The bounded artifact **13191140584**, `m3-original-onnx-customops-runtime-boundary.json`, was independently downloaded and inspected. Both exact original source `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and full-normal compiled native package SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` were authenticated.
+
+The previous real original ONNX **CPU `Constant`** model tests (API-base, session, and numerically checked `Run`) showed **zero ONNX-origin internal `dlopen` calls**; this was a genuine bounded negative result. The next executable original ONNX boundary was found in the upstream ONNX Runtime v1.22.0 `onnxruntime/core/session/onnxruntime_c_api.cc` implementation of **`RegisterCustomOpsLibrary`**, which calls `Env::Default().LoadDynamicLibrary`. The public C API slot **29** was compiled/checked with C `offsetof(OrtApi, RegisterCustomOpsLibrary)` against immutable upstream header blob `b01b7e48dc87bbeeb026c61fb06c591053853ad1` before invoking it from Rust. This is **custom-operator registration, not execution-provider or GPU activation**.
+
+The reusable std-only Rust test in `ci/m3-original-onnx-constant-session.rs` now accepts a second, tightly restricted argument for a locally compiled fixture named `libvulpra-onnx-test-customops.so`. That CI-owned fixture exports a trivial `RegisterCustomOps` callback registering **no custom operators**, and a counter. Original `libonnxruntime.so` receives the local fixture path through `OrtApi.RegisterCustomOpsLibrary`, returns its actual loader handle, and calls the fixture's registration callback. The Rust probe checks that callback counter equals **1**. Both an **ordinary uninstrumented control** and an isolated no-egress, **CI-only LD_PRELOAD observer** run subsequently create the same in-memory CPU `Constant` session and verify the exact **float32[1] = 1.25** numerical output, with neither model downloads nor personal browser data.
+
+| Independently observed original compiled ONNX native result | Verified |
+| --- | ---: |
+| Real original `RegisterCustomOpsLibrary` entry point called | **Yes** |
+| Actual CI-only inert plugin `RegisterCustomOps` callback invoked | **1** |
+| `dlopen` calls attributed to original `libonnxruntime.so` by immediate native caller | **1** |
+| Successful ONNX-origin internal `dlopen` calls | **1** |
+| Failed ONNX-origin internal `dlopen` calls | **0** |
+| Separately counted outer Rust probe/harness `dlopen` calls | **1** |
+| Both original CPU `Run` outcomes and exact output value | **PASS, float32[1] = 1.25** |
+| External execution provider, CUDA/GPU, real browser ML frontend | **Not tested** |
+
+The same origin observer had already passed native compiled positive and negative interposition fixtures ([41524996253](https://github.com/sguzman/vulpra/actions/runs/41524996253)); it distinguishes the **internal module-origin load** from the test harness's outer load, without exporting absolute load paths, caller PCs, symbol tables, runtime trace PIDs, or user state. The result demonstrates **at least one successful actual runtime call from original compiled ONNX into the conditional `dlopen` boundary**, unlike a symbol-only census. It does **not** assign that observation to one exact machine instruction in the original stripped binary, prove all alternate provider registrations, or establish provider-specific fallback behavior. It is an **instrumented** origin observation; the separate noninterposed run proves registration/inference correctness but has no origin stack.
+
+No browser was built, installed, or launched; no source was deleted, no package bytes saved, no third-party model or network needed. The now-proven custom-ops loader path is only one controlled native case; **complete ONNX optional loaders, all other FFI/dlopen paths, full feature-source ownership and live EndeavourOS/Hyprland behavior remain unproven**. The expensive original-package replay is returned to **manual dispatch only** following its acceptance.
+
+**M3 gate six still OPEN (5/6, 83%); Vulpra overall 61%; session Δ +0 percentage points.**
+
 ## Exact ONNX CPU output numerical correctness (2026-11-02)
 
 **[Updated original source-pinned native CI 41528669862 — PASS](https://github.com/sguzman/vulpra/actions/runs/41528669862)** and **[workflow lint 41528669790 — PASS](https://github.com/sguzman/vulpra/actions/runs/41528669790)**. The sanitized original-native artifact **13180313981**, `m3-original-onnx-cpu-constant-session.json`, was **downloaded and independently inspected**; it authenticates the compiled full-normal original package SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` and exact source Git `b1482404dfb8b01342990ee99ea3df0f9756b5f7`.

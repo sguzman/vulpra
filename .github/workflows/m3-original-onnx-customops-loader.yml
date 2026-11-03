@@ -2,13 +2,10 @@
 # This is NOT GPU execution-provider activation, nor browser ML feature QA.
 # In-memory float32 Constant CPU Run still validated in both test modes.
 name: M3 Original ONNX Internal Custom Ops Loader Activation
+# The source-pinned original ONNX custom-ops loader replay passed in CI
+# 41549851976 and its bounded artifact was independently inspected.
+# Avoid re-extracting original full-normal browser on each source/docs edit.
 on:
-  push:
-    branches: [main]
-    paths:
-      - ci/m3-original-onnx-constant-session.rs
-      - ci/m3-original-onnx-inert-customops.c
-      - .github/workflows/m3-original-onnx-customops-loader.yml
   workflow_dispatch:
 permissions:
   contents: read
