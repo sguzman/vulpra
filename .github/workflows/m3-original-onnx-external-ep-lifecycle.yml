@@ -212,6 +212,22 @@ jobs:
             "M3_EP_MAP stage=after_run kind=plugin name=libvulpra-onnx-ci-ep.so"; do
             grep -Fxq "$required" "$RUNNER_TEMP/m3-ep-mixed-compute.log"
           done
+          # Tight lifecycle assertions: unregistration releases the plugin mapping;
+          # the host closes the original libonnxruntime handle in this single process.
+          grep -Fxq 'M3_EP_MAP stage=session_released kind=plugin name=libvulpra-onnx-ci-ep.so' \
+            "$RUNNER_TEMP/m3-ep-mixed-compute.log"
+          grep -Fxq 'M3_EP_MAP stage=unregistered kind=package name=libonnxruntime.so' \
+            "$RUNNER_TEMP/m3-ep-mixed-compute.log"
+          if grep -Eq '^M3_EP_MAP stage=(before_dlopen|after_dlopen|unregistered|after_dlclose) kind=plugin ' \
+            "$RUNNER_TEMP/m3-ep-mixed-compute.log"; then
+            echo 'M3_EP_DIAGNOSTIC=plugin_residency_mismatch'
+            exit 1
+          fi
+          if grep -Eq '^M3_EP_MAP stage=(before_dlopen|after_dlclose) kind=package ' \
+            "$RUNNER_TEMP/m3-ep-mixed-compute.log"; then
+            echo 'M3_EP_DIAGNOSTIC=package_residency_mismatch'
+            exit 1
+          fi
           for stage in before_dlopen after_dlopen registered session_created after_run session_released unregistered after_dlclose; do
             grep -q "^M3_EP_MAP_SUMMARY stage=$stage " "$RUNNER_TEMP/m3-ep-mixed-compute.log"
           done
@@ -250,6 +266,8 @@ jobs:
               mixed_graph_result_float32:3.5625,
               mixed_cpu_add_not_claimed_by_external_ep:true,
               live_loader_map_original_onnx_and_plugin_verified:true,
+              plugin_unmapped_after_unregister_verified:true,
+              original_onnx_unmapped_after_final_dlclose_verified:true,
               live_loader_map_stages:8,
               live_loader_map_pathless_basename_only:true,
               live_loader_map_complete_dependencies_proven:false,
