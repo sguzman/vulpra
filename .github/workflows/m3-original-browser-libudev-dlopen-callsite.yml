@@ -19,6 +19,8 @@ on:
       - .github/workflows/m3-original-browser-libudev-dlopen-callsite.yml
       - ci/m3-original-libudev-dlopen-callsite.c
       - ci/m3-original-browser-libudev-dlsym-provider.jq
+      - ci/m3-original-browser-libudev-dlsym-verify.sh
+      - ci/m3-original-browser-webauthn-webdriver.sh
 permissions:
   contents: read
   actions: read
@@ -42,6 +44,7 @@ jobs:
             ci/m3-original-browser-webauthn-webdriver.sh
             ci/m3-original-libudev-dlopen-callsite.c
             ci/m3-original-browser-libudev-dlsym-provider.jq
+            ci/m3-original-browser-libudev-dlsym-verify.sh
       - name: Checkout original source WebAuthn virtual-authenticator regression
         uses: actions/checkout@v4
         with:
@@ -68,6 +71,8 @@ jobs:
           grep -Fq 'authenticatorAttachment:"cross-platform"' diagnostics/ci/m3-original-browser-webauthn-local-origin.rs
           grep -Fq 'usb-dlopen-trace' diagnostics/ci/m3-original-browser-webauthn-webdriver.sh
           bash -n diagnostics/ci/m3-original-browser-webauthn-webdriver.sh
+          bash -n diagnostics/ci/m3-original-browser-libudev-dlsym-verify.sh
+          grep -Fq '/audit/dlsym-verify.sh' diagnostics/ci/m3-original-browser-webauthn-webdriver.sh
           cc -std=c11 -Wall -Wextra -Werror -O2 -fPIC -shared \
             diagnostics/ci/m3-original-libudev-dlopen-callsite.c \
             -o "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so" -ldl
@@ -139,6 +144,7 @@ jobs:
             -v "$RUNNER_TEMP/m3-original-local-origin:/audit/local-origin:ro" \
             -v "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so:/audit/libudev-trace.so:ro" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-libudev-dlsym-provider.jq:/audit/dlsym-crosswalk.jq:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-libudev-dlsym-verify.sh:/audit/dlsym-verify.sh:ro" \
             -v "$RUNNER_TEMP/source-udev/m3-original-udev-arch.json:/audit/udev-original-abi.json:ro" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-webauthn-webdriver.sh:/audit/webdriver.sh:ro" \
             -v "$RUNNER_TEMP/reports:/reports:rw" \
@@ -159,43 +165,6 @@ jobs:
                 --clear-groups \
                 /bin/bash /audit/webdriver.sh /original/vulpra /audit/local-origin \
                 /reports/m3-original-browser-libudev-dlopen-callsite.json
-              # No unsanitized PIDs, paths or loader traces leave this sandbox.
-              sym=/tmp/vulpra-m3-libudev-dlsym.trace
-              open=/tmp/vulpra-m3-libudev-dlopen.trace
-              test -s "$sym" && test -s "$open"
-              test "$(stat -c %s "$sym")" -le 65536
-              crosscheck() {
-                jq -n --arg src "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
-                  --slurpfile abi /audit/udev-original-abi.json \
-                  --slurpfile feature "$2" \
-                  --rawfile dlsym "$1" --rawfile dlopen "$3" \
-                  -f /audit/dlsym-crosswalk.jq
-              }
-              clean=/reports/m3-original-browser-libudev-dlsym-provider.json
-              feature=/reports/m3-original-browser-libudev-dlopen-callsite.json
-              crosscheck "$sym" "$feature" "$open" >"$clean"
-              jq -e . "$clean" >/dev/null
-              # Real provider, symbol declaration, and process correlation
-              # must be independently required, not assumed from the dlopen.
-              cp "$sym" /tmp/dlsym-mutant
-              printf "1\t0x123\tudev_nonexistent\t hit\tlibudev.so.1.7.15\n" >>/tmp/dlsym-mutant
-              if crosscheck /tmp/dlsym-mutant "$feature" "$open" >/dev/null 2>&1; then
-                echo "FAIL: undeclared browser symbol accepted" >&2; exit 1
-              fi
-              awk -F "\t" "BEGIN{OFS=\"\\t\"} \$4==\"hit\"{\$5=\"libxul.so\"} {print}" "$sym" >/tmp/dlsym-mutant
-              if crosscheck /tmp/dlsym-mutant "$feature" "$open" >/dev/null 2>&1; then
-                echo "FAIL: mismatched real symbol provider accepted" >&2; exit 1
-              fi
-              awk -F "\t" "BEGIN{OFS=\"\\t\"} {\$1=\"9999999999\";print}" "$sym" >/tmp/dlsym-mutant
-              if crosscheck /tmp/dlsym-mutant "$feature" "$open" >/dev/null 2>&1; then
-                echo "FAIL: wrong-process dlsym evidence accepted" >&2; exit 1
-              fi
-              jq ".source_pinned_libxul_normal_load_hit_at_return_pc_0x9936667=false" \
-                "$feature" >/tmp/feature-mutant.json
-              if crosscheck "$sym" /tmp/feature-mutant.json "$open" >/dev/null 2>&1; then
-                echo "FAIL: corrupted original compiled callsite accepted" >&2; exit 1
-              fi
-              echo "PASS: same original browser process resolved source-declared libudev symbol from actual provider, four negative mutants"
             '
       - name: Accept original libxul callsites and bounded instrumented stack, not full graph
         shell: bash

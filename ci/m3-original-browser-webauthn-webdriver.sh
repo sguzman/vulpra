@@ -262,6 +262,13 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
     network_egress_allowed:false,
     m3_sixth_gate_closed:false
   }' >"$report"
+  # Run the optional dlsym provider check inside THIS already-unprivileged
+  # process, before cleanup removes temporary PID-bearing raw traces. The
+  # outer Docker launcher uses exec setpriv and cannot do postprocess work.
+  if [[ "$mode" == usb-dlopen-trace && -n "${VULPRA_M3_LIBUDEV_DLSYM_TRACE:-}" ]]; then
+    [[ -r /audit/dlsym-verify.sh ]] || { echo 'Missing bounded provider verifier' >&2; exit 2; }
+    /bin/bash /audit/dlsym-verify.sh "$report"
+  fi
   echo "PASS: original browser USB backend no-device attempt recorded; libudev mapping observed=$mapped_during (not a completed USB authenticator)"
   exit 0
 fi
