@@ -10,6 +10,14 @@
 name: M3 Original Browser Pulse Null Sink
 on:
   workflow_dispatch:
+  # TEMPORARY CI path trigger for native before/during audio map regression; restore after acceptance.
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-pulse-null-sink.yml
+      - ci/m3-original-browser-pulse-webdriver.sh
+      - ci/m3-original-browser-on-demand-maps.rs
+      - ci/m3-original-browser-pulse-map-crosswalk.jq
 permissions:
   contents: read
   actions: read
@@ -32,6 +40,8 @@ jobs:
             ci/m3-original-browser-pulse-local-origin.rs
             ci/m3-original-browser-pulse-webdriver.sh
             ci/m3-original-libpulse-dlopen-callsite.c
+            ci/m3-original-browser-on-demand-maps.rs
+            ci/m3-original-browser-pulse-map-crosswalk.jq
       - name: Checkout original cubeb backend source contracts
         uses: actions/checkout@v4
         with:
@@ -70,6 +80,11 @@ jobs:
           test -s "$RUNNER_TEMP/m3-libpulse-trace.so"
           rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-pulse-local-origin.rs \
             -o "$RUNNER_TEMP/m3-original-pulse-local-origin"
+          rustc --edition=2021 -D warnings --test diagnostics/ci/m3-original-browser-on-demand-maps.rs \
+            -o "$RUNNER_TEMP/m3-on-demand-maps-test"
+          "$RUNNER_TEMP/m3-on-demand-maps-test"
+          rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-on-demand-maps.rs \
+            -o "$RUNNER_TEMP/m3-on-demand-maps"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
             jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
           mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/reports"
@@ -108,6 +123,7 @@ jobs:
             -v "$RUNNER_TEMP/package/vulpra:/original:ro" \
             -v "$RUNNER_TEMP/m3-original-pulse-local-origin:/audit/local-origin:ro" \
             -v "$RUNNER_TEMP/m3-libpulse-trace.so:/audit/libpulse-trace.so:ro" \
+            -v "$RUNNER_TEMP/m3-on-demand-maps:/audit/on-demand-maps:ro" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-pulse-webdriver.sh:/audit/webdriver.sh:ro" \
             -v "$RUNNER_TEMP/reports:/reports:rw" \
             -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
@@ -124,6 +140,66 @@ jobs:
                 /bin/bash /audit/webdriver.sh /original/vulpra /audit/local-origin \
                 /reports/m3-original-browser-pulse-null-sink.json
             '
+      - name: Reconcile live original browser library mappings before and during real WebAudio
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="$RUNNER_TEMP/reports/m3-original-pulse-before-maps.json"
+          during="$RUNNER_TEMP/reports/m3-original-pulse-during-maps.json"
+          audio="$RUNNER_TEMP/reports/m3-original-browser-pulse-null-sink.json"
+          out="$RUNNER_TEMP/reports/m3-original-pulse-on-demand-map-crosswalk.json"
+          test -s "$before" && test -s "$during" && test -s "$audio"
+          crosswalk() {
+            jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+              --slurpfile before "$1" --slurpfile during "$2" \
+              --slurpfile audio "$3" \
+              -f diagnostics/ci/m3-original-browser-pulse-map-crosswalk.jq
+          }
+          crosswalk "$before" "$during" "$audio" >"$out"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_webaudio_before_during_actual_browser_library_residency_crosswalk" and
+            .original_browser_before_process_count>=1 and
+            .original_browser_during_process_count>=1 and
+            .before_original_package_library_count>=2 and
+            .during_original_package_library_count>=2 and
+            .pulse_mapped_during_real_audio==true and
+            .native_backend_pulse_rust_verified==true and
+            .real_private_null_sink_audio_confirmed==true and
+            .ld_preload_instrumentation_affects_resolution==true and
+            .complete_future_browser_ffi_dlopen_closure==false and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false' "$out" >/dev/null
+          jq '.host_mapped_shared_library_basenames -= ["libpulse.so.0"]' \
+            "$during" >"$RUNNER_TEMP/reports/m3-mutant-maps.json"
+          if crosswalk "$before" "$RUNNER_TEMP/reports/m3-mutant-maps.json" "$audio" \
+             >/dev/null 2>&1; then
+            echo 'FAIL: missing live PulseAudio mapping was accepted' >&2
+            exit 1
+          fi
+          jq '.original_archive_sha256="invalid-source-drift"' "$before" \
+            >"$RUNNER_TEMP/reports/m3-mutant-maps.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-mutant-maps.json" "$during" "$audio" \
+             >/dev/null 2>&1; then
+            echo 'FAIL: original package provenance mutation was accepted' >&2
+            exit 1
+          fi
+          jq '.package_mapped_shared_library_basenames |= . + [.[0]]' "$during" \
+            >"$RUNNER_TEMP/reports/m3-mutant-maps.json"
+          if crosswalk "$before" "$RUNNER_TEMP/reports/m3-mutant-maps.json" "$audio" \
+             >/dev/null 2>&1; then
+            echo 'FAIL: duplicated original package mapping was accepted' >&2
+            exit 1
+          fi
+          jq '.libpulse_mapped_in_original_browser |= not' "$before" \
+            >"$RUNNER_TEMP/reports/m3-mutant-maps.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-mutant-maps.json" "$during" "$audio" \
+             >/dev/null 2>&1; then
+            echo 'FAIL: inconsistent before-click PulseAudio witness accepted' >&2
+            exit 1
+          fi
+          echo 'PASS: original WebAudio feature before/during live mapped ELF and four negative mutations'
       - name: Accept only bounded audio stream evidence
         shell: bash
         run: |
@@ -158,6 +234,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-original-browser-pulse-null-sink
-          path: ${{ runner.temp }}/reports/m3-original-browser-pulse-null-sink.json
+          path: |
+            ${{ runner.temp }}/reports/m3-original-browser-pulse-null-sink.json
+            ${{ runner.temp }}/reports/m3-original-pulse-before-maps.json
+            ${{ runner.temp }}/reports/m3-original-pulse-during-maps.json
+            ${{ runner.temp }}/reports/m3-original-pulse-on-demand-map-crosswalk.json
           if-no-files-found: error
           retention-days: 14

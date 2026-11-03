@@ -77,6 +77,8 @@ pulse_mapped(){
  return 1
 }
 pre=false; pulse_mapped && pre=true
+probe_stage='browser-maps-before-click'
+/audit/on-demand-maps before /original /reports/m3-original-pulse-before-maps.json
 probe_stage='clicked-webaudio'
 button="$(api POST "/session/$session/element" '{"using":"css selector","value":"#play"}')"
 button_id="$(jq -er '.value."element-6066-11e4-a52e-4f735466cecf" // .value.ELEMENT' <<<"$button")"
@@ -94,6 +96,8 @@ for _ in {1..60}; do
  sleep 0.15
 done
 [[ "$sink" == true && "$mapped" == true && "$running" == true ]] || { echo "Audio witness missing: $sink $mapped $running" >&2; exit 1; }
+probe_stage='browser-maps-during-actual-playback'
+/audit/on-demand-maps during /original /reports/m3-original-pulse-during-maps.json
 probe_stage='native-backend-chrome-context'
 echo 'Pulse stream, mapping and browser WebAudio confirmed; querying native cubeb backend' >&2
 # Firefox about:support uses Services.wm.getMostRecentWindow("").windowUtils.
