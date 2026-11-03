@@ -24,8 +24,8 @@ export MOZ_CRASHREPORTER=1
 # No installed browser, permanent profile, external network or crash submission.
 # This explicit lack of NO_REPORT is necessary to test the reporter-launch path.
 unset MOZ_CRASHREPORTER_DISABLE MOZ_CRASHREPORTER_NO_REPORT MOZ_HEADLESS DISPLAY
-mkdir -m 0700 "$HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
-driver_pid='' observer_pid='' weston_pid='' session='' triggered=0
+mkdir -m 0700 "$HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR" "$work/profile"
+driver_pid='' observer_pid='' weston_pid='' browser_pid='' session='' triggered=0
 base=http://127.0.0.1:4444
 api() {
   local method="$1" path="$2" data="$3"
@@ -36,7 +36,7 @@ cleanup() {
   if [[ "$triggered" == 0 && -n "$session" ]]; then
     api DELETE "/session/$session" '{}' >/dev/null 2>&1 || true
   fi
-  for pid in "$driver_pid" "$weston_pid" "$observer_pid"; do
+  for pid in "$driver_pid" "$weston_pid" "$observer_pid" "$browser_pid"; do
     if [[ -n "$pid" ]]; then
       kill "$pid" 2>/dev/null || true
       wait "$pid" 2>/dev/null || true
@@ -59,14 +59,23 @@ done
 wayland-info >"$work/wayland-info.log" 2>&1
 grep -Fq xdg_wm_base "$work/wayland-info.log" || exit 1
 
+# Geckodriver normally spawns Firefox with report-dialog suppression.
+# That flag is captured by original SetExceptionHandler at browser startup.
+# Instead spawn the *unchanged original* executable directly with NO_REPORT
+# absent, and attach a driver to its existing Marionette socket.
+# No package, profile, user browser, or network configuration is modified.
 /audit/crashreporter-witness /tmp/vulpra-m3-fatal-abort-triggered "$2" \
   >"$work/witness.log" 2>&1 &
 observer_pid=$!
-geckodriver --host 127.0.0.1 --port 4444 --log error \
+"$1" --marionette --no-remote --new-instance --profile "$work/profile" about:blank \
+  >"$work/browser-private.log" 2>&1 &
+browser_pid=$!
+geckodriver --connect-existing --marionette-port 2828 \
+  --host 127.0.0.1 --port 4444 --log error \
   >"$work/driver.log" 2>&1 &
 driver_pid=$!
 ready=false
-for _ in {1..50}; do
+for _ in {1..65}; do
   if api GET /status '{}' 2>/dev/null | jq -e '.value.ready==true' >/dev/null 2>&1; then
     ready=true; break
   fi
@@ -74,12 +83,9 @@ for _ in {1..50}; do
   sleep 0.3
 done
 [[ "$ready" == true ]] || { echo 'Local original browser WebDriver unavailable' >&2; exit 1; }
-caps="$(jq -nc --arg bin "$1" '{
-  capabilities:{alwaysMatch:{browserName:"firefox",
-    "moz:firefoxOptions":{binary:$bin,args:["--no-remote","--new-instance"],
-     env:{"MOZ_CRASHREPORTER":"1","MOZ_CRASHREPORTER_NO_REPORT":""},
-     prefs:{"browser.shell.checkDefaultBrowser":false}}}}
-}')"
+# Already running original Vulpra is attached through Marionette; no
+# browser creation is delegated to the WebDriver client.
+caps='{"capabilities":{"alwaysMatch":{"browserName":"firefox"}}}'
 resp="$(api POST /session "$caps")"
 session="$(jq -er '.value.sessionId // .sessionId' <<<"$resp")" || {
   echo 'Original Vulpra browser WebDriver launch failed' >&2; exit 1;
