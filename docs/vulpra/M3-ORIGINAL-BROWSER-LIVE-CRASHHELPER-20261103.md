@@ -1,0 +1,27 @@
+# M3 — Original Vulpra browser-controlled live crashhelper launch (2026-11-03)
+
+## Accepted actual-original native browser result
+
+[**Original packaged browser crashhelper live-launch CI 41720817778 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41720817778), job `126212785812`, sanitized artifact **13272281706** (`m3-original-browser-owned-crashhelper-launch`). [Corrected GitHub workflow actionlint **41721043209 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41721043209).
+
+The real original full-normal Vulpra package was authenticated against immutable source commit `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and archive SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` before execution. No native browser code was rebuilt or changed. A disposable, read-only, no-network Docker Arch Linux userspace launched the actual packaged `/original/vulpra` executable with the unchanged private Weston/Wayland frame/profile smoke test. The isolated browser initialized its dedicated private profile, remained alive **10 seconds**, and emitted a real non-null Wayland buffer attach and commit on the same surface. No real user, installed Firefox, or installed browser profile was touched.
+
+This test kept the crash reporter **enabled for the original-browser process only** (`MOZ_CRASHREPORTER=1`) while suppressing any crash reporter dialog/transmission (`MOZ_CRASHREPORTER_NO_REPORT=1`); no browser crash was deliberately induced. The *original compiled executable* launched the *original compiled packaged `crashhelper`*, not a fake wrapper or CLI `crashhelper` executable invoked directly by CI. The run observed **three independent 200 ms polling samples with the actual helper and live original browser present at the same time**.
+
+### Source-correct launch relationship
+
+The verifier was based on the exact original source, not on a guessed Linux subprocess relationship:
+
+- `toolkit/crashreporter/nsExceptionHandler.cpp`, `CrashReporter::OOPInit`, locates `crashhelper` relative to the browser executable directory and calls `crash_helper_launch(crashHelperPath.c_str(), serverSocketFd, tempPath.get(), gToolkitBuildID)` when crash reporting is enabled.
+- `toolkit/crashreporter/crash_helper_client/src/platform/unix.rs` creates `parent_pid_arg` from the **browser process PID** and uses `posix_spawn` to launch the real helper. It then reads the actual helper PID from a pipe after the child double-forks and exits. Therefore **`PPid == browser PID` is not an appropriate Linux acceptance predicate** for the persistent helper.
+- The new std-only Rust observer `ci/m3-original-browser-crashhelper-live-launch.rs` checks each actual `/proc/<pid>/exe`: the helper must be `/original/crashhelper`, and its bounded six-argument `/proc/<pid>/cmdline` must have an exact original program argument followed by a decimal `argv[1]` whose PID resolves **at the same instant** to `/original/vulpra` or `/original/vulpra-bin` in the same isolated namespace, owned by the same test UID. It requires **at least three concurrent samples**, hard-bounds private process enumeration and command-line bytes, and emits **only** sanitized counters and provenance flags. It never exports numeric PIDs, raw command lines, file paths, profiles, environment, minidumps or network data.
+
+Three Rust parser/process-scope unit tests passed. The full original-browser CI validated exact source and archive identities, three correlated live helper/browser samples, 10-second real graphical-frame acceptance and private-profile isolation. Four deliberately corrupted sanitized evidence assertions (wrong browser PID relationship, absent helper, false source archive SHA, fabricated network egress) were rejected.
+
+### Boundaries and disposition
+
+**This is first direct original-browser-controlled helper-launch evidence**, not merely the earlier [standalone `crashhelper` missing-argument/binding diagnostic 41164023607](https://github.com/sguzman/vulpra/actions/runs/41164023607). The original browser actually started the original packaged `crashhelper` while running normally under an isolated graphical compositor.
+
+It does **not** prove that crashhelper generated a successful minidump, transported a crash report, launched the separate `crashreporter` UI executable, or completed an end-to-end crash/telemetry pipeline. It does not prove updater invocation or safe deletion of any of the protected binaries; it used crash reporter opt-in environment variables only in a disposable CI process. This is a **bounded Arch/container runtime** observation, not a test on the user's EndeavourOS/Hyprland/GPU workstation and not complete full-system feature/build/FFI/indirect-`dlopen` closure.
+
+The expensive original graphical CI workflow is restored to **manual-only `workflow_dispatch`** after acceptance. No browser source or library removed, no native bytes saved. **M3 still 5/6 gates = 83%; Vulpra overall 61%; delta +0 percentage points.** Subsequent coverage should distinguish normal crashhelper startup from crash-triggered reporter launch and updater application, preserving no-egress/profile isolation and never inducing a crash or installing an update on a user machine.
