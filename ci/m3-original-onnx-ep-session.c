@@ -51,7 +51,7 @@ static void field_sub(M3Buf *b, uint64_t field, const M3Buf *sub) {
 static M3Buf input_model(int plugin_mul) {
   M3Buf node = buf_new();
   field_bytes(&node, 1, "x", 1);
-  if (plugin_mul) field_bytes(&node, 1, "x", 1);
+  if (plugin_mul) field_bytes(&node, 1, "z", 1);
   field_bytes(&node, 2, "y", 1);
   field_bytes(&node, 4, plugin_mul ? "Mul" : "Identity", plugin_mul ? 3 : 8);
 
@@ -73,6 +73,12 @@ static M3Buf input_model(int plugin_mul) {
   field_sub(&graph, 1, &node);
   field_bytes(&graph, 2, "single-identity", 15);
   field_sub(&graph, 11, &input);
+  if (plugin_mul) {
+    M3Buf second_graph_input = buf_new();
+    field_bytes(&second_graph_input, 1, "z", 1);
+    field_sub(&second_graph_input, 2, &value_ty);
+    field_sub(&graph, 11, &second_graph_input);
+  }
   field_sub(&graph, 12, &output);
   M3Buf opset = buf_new(); field_var(&opset, 2, 13);
   M3Buf model = buf_new();
@@ -99,6 +105,7 @@ static int m3_probe_session(const OrtApi *api, OrtEnv *env,
   OrtSession *session = NULL;
   OrtValue *output = NULL;
   OrtValue *input = NULL;
+  OrtValue *second_input = NULL;
   OrtMemoryInfo *memory = NULL;
   OrtTensorTypeAndShapeInfo *shape = NULL;
   if (!checked(api, api->CreateSessionOptions(&opts), "session_options") || opts == NULL)
@@ -128,10 +135,20 @@ static int m3_probe_session(const OrtApi *api, OrtEnv *env,
                    memory, &input_value, sizeof(input_value),
                    dims, 1, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input),
                "input_tensor") || input == NULL) goto done;
-  const char *input_names[1] = {"x"};
-  const OrtValue *input_values[1] = {input};
+  const char *input_names[2] = {"x", "z"};
+  const OrtValue *input_values[2] = {input, NULL};
+  size_t input_count = 1;
+  float second_value = 1.25f;
+  if (plugin_mul) {
+    if (!checked(api, api->CreateTensorWithDataAsOrtValue(
+                     memory, &second_value, sizeof(second_value),
+                     dims, 1, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &second_input),
+                 "second_input_tensor") || second_input == NULL) goto done;
+    input_values[1] = second_input;
+    input_count = 2;
+  }
   const char *output_names[1] = {"y"};
-  if (!checked(api, api->Run(session, NULL, input_names, input_values, 1,
+  if (!checked(api, api->Run(session, NULL, input_names, input_values, input_count,
                              output_names, 1, &output),
                plugin_mul ? "native_ep_run" : "cpu_fallback_run") ||
       output == NULL) goto done;
@@ -166,6 +183,7 @@ done:
   if (shape != NULL) api->ReleaseTensorTypeAndShapeInfo(shape);
   if (output != NULL) api->ReleaseValue(output);
   if (input != NULL) api->ReleaseValue(input);
+  if (second_input != NULL) api->ReleaseValue(second_input);
   if (memory != NULL) api->ReleaseMemoryInfo(memory);
   if (session != NULL) api->ReleaseSession(session);
   if (opts != NULL) api->ReleaseSessionOptions(opts);

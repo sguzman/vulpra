@@ -136,7 +136,8 @@ int main(int argc, char **argv) {
                        ? m3_probe_external_ep_compute_session(api, env, matched_device)
                        : m3_probe_cpu_fallback_session(api, env, matched_device);
       if (result != 0) {
-        fputs("M3_EP_ERROR_STAGE=cpu_fallback_session\n", stderr);
+        fputs(run_native_compute ? "M3_EP_ERROR_STAGE=native_compute_session\n"
+                                 : "M3_EP_ERROR_STAGE=cpu_fallback_session\n", stderr);
         OrtStatus *cleanup = api->UnregisterExecutionProviderLibrary(
             env, "vulpra-ci-fixture");
         if (cleanup != NULL) api->ReleaseStatus(cleanup);
