@@ -97,3 +97,69 @@ void *dlopen(const char *filename, int flags) {
   }
   return result;
 }
+
+
+// Opt-in original-browser ELF symbol-provider tracer. It extends the
+// preceding dlopen caller-PC witness without changing the original browser.
+// Production code must never use this diagnostic LD_PRELOAD interposer.
+typedef void *(*native_dlsym_t)(void *, const char *);
+static _Thread_local int inside_dlsym_probe;
+
+static int bounded_udev_symbol(const char *s) {
+  if (!s || strncmp(s, "udev_", 5) != 0) return 0;
+  size_t n = 0;
+  for (; s[n] && n < 95; n++) {
+    unsigned char c = (unsigned char)s[n];
+    if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_')) return 0;
+  }
+  return n >= 6 && n < 95 && s[n] == 0;
+}
+
+__attribute__((noinline))
+void *dlsym(void *handle, const char *symbol) {
+  // A glibc versioned entry avoids calling our own dlsym hook.
+  native_dlsym_t original = (native_dlsym_t)dlvsym(RTLD_NEXT, "dlsym", "GLIBC_2.2.5");
+  if (!original) _exit(97);
+  void *from = __builtin_extract_return_addr(__builtin_return_address(0));
+  void *resolved = original(handle, symbol);
+  if (inside_dlsym_probe || !bounded_udev_symbol(symbol)) return resolved;
+  const char *out = getenv("VULPRA_M3_LIBUDEV_DLSYM_TRACE");
+  if (!out || strcmp(out, "/tmp/vulpra-m3-libudev-dlsym.trace") != 0)
+    return resolved;
+  inside_dlsym_probe = 1;
+  Dl_info caller = {0}, provider = {0};
+  if (dladdr(from, &caller) && caller.dli_fname && caller.dli_fbase) {
+    const char *base = strrchr(caller.dli_fname, '/');
+    base = base ? base + 1 : caller.dli_fname;
+    if (strcmp(base, "libxul.so") == 0) {
+      const char *provider_name = "none";
+      const char *outcome = "miss";
+      if (resolved) {
+        if (dladdr(resolved, &provider) && provider.dli_fname) {
+          const char *p = strrchr(provider.dli_fname, '/');
+          provider_name = p ? p + 1 : provider.dli_fname;
+        } else {
+          provider_name = "unknown";
+        }
+        outcome = "hit";
+      }
+      // Source-derived symbol names and backing-file provider names are
+      // fail-closed against independent original data before archiving.
+      uintptr_t pc = (uintptr_t)from - (uintptr_t)caller.dli_fbase;
+      char line[320];
+      int len = snprintf(line, sizeof(line), "%ld\t0x%lx\t%s\t%s\t%s\n",
+                         (long)getpid(), (unsigned long)pc, symbol,
+                         outcome, provider_name);
+      if (len > 0 && len < (int)sizeof(line)) {
+        int fd = open(out, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0600);
+        if (fd >= 0) {
+          ssize_t wrote = write(fd, line, (size_t)len);
+          if (wrote != len) { /* The CI verifier rejects truncated lines. */ }
+          (void)close(fd);
+        }
+      }
+    }
+  }
+  inside_dlsym_probe = 0;
+  return resolved;
+}

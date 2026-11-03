@@ -12,6 +12,13 @@ name: M3 Original Browser Libudev Dlopen Callsite Trace
 # expensive source-pinned native browser experiment manually dispatchable.
 on:
   workflow_dispatch:
+  # TEMPORARY native browser symbol-resolution acceptance test; restore manual-only.
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-libudev-dlopen-callsite.yml
+      - ci/m3-original-libudev-dlopen-callsite.c
+      - ci/m3-original-browser-libudev-dlsym-provider.jq
 permissions:
   contents: read
   actions: read
@@ -34,6 +41,7 @@ jobs:
             ci/m3-original-browser-webauthn-local-origin.rs
             ci/m3-original-browser-webauthn-webdriver.sh
             ci/m3-original-libudev-dlopen-callsite.c
+            ci/m3-original-browser-libudev-dlsym-provider.jq
       - name: Checkout original source WebAuthn virtual-authenticator regression
         uses: actions/checkout@v4
         with:
@@ -64,6 +72,9 @@ jobs:
             diagnostics/ci/m3-original-libudev-dlopen-callsite.c \
             -o "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so" -ldl
           test "$(nm -D --defined-only "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so" | awk '$3=="dlopen"{n++} END{print n+0}')" -eq 1
+          test "$(nm -D --defined-only "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so" | awk '$3=="dlsym"{n++} END{print n+0}')" -eq 1
+          grep -Fq 'native_dlsym_t original = (native_dlsym_t)dlvsym' diagnostics/ci/m3-original-libudev-dlopen-callsite.c
+          grep -Fq 'inside_dlsym_probe' diagnostics/ci/m3-original-libudev-dlopen-callsite.c
           if readelf -d "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so" | grep -F '[libudev.so.1]'; then
             echo 'Diagnostic interposer incorrectly links libudev eagerly' >&2; exit 1
           fi
@@ -79,6 +90,22 @@ jobs:
           tar -xf "$RUNNER_TEMP/original-archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/packaged"
           test -x "$RUNNER_TEMP/packaged/vulpra/vulpra"
           grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/packaged/vulpra/application.ini"
+          # The exact original source list is authenticated in an independent
+          # no-browser two-host ABI artifact; do not synthesize a guessed list.
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41358205206" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="3243200db85c6d75e4847b1e2b34ec3ee92e7673" and
+              .path==".github/workflows/m3-original-webauthn-libudev-host-abi.yml"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/source-udev"
+          gh run download 41358205206 --repo "$GITHUB_REPOSITORY"             --name m3-original-webauthn-libudev-two-host-abi --dir "$RUNNER_TEMP/source-udev"
+          jq -e --arg src "$SOURCE_SHA" '
+             .status=="pinned_webauthn_libudev_isolated_host_dynamic_abi" and
+             .original_source_commit==$src and .isolated_host=="archlinux-container" and
+             .source_declared_udev_soname=="libudev.so.1" and
+             .source_declared_udev_symbol_count==49 and
+             .host_resolved_udev_symbol_count==49 and
+             (.source_declared_udev_symbols|unique|length)==49
+          ' "$RUNNER_TEMP/source-udev/m3-original-udev-arch.json" >/dev/null
       - name: Build disposable Arch userspace with WebDriver and original browser dependencies
         shell: bash
         timeout-minutes: 15
@@ -111,6 +138,8 @@ jobs:
             -v "$RUNNER_TEMP/packaged/vulpra:/original:ro" \
             -v "$RUNNER_TEMP/m3-original-local-origin:/audit/local-origin:ro" \
             -v "$RUNNER_TEMP/m3-original-libudev-dlopen-observe.so:/audit/libudev-trace.so:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-libudev-dlsym-provider.jq:/audit/dlsym-crosswalk.jq:ro" \
+            -v "$RUNNER_TEMP/source-udev/m3-original-udev-arch.json:/audit/udev-original-abi.json:ro" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-webauthn-webdriver.sh:/audit/webdriver.sh:ro" \
             -v "$RUNNER_TEMP/reports:/reports:rw" \
             -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
@@ -119,6 +148,8 @@ jobs:
             -e VULPRA_M3_ORIGINAL_WEBAUTHN_MODE=usb-dlopen-trace \
             -e LD_PRELOAD=/audit/libudev-trace.so \
             -e VULPRA_M3_LIBUDEV_DLOPEN_TRACE=/tmp/vulpra-m3-libudev-dlopen.trace \
+            -e VULPRA_M3_LIBUDEV_DLSYM_TRACE=/tmp/vulpra-m3-libudev-dlsym.trace \
+            -e SOURCE_SHA="$SOURCE_SHA" -e ARCHIVE_SHA="$ARCHIVE_SHA" \
             -e VULPRA_M3_LIBUDEV_DLOPEN_STACK=/tmp/vulpra-m3-libudev-dlopen.stack \
             -e VULPRA_M3_NO_USB_PASSTHROUGH=1 \
             vulpra-m3-original-webauthn:ci /bin/bash -c '
@@ -128,6 +159,54 @@ jobs:
                 --clear-groups \
                 /bin/bash /audit/webdriver.sh /original/vulpra /audit/local-origin \
                 /reports/m3-original-browser-libudev-dlopen-callsite.json
+              # No unsanitized PIDs, paths or loader traces leave this sandbox.
+              sym=/tmp/vulpra-m3-libudev-dlsym.trace
+              open=/tmp/vulpra-m3-libudev-dlopen.trace
+              test -s "$sym" && test -s "$open"
+              test "$(stat -c %s "$sym")" -le 65536
+              crosscheck() {
+                jq -n --arg src "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
+                  --slurpfile abi /audit/udev-original-abi.json \
+                  --slurpfile feature "$2" \
+                  --rawfile dlsym "$1" --rawfile dlopen "$3" \
+                  -f /audit/dlsym-crosswalk.jq
+              }
+              clean=/reports/m3-original-browser-libudev-dlsym-provider.json
+              feature=/reports/m3-original-browser-libudev-dlopen-callsite.json
+              crosscheck "$sym" "$feature" "$open" >"$clean"
+              jq -e '
+                .schema_version==1 and
+                .status=="original_instrumented_browser_libxul_udev_symbol_real_provider_resolution_observed" and
+                .original_rust_source_declared_symbol_count==49 and
+                .source_declared_udev_new_resolved_by_actual_original_browser==true and
+                .unique_original_browser_udev_symbols_resolved>=1 and
+                .libxul_dlopen_and_libudev_dlsym_success_same_original_browser_pid_verified==true and
+                .ld_preload_instrumentation_changes_original_symbol_resolution==true and
+                .uninstrumented_original_browser_dlsym_provider_verified==false and
+                .source_pruning_authorized==false and
+                .native_bytes_saved==0 and .m3_sixth_gate_closed==false
+              ' "$clean" >/dev/null
+              # Real provider, symbol declaration, and process correlation
+              # must be independently required, not assumed from the dlopen.
+              cp "$sym" /tmp/dlsym-mutant
+              printf "1\t0x123\tudev_nonexistent\t hit\tlibudev.so.1.7.15\n" >>/tmp/dlsym-mutant
+              if crosscheck /tmp/dlsym-mutant "$feature" "$open" >/dev/null 2>&1; then
+                echo "FAIL: undeclared browser symbol accepted" >&2; exit 1
+              fi
+              awk -F "\t" "BEGIN{OFS=\"\\t\"} \$4==\"hit\"{\$5=\"libxul.so\"} {print}" "$sym" >/tmp/dlsym-mutant
+              if crosscheck /tmp/dlsym-mutant "$feature" "$open" >/dev/null 2>&1; then
+                echo "FAIL: mismatched real symbol provider accepted" >&2; exit 1
+              fi
+              awk -F "\t" "BEGIN{OFS=\"\\t\"} {\$1=\"9999999999\";print}" "$sym" >/tmp/dlsym-mutant
+              if crosscheck /tmp/dlsym-mutant "$feature" "$open" >/dev/null 2>&1; then
+                echo "FAIL: wrong-process dlsym evidence accepted" >&2; exit 1
+              fi
+              jq ".source_pinned_libxul_normal_load_hit_at_return_pc_0x9936667=false" \
+                "$feature" >/tmp/feature-mutant.json
+              if crosscheck "$sym" /tmp/feature-mutant.json "$open" >/dev/null 2>&1; then
+                echo "FAIL: corrupted original compiled callsite accepted" >&2; exit 1
+              fi
+              echo "PASS: same original browser process resolved source-declared libudev symbol from actual provider, four negative mutants"
             '
       - name: Accept original libxul callsites and bounded instrumented stack, not full graph
         shell: bash
@@ -162,12 +241,23 @@ jobs:
             .source_pruning_authorized==false and
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/reports/m3-original-browser-libudev-dlopen-callsite.json" >/dev/null
-          echo 'PASS: original browser exact libxul dlopen return PCs, flags, outcomes; no stack/hardware/full closure'
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .status=="original_instrumented_browser_libxul_udev_symbol_real_provider_resolution_observed" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .source_declared_udev_new_resolved_by_actual_original_browser==true and
+            .libxul_dlopen_and_libudev_dlsym_success_same_original_browser_pid_verified==true and
+            .source_declared_udev_symbols_not_all_tested_in_browser==true and
+            .uninstrumented_original_browser_dlsym_provider_verified==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/reports/m3-original-browser-libudev-dlsym-provider.json" >/dev/null
+          echo 'PASS: original browser instrumented libxul dlopen+real dlsym provider; no hardware or full FFI closure'
       - name: Upload only sanitized browser feature observations
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: m3-original-browser-libudev-dlopen-callsite
-          path: ${{ runner.temp }}/reports/m3-original-browser-libudev-dlopen-callsite.json
+          path: |
+            ${{ runner.temp }}/reports/m3-original-browser-libudev-dlopen-callsite.json
+            ${{ runner.temp }}/reports/m3-original-browser-libudev-dlsym-provider.json
           if-no-files-found: error
           retention-days: 14
