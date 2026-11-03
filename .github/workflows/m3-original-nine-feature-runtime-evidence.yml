@@ -1,0 +1,170 @@
+# Join-only: every one of nine original packaged ELFs absent from three
+# bounded browser maps has separately accepted native symbol-binding evidence.
+# No new browser execution, feature pruning or package savings are authorized.
+name: M3 Original Nine Unsampled Feature ELF Native Evidence
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-nine-feature-runtime-evidence.yml
+      - ci/m3-original-nine-feature-runtime-evidence-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-nine-feature-elf-evidence:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SOURCE_SHA: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE_SHA: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      SAMPLE_RUN: '41717623238'
+      SAMPLE_HEAD: 606bd99d85562ca4c66504aee7b51669efd62786
+      TEN_RUN: '41206028051'
+      TEN_HEAD: 1c5dc963a43c220d14dbee2f25ca1d6f8032a0b9
+      AUX_RUN: '41164023607'
+      AUX_HEAD: eaea87f05d0abe79dd685c204c1876a3d5ed44a7
+      MODULE_RUN: '41165330510'
+      MODULE_HEAD: ec678bc8223ca85c37bc41e44b9db2895d0c7414
+      PING_RUN: '41165514106'
+      PING_HEAD: c09e570d464a363492ce8569efbc688a67a9b406
+      GFX_RUN: '41165690323'
+      GFX_HEAD: fc1cf54ff96075d690796fb3f3a9d5efc24102d0
+      ALT_RUN: '41205746021'
+      ALT_HEAD: 5adfd14c417b496e26bcd6bcffe50716da89ecb0
+    steps:
+      - name: Checkout nine original ELF evidence reconciler only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-nine-feature-runtime-evidence-crosswalk.jq
+      - name: Authenticate exact original source and seven independent accepted CI runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          for key in SAMPLE TEN AUX MODULE PING GFX ALT; do
+            run_key="${key}_RUN"; head_key="${key}_HEAD"
+            run="${!run_key}"; expected="${!head_key}"
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e --arg sha "$expected" \
+                '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          done
+          unique_artifact() {
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$1/artifacts?per_page=50" |
+              jq -e --arg name "$2" \
+                '[.artifacts[]|select(.name==$name and .expired==false and .size_in_bytes>0)]|length==1' >/dev/null
+          }
+          unique_artifact "$SAMPLE_RUN" m3-original-28-elf-three-browser-workload-residency
+          unique_artifact "$TEN_RUN" m3-original-ten-requester-binding-reconciliation
+          unique_artifact "$AUX_RUN" m3-original-auxiliary-actual-symbol-bindings
+          unique_artifact "$MODULE_RUN" m3-original-feature-module-actual-bindings
+          unique_artifact "$PING_RUN" m3-original-pingsender-actual-bindings
+          unique_artifact "$GFX_RUN" m3-original-gfxtest-actual-bindings
+          unique_artifact "$ALT_RUN" m3-original-alternate-vulpra-bin-actual-bindings
+      - name: Download seven bounded accepted native diagnostic reports
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for key in sample ten aux module ping gfx alt; do mkdir -p "$RUNNER_TEMP/$key"; done
+          get_report() {
+            gh run download "$1" --repo "$GITHUB_REPOSITORY" --name "$2" --dir "$RUNNER_TEMP/$3"
+          }
+          get_report "$SAMPLE_RUN" m3-original-28-elf-three-browser-workload-residency sample
+          get_report "$TEN_RUN" m3-original-ten-requester-binding-reconciliation ten
+          get_report "$AUX_RUN" m3-original-auxiliary-actual-symbol-bindings aux
+          get_report "$MODULE_RUN" m3-original-feature-module-actual-bindings module
+          get_report "$PING_RUN" m3-original-pingsender-actual-bindings ping
+          get_report "$GFX_RUN" m3-original-gfxtest-actual-bindings gfx
+          get_report "$ALT_RUN" m3-original-alternate-vulpra-bin-actual-bindings alt
+          for file in \
+            "$RUNNER_TEMP/sample/m3-original-28-elf-three-workload-residency.json" \
+            "$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json" \
+            "$RUNNER_TEMP/aux/m3-auxiliary-native-actual-bindings.json" \
+            "$RUNNER_TEMP/module/mozinference-actual-bindings.json" \
+            "$RUNNER_TEMP/module/clearkey-actual-bindings.json" \
+            "$RUNNER_TEMP/module/onnx-actual-bindings.json" \
+            "$RUNNER_TEMP/ping/original-pingsender-actual-bindings.json" \
+            "$RUNNER_TEMP/gfx/original-gfxtest-actual-bindings.json" \
+            "$RUNNER_TEMP/alt/m3-alternate-vulpra-bin-actual-bindings.json"; do
+            test -s "$file"
+            jq -e 'type=="object"' "$file" >/dev/null
+          done
+      - name: Verify all nine independent requester bindings and reject eight actual-report mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          sample="$RUNNER_TEMP/sample/m3-original-28-elf-three-workload-residency.json"
+          ten="$RUNNER_TEMP/ten/m3-original-ten-native-binding-reconciliation.json"
+          aux="$RUNNER_TEMP/aux/m3-auxiliary-native-actual-bindings.json"
+          moz="$RUNNER_TEMP/module/mozinference-actual-bindings.json"
+          cdm="$RUNNER_TEMP/module/clearkey-actual-bindings.json"
+          onnx="$RUNNER_TEMP/module/onnx-actual-bindings.json"
+          ping="$RUNNER_TEMP/ping/original-pingsender-actual-bindings.json"
+          gfx="$RUNNER_TEMP/gfx/original-gfxtest-actual-bindings.json"
+          alt="$RUNNER_TEMP/alt/m3-alternate-vulpra-bin-actual-bindings.json"
+          out="$RUNNER_TEMP/m3-original-nine-feature-runtime-evidence.json"
+          verify() {
+            jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+              --slurpfile resident "$1" --slurpfile ten "$2" \
+              --slurpfile aux "$3" --slurpfile moz "$4" \
+              --slurpfile cdm "$5" --slurpfile onnx "$6" \
+              --slurpfile ping "$7" --slurpfile gfx "$8" \
+              --slurpfile alt "$9" \
+              -f ci/m3-original-nine-feature-runtime-evidence-crosswalk.jq
+          }
+          verify "$sample" "$ten" "$aux" "$moz" "$cdm" "$onnx" "$ping" "$gfx" "$alt" >"$out"
+          jq -e '
+            .schema_version==1 and
+            .status=="nine_original_unmapped_in_three_browser_samples_have_independent_bounded_native_bindings" and
+            .original_28_elf_members==28 and
+            .three_browser_sample_mapped_members==19 and
+            .three_sample_unobserved_members==9 and
+            .unobserved_three_sample_members_with_separate_normal_bindings==9 and
+            .separate_helper_executable_kinds==6 and
+            .separate_c_api_module_kinds==3 and
+            .summed_nine_elf_binding_events==2066 and
+            .summed_nine_elf_distinct_provider_symbol_pairs==1658 and
+            .all_ten_requester_binding_events==8394 and
+            (.rows|length)==9 and
+            ([.rows[]|select(.original_native_executable_launched)]|length)==6 and
+            ([.rows[]|select(.independent_c_api_library_load_tested)]|length)==3 and
+            (all(.rows[];.normal_browser_feature_path_verified==false and
+                  .end_to_end_feature_success_proven==false and
+                  .unused_or_removable_proven==false)) and
+            .no_same_browser_session_assumed==true and
+            .sample_absence_does_not_mean_unneeded==true and
+            .completed_28_elf_ffi_or_future_conditional_loader_closure==false and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and .m3_sixth_gate_closed==false' "$out" >/dev/null
+          jq '.not_observed_as_resident_in_these_samples_names[0]="libxul.so"' "$sample" >"$RUNNER_TEMP/mutant.json"
+          if verify "$RUNNER_TEMP/mutant.json" "$ten" "$aux" "$moz" "$cdm" "$onnx" "$ping" "$gfx" "$alt" >/dev/null 2>&1; then echo 'FAIL: forged missing ELF accepted' >&2; exit 1; fi
+          jq '.sum_normal_symbol_binding_events=0' "$ten" >"$RUNNER_TEMP/mutant.json"
+          if verify "$sample" "$RUNNER_TEMP/mutant.json" "$aux" "$moz" "$cdm" "$onnx" "$ping" "$gfx" "$alt" >/dev/null 2>&1; then echo 'FAIL: forged ten-original-binding total accepted' >&2; exit 1; fi
+          jq '.per_member.updater.normal_symbol_binding_events=0' "$aux" >"$RUNNER_TEMP/mutant.json"
+          if verify "$sample" "$ten" "$RUNNER_TEMP/mutant.json" "$moz" "$cdm" "$onnx" "$ping" "$gfx" "$alt" >/dev/null 2>&1; then echo 'FAIL: missing updater binding accepted' >&2; exit 1; fi
+          jq '.original_requester_basename="libxul.so"' "$moz" >"$RUNNER_TEMP/mutant.json"
+          if verify "$sample" "$ten" "$aux" "$RUNNER_TEMP/mutant.json" "$cdm" "$onnx" "$ping" "$gfx" "$alt" >/dev/null 2>&1; then echo 'FAIL: forged ML native identity accepted' >&2; exit 1; fi
+          jq '.no_network_egress=false' "$cdm" >"$RUNNER_TEMP/mutant.json"
+          if verify "$sample" "$ten" "$aux" "$moz" "$RUNNER_TEMP/mutant.json" "$onnx" "$ping" "$gfx" "$alt" >/dev/null 2>&1; then echo 'FAIL: unsafe ClearKey diagnostic accepted' >&2; exit 1; fi
+          jq '.normal_symbol_binding_events=0' "$onnx" >"$RUNNER_TEMP/mutant.json"
+          if verify "$sample" "$ten" "$aux" "$moz" "$cdm" "$RUNNER_TEMP/mutant.json" "$ping" "$gfx" "$alt" >/dev/null 2>&1; then echo 'FAIL: missing ONNX native binding accepted' >&2; exit 1; fi
+          jq '.synthetic_loopback_telemetry_only=false' "$ping" >"$RUNNER_TEMP/mutant.json"
+          if verify "$sample" "$ten" "$aux" "$moz" "$cdm" "$onnx" "$RUNNER_TEMP/mutant.json" "$gfx" "$alt" >/dev/null 2>&1; then echo 'FAIL: forged ping safety accepted' >&2; exit 1; fi
+          jq '.private_weston_wayland_gfx_probe_only=false' "$gfx" >"$RUNNER_TEMP/mutant.json"
+          if verify "$sample" "$ten" "$aux" "$moz" "$cdm" "$onnx" "$ping" "$RUNNER_TEMP/mutant.json" "$alt" >/dev/null 2>&1; then echo 'FAIL: forged graphical helper accepted' >&2; exit 1; fi
+          jq -r '"M3_NINE_ORIGINAL_ELF_SEPARATE_NATIVE_EVIDENCE=PASS nine=\(.unobserved_three_sample_members_with_separate_normal_bindings) events=\(.summed_nine_elf_binding_events) pairs=\(.summed_nine_elf_distinct_provider_symbol_pairs) rejected_mutants=8"' "$out"
+      - name: Archive only nine-source native ELF summarized evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-nine-feature-native-binding-evidence
+          path: ${{ runner.temp }}/m3-original-nine-feature-runtime-evidence.json
+          if-no-files-found: error
+          retention-days: 14
