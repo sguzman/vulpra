@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if ORT_API_VERSION != 30
 #error "This probe requires exactly ORT C API v30"
@@ -77,6 +78,46 @@ int main(int argc, char **argv) {
     return 6;
   }
   puts("M3_EP_STAGE=registration_succeeded"); fflush(stdout);
+  const char *device_mode = getenv("VULPRA_CI_ONNX_EP_DEVICE_PROBE");
+  if (device_mode != NULL && strcmp(device_mode, "1") == 0) {
+    const OrtEpDevice *const *ep_devices = NULL;
+    size_t ep_count = 0;
+    int query_ok = check_status(api,
+        api->GetEpDevices(env, &ep_devices, &ep_count), "enumerate_ep_devices");
+    size_t matching_cpu_devices = 0;
+    if (query_ok && ep_count <= 64 && (ep_count == 0 || ep_devices != NULL)) {
+      for (size_t i = 0; i < ep_count; ++i) {
+        const OrtEpDevice *device = ep_devices[i];
+        if (device == NULL) {
+          query_ok = 0;
+          break;
+        }
+        const char *name = api->EpDevice_EpName(device);
+        if (name != NULL && strcmp(name, "VulpraCIProbeEP") == 0) {
+          const OrtHardwareDevice *hardware = api->EpDevice_Device(device);
+          if (hardware == NULL ||
+              api->HardwareDevice_Type(hardware) != OrtHardwareDeviceType_CPU) {
+            query_ok = 0;
+            break;
+          }
+          ++matching_cpu_devices;
+        }
+      }
+    } else {
+      query_ok = 0;
+    }
+    if (!query_ok || matching_cpu_devices != 1) {
+      fprintf(stderr, "M3_EP_ERROR_STAGE=cpu_ep_device_enumeration matches=%zu\n",
+              matching_cpu_devices);
+      OrtStatus *cleanup = api->UnregisterExecutionProviderLibrary(
+          env, "vulpra-ci-fixture");
+      if (cleanup != NULL) api->ReleaseStatus(cleanup);
+      api->ReleaseEnv(env);
+      dlclose(handle);
+      return 8;
+    }
+    puts("M3_EP_STAGE=cpu_ep_device_enumerated"); fflush(stdout);
+  }
   puts("M3_EP_STAGE=unregister"); fflush(stdout);
   int unregistered = check_status(
       api, api->UnregisterExecutionProviderLibrary(

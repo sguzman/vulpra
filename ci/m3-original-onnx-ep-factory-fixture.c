@@ -12,6 +12,8 @@
 #endif
 
 static const OrtApi *runtime_api;
+static const OrtEpApi *runtime_ep_api;
+static int enumerate_ci_cpu_device;
 static const char provider_name[] = "VulpraCIProbeEP";
 static const char vendor_name[] = "Vulpra CI fixture";
 static const char fixture_version[] = "0.0.1";
@@ -57,7 +59,39 @@ static OrtStatus *ORT_API_CALL get_supported_devices(
                : NULL;
   }
   *num_ep_devices = 0;
-  return NULL;
+  if (!enumerate_ci_cpu_device) {
+    return NULL;
+  }
+  // Only a CPU device already discovered by ORT can be advertised.
+  // No synthetic GPU or accelerator is invented by this CI fixture.
+  if (runtime_api == NULL || runtime_ep_api == NULL ||
+      runtime_api->HardwareDevice_Type == NULL ||
+      runtime_ep_api->CreateEpDevice == NULL || devices == NULL ||
+      ep_devices == NULL || max_ep_devices == 0) {
+    return runtime_api != NULL
+               ? runtime_api->CreateStatus(ORT_FAIL, "CPU probe prerequisites missing")
+               : NULL;
+  }
+  for (size_t i = 0; i < device_count; ++i) {
+    if (devices[i] == NULL ||
+        runtime_api->HardwareDevice_Type(devices[i]) != OrtHardwareDeviceType_CPU) {
+      continue;
+    }
+    OrtEpDevice *created = NULL;
+    OrtStatus *status =
+        runtime_ep_api->CreateEpDevice(factory, devices[i], NULL, NULL, &created);
+    if (status != NULL) {
+      return status;
+    }
+    if (created == NULL) {
+      return runtime_api->CreateStatus(ORT_FAIL, "CreateEpDevice returned NULL");
+    }
+    ep_devices[0] = created;  // ORT owns the created device.
+    *num_ep_devices = 1;
+    fputs("M3_EP_CALLBACK=cpu_ep_device_created\n", stderr); fflush(stderr);
+    return NULL;
+  }
+  return runtime_api->CreateStatus(ORT_FAIL, "No discovered CPU hardware device");
 }
 
 // Required API callback, deliberately unreachable without advertised devices.
@@ -163,6 +197,13 @@ M3_EXPORT OrtStatus *CreateEpFactories(
     return api30->CreateStatus(ORT_FAIL, "CI factory allocation failed");
   }
   runtime_api = api30;
+  const char *device_mode = getenv("VULPRA_CI_ONNX_EP_DEVICE_PROBE");
+  enumerate_ci_cpu_device = device_mode != NULL && strcmp(device_mode, "1") == 0;
+  runtime_ep_api = api30->GetEpApi != NULL ? api30->GetEpApi() : NULL;
+  if (enumerate_ci_cpu_device && runtime_ep_api == NULL) {
+    free(factory);
+    return api30->CreateStatus(ORT_FAIL, "OrtEpApi unavailable");
+  }
   factories[0] = factory;
   *num_factories = 1;  // Unlike the retired zero-factory crash experiment.
   fputs("M3_EP_CALLBACK=factory_created\n", stderr);

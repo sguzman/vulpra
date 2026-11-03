@@ -4,6 +4,13 @@
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
+  # TEMPORARY validation trigger; restore manual-only after verified evidence.
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-onnx-ep-factory-fixture.c
+      - ci/m3-original-onnx-ep-registration.c
+      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read
@@ -111,13 +118,32 @@ jobs:
           grep -Fxq 'M3_EP_STAGE=unregistration_succeeded' "$RUNNER_TEMP/m3-ep-lifecycle.log"
           grep -Fxq 'PASS: original ONNX registered and unregistered CI-only factory' \
             "$RUNNER_TEMP/m3-ep-lifecycle.log"
+          # Separate opt-in enumeration: this fixture still cannot execute models.
+          if ! sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            VULPRA_CI_ONNX_EP_DEVICE_PROBE=1 LD_LIBRARY_PATH="$pkg" \
+            MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 35s \
+            "$RUNNER_TEMP/original-ep-registration" "$pkg/libonnxruntime.so" \
+            "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" 2>&1 | \
+            tee "$RUNNER_TEMP/m3-ep-device-enumeration.log"; then
+            echo 'M3_EP_DIAGNOSTIC=cpu_device_enumeration_failed'
+            exit 1
+          fi
+          grep -Fxq 'M3_EP_CALLBACK=cpu_ep_device_created' \
+            "$RUNNER_TEMP/m3-ep-device-enumeration.log"
+          grep -Fxq 'M3_EP_STAGE=cpu_ep_device_enumerated' \
+            "$RUNNER_TEMP/m3-ep-device-enumeration.log"
+          grep -Fxq 'M3_EP_STAGE=unregistration_succeeded' \
+            "$RUNNER_TEMP/m3-ep-device-enumeration.log"
           jq -n --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
             '{schema_version:1, status:"source_pinned_original_external_ep_factory_lifecycle_pass",
               original_source_commit:$source, original_archive_sha256:$archive,
               exact_header_blob:"a254e990237d5575186cf3871392db8c70835a56",
               exact_ep_header_blob:"0424a95c2d2c1102f328b4e3aeb77ec72601a120",
               exact_error_header_blob:"732fcd7a82eaa0208c7c97aa5f2fb2b0c694456f",
-              test_ep_factories:1, test_ep_devices:0, actual_model_executed:false,
+              test_ep_factories:1, test_ep_devices:0,
+              second_probe_cpu_ep_devices:1, cpu_device_enumeration_verified:true,
+              actual_model_executed:false,
               original_library_registration_succeeded:true,
               original_library_unregistration_succeeded:true,
               fixture_factory_released:true,
