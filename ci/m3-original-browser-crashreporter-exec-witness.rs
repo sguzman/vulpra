@@ -90,7 +90,12 @@ fn run()->Result<(),String>{
         thread::sleep(Duration::from_millis(5));
     }
     if reporter_samples<1||!browser_gone{
-        return Err("no real reporter exe plus original browser termination witnessed".into())
+        // Counts and booleans only. These diagnostics contain no private
+        // process IDs, minidump paths, raw argument bytes or profile data.
+        return Err(format!(
+            "runtime observation incomplete: reporter_seen={} browser_exit_seen={} samples={} before_browser_seen={}",
+            reporter_samples>0,browser_gone,scans,before_browser
+        ))
     }
     let out=format!(concat!(
       "{{\"schema_version\":1,",
