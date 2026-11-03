@@ -30,3 +30,19 @@ The accepted crosswalk independently rejects **six** corruptions of real source/
 **Interpretation:** The actual Arch library demonstrably has a versioned internal address relocation for the same `libudev` function that glibc reported as a self-binding in an original browser process. This independently **supports a host-library internal binding explanation**, not a 50th Vulpra WebAuthn Rust declaration or an exact original caller. The inspected Arch ELF's hash is preserved for future matching, but the earlier browser run did **not** archive the host ELF SHA: equal filenames **do not prove byte-identical libudev binaries across these two CI runs**. Neither an uninterrupted uninstrumented original Rust-to-C call stack, the original browser's exact instruction ownership, all 49 browser FFI runtime resolutions, actual physical authenticator behavior, target EndeavourOS/Hyprland/GPU host, nor the complete 28-ELF source/build/feature/indirect `dlopen` dependency closure has been established.
 
 **No source or packaged binary was removed, no native bytes were saved, and the sixth M3 acceptance gate remains open. Overall Vulpra 61%, M3 5/6 = 83%, session Δ +0 percentage points.** The lightweight diagnostic workflow is restored to manual-only `workflow_dispatch` after acceptance.
+
+## Original-browser mapped host ELF cryptographic match (later acceptance, 2026-11-03)
+
+The previously missing **original-browser host ELF SHA** has now been captured and compared with the earlier independently inspected Arch host ELF. [Original compiled browser CI **41712441426 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41712441426), artifact **13269210009** (`m3-original-browser-usb-nodevice-loader`); [workflow lint **41712441350 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41712441350).
+
+During the same real, source/archive-pinned, offline original-browser WebAuthn USB no-device test, the CI-only Rust observer `ci/m3-original-browser-libudev-host-fingerprint.rs` read the original `libxul.so`-loaded browser's live `/proc/maps`, located its host `libudev.so.1.7.15` backing file, verified **both mapped device and inode** against the host filesystem and recorded its bounded SHA-256 without exporting raw maps, paths or PIDs. The browser's registration ended with the expected `NotAllowedError` (no physical key); `LD_DEBUG=bindings` remained non-interposing, with no `LD_PRELOAD` or `LD_AUDIT`.
+
+The browser-host SHA-256 **matched** the previously accepted independently inspected Arch ELF fingerprint:
+
+```text
+dd636932094404444ce8319c89d6074936322f96a8f80e08e22f71c295a84d9d
+```
+
+The new `ci/m3-original-browser-libudev-hash-crosswalk.jq` rejects mismatched original source/archive, mapped-ELF basename, missing device/inode verification, invalid fingerprint and incompatible prior glibc/Arch evidence. **Four deliberate corruptions of the actual live fingerprint report were rejected**, and the three new Rust unit tests plus native original browser, three-phase mapping and glibc source-bound crosswalk passed. Both independent observations are now cryptographically linked to identical ELF bytes, not merely a matching filename; the original glibc-reported `libudev` self-binding is consistent with that ELF's previously verified versioned `R_X86_64_GLOB_DAT` relocation.
+
+**Remaining limits:** Byte identity does not prove the exact source instruction or Rust/C call stack, physical security-key success, execution of all 49 Rust-declared symbols in the real browser, or complete source/build/runtime/dynamic-load closure of the 28 ELF inventory. No production source or packaged binary was removed, no new native bytes were saved, and M3's sixth gate remains open. **M3 5/6 = 83%; Vulpra 61%; Δ +0 percentage points.** The expensive browser workflow is restored to manual-only dispatch.
