@@ -9,16 +9,11 @@ name: M3 Original Browser USB Backend No-Device Loader Probe
 # Actual three-phase versioned libudev mapping and four negative mutants
 # passed in original native CI 41674689904. Glibc no-LD_PRELOAD actual
 # original browser provider and 15 source-matching / 1 unattributed symbol
-# accepted in CI 41692027881, four negative mutations rejected. Manual-only.
+# accepted in CI 41692027881, four negative mutations rejected. Same
+# glibc libudev request/provider evidence and seven native negative tests
+# accepted in CI 41694350808. Manual-only expensive native workflow.
 on:
   workflow_dispatch:
-  # TEMPORARY source-pinned requester/provider regression, restore manual-only.
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-usb-nodevice-loader.yml
-      - ci/m3-original-udev-glibc-bindings.rs
-      - ci/m3-original-udev-glibc-bindings-crosswalk.jq
 permissions:
   contents: read
   actions: read
