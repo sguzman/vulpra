@@ -1,4 +1,4 @@
-// Original Vulpra WebAudio test: bounded on-demand /proc/maps snapshot.
+// Original Vulpra WebAudio / WebAuthn USB CI: bounded on-demand /proc/maps snapshot.
 // Only /original/vulpra and /original/vulpra-bin executable PIDs are included;
 // no paths, PIDs, memory contents or raw /proc files are exported. This is one
 // sampled phase's residency evidence, NOT general dynamic loader closure.

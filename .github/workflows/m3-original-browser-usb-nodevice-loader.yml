@@ -6,17 +6,10 @@ name: M3 Original Browser USB Backend No-Device Loader Probe
 # request response is expected with no physical authenticator; actual mapped
 # libudev evidence is measured independently. This is not sixth-gate closure.
 # A source-pinned original-browser mapping transition passed 41371647131.
-# This expensive experiment is manually dispatchable, not a regular push gate.
+# Actual three-phase versioned libudev mapping and four negative mutants
+# passed in original native CI 41674689904. Manual-only expensive workflow.
 on:
   workflow_dispatch:
-  # TEMPORARY native USB map regression. Restore manual-only once verified.
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-usb-nodevice-loader.yml
-      - ci/m3-original-browser-webauthn-webdriver.sh
-      - ci/m3-original-browser-on-demand-maps.rs
-      - ci/m3-original-webauthn-usb-maps-crosswalk.jq
 permissions:
   contents: read
   actions: read
