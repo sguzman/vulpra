@@ -10,6 +10,14 @@ name: M3 Original Browser USB Backend No-Device Loader Probe
 # passed in original native CI 41674689904. Manual-only expensive workflow.
 on:
   workflow_dispatch:
+  # TEMPORARY accepted-native LD_DEBUG symbol-provider test; return to manual-only.
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-usb-nodevice-loader.yml
+      - ci/m3-original-browser-webauthn-webdriver.sh
+      - ci/m3-original-udev-glibc-bindings.rs
+      - ci/m3-original-udev-glibc-bindings-crosswalk.jq
 permissions:
   contents: read
   actions: read
@@ -33,6 +41,8 @@ jobs:
             ci/m3-original-browser-webauthn-webdriver.sh
             ci/m3-original-browser-on-demand-maps.rs
             ci/m3-original-webauthn-usb-maps-crosswalk.jq
+            ci/m3-original-udev-glibc-bindings.rs
+            ci/m3-original-udev-glibc-bindings-crosswalk.jq
       - name: Checkout original source WebAuthn virtual-authenticator regression
         uses: actions/checkout@v4
         with:
@@ -66,6 +76,11 @@ jobs:
           "$RUNNER_TEMP/m3-webauthn-map-tests"
           rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-on-demand-maps.rs \
             -o "$RUNNER_TEMP/m3-webauthn-on-demand-maps"
+          rustc --edition=2021 -D warnings --test diagnostics/ci/m3-original-udev-glibc-bindings.rs \
+            -o "$RUNNER_TEMP/m3-original-udev-glibc-bindings-tests"
+          "$RUNNER_TEMP/m3-original-udev-glibc-bindings-tests"
+          rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-udev-glibc-bindings.rs \
+            -o "$RUNNER_TEMP/m3-original-udev-glibc-observer"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
             jq -e --arg src "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$src' >/dev/null
           mkdir -p "$RUNNER_TEMP/original-archive" "$RUNNER_TEMP/packaged" "$RUNNER_TEMP/reports"
@@ -76,6 +91,25 @@ jobs:
           tar -xf "$RUNNER_TEMP/original-archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/packaged"
           test -x "$RUNNER_TEMP/packaged/vulpra/vulpra"
           grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/packaged/vulpra/application.ini"
+          # Independently verify original WebAuthn Rust source's 49-symbol
+          # allowlist via a previous exact-success no-browser ABI test.
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/41358205206" |
+            jq -e '.status=="completed" and .conclusion=="success" and
+              .head_sha=="3243200db85c6d75e4847b1e2b34ec3ee92e7673" and
+              .path==".github/workflows/m3-original-webauthn-libudev-host-abi.yml"' >/dev/null
+          mkdir -p "$RUNNER_TEMP/udev-abi"
+          gh run download 41358205206 --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-webauthn-libudev-two-host-abi --dir "$RUNNER_TEMP/udev-abi"
+          jq -e --arg src "$SOURCE_SHA" '
+            .schema_version==1 and
+            .status=="pinned_webauthn_libudev_isolated_host_dynamic_abi" and
+            .original_source_commit==$src and .isolated_host=="archlinux-container" and
+            .source_declared_udev_soname=="libudev.so.1" and
+            .source_declared_udev_symbol_count==49 and
+            .host_resolved_udev_symbol_count==49 and
+            (.source_declared_udev_symbols|unique|length)==49 and
+            .original_browser_executed==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/udev-abi/m3-original-udev-arch.json" >/dev/null
       - name: Build disposable Arch userspace with WebDriver and original browser dependencies
         shell: bash
         timeout-minutes: 15
@@ -108,6 +142,7 @@ jobs:
             -v "$RUNNER_TEMP/packaged/vulpra:/original:ro" \
             -v "$RUNNER_TEMP/m3-original-local-origin:/audit/local-origin:ro" \
             -v "$RUNNER_TEMP/m3-webauthn-on-demand-maps:/audit/on-demand-maps:ro" \
+            -v "$RUNNER_TEMP/m3-original-udev-glibc-observer:/audit/glibc-observer:ro" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-webauthn-webdriver.sh:/audit/webdriver.sh:ro" \
             -v "$RUNNER_TEMP/reports:/reports:rw" \
             -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
@@ -116,6 +151,7 @@ jobs:
             -e VULPRA_M3_ORIGINAL_WEBAUTHN_MODE=usb-no-device \
             -e VULPRA_M3_NO_USB_PASSTHROUGH=1 \
             -e VULPRA_M3_WEBAUTHN_MAP_PHASES=1 \
+            -e VULPRA_M3_GLIBC_BINDINGS=1 \
             vulpra-m3-original-webauthn:ci /bin/bash -c '
               set -euo pipefail
               ip link set lo up
@@ -214,6 +250,63 @@ jobs:
             echo 'FAIL: inconsistent original pre-click libudev state accepted' >&2; exit 1
           fi
           echo 'PASS: three original WebAuthn USB-backend real mapped-ELF phases and four negative mutants'
+      - name: Crosscheck real original browser glibc bindings against exact Rust WebAuthn symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          observation="$RUNNER_TEMP/reports/m3-original-udev-glibc-bindings.json"
+          feature="$RUNNER_TEMP/reports/m3-original-browser-usb-nodevice-loader.json"
+          abi="$RUNNER_TEMP/udev-abi/m3-original-udev-arch.json"
+          out="$RUNNER_TEMP/reports/m3-original-udev-glibc-bindings-crosswalk.json"
+          test -s "$observation" && test -s "$feature" && test -s "$abi"
+          crosswalk() {
+            jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+              --slurpfile glibc "$1" --slurpfile abi "$abi" \
+              --slurpfile feature "$2" \
+              -f diagnostics/ci/m3-original-udev-glibc-bindings-crosswalk.jq
+          }
+          crosswalk "$observation" "$feature" >"$out"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_browser_source_pinned_glibc_no_preload_udev_binding_reconciled" and
+            .source_declared_udev_ffi_symbols==49 and
+            .native_glibc_binding_event_count>=1 and
+            .native_glibc_unique_udev_symbol_count>=1 and
+            (.native_glibc_resolved_udev_names|index("udev_new"))!=null and
+            .original_libxul_loaded_pid_traces_with_udev_bindings>=1 and
+            .no_ld_preload_or_ld_audit_used==true and
+            .glibc_bindings_debug_changes_timing==true and
+            .provider_resolved_in_actual_original_browser_trace==true and
+            .glibc_dlsym_binding_requester_not_rust_caller==true and
+            .original_browser_rust_to_ffi_uninstrumented_stack_proven==false and
+            .full_49_original_browser_symbols_proven==false and
+            .raw_private_logs_or_process_ids_exported==false and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and .m3_sixth_gate_closed==false
+          ' "$out" >/dev/null
+          # Four mutations of actual native evidence must be rejected.
+          jq '.original_browser_resolved_udev_symbol_names |= . + ["udev_forged_symbol"] |
+              .original_browser_unique_udev_symbol_count += 1' "$observation" \
+            >"$RUNNER_TEMP/reports/m3-glibc-mutant.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: source-undeclared provider symbol accepted' >&2; exit 1
+          fi
+          jq '.original_browser_udev_provider_basenames=["libxul.so"]' "$observation" \
+            >"$RUNNER_TEMP/reports/m3-glibc-mutant.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: invalid native symbol provider accepted' >&2; exit 1
+          fi
+          jq '.original_libxul_and_libudev_binding_same_trace_count=0' "$observation" \
+            >"$RUNNER_TEMP/reports/m3-glibc-mutant.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: no common native browser trace accepted' >&2; exit 1
+          fi
+          jq '.original_archive_sha256="sha-drift"' "$observation" \
+            >"$RUNNER_TEMP/reports/m3-glibc-mutant.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: wrong original archive accepted' >&2; exit 1
+          fi
+          echo 'PASS: actual original glibc browser libudev provider with 49-source allowlist and four negative mutations'
       - name: Upload only sanitized browser feature observations
         if: always()
         uses: actions/upload-artifact@v4
@@ -225,5 +318,7 @@ jobs:
             ${{ runner.temp }}/reports/m3-original-webauthn-usb-during-maps.json
             ${{ runner.temp }}/reports/m3-original-webauthn-usb-after-maps.json
             ${{ runner.temp }}/reports/m3-original-webauthn-usb-maps-crosswalk.json
+            ${{ runner.temp }}/reports/m3-original-udev-glibc-bindings.json
+            ${{ runner.temp }}/reports/m3-original-udev-glibc-bindings-crosswalk.json
           if-no-files-found: error
           retention-days: 14

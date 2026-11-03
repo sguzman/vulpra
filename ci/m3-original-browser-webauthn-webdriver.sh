@@ -7,6 +7,12 @@ origin="$(realpath -e -- "$2")"
 report="$3"
 mode="${VULPRA_M3_ORIGINAL_WEBAUTHN_MODE:-virtual}"
 [[ "$mode" == virtual || "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]] || { echo 'Unsupported WebAuthn CI mode' >&2; exit 2; }
+if [[ "${VULPRA_M3_GLIBC_BINDINGS:-0}" == 1 ]]; then
+  # glibc diagnostics, not LD_PRELOAD/LD_AUDIT. Source attribution below
+  # remains limited to an original libxul-loaded browser PID trace.
+  [[ "$mode" == usb-no-device && -z "${LD_PRELOAD:-}" && -z "${LD_AUDIT:-}" &&
+     -x /audit/glibc-observer ]] || exit 2
+fi
 if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
   [[ "${VULPRA_M3_NO_USB_PASSTHROUGH:-}" == 1 ]] || { echo 'USB probe must explicitly disallow device passthrough' >&2; exit 2; }
   for dev in /dev/hidraw*; do [[ ! -e "$dev" ]] || { echo 'USB probe unexpectedly has physical hidraw device' >&2; exit 2; }; done
@@ -70,7 +76,14 @@ wayland-info >"$work/wayland-info.log" 2>&1
 grep -Fq xdg_wm_base "$work/wayland-info.log" || { echo 'Private Weston lacks xdg_wm_base' >&2; exit 1; }
 "$origin" vulpra-original-offline-webauthn >"$work/origin.log" 2>&1 &
 server_pid=$!
-geckodriver --host 127.0.0.1 --port 4444 --log error >"$work/driver.log" 2>&1 &
+if [[ "${VULPRA_M3_GLIBC_BINDINGS:-0}" == 1 ]]; then
+  # Only geckodriver and its original browser children inherit LD_DEBUG;
+  # the host test shell and original packaged binary stay unchanged.
+  LD_DEBUG=bindings LD_DEBUG_OUTPUT="$work/m3-original-browser-usb-glibc-bindings" \
+    geckodriver --host 127.0.0.1 --port 4444 --log error >"$work/driver.log" 2>&1 &
+else
+  geckodriver --host 127.0.0.1 --port 4444 --log error >"$work/driver.log" 2>&1 &
+fi
 driver_pid=$!
 ready=false
 for _ in {1..45}; do
@@ -153,6 +166,9 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
   # poll budget can race its asynchronous NotAllowedError under LD_PRELOAD.
   # Expand only the opt-in provider-instrumented diagnostic, not other modes.
   request_poll_limit=65
+  if [[ "${VULPRA_M3_GLIBC_BINDINGS:-0}" == 1 ]]; then
+    request_poll_limit=150
+  fi
   if [[ "$mode" == usb-dlopen-trace && -n "${VULPRA_M3_LIBUDEV_DLSYM_TRACE:-}" ]]; then
     request_poll_limit=150
   fi
@@ -269,6 +285,10 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
     network_egress_allowed:false,
     m3_sixth_gate_closed:false
   }' >"$report"
+  # Glibc traces are still private here. Parse before the EXIT cleanup.
+  if [[ "${VULPRA_M3_GLIBC_BINDINGS:-0}" == 1 ]]; then
+    /audit/glibc-observer "$work" /reports/m3-original-udev-glibc-bindings.json
+  fi
   # Run the optional dlsym provider check inside THIS already-unprivileged
   # process, before cleanup removes temporary PID-bearing raw traces. The
   # outer Docker launcher uses exec setpriv and cannot do postprocess work.
