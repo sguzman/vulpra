@@ -1,0 +1,38 @@
+# M3 — Original browser-owned pingsender executes real libcurl curl_easy_perform (2026-11-03)
+
+## Accepted source-pinned original native result
+
+[**CI 41741770814 — PASS**](https://github.com/sguzman/vulpra/actions/runs/41741770814), job **126284758605**; sanitized original native artifact **13281756134**, `m3-original-browser-pingsender-real-curl-perform`. The artifact was independently downloaded and inspected as one **2,283-byte JSON file** (ZIP **983 bytes**). Source-pinned unchanged original compiled browser commit **`b1482404dfb8b01342990ee99ea3df0f9756b5f7`**, original full-normal archive SHA-256 **`7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`**. The original packaged `vulpra` and `pingsender` ELF file digests matched before and after the native test; their installation mount was read-only.
+
+**New verified result:** the **real originally compiled Vulpra browser**, in a disposable source-pinned Arch/Weston no-network environment, invoked its original `TelemetrySend.testRunPingSender` JavaScript method, which spawned the **actual originally compiled packaged `pingsender` ELF** using `nsIProcess.runAsync`. The genuine child loaded a real host `libcurl` with the original `dlopen(RTLD_NOW)`, resolved the exact 14 original source-defined `dlsym` function names with non-null results, and **actually called the real `curl_easy_perform` function** through a transparent ABI-compatible CI-only function-pointer forwarding probe. The real function returned the original libcurl error **`CURLE_COULDNT_CONNECT = 7`** against a deliberately closed **localhost port 9**. No successful telemetry delivery was possible or claimed.
+
+This closes a new concrete runtime uncertainty: the previous [source-authenticated pingsender 14/14 dynamic symbols CI 41739731454](https://github.com/sguzman/vulpra/actions/runs/41739731454) proved native loader and symbol resolution, **not invocation of `curl_easy_perform`**. This test observes actual execution and its real non-success return, rather than inferring it from a successfully resolved function pointer.
+
+## Original compiled source and exact native probe
+
+The original `toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp` has `CurlWrapper::Init`, which loads a source-listed `libcurl` candidate through `dlopen` and resolves nine required and five optional `curl_*` functions with `dlsym`. In `CurlWrapper::Post`, the actual original source builds request options (including the URL, headers, POST body and connect timeout), then calls **`err = easy_perform(mCurl);`**, checks `err != CURLE_OK` and returns a failure on nonzero curl status.
+
+The **unchanged actual original browser and pingsender** were used. Only the separate test instrument `ci/m3-original-browser-pingsender-libcurl-perform.rs` was compiled in CI:
+
+1. Its ELF initializer authenticates the **actual original packaged `/original/pingsender`** from `/proc/self/exe`, exactly the three synthetic kernel-visible arguments, and the **original browser `/original/vulpra` parent executable** before allowing any observation.
+2. Its interposed `dlopen` forwards to actual glibc via `dlvsym`; it accepts only a non-null real library handle requested through one of six original-source Linux `libcurl` candidate names. Its interposed `dlsym` also forwards to real glibc and tracks exactly **14/14 actual non-null results** on that same authenticated real handle.
+3. For **only** `curl_easy_perform`, after obtaining the non-null original real libcurl function address, the instrument returns a CI-only `extern "C" fn(CURL*) -> CURLcode` **proxy pointer to the original pingsender**. The original unchanged `CurlWrapper::Post` invokes that pointer. The proxy immediately **forwards to the actual real libcurl function** using the original returned pointer, waits for the actual function to return and passes the exact same real `CURLcode` back to the original caller. It never synthesizes success or error 7; the acceptance marker is emitted **only after** the underlying real function itself returns 7 and all 14 native lookups have completed.
+4. The bounded JSON marker is produced from inside the original pingsender child after the real `curl_easy_perform` call, not by a standalone CLI invocation, mock program, a browser process observation, or merely `dlsym`. The witness contains no PIDs, source path data from profiles, kernel command lines, libcurl return pointers or real telemetry contents.
+
+The experiment is **instrumented**, not an uninstrumented production call graph. The CI-only proxy does change one returned function pointer, while forwarding every call through that pointer to genuine libcurl and preserving its status. That limits the conclusion to a validated instrumented execution path rather than proving an identical result on every host, build or libcurl ABI.
+
+## Safety and accepted assertions
+
+The fixture included only `{"vulpra_ci_synthetic":true,"no_real_telemetry":true}` in a disposable file and a fixed URL `http://localhost:9/vulpra-m3-synthetic-never-submit`. The test confirmed no listener on the port before invoking the original sender. Docker ran with **`--network none`**, private loopback only for localhost WebDriver, read-only original installation, disposable HOME/profile and no host desktop/network/user profile mounts. The actual browser's **`datareporting.healthreport.uploadEnabled=false`** was verified through native XPCOM; its independent telemetry collection preference could remain enabled. No real telemetry was supplied and no external submission could occur.
+
+The original Vulpra browser remained WebDriver-responsive after the original child invoked real libcurl. The fixed synthetic file remained (no transport success), and original Vulpra/pingsender executable SHA checks passed after container exit.
+
+The accepted run passed **4/4 Rust tests** (original executable/kernel argv filter, six permitted libcurl loader names, 14 unique source ABI names, and bounded real function-call reporting). The CI validator independently rejected **14/14 deliberately forged summary variants**, including false original-child parent/executable or native loader proof, a faked successful curl status, missing source ABI functions, false source/archive identity, an invented upload, and premature claims that the entire dependency graph or source pruning were safe.
+
+## Interpretation / remaining work
+
+**Established:** a source-pinned, unchanged original compiled Vulpra browser can start its genuine packaged pingsender, which loads and resolves real host libcurl and **actually executes a real `curl_easy_perform` call**, receiving **`CURLE_COULDNT_CONNECT=7`** for the deliberately unreachable local synthetic destination, in a single private, no-egress native process chain.
+
+**Not established:** normal policy/shutdown telemetry dispatch; successful HTTP/TLS upload; real telemetry contents; all 14 functions' runtime invocation; alternate libcurl provider and missing-URL-helper fallback; production uninstrumented call behavior; target user's EndeavourOS/Hyprland/hardware parity; complete dependency/FFI/conditional loader mapping across browser features; safe source deletion. `curl_easy_perform` returning 7 proves a native error result, **not** a network send or delivery. No original Vulpra source was modified, no native executable removed, **zero bytes saved**.
+
+The expensive native workflow `.github/workflows/m3-original-browser-pingsender-real-curl-perform.yml` was restored to **manual-only `workflow_dispatch`** after the accepted CI, and workflow lint was run. **Vulpra overall 61%, M3 5/6 gates = 83%, Δ+0 percentage points**; the sixth full feature/build/native conditional-dependency closure gate remains OPEN.
