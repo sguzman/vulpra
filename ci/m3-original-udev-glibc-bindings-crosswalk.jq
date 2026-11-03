@@ -37,6 +37,15 @@ check(
  $g.original_browser_libudev_binding_event_count>=1 and
  safe($g.original_browser_resolved_udev_symbol_names) and
  safe($g.original_browser_udev_provider_basenames) and
+ safe($g.unattributed_udev_monitor_filter_update_requester_basenames) and
+ safe($g.unattributed_udev_monitor_filter_update_provider_basenames) and
+ ($g.unattributed_udev_monitor_filter_update_requester_basenames|length)>=1 and
+ ($g.unattributed_udev_monitor_filter_update_provider_basenames|length)>=1 and
+ ($g.unattributed_udev_monitor_filter_update_binding_events|type)=="number" and
+ $g.unattributed_udev_monitor_filter_update_binding_events>=1 and
+ $g.unattributed_udev_monitor_filter_update_binding_events<=$g.original_browser_libudev_binding_event_count and
+ $g.glibc_binding_requester_is_not_rust_ffi_callsite==true and
+ $g.extra_symbol_source_owner_identified==false and
  ($g.original_browser_resolved_udev_symbol_names|length)==$g.original_browser_unique_udev_symbol_count and
  ($g.original_browser_resolved_udev_symbol_names|index("udev_new")) != null;
  "original source-pinned glibc debug observation or coverage flags invalid") |
@@ -77,6 +86,8 @@ check(
  ($source_matches|index("udev_new"))!=null and
  all($g.original_browser_resolved_udev_symbol_names[]; test("^udev_[a-z0-9_]+$")) and
  all($g.original_browser_udev_provider_basenames[]; provider) and
+ all($g.unattributed_udev_monitor_filter_update_provider_basenames[];
+   . as $p | provider and ($g.original_browser_udev_provider_basenames|index($p))!=null) and
  ($g.original_browser_udev_provider_basenames|length)>=1;
  "native libudev symbol outside source-declared WebAuthn and pinned unowned-symbol boundary") |
 {
@@ -92,6 +103,13 @@ check(
  native_glibc_unattributed_external_symbol_count:($extra|length),
  native_glibc_unattributed_external_symbol_names:$extra,
  extra_symbol_original_caller_ownership_proven:false,
+ native_glibc_unattributed_symbol_binding_events:$g.unattributed_udev_monitor_filter_update_binding_events,
+ native_glibc_unattributed_symbol_glibc_requester_basenames:$g.unattributed_udev_monitor_filter_update_requester_basenames,
+ native_glibc_unattributed_symbol_provider_basenames:$g.unattributed_udev_monitor_filter_update_provider_basenames,
+ native_glibc_unattributed_symbol_requesters_are_only_its_provider:
+    (($g.unattributed_udev_monitor_filter_update_requester_basenames -
+      $g.unattributed_udev_monitor_filter_update_provider_basenames)|length)==0,
+ native_glibc_binding_file_requester_not_definitive_original_caller:true,
  native_glibc_resolved_udev_names:$g.original_browser_resolved_udev_symbol_names,
  native_glibc_provider_basenames:$g.original_browser_udev_provider_basenames,
  original_libxul_loaded_pid_traces_with_udev_bindings:$g.original_libxul_and_libudev_binding_same_trace_count,

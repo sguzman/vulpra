@@ -12,6 +12,13 @@ name: M3 Original Browser USB Backend No-Device Loader Probe
 # accepted in CI 41692027881, four negative mutations rejected. Manual-only.
 on:
   workflow_dispatch:
+  # TEMPORARY source-pinned requester/provider regression, restore manual-only.
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-usb-nodevice-loader.yml
+      - ci/m3-original-udev-glibc-bindings.rs
+      - ci/m3-original-udev-glibc-bindings-crosswalk.jq
 permissions:
   contents: read
   actions: read
@@ -269,6 +276,10 @@ jobs:
             .native_glibc_source_declared_web_authn_symbol_count==15 and
             .native_glibc_unattributed_external_symbol_names==["udev_monitor_filter_update"] and
             .extra_symbol_original_caller_ownership_proven==false and
+            .native_glibc_unattributed_symbol_binding_events>=1 and
+            (.native_glibc_unattributed_symbol_glibc_requester_basenames|length)>=1 and
+            (.native_glibc_unattributed_symbol_provider_basenames|length)>=1 and
+            .native_glibc_binding_file_requester_not_definitive_original_caller==true and
             (.native_glibc_resolved_udev_names|index("udev_new"))!=null and
             .original_libxul_loaded_pid_traces_with_udev_bindings>=1 and
             .no_ld_preload_or_ld_audit_used==true and
@@ -303,7 +314,22 @@ jobs:
           if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
             echo 'FAIL: wrong original archive accepted' >&2; exit 1
           fi
-          echo 'PASS: actual original glibc browser libudev provider; 15 names overlapping WebAuthn source and one unattributed native name, four rejected negative mutations'
+          jq '.unattributed_udev_monitor_filter_update_requester_basenames=[]' "$observation" \
+            >"$RUNNER_TEMP/reports/m3-glibc-mutant.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: missing actual glibc binding requester accepted' >&2; exit 1
+          fi
+          jq '.unattributed_udev_monitor_filter_update_binding_events=0' "$observation" \
+            >"$RUNNER_TEMP/reports/m3-glibc-mutant.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: no glibc unattributed symbol binding event accepted' >&2; exit 1
+          fi
+          jq '.unattributed_udev_monitor_filter_update_provider_basenames=["libxul.so"]' "$observation" \
+            >"$RUNNER_TEMP/reports/m3-glibc-mutant.json"
+          if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: wrong native backing provider for extra symbol accepted' >&2; exit 1
+          fi
+          echo 'PASS: actual glibc provider and extra symbol requester distinguished; seven negative mutations rejected'
       - name: Upload only sanitized browser feature observations
         if: always()
         uses: actions/upload-artifact@v4
