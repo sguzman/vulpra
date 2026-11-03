@@ -1,9 +1,18 @@
 # Source-pinned, expensive manual-only native lifecycle regression.
 # Original zero-device registration PASS: 41559011764; CPU EP device enumeration PASS: 41560348027.
-# Neither probe executes a model through the external provider or establishes GPU support.
+# The opt-in CPU fallback probe exercises a real model, but the external EP claims no nodes.
+# The fixture is not an accelerator or production execution provider.
 name: M3 Original ONNX External EP Factory Lifecycle
 on:
   workflow_dispatch:
+  # TEMPORARY source-pinned CI validation; restore manual-only after inspection.
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-original-onnx-ep-factory-fixture.c
+      - ci/m3-original-onnx-ep-registration.c
+      - ci/m3-original-onnx-ep-session.c
+      - .github/workflows/m3-original-onnx-external-ep-lifecycle.yml
 permissions:
   contents: read
   actions: read
@@ -27,6 +36,7 @@ jobs:
           sparse-checkout: |
             ci/m3-original-onnx-ep-factory-fixture.c
             ci/m3-original-onnx-ep-registration.c
+            ci/m3-original-onnx-ep-session.c
       - name: Pin upstream v30 headers and verify test fixture ABI
         shell: bash
         env:
@@ -57,6 +67,7 @@ jobs:
             grep -Eq ' ReleaseEpFactory$'
           cc -std=c11 -g -O0 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
             ci/m3-original-onnx-ep-registration.c \
+            ci/m3-original-onnx-ep-session.c \
             -o "$RUNNER_TEMP/original-ep-registration" -ldl
       - name: Authenticate source-pinned original full-native package
         shell: bash
@@ -128,6 +139,23 @@ jobs:
             "$RUNNER_TEMP/m3-ep-device-enumeration.log"
           grep -Fxq 'M3_EP_STAGE=unregistration_succeeded' \
             "$RUNNER_TEMP/m3-ep-device-enumeration.log"
+          # The fixture selects a real CPU device but claims zero graph nodes.
+          # ORT's genuine CPU provider must run and yield an exact 1.25f tensor.
+          if ! sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            VULPRA_CI_ONNX_EP_CPU_FALLBACK=1 LD_LIBRARY_PATH="$pkg" \
+            MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            timeout --signal=TERM --kill-after=3s 35s \
+            "$RUNNER_TEMP/original-ep-registration" "$pkg/libonnxruntime.so" \
+            "$RUNNER_TEMP/libvulpra-onnx-ci-ep.so" 2>&1 | \
+            tee "$RUNNER_TEMP/m3-ep-cpu-fallback.log"; then
+            echo 'M3_EP_DIAGNOSTIC=cpu_fallback_session_failed'
+            exit 1
+          fi
+          grep -Fxq 'M3_EP_CALLBACK=session_ep_created' "$RUNNER_TEMP/m3-ep-cpu-fallback.log"
+          grep -Fxq 'M3_EP_CALLBACK=get_capability_no_nodes' "$RUNNER_TEMP/m3-ep-cpu-fallback.log"
+          grep -Fxq 'M3_EP_STAGE=cpu_fallback_numerical_result_1_25' "$RUNNER_TEMP/m3-ep-cpu-fallback.log"
+          grep -Fxq 'M3_EP_CALLBACK=release_ep' "$RUNNER_TEMP/m3-ep-cpu-fallback.log"
+          grep -Fxq 'M3_EP_STAGE=unregistration_succeeded' "$RUNNER_TEMP/m3-ep-cpu-fallback.log"
           jq -n --arg source "$SOURCE_SHA" --arg archive "$ARCHIVE_SHA" \
             '{schema_version:1, status:"source_pinned_original_external_ep_factory_lifecycle_pass",
               original_source_commit:$source, original_archive_sha256:$archive,
@@ -136,7 +164,11 @@ jobs:
               exact_error_header_blob:"732fcd7a82eaa0208c7c97aa5f2fb2b0c694456f",
               test_ep_factories:1, test_ep_devices:0,
               second_probe_cpu_ep_devices:1, cpu_device_enumeration_verified:true,
-              actual_model_executed:false,
+              external_ep_session_created:true,
+              model_executed_on_builtin_cpu_fallback:true,
+              expected_numeric_float:1.25,
+              external_ep_claimed_nodes:0, external_ep_inference_executed:false,
+              actual_model_executed:true,
               original_library_registration_succeeded:true,
               original_library_unregistration_succeeded:true,
               fixture_factory_released:true,

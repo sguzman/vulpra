@@ -7,6 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Session implementation is kept in a separate, focused C translation unit.
+int m3_probe_cpu_fallback_session(const OrtApi *api, OrtEnv *env,
+                                  const OrtEpDevice *device);
+
 #if ORT_API_VERSION != 30
 #error "This probe requires exactly ORT C API v30"
 #endif
@@ -79,12 +83,16 @@ int main(int argc, char **argv) {
   }
   puts("M3_EP_STAGE=registration_succeeded"); fflush(stdout);
   const char *device_mode = getenv("VULPRA_CI_ONNX_EP_DEVICE_PROBE");
-  if (device_mode != NULL && strcmp(device_mode, "1") == 0) {
+  const char *session_mode = getenv("VULPRA_CI_ONNX_EP_CPU_FALLBACK");
+  int run_cpu_fallback = session_mode != NULL && strcmp(session_mode, "1") == 0;
+  if (run_cpu_fallback ||
+      (device_mode != NULL && strcmp(device_mode, "1") == 0)) {
     const OrtEpDevice *const *ep_devices = NULL;
     size_t ep_count = 0;
     int query_ok = check_status(api,
         api->GetEpDevices(env, &ep_devices, &ep_count), "enumerate_ep_devices");
     size_t matching_cpu_devices = 0;
+    const OrtEpDevice *matched_device = NULL;
     if (query_ok && ep_count <= 64 && (ep_count == 0 || ep_devices != NULL)) {
       for (size_t i = 0; i < ep_count; ++i) {
         const OrtEpDevice *device = ep_devices[i];
@@ -101,6 +109,7 @@ int main(int argc, char **argv) {
             break;
           }
           ++matching_cpu_devices;
+          matched_device = device;
         }
       }
     } else {
@@ -117,6 +126,18 @@ int main(int argc, char **argv) {
       return 8;
     }
     puts("M3_EP_STAGE=cpu_ep_device_enumerated"); fflush(stdout);
+    if (run_cpu_fallback) {
+      if (m3_probe_cpu_fallback_session(api, env, matched_device) != 0) {
+        fputs("M3_EP_ERROR_STAGE=cpu_fallback_session\n", stderr);
+        OrtStatus *cleanup = api->UnregisterExecutionProviderLibrary(
+            env, "vulpra-ci-fixture");
+        if (cleanup != NULL) api->ReleaseStatus(cleanup);
+        api->ReleaseEnv(env);
+        dlclose(handle);
+        return 9;
+      }
+      puts("M3_EP_STAGE=cpu_fallback_model_pass"); fflush(stdout);
+    }
   }
   puts("M3_EP_STAGE=unregister"); fflush(stdout);
   int unregistered = check_status(
