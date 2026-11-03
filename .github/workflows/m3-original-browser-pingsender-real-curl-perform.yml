@@ -1,0 +1,231 @@
+# Actual original browser -> original packaged pingsender ->
+# genuine libcurl curl_easy_perform function invocation and non-success
+# localhost:9 result. Private no-egress Arch/Weston and synthetic JSON.
+# Original package read-only; Rust pointer interposer forwards to real libcurl.
+name: M3 Original Browser Pingsender Real Curl Perform No Egress
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-pingsender-real-curl-perform.yml
+      - ci/m3-original-browser-pingsender-real-curl-perform.sh
+      - ci/m3-original-browser-pingsender-libcurl-perform.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-browser-to-pingsender-real-elf:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ARCHIVE: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+      ORIGINAL_RUN: '40997075527'
+    steps:
+      - name: Checkout only disposable browser pingsender native observer
+        uses: actions/checkout@v4
+        with:
+          path: diagnostics
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-browser-pingsender-libcurl-perform.rs
+            ci/m3-original-browser-pingsender-real-curl-perform.sh
+      - name: Checkout exact original telemetry process-launch source
+        uses: actions/checkout@v4
+        with:
+          path: original-source
+          ref: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+            toolkit/components/telemetry/pingsender/pingsender.cpp
+            toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+            toolkit/components/telemetry/pingsender/moz.build
+      - name: Authenticate exact original curl ABI and build child-only interposer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git -C diagnostics rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C original-source rev-parse HEAD)" = "$SOURCE"
+          bash -n diagnostics/ci/m3-original-browser-pingsender-real-curl-perform.sh
+          grep -Fq 'testRunPingSender(pings, observer)' original-source/toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          grep -Fq 'process.runAsync(params, params.length, observer);' original-source/toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          grep -Fq '"@mozilla.org/process/util;1"' original-source/toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          grep -Fq '"toolkit.telemetry.testing.suppressPingsender"' original-source/toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          grep -Fq 'AppConstants.platform === "win" ? "pingsender.exe" : "pingsender";' original-source/toolkit/components/telemetry/app/TelemetrySend.sys.mjs
+          grep -Fq 'GeckoProgram("pingsender", linkage=None)' original-source/toolkit/components/telemetry/pingsender/moz.build
+          grep -Fq '"localhost",' original-source/toolkit/components/telemetry/pingsender/pingsender.cpp
+          grep -Fq '"incoming.telemetry.mozilla.org",' original-source/toolkit/components/telemetry/pingsender/pingsender.cpp
+          grep -Fq 'if (!ping.Send()) {' original-source/toolkit/components/telemetry/pingsender/pingsender.cpp
+          grep -Fq 'mLib = dlopen(libname, RTLD_NOW);' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'mLib = dlopen(libname, RTLD_NOW);' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_easy_init")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_easy_setopt")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_easy_perform")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_easy_getinfo")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_slist_append")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_slist_free_all")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_easy_strerror")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_easy_cleanup")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_global_cleanup")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_url")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_url_set")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_url_get")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_free")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'dlsym(mLib, "curl_url_cleanup")' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'if (!easy_init || !easy_setopt || !easy_perform || !easy_getinfo ||' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'mCanParseUrl =' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'err = easy_perform(mCurl);' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'if (err != CURLE_OK) {' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          grep -Fq 'return false;' original-source/toolkit/components/telemetry/pingsender/pingsender_unix_common.cpp
+          rustc --edition=2021 -D warnings --test \
+            diagnostics/ci/m3-original-browser-pingsender-libcurl-perform.rs \
+            -o "$RUNNER_TEMP/pingsender-real-perform-tests"
+          "$RUNNER_TEMP/pingsender-real-perform-tests"
+          rustc --edition=2021 -D warnings -C opt-level=2 --crate-type cdylib \
+            diagnostics/ci/m3-original-browser-pingsender-libcurl-perform.rs \
+            -o "$RUNNER_TEMP/pingsender-real-perform-observer.so"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
+            jq -e --arg sha "$SOURCE" \
+              '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
+          mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/reports"
+          gh run download "$ORIGINAL_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name vulpra-m3-normandy-matched-full-baseline --dir "$RUNNER_TEMP/archive"
+          (cd "$RUNNER_TEMP/archive" && sha256sum -c full-normandy-baseline.tar.xz.sha256)
+          test "$(sha256sum "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" | cut -d ' ' -f 1)" = "$ARCHIVE"
+          tar -xf "$RUNNER_TEMP/archive/full-normandy-baseline.tar.xz" -C "$RUNNER_TEMP/package"
+          for elf in vulpra pingsender; do
+            test -x "$RUNNER_TEMP/package/vulpra/$elf"
+            test "$(head -c 4 "$RUNNER_TEMP/package/vulpra/$elf" | od -An -tx1 | tr -d ' \n')" = 7f454c46
+          done
+          (cd "$RUNNER_TEMP" && sha256sum package/vulpra/vulpra package/vulpra/pingsender >original-native-sha.before)
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/package/vulpra/application.ini"
+      - name: Build private offline Arch Linux Wayland process environment
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arch-pingsender"
+          cat >"$RUNNER_TEMP/arch-pingsender/Dockerfile" <<'EOF'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+            bash coreutils curl jq grep findutils procps-ng util-linux \
+            iproute2 geckodriver gtk3 dbus-glib alsa-lib nss \
+            weston wayland-utils mesa libglvnd ttf-dejavu \
+            && command -v geckodriver && command -v weston \
+            && command -v setpriv && command -v wayland-info \
+            && rm -rf /var/cache/pacman/pkg/*
+          EOF
+          docker build --pull --no-cache -t m3-original-pingsender:ci \
+            "$RUNNER_TEMP/arch-pingsender"
+      - name: Require real original child executes actual curl_easy_perform and returns connection refused
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only --shm-size 256m \
+            --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
+            --security-opt no-new-privileges --pids-limit 512 --memory 4g \
+            --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
+            -v "$RUNNER_TEMP/package/vulpra:/original:ro" \
+            -v "$RUNNER_TEMP/pingsender-real-perform-observer.so:/audit/pingsender-real-perform-observer.so:ro" \
+            -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-pingsender-real-curl-perform.sh:/audit/test.sh:ro" \
+            -v "$RUNNER_TEMP/reports:/reports:rw" \
+            -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
+            -e MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
+            -e VULPRA_M3_DISPOSABLE_PINGSENDER=1 \
+            m3-original-pingsender:ci /bin/bash -c '
+              set -euo pipefail
+              ip link set lo up
+              exec setpriv --reuid "$CI_UID" --regid "$CI_GID" \
+                --clear-groups /bin/bash /audit/test.sh \
+                /original/vulpra /reports/m3-original-browser-pingsender-real-curl-perform.json
+            '
+          (cd "$RUNNER_TEMP" && sha256sum -c original-native-sha.before)
+          report="$RUNNER_TEMP/reports/m3-original-browser-pingsender-real-curl-perform.json"
+          jq -e --arg src "$SOURCE" --arg sha "$ARCHIVE" '
+            .schema_version==1 and
+            .status=="original_browser_owned_actual_pingsender_real_curl_easy_perform_failed_localhost" and
+            .source_commit==$src and .archive_sha256==$sha and
+            .original_browser_owned_actual_pingsender_elf==true and
+            .genuine_source_defined_libcurl_dlopen_and_14_dlsym==true and
+            .actual_original_pingsender_executed_real_libcurl_easy_perform==true and
+            .actual_real_libcurl_perform_return_code==7 and
+            .original_browser_remained_responsive==true and
+            .only_synthetic_localhost_payload_used==true and
+            .synthetic_local_payload_retained==true and
+            .real_upload_permission_disabled==true and
+            .original_installation_read_only==true and
+            .no_network_egress_or_real_user_telemetry==true and
+            .successful_telemetry_send_or_normal_policy_proven==false and
+            .all_possible_conditional_ffi_dependency_paths_closed==false and
+            .real_original_child_curl_perform_witness.status=="original_browser_owned_pingsender_real_libcurl_perform_connection_refused" and
+            .real_original_child_curl_perform_witness.source_commit==$src and
+            .real_original_child_curl_perform_witness.archive_sha256==$sha and
+            .real_original_child_curl_perform_witness.original_packaged_pingsender_elf_and_browser_parent_authenticated==true and
+            .real_original_child_curl_perform_witness.synthetic_localhost_only_kernel_argv_authenticated==true and
+            .real_original_child_curl_perform_witness.real_original_child_dlopen_libcurl_success==true and
+            .real_original_child_curl_perform_witness.real_source_defined_dlsym_nonnull_count==14 and
+            .real_original_child_curl_perform_witness.original_pingsender_invoked_real_curl_easy_perform==true and
+            .real_original_child_curl_perform_witness.real_libcurl_function_forwarded_and_returned==true and
+            .real_original_child_curl_perform_witness.actual_curl_easy_perform_return_code==7 and
+            .real_original_child_curl_perform_witness.actual_curl_easy_perform_returned_curle_couldnt_connect==true and
+            .real_original_child_curl_perform_witness.no_telemetry_success==true and
+            .real_original_child_curl_perform_witness.normal_telemetry_policy_or_actual_upload_proven==false and
+            .real_original_child_curl_perform_witness.complete_native_dependency_graph_proven==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false
+          ' "$report" >/dev/null
+          verify() {
+            jq -e --arg src "$SOURCE" --arg sha "$ARCHIVE" '
+              .source_commit==$src and .archive_sha256==$sha and
+              .original_browser_owned_actual_pingsender_elf==true and
+              .actual_original_pingsender_executed_real_libcurl_easy_perform==true and
+              .actual_real_libcurl_perform_return_code==7 and
+              .real_original_child_curl_perform_witness.original_packaged_pingsender_elf_and_browser_parent_authenticated==true and
+              .real_original_child_curl_perform_witness.real_original_child_dlopen_libcurl_success==true and
+              .real_original_child_curl_perform_witness.real_source_defined_dlsym_nonnull_count==14 and
+              .real_original_child_curl_perform_witness.real_libcurl_function_forwarded_and_returned==true and
+              .real_original_child_curl_perform_witness.actual_curl_easy_perform_return_code==7 and
+              .no_network_egress_or_real_user_telemetry==true and
+              .original_installation_read_only==true and
+              .successful_telemetry_send_or_normal_policy_proven==false and
+              .all_possible_conditional_ffi_dependency_paths_closed==false and
+              .source_pruning_authorized==false
+            ' "$1" >/dev/null
+          }
+          for mutation in \
+            '.original_browser_owned_actual_pingsender_elf=false' \
+            '.actual_original_pingsender_executed_real_libcurl_easy_perform=false' \
+            '.actual_real_libcurl_perform_return_code=0' \
+            '.real_original_child_curl_perform_witness.original_packaged_pingsender_elf_and_browser_parent_authenticated=false' \
+            '.real_original_child_curl_perform_witness.real_original_child_dlopen_libcurl_success=false' \
+            '.real_original_child_curl_perform_witness.real_source_defined_dlsym_nonnull_count=13' \
+            '.real_original_child_curl_perform_witness.real_libcurl_function_forwarded_and_returned=false' \
+            '.real_original_child_curl_perform_witness.actual_curl_easy_perform_return_code=7.5' \
+            '.no_network_egress_or_real_user_telemetry=false' \
+            '.original_installation_read_only=false' \
+            '.successful_telemetry_send_or_normal_policy_proven=true' \
+            '.all_possible_conditional_ffi_dependency_paths_closed=true' \
+            '.archive_sha256="forged"' \
+            '.source_pruning_authorized=true'; do
+            jq "$mutation" "$report" >"$RUNNER_TEMP/reports/forged.json"
+            if verify "$RUNNER_TEMP/reports/forged.json"; then
+              echo 'FAIL: forged original browser real curl function evidence accepted' >&2; exit 1
+            fi
+          done
+          rm -f "$RUNNER_TEMP/reports/forged.json"
+          echo 'M3_ORIGINAL_BROWSER_CURL_PERFORM=PASS real original child curl_easy_perform returned 7 with no egress; 14 forged summaries rejected'
+      - name: Upload only sanitized original browser-owned real curl function execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-browser-pingsender-real-curl-perform
+          path: ${{ runner.temp }}/reports/m3-original-browser-pingsender-real-curl-perform.json
+          if-no-files-found: warn
+          retention-days: 14
