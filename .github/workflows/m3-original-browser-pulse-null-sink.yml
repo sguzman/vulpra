@@ -6,18 +6,12 @@
 # Native source-pinned CI 41492260472 passed; sanitized artifact 13163799244:
 # two successful instrumented libxul-origin libpulse.so.0 dlopen records.
 # LD_PRELOAD modifies symbol resolution; no uninstrumented full FFI stack.
-# Keep the expensive native experiment manually dispatchable.
+# Source-pinned before/during browser proc-map crosswalk PASS: 41668827940;
+# no new mapped library basenames across phases, Pulse backing ELF already resident.
+# Four negative mutations rejected; retain manual-only expensive native workflow.
 name: M3 Original Browser Pulse Null Sink
 on:
   workflow_dispatch:
-  # TEMPORARY CI path trigger for native before/during audio map regression; restore after acceptance.
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-pulse-null-sink.yml
-      - ci/m3-original-browser-pulse-webdriver.sh
-      - ci/m3-original-browser-on-demand-maps.rs
-      - ci/m3-original-browser-pulse-map-crosswalk.jq
 permissions:
   contents: read
   actions: read
