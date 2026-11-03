@@ -60,7 +60,9 @@ fn run() -> Result<(),String> {
     }
     let onnx = must_path(&args[1], "/libonnxruntime.so")?;
     let fixture=must_path(&args[2], "/libvulpra-onnx-inert-ep.so")?;
+    eprintln!("M3_EP_STAGE=before_original_elf_load");
     let h = unsafe {dlopen(onnx.as_ptr(), RTLD_NOW|RTLD_LOCAL)};
+    eprintln!("M3_EP_STAGE=after_original_elf_load");
     if h.is_null() {return Err("original compiled ONNX ELF could not be loaded".into());}
     let sym = unsafe {dlsym(h,c"OrtGetApiBase".as_ptr())};
     if sym.is_null() {return Err("missing OrtGetApiBase on original native ELF".into());}
@@ -73,7 +75,9 @@ fn run() -> Result<(),String> {
     }
 
     // Exact safety gate: no v22 API table => no reading slot 284 or 285.
+    eprintln!("M3_EP_STAGE=before_get_api_v22");
     let api22=unsafe{((*base).get_api)(22)};
+    eprintln!("M3_EP_STAGE=after_get_api_v22");
     if api22.is_null() {
         outcome("api_v22_not_available");
         return Ok(());
@@ -84,11 +88,15 @@ fn run() -> Result<(),String> {
     let error_code:GetErrorCode=unsafe{method(api1,1)?};
     let register:RegisterEp=unsafe{method(api22,reg_slot)?};
     let unregister:UnregisterEp=unsafe{method(api22,unreg_slot)?};
+    eprintln!("M3_EP_STAGE=before_create_env");
     let mut ort_env=ptr::null_mut();
     let status=unsafe{create_env(3,c"vulpra-isolated-inert-ep-probe".as_ptr(),&mut ort_env)};
     if !status.is_null()||ort_env.is_null(){return Err("CreateEnv failed".into());}
+    eprintln!("M3_EP_STAGE=after_create_env");
     let reg_name=c"vulpra_inert_ci_ep";
+    eprintln!("M3_EP_STAGE=before_register_ep");
     let status=unsafe{register(ort_env,reg_name.as_ptr(),fixture.as_ptr())};
+    eprintln!("M3_EP_STAGE=after_register_ep");
     if !status.is_null(){
         let code=unsafe{error_code(status)};
         if code==ORT_NOT_IMPLEMENTED {
@@ -105,14 +113,18 @@ fn run() -> Result<(),String> {
 
     // An OK status must correspond to an actual fixture previously loaded by
     // ONNX, not something our test harness accidentally loads for the check.
+    eprintln!("M3_EP_STAGE=before_fixture_noload");
     let plugin=unsafe{dlopen(fixture.as_ptr(),RTLD_NOW|RTLD_NOLOAD)};
+    eprintln!("M3_EP_STAGE=after_fixture_noload");
     if plugin.is_null(){return Err("registration returned OK but inert library not loaded".into());}
     let counter=unsafe{dlsym(plugin,c"m3_ep_factory_call_count".as_ptr())};
     if counter.is_null()||unsafe{*(counter.cast::<u32>())}!=1 {
         return Err("real original ONNX did not invoke the inert EP factory callback once".into());
     }
     unsafe{dlclose(plugin)};
+    eprintln!("M3_EP_STAGE=before_unregister_ep");
     let status=unsafe{unregister(ort_env,reg_name.as_ptr())};
+    eprintln!("M3_EP_STAGE=after_unregister_ep");
     if !status.is_null(){return Err("original ONNX EP unregistration returned a failure".into());}
     outcome("v22_inert_ep_registration_and_factory_callback_success");
     Ok(())
