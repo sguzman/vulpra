@@ -8,6 +8,8 @@ on:
       - .github/workflows/m3-original-arch-wayland-native-loader.yml
       - packaging/test-wayland.sh
       - ci/m3-original-arch-wayland-loader-events.rs
+      - ci/m3-original-arch-browser-proc-maps.rs
+      - ci/m3-original-arch-browser-proc-maps-reconcile.jq
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,6 +33,8 @@ jobs:
           sparse-checkout: |
             packaging/test-wayland.sh
             ci/m3-original-arch-wayland-loader-events.rs
+            ci/m3-original-arch-browser-proc-maps.rs
+            ci/m3-original-arch-browser-proc-maps-reconcile.jq
       - name: Authenticate original compiled Vulpra archive and isolated test harness
         shell: bash
         env:
@@ -42,6 +46,9 @@ jobs:
           rustc --edition=2021 --test ci/m3-original-arch-wayland-loader-events.rs -o "$RUNNER_TEMP/arch-native-event-tests"
           "$RUNNER_TEMP/arch-native-event-tests"
           rustc --edition=2021 -O ci/m3-original-arch-wayland-loader-events.rs -o "$RUNNER_TEMP/arch-native-event-parser"
+          rustc --edition=2021 --test ci/m3-original-arch-browser-proc-maps.rs -o "$RUNNER_TEMP/arch-proc-map-tests"
+          "$RUNNER_TEMP/arch-proc-map-tests"
+          rustc --edition=2021 -O ci/m3-original-arch-browser-proc-maps.rs -o "$RUNNER_TEMP/arch-proc-map-observer"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" |
             jq -e --arg sha "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$sha' >/dev/null
           mkdir -p "$RUNNER_TEMP/archive" "$RUNNER_TEMP/package" "$RUNNER_TEMP/arch-wayland"
@@ -99,6 +106,7 @@ jobs:
             --mount type=bind,src="$RUNNER_TEMP/package/vulpra",dst=/original,readonly \
             --mount type=bind,src="$RUNNER_TEMP/arch-wayland/shim",dst=/shim,readonly \
             --mount type=bind,src="$RUNNER_TEMP/arch-native-event-parser",dst=/audit/arch-native-event-parser,readonly \
+            --mount type=bind,src="$RUNNER_TEMP/arch-proc-map-observer",dst=/audit/arch-proc-map-observer,readonly \
             --mount type=bind,src="$RUNNER_TEMP/arch-wayland",dst=/reports \
             --mount type=bind,src="$GITHUB_WORKSPACE/packaging/test-wayland.sh",dst=/audit/test-wayland.sh,readonly \
             --env HOME=/tmp/isolated-private-home \
@@ -112,7 +120,12 @@ jobs:
               mkdir -m 0700 /tmp/original-browser-traces
               export VULPRA_M3_LOADER_TRACE_KIND=libs,files
               export VULPRA_M3_LOADER_TRACE_PREFIX=/tmp/original-browser-traces/m3-browser-loader
+              # Separate observer polls only /original/vulpra process mappings.
+              # It does not change the graphical launcher or its QA invariants.
+              /audit/arch-proc-map-observer /original /reports/original-arch-browser-proc-maps.json &
+              map_pid="$!"
               bash /audit/test-wayland.sh /shim
+              wait "$map_pid"
               /audit/arch-native-event-parser /tmp/original-browser-traces /reports/original-arch-loader-witness.json
               test ! -e /tmp/isolated-private-home/.mozilla
               echo "PASS: original Vulpra Arch Weston committed graphical frame and actual glibc library initializers"
@@ -132,6 +145,56 @@ jobs:
             .full_future_dlopen_or_feature_coverage_proven==false and
             .m3_sixth_gate_closed==false' \
             "$RUNNER_TEMP/arch-wayland/original-arch-loader-witness.json" >/dev/null
+          jq -e --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" '
+            .schema_version==1 and
+            .status=="original_arch_private_wayland_browser_proc_maps_residency" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .browser_process_samples>=4 and
+            .max_simultaneously_visible_original_browser_processes>=1 and
+            (.package_mapped_library_basenames|length)>=3 and
+            ([ "libxul.so", "libmozgtk.so", "libmozwayland.so" ] - .package_mapped_library_basenames|length)==0 and
+            .private_original_executable_only==true and
+            .absolute_paths_or_pids_exported==false and
+            .time_bounded_snapshot_not_all_runtime_libraries==true and
+            .complete_browser_feature_or_ffi_dependency_closure==false and
+            .source_removal_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/arch-wayland/original-arch-browser-proc-maps.json" >/dev/null
+          crosscheck() {
+            jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+              --slurpfile map "$1" --slurpfile native "$2" \
+              -f ci/m3-original-arch-browser-proc-maps-reconcile.jq
+          }
+          map="$RUNNER_TEMP/arch-wayland/original-arch-browser-proc-maps.json"
+          witness="$RUNNER_TEMP/arch-wayland/original-arch-loader-witness.json"
+          crosscheck "$map" "$witness" \
+            >"$RUNNER_TEMP/arch-wayland/original-arch-browser-maps-init-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_arch_wayland_mapped_browser_libs_vs_real_initializer_witness" and
+            .actual_package_mapped_library_count>=3 and
+            .actual_package_mapped_and_initialized_count>=3 and
+            .original_three_core_wayland_libraries_both_mapped_and_initialized==true and
+            .all_future_features_dynamic_ffi_dependencies_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/arch-wayland/original-arch-browser-maps-init-crosswalk.json" >/dev/null
+          jq '.package_mapped_library_basenames -= ["libxul.so"]' "$map" \
+            >"$RUNNER_TEMP/arch-wayland/forged-mapped.json"
+          if crosscheck "$RUNNER_TEMP/arch-wayland/forged-mapped.json" "$witness" >/dev/null 2>&1; then
+            echo 'FAIL: missing live libxul map accepted' >&2; exit 1
+          fi
+          jq '.original_archive_sha256="untrusted-drift"' "$map" \
+            >"$RUNNER_TEMP/arch-wayland/forged-mapped.json"
+          if crosscheck "$RUNNER_TEMP/arch-wayland/forged-mapped.json" "$witness" >/dev/null 2>&1; then
+            echo 'FAIL: stale original archive mapping accepted' >&2; exit 1
+          fi
+          jq '.package_mapped_library_basenames |= . + [.[0]]' "$map" \
+            >"$RUNNER_TEMP/arch-wayland/forged-mapped.json"
+          if crosscheck "$RUNNER_TEMP/arch-wayland/forged-mapped.json" "$witness" >/dev/null 2>&1; then
+            echo 'FAIL: duplicate live map accepted' >&2; exit 1
+          fi
+          echo 'M3_ARCH_PROC_MAP_CROSSWALK=original_browser_mapping_initializer_three_mutants_rejected'
+
           image_id="$(docker image inspect m3-original-arch-weston:ci --format '{{.Id}}')"
           printf '%s' "$image_id" | grep -Eq '^sha256:[a-f0-9]{64}$'
           glibc_version="$(docker run --rm --network none --read-only --cap-drop ALL \
@@ -179,5 +242,7 @@ jobs:
           path: |
             ${{ runner.temp }}/arch-wayland/original-arch-wayland-frame.json
             ${{ runner.temp }}/arch-wayland/original-arch-loader-witness.json
+            ${{ runner.temp }}/arch-wayland/original-arch-browser-proc-maps.json
+            ${{ runner.temp }}/arch-wayland/original-arch-browser-maps-init-crosswalk.json
           if-no-files-found: error
           retention-days: 14
