@@ -22,7 +22,11 @@ fn safe_name(s: &str) -> bool {
         && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"._+-".contains(&b))
 }
 fn is_library(name: &str) -> bool {
-    name.ends_with(".so") || name.contains(".so.") || matches!(name, "vulpra" | "vulpra-bin")
+    name.ends_with(".so")
+        || name.rsplit_once(".so.").is_some_and(|(_, suffix)| {
+            suffix.as_bytes().first().is_some_and(|c| c.is_ascii_digit())
+        })
+        || matches!(name, "vulpra" | "vulpra-bin")
 }
 fn package_path(path: &str) -> bool {
     path.strip_prefix(PACKAGE).is_some_and(|rest| rest.starts_with('/'))
@@ -179,6 +183,14 @@ mod tests {
         assert!(safe_name("libnss3.so.1"));
         assert!(!safe_name("../escaped"));
         assert!(!safe_name("fake library.so"));
+    }
+    #[test] fn do_not_count_loader_cache_as_shared_library() {
+        assert!(!is_library("ld.so.cache"));
+        assert!(!is_library("plain-document.txt"));
+        assert!(!is_library("libthing.so.debug"));
+        assert!(is_library("libc.so.6"));
+        assert!(is_library("libmozgtk.so"));
+        assert!(is_library("libX11.so.6.4.0"));
     }
     #[test] fn source_scope() {
         assert!(package_path("/original/libxul.so"));
