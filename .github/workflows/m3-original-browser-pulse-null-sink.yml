@@ -11,6 +11,10 @@
 # Four negative mutations rejected; retain manual-only expensive native workflow.
 name: M3 Original Browser Pulse Null Sink
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-pulse-null-sink.yml
   workflow_dispatch:
 permissions:
   contents: read
