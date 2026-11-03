@@ -215,7 +215,10 @@ jobs:
           for stage in before_dlopen after_dlopen registered session_created after_run session_released unregistered after_dlclose; do
             grep -q "^M3_EP_MAP_SUMMARY stage=$stage " "$RUNNER_TEMP/m3-ep-mixed-compute.log"
           done
-          ! grep -q '^M3_EP_MAP_ERROR=' "$RUNNER_TEMP/m3-ep-mixed-compute.log"
+          if grep -q '^M3_EP_MAP_ERROR=' "$RUNNER_TEMP/m3-ep-mixed-compute.log"; then
+            echo 'M3_EP_DIAGNOSTIC=loader_map_invalid'
+            exit 1
+          fi
           jq -R -s '
             [split("\n")[] | select(startswith("M3_EP_MAP stage=")) |
              capture("^M3_EP_MAP stage=(?<stage>[a-z_]+) kind=(?<kind>package|plugin|host) name=(?<name>[A-Za-z0-9._+-]{1,111})$")]
