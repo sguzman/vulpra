@@ -9,6 +9,14 @@ name: M3 Original Browser USB Backend No-Device Loader Probe
 # This expensive experiment is manually dispatchable, not a regular push gate.
 on:
   workflow_dispatch:
+  # TEMPORARY native USB map regression. Restore manual-only once verified.
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-browser-usb-nodevice-loader.yml
+      - ci/m3-original-browser-webauthn-webdriver.sh
+      - ci/m3-original-browser-on-demand-maps.rs
+      - ci/m3-original-webauthn-usb-maps-crosswalk.jq
 permissions:
   contents: read
   actions: read
@@ -30,6 +38,8 @@ jobs:
           sparse-checkout: |
             ci/m3-original-browser-webauthn-local-origin.rs
             ci/m3-original-browser-webauthn-webdriver.sh
+            ci/m3-original-browser-on-demand-maps.rs
+            ci/m3-original-webauthn-usb-maps-crosswalk.jq
       - name: Checkout original source WebAuthn virtual-authenticator regression
         uses: actions/checkout@v4
         with:
@@ -58,6 +68,11 @@ jobs:
           bash -n diagnostics/ci/m3-original-browser-webauthn-webdriver.sh
           rustc --edition=2021 -O diagnostics/ci/m3-original-browser-webauthn-local-origin.rs \
             -o "$RUNNER_TEMP/m3-original-local-origin"
+          rustc --edition=2021 -D warnings --test diagnostics/ci/m3-original-browser-on-demand-maps.rs \
+            -o "$RUNNER_TEMP/m3-webauthn-map-tests"
+          "$RUNNER_TEMP/m3-webauthn-map-tests"
+          rustc --edition=2021 -D warnings -O diagnostics/ci/m3-original-browser-on-demand-maps.rs \
+            -o "$RUNNER_TEMP/m3-webauthn-on-demand-maps"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ORIGINAL_RUN" |
             jq -e --arg src "$SOURCE_SHA" '.status=="completed" and .conclusion=="success" and .head_sha==$src' >/dev/null
           mkdir -p "$RUNNER_TEMP/original-archive" "$RUNNER_TEMP/packaged" "$RUNNER_TEMP/reports"
@@ -99,6 +114,7 @@ jobs:
             --tmpfs /tmp:rw,nosuid,nodev,size=600m,mode=1777 \
             -v "$RUNNER_TEMP/packaged/vulpra:/original:ro" \
             -v "$RUNNER_TEMP/m3-original-local-origin:/audit/local-origin:ro" \
+            -v "$RUNNER_TEMP/m3-webauthn-on-demand-maps:/audit/on-demand-maps:ro" \
             -v "$GITHUB_WORKSPACE/diagnostics/ci/m3-original-browser-webauthn-webdriver.sh:/audit/webdriver.sh:ro" \
             -v "$RUNNER_TEMP/reports:/reports:rw" \
             -e CI_UID="$(id -u)" -e CI_GID="$(id -g)" \
@@ -106,6 +122,7 @@ jobs:
             -e VULPRA_OFFLINE_CONTAINER_ONLY=1 \
             -e VULPRA_M3_ORIGINAL_WEBAUTHN_MODE=usb-no-device \
             -e VULPRA_M3_NO_USB_PASSTHROUGH=1 \
+            -e VULPRA_M3_WEBAUTHN_MAP_PHASES=1 \
             vulpra-m3-original-webauthn:ci /bin/bash -c '
               set -euo pipefail
               ip link set lo up
@@ -141,11 +158,79 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/reports/m3-original-browser-usb-nodevice-loader.json" >/dev/null
           echo 'PASS: original browser USB no-device negative probe; actual libudev mapping flag recorded; no full closure'
+      - name: Reconcile three original browser USB backend mapped-ELF phases and negative mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="$RUNNER_TEMP/reports/m3-original-webauthn-usb-before-maps.json"
+          during="$RUNNER_TEMP/reports/m3-original-webauthn-usb-during-maps.json"
+          after="$RUNNER_TEMP/reports/m3-original-webauthn-usb-after-maps.json"
+          feature="$RUNNER_TEMP/reports/m3-original-browser-usb-nodevice-loader.json"
+          cross="$RUNNER_TEMP/reports/m3-original-webauthn-usb-maps-crosswalk.json"
+          test -s "$before" && test -s "$during" && test -s "$after" && test -s "$feature"
+          verify_map() {
+            jq -n --arg src "$SOURCE_SHA" --arg sha "$ARCHIVE_SHA" \
+              --slurpfile before "$1" --slurpfile during "$2" \
+              --slurpfile after "$3" --slurpfile feature "$4" \
+              -f diagnostics/ci/m3-original-webauthn-usb-maps-crosswalk.jq
+          }
+          verify_map "$before" "$during" "$after" "$feature" >"$cross"
+          jq -e '
+            .schema_version==1 and
+            .status=="original_webauthn_usb_nodevice_three_phase_browser_mappings_verified" and
+            .original_browser_usbtoken_pref_verified==true and
+            .original_browser_softtoken_disabled==true and
+            .physical_hardware_device_used==false and
+            .real_user_clicked_create_ended_notallowed==true and
+            .libudev_real_browser_mapped_during_attempt==true and
+            (.before_browser_processes|type=="number" and .>=1) and
+            (.while_udev_mapped_browser_processes|type=="number" and .>=1) and
+            (.after_notallowed_browser_processes|type=="number" and .>=1) and
+            (.during_udev_mapped_filenames|length)>=1 and
+            .snapshots_not_transient_dlopen_log_or_abi_resolution==true and
+            .full_physical_webauthn_or_feature_ffi_closure==false and
+            .source_pruning_authorized==false and
+            .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false
+          ' "$cross" >/dev/null
+          # The validator must reject mutations of actual source-pinned
+          # mapped-file records, not an unresolved SONAME alias.
+          jq '.host_mapped_shared_library_basenames |=
+                map(select(startswith("libudev.so.1") | not))' "$during" \
+            >"$RUNNER_TEMP/reports/m3-usb-mutant.json"
+          if verify_map "$before" "$RUNNER_TEMP/reports/m3-usb-mutant.json" \
+            "$after" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: missing actual mapped libudev ELF accepted' >&2; exit 1
+          fi
+          jq '.original_archive_sha256="invalid-source-sha"' "$before" \
+            >"$RUNNER_TEMP/reports/m3-usb-mutant.json"
+          if verify_map "$RUNNER_TEMP/reports/m3-usb-mutant.json" "$during" \
+            "$after" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: untrusted original source archive accepted' >&2; exit 1
+          fi
+          jq '.package_mapped_shared_library_basenames |= . + [.[0]]' "$during" \
+            >"$RUNNER_TEMP/reports/m3-usb-mutant.json"
+          if verify_map "$before" "$RUNNER_TEMP/reports/m3-usb-mutant.json" \
+            "$after" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: duplicated package-mapped ELF accepted' >&2; exit 1
+          fi
+          jq '.libudev_mapped_in_original_browser |= not' "$before" \
+            >"$RUNNER_TEMP/reports/m3-usb-mutant.json"
+          if verify_map "$RUNNER_TEMP/reports/m3-usb-mutant.json" "$during" \
+            "$after" "$feature" >/dev/null 2>&1; then
+            echo 'FAIL: inconsistent original pre-click libudev state accepted' >&2; exit 1
+          fi
+          echo 'PASS: three original WebAuthn USB-backend real mapped-ELF phases and four negative mutants'
       - name: Upload only sanitized browser feature observations
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: m3-original-browser-usb-nodevice-loader
-          path: ${{ runner.temp }}/reports/m3-original-browser-usb-nodevice-loader.json
+          path: |
+            ${{ runner.temp }}/reports/m3-original-browser-usb-nodevice-loader.json
+            ${{ runner.temp }}/reports/m3-original-webauthn-usb-before-maps.json
+            ${{ runner.temp }}/reports/m3-original-webauthn-usb-during-maps.json
+            ${{ runner.temp }}/reports/m3-original-webauthn-usb-after-maps.json
+            ${{ runner.temp }}/reports/m3-original-webauthn-usb-maps-crosswalk.json
           if-no-files-found: error
           retention-days: 14

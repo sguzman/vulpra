@@ -32,6 +32,14 @@ fn is_pulse_library(name: &str) -> bool {
                 suffix.as_bytes().last().is_some_and(|b|b.is_ascii_digit())
         })
 }
+fn is_udev_library(name: &str) -> bool {
+    name=="libudev.so.1" ||
+        name.strip_prefix("libudev.so.1.").is_some_and(|suffix| {
+            !suffix.is_empty() &&
+                suffix.bytes().all(|b| b.is_ascii_digit() || b==b'.') &&
+                suffix.as_bytes().last().is_some_and(|b| b.is_ascii_digit())
+        })
+}
 fn in_package(p: &str) -> bool {
     p.strip_prefix(PACKAGE).is_some_and(|s| s.starts_with('/'))
 }
@@ -91,17 +99,21 @@ fn census() -> Result<(usize,usize,BTreeSet<String>,BTreeSet<String>),String> {
 }
 fn run() -> Result<(),String>{
     let a:Vec<String>=env::args().collect();
-    if a.len()!=4 || !matches!(a[1].as_str(),"before"|"during") ||
+    if a.len()!=4 || !matches!(a[1].as_str(),"before"|"during"|"usb-before"|"usb-during"|"usb-after") ||
        a[2]!=PACKAGE || !a[3].starts_with("/reports/") ||
        !a[3].ends_with(".json") || a[3].len()>160 {
-        return Err("usage: on-demand-map before|during /original /reports/<name>.json".into());
+        return Err("usage: on-demand-map before|during|usb-before|usb-during|usb-after /original /reports/<name>.json".into());
     }
     let (processes,unreadable,package,host)=census()?;
     // /proc/maps records the fully versioned backing ELF filename,
     // not necessarily the libpulse.so.0 SONAME used by dlopen callers.
     let pulse=host.iter().any(|name|is_pulse_library(name));
+    let udev=host.iter().any(|name|is_udev_library(name));
     if a[1]=="during" && !pulse {
         return Err("WebAudio stream did not map libpulse.so.0 in original browser".into())
+    }
+    if a[1]=="usb-during" && !udev {
+        return Err("USB backend attempt did not map libudev.so.1 in original browser".into())
     }
     let report=format!(concat!(
         "{{",
@@ -115,6 +127,7 @@ fn run() -> Result<(),String>{
         "\"package_mapped_shared_library_basenames\":{},",
         "\"host_mapped_shared_library_basenames\":{},",
         "\"libpulse_mapped_in_original_browser\":{},",
+        "\"libudev_mapped_in_original_browser\":{},",
         "\"original_browser_executables_only\":true,",
         "\"raw_paths_or_process_ids_exported\":false,",
         "\"no_physical_audio_device_used\":true,",
@@ -123,7 +136,7 @@ fn run() -> Result<(),String>{
         "\"m3_sixth_gate_closed\":false",
         "}}\n"
     ),SRC,SHA,a[1],processes,unreadable,
-        json_array(&package),json_array(&host),pulse);
+        json_array(&package),json_array(&host),pulse,udev);
     fs::write(&a[3],report).map_err(|_|"cannot write private WebAudio map evidence")?;
     println!("M3_WEBAUDIO_MAP_SNAPSHOT={} process_maps={processes}",a[1]);
     Ok(())
@@ -151,6 +164,13 @@ mod tests{
         assert!(is_pulse_library("libpulse.so.0.24.3"));
         assert!(!is_pulse_library("libpulse.so.0.debug"));
         assert!(!is_pulse_library("libpulse-trace.so"));
+    }
+    #[test]fn libudev_exact_abi_and_numeric_backing_filename(){
+        assert!(is_udev_library("libudev.so.1"));
+        assert!(is_udev_library("libudev.so.1.7.9"));
+        assert!(!is_udev_library("libudev.so.0"));
+        assert!(!is_udev_library("libudev.so.1.debug"));
+        assert!(!is_udev_library("libudev.so.1.a"));
     }
     #[test]fn parser_ignores_unrelated(){
         let input="123-456 r-xp 00000000 00:00 1 /original/libxul.so\n\

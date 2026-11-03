@@ -134,14 +134,32 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
   }
   preloaded=false
   if browser_maps_udev; then preloaded=true; fi
+  # Opt-in independent Rust ELF residency witness for this no-device
+  # original-browser workload. No effect on virtual or interposed modes.
+  phase_maps=false
+  if [[ "${VULPRA_M3_WEBAUTHN_MAP_PHASES:-0}" == 1 ]]; then
+    [[ "$mode" == usb-no-device && -x /audit/on-demand-maps ]] || exit 2
+    /audit/on-demand-maps usb-before /original /reports/m3-original-webauthn-usb-before-maps.json
+    phase_maps=true
+  fi
   found="$(api POST "/session/$session/element" '{"using":"css selector","value":"#create"}')"
   button_id="$(jq -er '.value."element-6066-11e4-a52e-4f735466cecf" // .value.ELEMENT' <<<"$found")"
   api POST "/session/$session/element/$button_id/click" '{}' | jq -e '.value==null' >/dev/null
   mapped_during=false
+  phase_during_saved=false
   completed=false
   create_state=''
   for _ in {1..65}; do
-    if browser_maps_udev; then mapped_during=true; fi
+    if browser_maps_udev; then
+      mapped_during=true
+      if [[ "$phase_maps" == true && "$phase_during_saved" == false ]]; then
+        # Never infer a transient mapping from a retrospective flag:
+        # capture the backing filename while /proc/maps still shows libudev.
+        if /audit/on-demand-maps usb-during /original /reports/m3-original-webauthn-usb-during-maps.json; then
+          phase_during_saved=true
+        fi
+      fi
+    fi
     create_state="$(api POST "/session/$session/execute/sync" '{"script":"return window.__vulpraResult.create;","args":[]}')"
     if jq -e '.value.state=="complete"' <<<"$create_state" >/dev/null 2>&1; then
       completed=true; break
@@ -156,6 +174,13 @@ if [[ "$mode" == usb-no-device || "$mode" == usb-dlopen-trace ]]; then
     exit 1
   fi
   if browser_maps_udev; then mapped_during=true; fi
+  if [[ "$phase_maps" == true ]]; then
+    [[ "$phase_during_saved" == true ]] || {
+      echo 'No independent original libudev mapping during USB attempt' >&2
+      exit 1
+    }
+    /audit/on-demand-maps usb-after /original /reports/m3-original-webauthn-usb-after-maps.json
+  fi
   callsites_verified=false
   stack_verified=false
   if [[ "$mode" == usb-dlopen-trace ]]; then
