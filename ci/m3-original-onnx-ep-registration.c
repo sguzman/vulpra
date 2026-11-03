@@ -1,4 +1,4 @@
-// Bounded original ONNX v22 EP registration/teardown test; never runs an EP.
+// Bounded original ONNX v30 EP registration/teardown test; never runs an EP.
 // A separate, source-pinned manual CI workflow supplies the original ELF.
 #include "onnxruntime_c_api.h"
 #include <dlfcn.h>
@@ -6,8 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#if ORT_API_VERSION != 22
-#error "This probe requires exactly ORT C API v22"
+#if ORT_API_VERSION != 30
+#error "This probe requires exactly ORT C API v30"
 #endif
 _Static_assert(offsetof(OrtApi, UnregisterExecutionProviderLibrary) ==
                    offsetof(OrtApi, RegisterExecutionProviderLibrary) + sizeof(void *),
@@ -48,12 +48,12 @@ int main(int argc, char **argv) {
   }
   const OrtApiBase *base = get_api_base();
   if (base != NULL) {
-    fprintf(stderr, "M3_EP_ORIGINAL_VERSION=%.80s v23=%d v24=%d\n",
-            base->GetVersionString(), base->GetApi(23) != NULL,
-            base->GetApi(24) != NULL);
+    fprintf(stderr, "M3_EP_ORIGINAL_VERSION=%.80s v30=%d v31=%d\n",
+            base->GetVersionString(), base->GetApi(30) != NULL,
+            base->GetApi(31) != NULL);
     fflush(stderr);
   }
-  const OrtApi *api = base != NULL ? base->GetApi(22) : NULL;
+  const OrtApi *api = base != NULL ? base->GetApi(30) : NULL;
   if (api == NULL || api->RegisterExecutionProviderLibrary == NULL ||
       api->UnregisterExecutionProviderLibrary == NULL) {
     fputs("M3_EP_ERROR_STAGE=api22_unavailable\n", stderr);

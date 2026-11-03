@@ -1,5 +1,5 @@
-// CI-only ONNX Runtime 1.22 EP factory. No devices, kernels, or production EP.
-// Compile against the SHA-pinned v1.22.0 onnxruntime_c_api.h in the workflow.
+// CI-only ONNX Runtime 1.30 EP factory. No devices, kernels, or production EP.
+// Compile against the SHA-pinned v1.30.0 onnxruntime_c_api.h and ep_c_api.h in the workflow.
 #include "onnxruntime_c_api.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -7,13 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if ORT_API_VERSION != 22
-#error "This fixture intentionally targets the pinned ORT C API v22 only"
+#if ORT_API_VERSION != 30
+#error "This fixture intentionally targets the pinned ORT C API v30 only"
 #endif
 
 static const OrtApi *runtime_api;
 static const char provider_name[] = "VulpraCIProbeEP";
 static const char vendor_name[] = "Vulpra CI fixture";
+static const char fixture_version[] = "0.0.1";
 
 static const char *ORT_API_CALL get_name(const OrtEpFactory *factory) {
   (void)factory;
@@ -26,6 +27,16 @@ static const char *ORT_API_CALL get_vendor(const OrtEpFactory *factory) {
 }
 
 // This test plugin claims NO real hardware or supported OrtEpDevice.
+static uint32_t ORT_API_CALL get_vendor_id(const OrtEpFactory *factory) {
+  (void)factory;
+  return 0;  // CI fixture, no PCI hardware vendor.
+}
+
+static const char *ORT_API_CALL get_version(const OrtEpFactory *factory) {
+  (void)factory;
+  return fixture_version;
+}
+
 static OrtStatus *ORT_API_CALL get_supported_devices(
     OrtEpFactory *factory, const OrtHardwareDevice *const *devices,
     size_t device_count, OrtEpDevice **ep_devices, size_t max_ep_devices,
@@ -78,6 +89,8 @@ static OrtEpFactory *make_factory(void) {
   factory->ort_version_supported = ORT_API_VERSION;
   factory->GetName = get_name;
   factory->GetVendor = get_vendor;
+  factory->GetVendorId = get_vendor_id;
+  factory->GetVersion = get_version;
   factory->GetSupportedDevices = get_supported_devices;
   factory->CreateEp = create_ep;
   factory->ReleaseEp = release_ep;
@@ -92,7 +105,9 @@ static OrtEpFactory *make_factory(void) {
 
 M3_EXPORT OrtStatus *CreateEpFactories(
     const char *registered_name, const OrtApiBase *api_base,
-    OrtEpFactory **factories, size_t max_factories, size_t *num_factories) {
+    const OrtLogger *default_logger, OrtEpFactory **factories,
+    size_t max_factories, size_t *num_factories) {
+  (void)default_logger;
   fputs("M3_EP_CALLBACK=entered_factory_init\n", stderr);
   fflush(stderr);
   /* Never dereference shifted arguments if the compiled EP ABI differs. */
@@ -115,20 +130,20 @@ M3_EXPORT OrtStatus *CreateEpFactories(
                                         "invalid fixture factory arguments")
                : NULL;
   }
-  fputs("M3_EP_CALLBACK=before_api22\n", stderr);
+  fputs("M3_EP_CALLBACK=before_api30\n", stderr);
   fflush(stderr);
-  const OrtApi *api22 = api_base->GetApi(ORT_API_VERSION);
-  if (api22 == NULL) {
+  const OrtApi *api30 = api_base->GetApi(ORT_API_VERSION);
+  if (api30 == NULL) {
     return fallback != NULL
                ? fallback->CreateStatus(ORT_NOT_IMPLEMENTED,
-                                        "ORT API v22 required")
+                                        "ORT API v30 required")
                : NULL;
   }
   OrtEpFactory *factory = make_factory();
   if (factory == NULL) {
-    return api22->CreateStatus(ORT_FAIL, "CI factory allocation failed");
+    return api30->CreateStatus(ORT_FAIL, "CI factory allocation failed");
   }
-  runtime_api = api22;
+  runtime_api = api30;
   factories[0] = factory;
   *num_factories = 1;  // Unlike the retired zero-factory crash experiment.
   fputs("M3_EP_CALLBACK=factory_created\n", stderr);
@@ -146,12 +161,15 @@ M3_EXPORT OrtStatus *ReleaseEpFactory(OrtEpFactory *factory) {
 #ifdef M3_EP_FIXTURE_SELFTEST
 int main(void) {
   OrtEpFactory *factory = make_factory();
-  if (factory == NULL || factory->ort_version_supported != 22 ||
+  if (factory == NULL || factory->ort_version_supported != 30 ||
       factory->GetName == NULL || factory->GetVendor == NULL ||
+      factory->GetVendorId == NULL || factory->GetVersion == NULL ||
       factory->GetSupportedDevices == NULL || factory->CreateEp == NULL ||
       factory->ReleaseEp == NULL ||
       strcmp(factory->GetName(factory), provider_name) != 0 ||
-      strcmp(factory->GetVendor(factory), vendor_name) != 0) {
+      strcmp(factory->GetVendor(factory), vendor_name) != 0 ||
+      factory->GetVendorId(factory) != 0 ||
+      strcmp(factory->GetVersion(factory), fixture_version) != 0) {
     return 1;
   }
   size_t count = SIZE_MAX;
