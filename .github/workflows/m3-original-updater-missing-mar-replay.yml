@@ -2,15 +2,15 @@
 # staging args as verified in browser-owned native execv CI 41731162834.
 # Synthetic missing MAR only; private no-egress Arch, original install RO.
 # This is a DIRECT CI replay, NOT actual original browser launching updater.
+# Native test accepted source-pinned original compiled updater CI 41733351456
+# PASS, sanitized artifact 13276607606, READ_ERROR 6 and status failed: 6,
+# 11 forged summary variants rejected, real updater exit 1.
+# No MAR provided; original install hashes unchanged; stage fixture empty.
+# Manual-only after acceptance.
 # Separate writable /original/updated staging fixture permits reaching the
 # original archive-open rejection, while source/package ELF remains read-only.
 name: M3 Original Updater Missing MAR Failure Replay
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-updater-missing-mar-replay.yml
-      - ci/m3-original-updater-missing-mar-replay.sh
   workflow_dispatch:
 permissions:
   contents: read
