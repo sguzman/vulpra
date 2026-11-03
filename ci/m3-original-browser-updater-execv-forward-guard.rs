@@ -54,7 +54,7 @@ unsafe fn source_argv(argv:*const *const c_char)->bool{
         if val.len()>128{return false}
         *item=val;
     }
-    unsafe{(*argv.add(7)).is_null()}&&expected(p)
+    (unsafe{(*argv.add(7)).is_null()})&&expected(p)
 }
 unsafe fn own_kernel_argv()->bool{
     // Read directly from /proc, not a mutable user-space argv pointer.
