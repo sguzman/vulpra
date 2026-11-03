@@ -37,8 +37,8 @@ check(safe($m.package_mapped_library_basenames) and
 ($m.package_mapped_library_basenames) as $package |
 ($m.host_mapped_library_basenames) as $host |
 ($n.initialized_native_provider_basenames) as $init |
-check(all(["libxul.so","libmozgtk.so","libmozwayland.so"][] as $core;
-    ($package|index($core))!=null and ($init|index($core))!=null);
+check((["libxul.so","libmozgtk.so","libmozwayland.so"] - $package | length)==0 and
+  (["libxul.so","libmozgtk.so","libmozwayland.so"] - $init | length)==0;
   "missing original actual mapped-and-initialized core browser library") |
 ([$package[] as $name | select(($init|index($name))!=null) | $name]) as $both |
 ([$package[] as $name | select(($init|index($name))==null) | $name]) as $only_map |
