@@ -4,7 +4,15 @@
  * Header is pinned upstream and compiled in CI, not vendored in Vulpra.
  */
 #include <stdint.h>
+#include <unistd.h>
 #include "onnxruntime_c_api.h"
+
+/* Fixed stage markers only, no paths, addresses, or caller arguments. */
+__attribute__((constructor))
+static void m3_ep_loaded_marker(void) {
+  static const char msg[] = "M3_EP_FIXTURE=loaded\n";
+  (void)write(2, msg, sizeof(msg) - 1);
+}
 
 __attribute__((visibility("default")))
 uint32_t m3_ep_factory_call_count = 0;
@@ -15,6 +23,8 @@ OrtStatus* CreateEpFactories(const char* registration_name,
                              OrtEpFactory** factories,
                              size_t max_factories,
                              size_t* num_factories) {
+  static const char msg[] = "M3_EP_FIXTURE=create_ep_factories_called\n";
+  (void)write(2, msg, sizeof(msg) - 1);
   if (registration_name == 0 || base == 0 || factories == 0 ||
       max_factories == 0 || num_factories == 0 ||
       m3_ep_factory_call_count != 0) {

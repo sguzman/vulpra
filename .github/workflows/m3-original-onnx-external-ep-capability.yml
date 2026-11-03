@@ -119,11 +119,24 @@ jobs:
           fixture="$RUNNER_TEMP/libvulpra-onnx-inert-ep.so"
           observer="$RUNNER_TEMP/original-onnx-origin-observer.so"
           report="$RUNNER_TEMP/original-ep-origin.json"
-          sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+          if ! sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
             LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             timeout --signal=TERM --kill-after=3s 40s \
             "$probe" "$package/libonnxruntime.so" "$fixture" "$REGISTER_EP_SLOT" "$UNREGISTER_EP_SLOT" |
-            tee "$RUNNER_TEMP/original-ep-control.stdout" >/dev/null
+            tee "$RUNNER_TEMP/original-ep-control.stdout" >/dev/null; then
+            # Diagnostic ONLY on a native failure. A raw crash never becomes
+            # accepted evidence or a false 'unsupported' classification.
+            if command -v gdb >/dev/null 2>&1; then
+              sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+                LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+                timeout --signal=TERM --kill-after=3s 40s \
+                gdb -q -batch -ex 'set pagination off' -ex run -ex 'bt 10' \
+                --args "$probe" "$package/libonnxruntime.so" "$fixture" "$REGISTER_EP_SLOT" "$UNREGISTER_EP_SLOT" \
+                2>&1 | grep -E 'M3_EP_STAGE=|M3_EP_FIXTURE=|Program received signal|^#[0-9]+' | head -35 || true
+            fi
+            echo 'FAIL: original external EP registration crashed or exited unsuccessfully; no capability claim' >&2
+            exit 1
+          fi
           sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
             LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             timeout --signal=TERM --kill-after=3s 40s \
