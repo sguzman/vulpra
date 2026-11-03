@@ -1,5 +1,5 @@
 // Bounded original ONNX v30 EP registration/teardown and optional session modes.
-// CPU fallback and a separate external CPU scalar-Mul inference probe are opt-in.
+// CPU fallback, isolated external Mul, and mixed EP/CPU graph inference are opt-in.
 // A separate, source-pinned manual CI workflow supplies the original ELF.
 #include "onnxruntime_c_api.h"
 #include <dlfcn.h>

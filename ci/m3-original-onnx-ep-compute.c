@@ -1,5 +1,5 @@
 // Test-only, source-pinned ONNX 1.30 external execution provider arithmetic.
-// Not shipped in Vulpra: one fixed-shape CPU float32[1] Mul node only.
+// Not shipped in Vulpra: claims one CPU float32[1] Mul, declines downstream Add.
 #include "onnxruntime_c_api.h"
 #include <stddef.h>
 #include <stdint.h>

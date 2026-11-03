@@ -1,5 +1,5 @@
 // CI-only ONNX v30 external-EP session and numerical tests.
-// Builds Identity fallback, single-node Mul, or mixed Mul -> CPU Add graphs.
+// Builds Identity fallback, single-node Mul, or mixed external Mul -> CPU Add graphs.
 #include "onnxruntime_c_api.h"
 #include <stdint.h>
 #include <stdio.h>
