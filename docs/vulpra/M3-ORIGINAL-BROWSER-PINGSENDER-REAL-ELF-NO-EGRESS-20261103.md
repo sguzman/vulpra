@@ -1,0 +1,41 @@
+# M3 — Genuine original browser-owned `pingsender` ELF launch with no network egress (2026-11-03)
+
+## Source-pinned accepted native observation
+
+[**Native original browser → original packaged `pingsender` CI 41738630382 PASS**](https://github.com/sguzman/vulpra/actions/runs/41738630382), job **126274184793**; only sanitized artifact **13279278998** (`m3-original-browser-owned-pingsender-no-egress`). The artifact was separately downloaded and inspected: one **1,781-byte JSON** file, ZIP **831 bytes**. Original source commit `b1482404dfb8b01342990ee99ea3df0f9756b5f7` and full-normal compiled browser archive SHA-256 `7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a` were authenticated before execution. The real compiled `/original/vulpra` and `/original/pingsender` ELF files remained unchanged, packaged read-only and checked with before/after SHA-256.
+
+The **actual original compiled browser**, rather than an independent shell or mock executable, used its original source-defined telemetry module to start its **actual packaged original `pingsender` executable**.
+
+## Exactly which original path executed
+
+At the pinned original source:
+
+- `toolkit/components/telemetry/app/TelemetrySend.sys.mjs` exports `TelemetrySend.testRunPingSender(pings, observer)`. Its internal `runPingSender` uses `Services.dirsvc.get("GreBinD", Ci.nsIFile)` to locate the packaged executable, configures `nsIProcess` with `startHidden` and `noShell`, and invokes `process.runAsync(params, params.length, observer)`. The test deliberately exercises **this test-only exported method**, not ordinary background or shutdown telemetry scheduling.
+- The same original method may choose an app `--backgroundtask pingsender` instead of standalone `pingsender`, depending on the Nimbus `backgroundTaskEnabled` variable. The accepted source-pinned execution used the **standalone packaged ELF** route; its selection should not be assumed for all configurations.
+- The original `toolkit/components/telemetry/pingsender/pingsender.cpp` explicitly permits `localhost` as a destination (alongside Mozilla's telemetry endpoint). It parses URL/path argument pairs and fails on unsuccessful submission. The source-pinned native test used the fixed URL `http://localhost:9/vulpra-m3-synthetic-never-submit` and a fixed disposable file `/tmp/vulpra-m3-synthetic-only-ping.json` containing only `{"vulpra_ci_synthetic":true,"no_real_telemetry":true}`. No user telemetry or profile contents were used.
+- The browser was launched **directly** as its unchanged compiled `/original/vulpra` ELF with an isolated temporary profile; `geckodriver --connect-existing` attached afterward in a private Weston compositor. A chrome-context call imported `TelemetrySend.sys.mjs` from the genuine original browser and called `testRunPingSender([{url, path}], null)` exactly once.
+- A CI-only Rust standard-library-free-startup `LD_PRELOAD` ELF initializer (`ci/m3-original-browser-pingsender-elf-witness.rs`) ran **inside the actually executed original `pingsender`**. It validated actual `/proc/self/exe == /original/pingsender`, the kernel `/proc/self/cmdline` contained exactly the three source-expected arguments with the synthetic localhost URL and file path, and `/proc/<parent>/exe == /original/vulpra`. Only the real original child process with exact parent/args could emit the sanitized JSON witness. This observer does **not** replace, patch or execute a fake pingsender, and exports no raw PIDs, argv or file data.
+
+The actual native ELF witness was present and accepted. After launch, the temporary synthetic file remained on disk rather than being deleted on successful transport, the original browser remained WebDriver-responsive, and a probe confirmed no local listener on port 9. The original browser executables still matched their pre-run hashes.
+
+## Privacy, safety and scope
+
+- **No external network egress**: the browser/pingsender executed in a Docker `--network none` namespace with a private local loopback created only for WebDriver, and no network devices or user browser profiles were mounted. The test did not start a server on the fixed localhost destination; no real telemetry submission or HTTP success was observed or claimed.
+- The original browser's actual **`datareporting.healthreport.uploadEnabled` was false**, verified by a browser-side XPCOM preference query before the test. The source-defined pingsender test-only method can launch a test process independently of normal upload permission; that distinction is intentional.
+- The original build reported **`toolkit.telemetry.enabled=true`** even after the disposable profile tried to set that collection preference false. This collection preference is **not** the upload permission. The test deliberately did **not** claim that all collection machinery was disabled, and it relied on the authenticated upload-permission denial, synthetic-only data, and network isolation instead.
+- `toolkit.telemetry.testing.suppressPingsender` was observed **false** in the original browser to allow the intended test-only helper launch. Normal upload was not enabled, and no test-only override of the sender's official-build checks was requested. No user secrets or existing Firefox profile files were touched.
+- The source and ELF assets were precompiled original immutable Vulpra. The temporary observer was **CI-only instrumentation**, not a permanent production change. `/original` was mounted read-only. No original program files deleted and **0 claimed native bytes saved**.
+
+## Native controls, earlier investigations and acceptance
+
+Initial [CI 41738089962](https://github.com/sguzman/vulpra/actions/runs/41738089962) and diagnostic [CI 41738339098](https://github.com/sguzman/vulpra/actions/runs/41738339098) failed **before spawning pingsender**, because the preflight incorrectly required the mutable `toolkit.telemetry.enabled` collection preference to be false. The first safe preflight diagnostic showed that the original method existed, and the second showed `collection_pref=true`, `suppressPingsender=false`, `upload_permission=false`, and original packaged binary directory identity. The predicate was corrected to require the actual user-facing upload permission false while treating the independently observed collection pref as a separate fact; the test retained the closed-network and synthetic-only restrictions. The corrected [CI 41738630382](https://github.com/sguzman/vulpra/actions/runs/41738630382) **passed**.
+
+The accepted run passed **2/2 Rust exact-source/argument-shape tests** and rejected **10/10 deliberately forged JSON reports** covering child executable, parent, synthetic argument provenance, payload retention, upload permission, false submission success, source/archive hash and unauthorized source pruning. Only sanitized summary flags were uploaded (1,781-byte JSON).
+
+## Exactly proven / not established
+
+**Established:** in a disposable, source-authenticated compiled original Vulpra browser, the real source-defined test-only `TelemetrySend` launcher can **actually start the original packaged `pingsender` ELF** as an original browser child, with exact local synthetic input, while the original browser remains responsive and no telemetry network egress is available. This extends previously accepted independent original pingsender **standalone** native loader/binding evidence to a **true original browser-owned native process execution path**.
+
+**Not established:** any normal policy-compliant telemetry upload, data submission or delivery; normal shutdown/queued telemetry scheduling; any external network communication; actual telemetry collection being disabled, all pingsender alternate background-task branches, all `libcurl` lazy/indirect call paths, real private telemetry contents, target EndeavourOS/Hyprland hardware behavior, full dependency/feature/source-build closure, or safe pruning of the binary or telemetry security paths. This is **not** a basis for removing protected privacy/deletion functionality.
+
+After acceptance, the expensive workflow `.github/workflows/m3-original-browser-pingsender-no-egress.yml` was restored to **manual-only `workflow_dispatch`**. **M3 remains 5/6 gates = 83%; Vulpra overall 61%; session Δ +0 percentage points.** No package-size improvement or additional source removal is claimed.
