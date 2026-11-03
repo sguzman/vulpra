@@ -2,14 +2,12 @@
 # symbol resolution under private no-egress Arch/Weston. The normal full
 # package source and binaries remain original/immutable.
 # Synthetic localhost-only payload; not a real telemetry submission.
+# Accepted original compiled native CI 41739731454 PASS, job 126277925092;
+# artifact 13280597614, genuine original child libcurl dlopen + 14/14
+# source-declared dlsym resolutions. 4/4 Rust tests and 13/13 forged
+# summary mutations rejected. Restored to manual-only after acceptance.
 name: M3 Original Browser Pingsender Libcurl Runtime 14 Dlsym No Egress
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-pingsender-libcurl-no-egress.yml
-      - ci/m3-original-browser-pingsender-libcurl-no-egress.sh
-      - ci/m3-original-browser-pingsender-libcurl-dlsym.rs
   workflow_dispatch:
 permissions:
   contents: read
