@@ -1,15 +1,14 @@
 # Source-authenticated original Vulpra starts the *original* packaged
 # crashhelper while rendering a real Wayland frame in private no-egress Arch.
 # On Linux the original Rust helper double-forks: do not assert PPid==browser.
-# Instead correlate the helper argv[1] numeric launch pid with the live actual
+# Accepted original browser native run 41720817778, Rust tests 3/3,
+# private Weston Wayland frame, 3 live browser/helper correlated observations,
+# four deliberately forged summary cases rejected; workflow lint corrected
+# and accepted in 41721043209. Manual-only after native acceptance.
+# Instead correlate helper argv[1] numeric launch pid with the live actual
 # original browser ELF and the helper's exact /proc/exe, no raw PIDs exported.
 name: M3 Original Browser Live Crashhelper Spawn
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-crashhelper-live-launch.yml
-      - ci/m3-original-browser-crashhelper-live-launch.rs
   workflow_dispatch:
 permissions:
   contents: read
