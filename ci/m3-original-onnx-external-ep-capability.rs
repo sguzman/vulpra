@@ -12,8 +12,8 @@ const RTLD_NOW: c_int = 2;
 const RTLD_LOCAL: c_int = 0;
 const RTLD_NOLOAD: c_int = 4;
 const ORT_NOT_IMPLEMENTED: c_int = 9;
-const REGISTER_EP_SLOT: usize = 284;
-const UNREGISTER_EP_SLOT: usize = 285;
+// Function table slots are supplied only by a CI-compiled offsetof(OrtApi)
+// fixture using the exact authenticated upstream public C API header.
 
 #[link(name="dl")]
 unsafe extern "C" {
@@ -52,7 +52,12 @@ fn outcome(line: &str) {
 }
 fn run() -> Result<(),String> {
     let args:Vec<String> = env::args().collect();
-    if args.len()!=3 {return Err("expected original ONNX path and inert EP fixture".into());}
+    if args.len()!=5 {return Err("expected original ONNX, inert EP fixture and two verified C ABI offsets".into());}
+    let reg_slot:usize=args[3].parse().map_err(|_| "bad C-verified registration slot")?;
+    let unreg_slot:usize=args[4].parse().map_err(|_| "bad C-verified unregistration slot")?;
+    if !(250..=400).contains(&reg_slot) || unreg_slot!=reg_slot+1 {
+        return Err("pinned header v22 registration slot bounds invalid".into());
+    }
     let onnx = must_path(&args[1], "/libonnxruntime.so")?;
     let fixture=must_path(&args[2], "/libvulpra-onnx-inert-ep.so")?;
     let h = unsafe {dlopen(onnx.as_ptr(), RTLD_NOW|RTLD_LOCAL)};
@@ -77,8 +82,8 @@ fn run() -> Result<(),String> {
     if api1.is_null(){return Err("original ONNX v1 API unexpectedly unavailable".into());}
     let create_env:CreateEnv=unsafe{method(api1,3)?};
     let error_code:GetErrorCode=unsafe{method(api1,1)?};
-    let register:RegisterEp=unsafe{method(api22,REGISTER_EP_SLOT)?};
-    let unregister:UnregisterEp=unsafe{method(api22,UNREGISTER_EP_SLOT)?};
+    let register:RegisterEp=unsafe{method(api22,reg_slot)?};
+    let unregister:UnregisterEp=unsafe{method(api22,unreg_slot)?};
     let mut ort_env=ptr::null_mut();
     let status=unsafe{create_env(3,c"vulpra-isolated-inert-ep-probe".as_ptr(),&mut ort_env)};
     if !status.is_null()||ort_env.is_null(){return Err("CreateEnv failed".into());}
@@ -119,8 +124,6 @@ fn main()->ExitCode {
 mod tests {
     use super::*;
     #[test] fn version_guard_and_offsets_are_bounded(){
-        assert_eq!(REGISTER_EP_SLOT,284);
-        assert_eq!(UNREGISTER_EP_SLOT,285);
         assert_eq!(ORT_NOT_IMPLEMENTED,9);
         assert!(must_path("/tmp/safe/libonnxruntime.so","/libonnxruntime.so").is_ok());
         assert!(must_path("../libonnxruntime.so","/libonnxruntime.so").is_err());

@@ -51,18 +51,28 @@ jobs:
             b01b7e48dc87bbeeb026c61fb06c591053853ad1
           cat >"$RUNNER_TEMP/original-ep-abi.c" <<'C'
           #include <stddef.h>
+          #include <stdio.h>
           #include "onnxruntime_c_api.h"
           _Static_assert(ORT_API_VERSION==22, "unexpected upstream ORT API");
           _Static_assert(ORT_NOT_IMPLEMENTED==9, "unexpected OrtErrorCode value");
-          _Static_assert(offsetof(OrtApi,RegisterExecutionProviderLibrary)==284*sizeof(void*),
-                         "unexpected EP registration C API slot");
-          _Static_assert(offsetof(OrtApi,UnregisterExecutionProviderLibrary)==285*sizeof(void*),
-                         "unexpected EP removal C API slot");
-          int main(void) { return 0; }
+          _Static_assert(offsetof(OrtApi,UnregisterExecutionProviderLibrary) ==
+                         offsetof(OrtApi,RegisterExecutionProviderLibrary)+sizeof(void*),
+                         "nonadjacent external EP registration ABI");
+          int main(void) {
+            printf("%zu %zu\n",
+                   offsetof(OrtApi,RegisterExecutionProviderLibrary)/sizeof(void*),
+                   offsetof(OrtApi,UnregisterExecutionProviderLibrary)/sizeof(void*));
+            return 0;
+          }
           C
           cc -std=c11 -O2 -Wall -Wextra -Werror -I"$RUNNER_TEMP" \
             "$RUNNER_TEMP/original-ep-abi.c" -o "$RUNNER_TEMP/original-ep-abi"
-          "$RUNNER_TEMP/original-ep-abi"
+          read -r reg_slot unreg_slot < <("$RUNNER_TEMP/original-ep-abi")
+          test "$reg_slot" -ge 250 && test "$reg_slot" -le 400
+          test "$unreg_slot" -eq "$((reg_slot+1))"
+          echo "REGISTER_EP_SLOT=$reg_slot" >>"$GITHUB_ENV"
+          echo "UNREGISTER_EP_SLOT=$unreg_slot" >>"$GITHUB_ENV"
+          echo "PASS: v22 header-authenticated EP registration function table index $reg_slot"
           cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared -I"$RUNNER_TEMP" \
             ci/m3-original-onnx-inert-ep.c \
             -o "$RUNNER_TEMP/libvulpra-onnx-inert-ep.so"
@@ -79,7 +89,7 @@ jobs:
               .head_sha==$sha and
               .path==".github/workflows/m3-original-onnx-explicit-cpu-ep.yml"
             ' >/dev/null
-          echo 'PASS: guarded C ABI v22 static offsets, benign EP factory and original observer compiled'
+          echo 'PASS: compiled v22 C API native offsets supplied to Rust at runtime, benign EP fixture and observer built'
       - name: Authenticate historical exact-original full-normal compiled ONNX ELF
         shell: bash
         env:
@@ -112,13 +122,13 @@ jobs:
           sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
             LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             timeout --signal=TERM --kill-after=3s 40s \
-            "$probe" "$package/libonnxruntime.so" "$fixture" |
+            "$probe" "$package/libonnxruntime.so" "$fixture" "$REGISTER_EP_SLOT" "$UNREGISTER_EP_SLOT" |
             tee "$RUNNER_TEMP/original-ep-control.stdout" >/dev/null
           sudo unshare --net -- env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
             LD_LIBRARY_PATH="$package" MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
             timeout --signal=TERM --kill-after=3s 40s \
             env LD_PRELOAD="$observer" M3_ONNX_INNER_DLOPEN_REPORT="$report" \
-            "$probe" "$package/libonnxruntime.so" "$fixture" |
+            "$probe" "$package/libonnxruntime.so" "$fixture" "$REGISTER_EP_SLOT" "$UNREGISTER_EP_SLOT" |
             tee "$RUNNER_TEMP/original-ep-observed.stdout" >/dev/null
           result="$(sed -n 's/^M3_EXTERNAL_EP_RESULT=//p' "$RUNNER_TEMP/original-ep-control.stdout")"
           observed="$(sed -n 's/^M3_EXTERNAL_EP_RESULT=//p' "$RUNNER_TEMP/original-ep-observed.stdout")"
