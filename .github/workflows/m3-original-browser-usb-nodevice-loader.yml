@@ -7,17 +7,11 @@ name: M3 Original Browser USB Backend No-Device Loader Probe
 # libudev evidence is measured independently. This is not sixth-gate closure.
 # A source-pinned original-browser mapping transition passed 41371647131.
 # Actual three-phase versioned libudev mapping and four negative mutants
-# passed in original native CI 41674689904. Manual-only expensive workflow.
+# passed in original native CI 41674689904. Glibc no-LD_PRELOAD actual
+# original browser provider and 15 source-matching / 1 unattributed symbol
+# accepted in CI 41692027881, four negative mutations rejected. Manual-only.
 on:
   workflow_dispatch:
-  # TEMPORARY accepted-native LD_DEBUG symbol-provider test; return to manual-only.
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-browser-usb-nodevice-loader.yml
-      - ci/m3-original-browser-webauthn-webdriver.sh
-      - ci/m3-original-udev-glibc-bindings.rs
-      - ci/m3-original-udev-glibc-bindings-crosswalk.jq
 permissions:
   contents: read
   actions: read
@@ -309,7 +303,7 @@ jobs:
           if crosswalk "$RUNNER_TEMP/reports/m3-glibc-mutant.json" "$feature" >/dev/null 2>&1; then
             echo 'FAIL: wrong original archive accepted' >&2; exit 1
           fi
-          echo 'PASS: actual original glibc browser libudev provider; 15 source-owned WebAuthn names, one unowned native name, four rejected negative mutations'
+          echo 'PASS: actual original glibc browser libudev provider; 15 names overlapping WebAuthn source and one unattributed native name, four rejected negative mutations'
       - name: Upload only sanitized browser feature observations
         if: always()
         uses: actions/upload-artifact@v4
