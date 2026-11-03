@@ -1,0 +1,38 @@
+# M3 — Real original browser attempted updater staging execv; execution denied (2026-11-03)
+
+## Source-pinned accepted original native result
+
+[**Original browser → native updater `execv` boundary native CI **41731162834 PASS**](https://github.com/sguzman/vulpra/actions/runs/41731162834), job `126248573557`, sanitized [Actions artifact **13276437121**](https://github.com/sguzman/vulpra/actions/runs/41731162834/artifacts/13276437121), `m3-original-browser-updater-execv-denied`. Exact source commit **`b1482404dfb8b01342990ee99ea3df0f9756b5f7`**; original full-normal native archive SHA-256 **`7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`**, authenticated from accepted original compiled CI source run `40997075527`. Original executable file digests for `vulpra` and `updater` were computed before the test and rechecked afterward.
+
+**What actually happened:** the *original compiled* browser `/original/vulpra` was directly launched in an offline disposable Arch/Weston environment, then controlled via a WebDriver client attached to its existing Marionette process. A test-owned, artificial `updates/0/update.version` file containing `null` and an artificial `updates/0/update.status` containing `pending` were created **only after browser startup** in an isolated writable nested update mount, with **no `update.mar`**. The main original install directory and binaries were mounted read-only. The browser's original `nsIUpdateProcessor.processUpdate()` was explicitly invoked from its own privileged XPCOM context. The original browser reached the true native **`fork` → `execv("/original/updater", argv)`** staging boundary. An injected CI-only Rust `LD_PRELOAD` guard checked the exact original process executable and seven Linux staging arguments, wrote a sanitized witness, and returned **`EACCES` before the intended updater executable was ever allowed to run**.
+
+This is an actual original compiled browser **attempting to execute** its packaged updater, **not** an actual updater process launch or successful update. It goes beyond the previously accepted [original browser disabled/idle update-service observation](M3-ORIGINAL-BROWSER-UPDATER-READONLY-20261103.md), which deliberately did not attempt the update processor path.
+
+## Original-source link and argument shape
+
+The following exact source was checked out at the source-pinned original commit and textually authenticated by CI:
+
+- `toolkit/xre/nsXREDirProvider.cpp`: on Linux the original `GetUpdateRootDir` resolves to the parent directory of the actual browser executable. In this test, the browser independently returned **`UpdRootD = /original`**.
+- `toolkit/xre/nsUpdateDriver.cpp`: `ProcessUpdates` checks `updates/0/update.version`, interprets `null` as *not an older version*, reads `update.status`, and branches to `ApplyUpdate(..., restart=false, isStaged=false)` for `pending`.
+- `ApplyUpdate`: the original Linux staging path populates the seven source-declared native arguments `/original/updater`, `3`, `/original/updates/0`, `/original`, `/original/updated`, `first`, `-1`; forks and attempts `execv(updaterPath, argv)`. `-1` is the staging PID argument, **not** the restart/apply path. The Rust guard matched the complete exact shape, null terminator and original browser `/proc/self/exe` identity; no user PID or raw argument text was exported.
+- `toolkit/mozapps/update/nsIUpdateService.idl`: original `nsIUpdateProcessor.processUpdate()` contract. The original `UpdateService.sys.mjs` references the same updater processor for update staging.
+
+The test invoked the processor directly; it did **not** prove that normal user-facing updater menus, background downloads or automatic scheduling reach it with all real conditions satisfied.
+
+## Isolation and negative tests
+
+The temporary test ran under Docker `--network none`, private Weston/Wayland and temporary HOME/profile, with all Linux capabilities dropped before running the browser and no real display/device/profile mounts. The original archive and compiled binaries were unchanged. The only writable update fixture was nested at `/original/updates`, inside the disposable host runner directory; the original browser installation was read-only and the `/original/updated` staging target was absent and unwritable. The missing `update.mar` condition was verified before and after the request. No update payload was downloaded or provided.
+
+**Fail-closed native guard:** `ci/m3-original-updater-execv-deny.rs` exports a CI-only dynamic `execv` interposer. It never forwards any `execv` request, and it records a sanitized success witness only when the *genuine original browser process* invokes the *actual packaged updater path* with its exact source-declared staging arguments. All intercepted `execv` requests return `-1/EACCES`. The real updater **does not execute**; changing install files is impossible from this test path. This is intentional test instrumentation, **not** production behavior or an unmodified launcher configuration. The actual original browser code and binaries were not patched.
+
+**Accepted checks:** 2/2 Rust parser/guard unit tests passed, the original source/archive authenticated, the original browser independently resolved the update root, the in-browser processor returned after the synthetic staging request, and the guard observed the exact native `execv` attempt. The finalized sanitized JSON was downloaded and inspected and had `actual_browser_to_updater_execv_boundary_observed=true`, `actual_updater_process_executed=false`, `updater_executable_never_allowed_to_exec=true`, `missing_mar_fixture_confirmed=true`, `native_bytes_saved=0`. **9/9 deliberately forged JSON variants** were rejected, including false argument provenance, false execution outcomes, missing MAR safeguard, false installation-root immutability and incorrect source archive.
+
+Two earlier trial native runs [41730884391](https://github.com/sguzman/vulpra/actions/runs/41730884391) and [41730977462](https://github.com/sguzman/vulpra/actions/runs/41730977462) **failed at guard compilation** due to incorrect C FFI declarations for variadic `open` and `write(void*)`, before any original runtime test. The guard signatures were corrected at commit `5e9bb4c17308aceb596be30ca3e879a008af2ecc`; the [accepted CI 41731162834](https://github.com/sguzman/vulpra/actions/runs/41731162834) then passed. Previous failed runs are not native updater evidence.
+
+## Interpretation, exclusions, milestone
+
+**Established:** the original compiled Vulpra browser's native staging route can construct and attempt the exact original packaged `updater` `execv` command for a synthetic pending update. The staging launch **boundary is actually reached** in an offline, instrumented browser. Original source/build owner and packaged ELF identity remain source-backed.
+
+**Not established:** actual updater process execution, MAR validity/signature verification, staging/install results, normal update availability, real application restart, background update completion, real user profile behavior, workstation-specific EndeavourOS/Hyprland coverage, full feature/build/FFI/conditional native-loader closure, or any new source removal candidate. The artificial fixture and interposer deliberately prevent a normal end-to-end update. The **source must not be pruned** based on this result.
+
+After native CI acceptance, the expensive `.github/workflows/m3-original-browser-updater-execv-denied.yml` workflow was restored to **manual-only `workflow_dispatch`** and lint reverified. **Overall Vulpra 61%, M3 5/6=83%, delta +0 percentage points**, **zero native bytes saved**, no original source/package deletion.
