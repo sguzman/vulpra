@@ -85,6 +85,17 @@ All changed-code SHA identities and relevant protective hunks are recorded in th
 
 **Current spot audit: 15 CVEs checked, two confirmed missing patches; ten additional issues with exact resulting code-file identities or verified fix ancestry, plus three where relevant security-remediation hunks are present but full fixed-result file identity differs.** Most of the large Firefox 159 advisory still requires review, and a separate security-updated native build is release-blocking.
 
+## Two additional Firefox 159 high-impact fixes verified (2026-11-04)
+
+Two more [MFSA 2026-118](https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/) defects were independently checked against their actual upstream fix-result commits, tagged 159.0b5, stable 159 and Vulpra `main`:
+
+| Issue | Exact code evidence | Qualification |
+| --- | --- | --- |
+| **CVE-2026-117870 / Bug 2068395** — JavaScript sparse-array densification use-after-free | The two upstream source fixes [`b8032b0`](https://github.com/mozilla-firefox/firefox/commit/b8032b08e3f65822ab9be50d7f8a6f00a0b3eec2) and [`40efda3`](https://github.com/mozilla-firefox/firefox/commit/40efda3cb0542d8c8c9741b20d3351f3e658ee23) were confirmed sequential by Git ancestry. Their final **4/4 changed existing code files** in `js/src/vm` match the fix-result, beta, stable release and Vulpra Git blobs exactly | The fix chain itself is sequential, but the final commit is not an ancestor of the tagged beta; verification relies on code identity and is not an exploit run |
+| **CVE-2026-117921 / Bug 2079687** — CSS parent-rule use-after-free | [Upstream fix `e54211e`](https://github.com/mozilla-firefox/firefox/commit/e54211ea08efc3e4a6440739aa173b9edfc83b67): **8/8 existing changed code files** (`dom/webidl` and `layout/style`) have identical Git blobs in patch result, tagged beta, stable and Vulpra | Commit ancestry to beta diverges, but each post-fix file is identical; no runtime memory-safety assertion |
+
+The [JSON crosswalk](SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json) records all 12 matched code paths and SHA-1 blobs. This **17-issue spot audit** now classifies **two missing** fixes, **12 fixes with verified complete patch-result code-file identities or authenticated fix ancestry**, and **three with the relevant fixed-condition hunks present but differing whole-file hashes**. It is not exhaustive and does not change the security-port branch's compiled/runtime acceptance status.
+
 ## Scope and required continuation
 
 **These two exact upstream patch changes are missing.** The audit does not prove that the corresponding exploit is reachable in every Vulpra configuration, that a missing patch necessarily makes a specific user action exploitable, or that other Mozilla security fixes are missing or present. Do not extrapolate these two findings to an exhaustive CVE inventory. Some upstream fixes may predate the beta; others may require applicability/patch-review rather than cherry-picking.

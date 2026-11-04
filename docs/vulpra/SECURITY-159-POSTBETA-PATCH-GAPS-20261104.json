@@ -238,7 +238,8 @@
     "verified_exact_patch_result_code_issues_in_new_batch": 3,
     "verified_relevant_patch_hunk_issues_in_new_batch": 2,
     "five_additional_159_advisory_fixes_code_present": true,
-    "four_additional_159_advisory_fixes_code_present": true
+    "four_additional_159_advisory_fixes_code_present": true,
+    "two_additional_159_source_matched_advisory_fixes": true
   },
   "recommended_action": "Separate, source-matched security maintenance update and full browser regression before routine or public browsing; do not mix fixes into the immutable M3 original binary comparator",
   "follow_up_audit_head": "d96d1147cc386b6b097c13f5837ca994fc1e67c3",
@@ -700,7 +701,145 @@
         "if (srcGap < 0 || dstGap < 0) {"
       ],
       "note": "Exact relevant gap-based collapse and checked stride code observed in Vulpra; whole-file blob differs from upstream fix result and ancestry diverges. Not a runtime proof."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117870",
+      "bug": 2068395,
+      "topic": "JavaScript Engine sparse-array densification use-after-free",
+      "patch_commits": [
+        "b8032b08e3f65822ab9be50d7f8a6f00a0b3eec2",
+        "40efda3cb0542d8c8c9741b20d3351f3e658ee23"
+      ],
+      "patch_commit": "40efda3cb0542d8c8c9741b20d3351f3e658ee23",
+      "patch_sequence_confirmed": true,
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "four_exact_fix_result_code_blobs_match_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "js/src/vm/Iteration.cpp",
+          "vulpra_sha": "de0b58488df54a445efc5ad95760360402dfd111",
+          "pinned_beta_sha": "de0b58488df54a445efc5ad95760360402dfd111",
+          "upstream_fix_commit_result_sha": "de0b58488df54a445efc5ad95760360402dfd111",
+          "upstream_stable_159_sha": "de0b58488df54a445efc5ad95760360402dfd111",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/NativeObject.cpp",
+          "vulpra_sha": "909657bffef9b3d79d43ae055a419fecdf9bc6af",
+          "pinned_beta_sha": "909657bffef9b3d79d43ae055a419fecdf9bc6af",
+          "upstream_fix_commit_result_sha": "909657bffef9b3d79d43ae055a419fecdf9bc6af",
+          "upstream_stable_159_sha": "909657bffef9b3d79d43ae055a419fecdf9bc6af",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/NativeObject.h",
+          "vulpra_sha": "78b165cfa2887838a0e5fd50f3e3974824654f36",
+          "pinned_beta_sha": "78b165cfa2887838a0e5fd50f3e3974824654f36",
+          "upstream_fix_commit_result_sha": "78b165cfa2887838a0e5fd50f3e3974824654f36",
+          "upstream_stable_159_sha": "78b165cfa2887838a0e5fd50f3e3974824654f36",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/Shape.cpp",
+          "vulpra_sha": "dd8aa1ba5d9005424d8ce5d5f2d1b4a51096e88d",
+          "pinned_beta_sha": "dd8aa1ba5d9005424d8ce5d5f2d1b4a51096e88d",
+          "upstream_fix_commit_result_sha": "dd8aa1ba5d9005424d8ce5d5f2d1b4a51096e88d",
+          "upstream_stable_159_sha": "dd8aa1ba5d9005424d8ce5d5f2d1b4a51096e88d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "The second upstream fix is a direct descendant of the first, but the later fix commit diverged from the tagged beta; final changed-code-file identities establish source presence, not direct ancestry."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117921",
+      "bug": 2079687,
+      "topic": "CSS Parsing and Computation use-after-free via parent-rule lifetime",
+      "patch_commit": "e54211ea08efc3e4a6440739aa173b9edfc83b67",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "eight_exact_fix_result_code_blobs_match_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/webidl/CSSRule.webidl",
+          "vulpra_sha": "ae2ecfeadd11a52490bc5422b32543747bf81bd8",
+          "pinned_beta_sha": "ae2ecfeadd11a52490bc5422b32543747bf81bd8",
+          "upstream_fix_commit_result_sha": "ae2ecfeadd11a52490bc5422b32543747bf81bd8",
+          "upstream_stable_159_sha": "ae2ecfeadd11a52490bc5422b32543747bf81bd8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/webidl/CSSStyleDeclaration.webidl",
+          "vulpra_sha": "1b5e8bfeff68f5fd38223b0c98d6472a371b4d9d",
+          "pinned_beta_sha": "1b5e8bfeff68f5fd38223b0c98d6472a371b4d9d",
+          "upstream_fix_commit_result_sha": "1b5e8bfeff68f5fd38223b0c98d6472a371b4d9d",
+          "upstream_stable_159_sha": "1b5e8bfeff68f5fd38223b0c98d6472a371b4d9d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/style/Rule.cpp",
+          "vulpra_sha": "d6f8acade1e2f647718f65f2e7a2078e59a0445a",
+          "pinned_beta_sha": "d6f8acade1e2f647718f65f2e7a2078e59a0445a",
+          "upstream_fix_commit_result_sha": "d6f8acade1e2f647718f65f2e7a2078e59a0445a",
+          "upstream_stable_159_sha": "d6f8acade1e2f647718f65f2e7a2078e59a0445a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/style/Rule.h",
+          "vulpra_sha": "f61aeadc260d0cab86011d7729730dd18fd965a6",
+          "pinned_beta_sha": "f61aeadc260d0cab86011d7729730dd18fd965a6",
+          "upstream_fix_commit_result_sha": "f61aeadc260d0cab86011d7729730dd18fd965a6",
+          "upstream_stable_159_sha": "f61aeadc260d0cab86011d7729730dd18fd965a6",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/style/StyleSheet.cpp",
+          "vulpra_sha": "22d493369c70cae6aba3c948cb2e17a0d512724c",
+          "pinned_beta_sha": "22d493369c70cae6aba3c948cb2e17a0d512724c",
+          "upstream_fix_commit_result_sha": "22d493369c70cae6aba3c948cb2e17a0d512724c",
+          "upstream_stable_159_sha": "22d493369c70cae6aba3c948cb2e17a0d512724c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/style/StyleSheet.h",
+          "vulpra_sha": "7480ff39743b035730636640effb15d97ce8ee71",
+          "pinned_beta_sha": "7480ff39743b035730636640effb15d97ce8ee71",
+          "upstream_fix_commit_result_sha": "7480ff39743b035730636640effb15d97ce8ee71",
+          "upstream_stable_159_sha": "7480ff39743b035730636640effb15d97ce8ee71",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/style/nsICSSDeclaration.cpp",
+          "vulpra_sha": "19ff52089c8d9fb902939b60fc36c4e6d9873b42",
+          "pinned_beta_sha": "19ff52089c8d9fb902939b60fc36c4e6d9873b42",
+          "upstream_fix_commit_result_sha": "19ff52089c8d9fb902939b60fc36c4e6d9873b42",
+          "upstream_stable_159_sha": "19ff52089c8d9fb902939b60fc36c4e6d9873b42",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/style/nsICSSDeclaration.h",
+          "vulpra_sha": "9b0853f09b39c7e66acbdabd538c6bfcb018e3d8",
+          "pinned_beta_sha": "9b0853f09b39c7e66acbdabd538c6bfcb018e3d8",
+          "upstream_fix_commit_result_sha": "9b0853f09b39c7e66acbdabd538c6bfcb018e3d8",
+          "upstream_stable_159_sha": "9b0853f09b39c7e66acbdabd538c6bfcb018e3d8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
     }
   ],
-  "additional_source_audit_head": "166c51c47810a00bd264482d07a08c26cea1a230"
+  "additional_source_audit_head": "b100f0ba13b62021544bc5cf5a9a75b810447427"
 }
