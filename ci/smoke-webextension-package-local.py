@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+import ssl
 import socket
 import subprocess
 import sys
@@ -209,6 +210,105 @@ def verify_js_navigation(port: int, base: str, server: http.server.ThreadingHTTP
             "final_url": last["url"], "final_document_title": last["title"],
             "final_document_text": last["text"]}
 
+def certificate_denial(status: int, body: object) -> bool:
+    """Fail closed: only W3C insecure-certificate navigation is accepted."""
+    if not 400 <= status < 600 or not isinstance(body, dict):
+        return False
+    error = body.get("value")
+    return (isinstance(error, dict) and
+            error.get("error") == "insecure certificate" and
+            isinstance(error.get("message"), str) and bool(error["message"].strip()))
+
+
+def test_certificate_denial_parser() -> None:
+    good = {"value": {"error": "insecure certificate", "message": "untrusted"}}
+    assert certificate_denial(500, good)
+    for status in (0, 200, 301, 399, 600):
+        assert not certificate_denial(status, good)
+    bad = [
+        {}, [], None, {"value": {}}, {"value": []},
+        {"value": {"error": "unknown error", "message": "certificate"}},
+        {"value": {"error": "timeout", "message": "certificate"}},
+        {"value": {"error": "insecure certificate", "message": ""}},
+        {"value": {"error": "insecure certificate", "message": None}},
+        {"value": {"error": "insecure certificate", "message": 1}},
+        {"value": {"error": "success", "message": "certificate"}},
+    ]
+    for result in bad:
+        assert not certificate_denial(500, result)
+    print(f"PASS: strict certificate parser rejected {len(bad)+5}/"
+          f"{len(bad)+5} forged or non-certificate cases")
+
+
+def verify_local_certificate_denial(port: int, base: str, work: Path) -> dict:
+    """Verify the current packaged browser rejects an untrusted local origin.
+
+    No browser SSL override, CA store change, public URL or real profile.
+    Only the disposable fixture-health-check bypasses TLS verification.
+    """
+    crt, key = work / "local-tls.crt", work / "local-tls.key"
+    subprocess.run([
+        "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+        "-days", "1", "-sha256", "-subj", "/CN=localhost",
+        "-addext", "subjectAltName=IP:127.0.0.1",
+        "-out", str(crt), "-keyout", str(key),
+    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=15)
+    tls = http.server.ThreadingHTTPServer(("127.0.0.1", 0), LocalPage)
+    tls.paths = []
+    tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    tls_context.load_cert_chain(certfile=str(crt), keyfile=str(key))
+    tls.socket = tls_context.wrap_socket(tls.socket, server_side=True)
+    from threading import Thread
+    Thread(target=tls.serve_forever, daemon=True).start()
+    url = f"https://127.0.0.1:{tls.server_port}/page"
+    try:
+        # Only the external local fixture probe accepts a self-signed cert.
+        with urllib.request.urlopen(
+            url, context=ssl._create_unverified_context(), timeout=8
+        ) as healthy:
+            if healthy.status != 200 or b"JavaScript navigation succeeded" not in healthy.read(4096):
+                raise RuntimeError("Local HTTPS fixture not healthy")
+        try:
+            urllib.request.urlopen(url, timeout=8)
+        except urllib.error.URLError as exc:
+            if not isinstance(exc.reason, ssl.SSLCertVerificationError):
+                raise RuntimeError("TLS fixture failed for a non-certificate reason") from exc
+        else:
+            raise RuntimeError("Untrusted TLS fixture unexpectedly trusted by OS")
+
+        navigation = urllib.request.Request(
+            f"http://127.0.0.1:{port}{base}/url",
+            data=json.dumps({"url": url}).encode(), method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(navigation, timeout=35) as result:
+                result.read(1024)
+            raise RuntimeError("Packaged browser accepted untrusted local HTTPS")
+        except urllib.error.HTTPError as exc:
+            try:
+                body = json.loads(exc.read(16384))
+            except (ValueError, UnicodeError) as error:
+                raise RuntimeError("Malformed WebDriver TLS error response") from error
+            if not certificate_denial(exc.code, body):
+                raise RuntimeError("Browser failed TLS test without strict certificate rejection")
+        return {
+            "verified": True,
+            "local_self_signed_only": True,
+            "fixture_health_passed": True,
+            "ordinary_tls_client_rejected": True,
+            "webdriver_accept_insecure_certs": False,
+            "webdriver_error": "insecure certificate",
+            "certificate_store_modified": False,
+            "safebrowsing_tested": False,
+            "sandbox_denial_tested": False,
+            "no_external_egress_proven": False,
+        }
+    finally:
+        tls.shutdown()
+        tls.server_close()
+
+
 def verify_nimbus_ready(port: int, base: str) -> dict:
     """CI-only privileged check: retained Nimbus actually initializes.
 
@@ -376,6 +476,9 @@ def verify_uninstall_stays_uninstalled(proof, seconds: float = 2.0) -> int:
 
 
 def main() -> int:
+    if sys.argv[1:] == ["--self-test-cert-parser"]:
+        test_certificate_denial_parser()
+        return 0
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Code/Apps/vulpra").resolve()
     gecko = shutil.which("geckodriver")
     if not gecko:
@@ -442,6 +545,7 @@ def main() -> int:
                 value = request(port, "POST", "/session", {
                     "capabilities": {"alwaysMatch": {
                         "browserName": "firefox",
+                        "acceptInsecureCerts": False,
                         "moz:firefoxOptions": {
                             "binary": str(browser),
                             "args": ["-headless", "-no-remote"],
@@ -459,9 +563,13 @@ def main() -> int:
                 reported = value.get("capabilities", {})
                 if reported.get("browserName") != "firefox":
                     raise RuntimeError(f"Unexpected automation browser: {reported!r}")
+                if reported.get("acceptInsecureCerts") is not False:
+                    raise RuntimeError("WebDriver disabled certificate verification")
                 base = f"/session/{session_id}"
                 js_result = verify_js_navigation(port, base, server)
                 print("PASS: real WebDriver JS redirect, HTTP 302 and final DOM", flush=True)
+                tls_result = verify_local_certificate_denial(port, base, work)
+                print("PASS: real browser denied self-signed localhost HTTPS", flush=True)
                 url = f"http://127.0.0.1:{server.server_port}/extension"
                 def navigate(suffix: str) -> None:
                     request(port, "POST", base + "/url", {"url": url + "?step=" + suffix})
@@ -517,11 +625,12 @@ def main() -> int:
                                      "storage_local": True, "uninstall": True,
                                      "post_uninstall_observation_seconds": 2.0,
                                      "post_uninstall_samples": uninstall_samples},
-                    "security": {"original_firefox_profile_preserved": True, "temporary_home": True},
+                    "security": {"original_firefox_profile_preserved": True, "temporary_home": True,
+                                 "local_untrusted_tls_denial": tls_result},
                     "nimbus": nimbus_result,
                     "asrouter_promotion_optout": promo_result,
                     "newtab_adsfeed_optout": adsfeed_result,
-                    "limits": ["Not a comprehensive security audit", "Does not test signed AMO extensions",
+                    "limits": ["Not a comprehensive security audit", "Does not test Safe Browsing, process sandbox denial, or absence of background network egress", "Does not test signed AMO extensions",
                                "Does not verify persisted extensions across restarts"],
                 }
                 output.write_text(json.dumps(report, indent=2) + "\n")

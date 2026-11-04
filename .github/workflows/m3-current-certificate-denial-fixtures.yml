@@ -1,0 +1,31 @@
+name: M3 Local TLS Certificate Denial Parser Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/smoke-webextension-package-local.py
+      - .github/workflows/m3-current-certificate-denial-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fail-closed-certificate-parser:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only native browser's security smoke parser
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            ci/smoke-webextension-package-local.py
+      - name: Check syntax and reject bogus WebDriver certificate results
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/smoke-webextension-package-local.py
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
