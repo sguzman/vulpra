@@ -232,7 +232,8 @@
     "source_pruning_authorized": false,
     "m3_sixth_gate_closed": false,
     "two_additional_159_advisory_fixes_verified_present_in_beta": true,
-    "remaining_advisory_cases_not_exhaustively_checked": true
+    "remaining_advisory_cases_not_exhaustively_checked": true,
+    "third_159_advisory_fix_result_blobs_verified_present_in_beta": true
   },
   "recommended_action": "Separate, source-matched security maintenance update and full browser regression before routine or public browsing; do not mix fixes into the immutable M3 original binary comparator",
   "follow_up_audit_head": "d96d1147cc386b6b097c13f5837ca994fc1e67c3",
@@ -360,6 +361,45 @@
         }
       ],
       "affected_existing_files_count": 6
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117868",
+      "bug": 2059961,
+      "topic": "Sandbox escape in DOM: Networking (WebTransport)",
+      "patch_commit": "315f2bc612414bcf088fc865d2b2225489aba010",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "upstream_compare_status": "diverged",
+      "upstream_merge_base_sha": "79a90a9e0a86df09e5780b3a15723de2454a2846",
+      "affected_existing_files_count": 3,
+      "source_file_blobs": [
+        {
+          "path": "dom/webtransport/parent/WebTransportParent.cpp",
+          "vulpra_sha": "015d50e4edd21ebd8b09d93cc3cea8b542cc58d4",
+          "pinned_beta_sha": "015d50e4edd21ebd8b09d93cc3cea8b542cc58d4",
+          "upstream_fix_commit_result_sha": "015d50e4edd21ebd8b09d93cc3cea8b542cc58d4",
+          "vulpra_matches_pinned_beta": true,
+          "vulpra_matches_upstream_fix_commit_result": true
+        },
+        {
+          "path": "netwerk/protocol/webtransport/WebTransportSessionProxy.cpp",
+          "vulpra_sha": "f73d51678611599974d766c79f37e66d9ee3d4d5",
+          "pinned_beta_sha": "f73d51678611599974d766c79f37e66d9ee3d4d5",
+          "upstream_fix_commit_result_sha": "f73d51678611599974d766c79f37e66d9ee3d4d5",
+          "vulpra_matches_pinned_beta": true,
+          "vulpra_matches_upstream_fix_commit_result": true
+        },
+        {
+          "path": "netwerk/protocol/webtransport/WebTransportSessionProxy.h",
+          "vulpra_sha": "852ac0180dc980e64a261f58faa70b4219687a73",
+          "pinned_beta_sha": "852ac0180dc980e64a261f58faa70b4219687a73",
+          "upstream_fix_commit_result_sha": "852ac0180dc980e64a261f58faa70b4219687a73",
+          "vulpra_matches_pinned_beta": true,
+          "vulpra_matches_upstream_fix_commit_result": true
+        }
+      ],
+      "classification": "three_fix_result_code_blobs_match_pinned_beta_and_vulpra_even_though_git_history_diverged",
+      "note": "Source blob identity proves code from these three patch-result files is present; divergent Git branches do not establish ancestor relationship"
     }
   ]
 }
