@@ -9,6 +9,8 @@ on:
       - ci/m3-native-link-evidence-ledger.py
       - ci/m3-current-local-tls-native-evidence.jq
       - ci/tests/m3-current-local-tls-native-evidence-tests.sh
+      - ci/security-159-css-evidence.jq
+      - ci/tests/security-159-css-evidence-tests.sh
       - .github/workflows/security-159-hotfix-evidence-reconcile.yml
   workflow_run:
     workflows:
@@ -58,6 +60,7 @@ jobs:
           python3 -m py_compile ci/m3-native-link-evidence-ledger.py
           python3 ci/m3-native-link-evidence-ledger.py --self-test
           bash ci/tests/m3-current-local-tls-native-evidence-tests.sh
+          bash ci/tests/security-159-css-evidence-tests.sh
 
   reconcile-real-native-run:
     if: >-
@@ -65,6 +68,7 @@ jobs:
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
       github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
+      github.event.workflow_run.name == 'Security 159 Post-Beta Hotfix Native Build and Runtime' &&
       github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 18
@@ -243,47 +247,9 @@ jobs:
           test "$(find "$evidence" -type f -name m3-native-link-inputs.json | wc -l)" -eq 1
           jq -n \
             --slurpfile replay "$css" --slurpfile native "$native" \
-            --arg source "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
-            if ($replay | length) != 1 or ($native | length) != 1 then
-              error("expected one CSS replay and one native report")
-            else
-              $replay[0] as $r | $native[0] as $n |
-              if (
-                $n.source_commit == $source and $n.workflow_run_id == $run and
-                $n.runtime_passed_after_link_audit == true and
-                ($n.package.package_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
-                $r.schema_version == 1 and
-                $r.status == "passed_bounded_original_crashtest_replay" and
-                $r.source_commit == $source and
-                $r.fixture_git_blob_sha1 == "31a14963b356d869475bac62ca44991d9275a285" and
-                $r.fixture == "testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html" and
-                $r.real_packaged_browser == true and
-                $r.accept_insecure_certs == false and
-                $r.temporary_profile_preserved == true and
-                $r.official_wpt_harness_used == false and
-                $r.memory_safety_exploit_rejection_proven == false and
-                $r.security_current == false and $r.release_ready == false and
-                ($r.iterations | type == "array" and length == 3) and
-                ([$r.iterations[].iteration] == [0,1,2]) and
-                all($r.iterations[];
-                    (.height | type == "number" and . > 0 and . == floor))
-              ) then {
-                schema_version: 1,
-                status: "bounded_css_regression_source_linked_reconciliation",
-                source_commit: $source,
-                native_run_id: $run,
-                compiled_package_sha256: $n.package.package_sha256,
-                upstream_fixture_blob_sha1: $r.fixture_git_blob_sha1,
-                three_real_packaged_replays_verified: true,
-                full_wpt_harness_executed: false,
-                exploit_rejection_proven: false,
-                full_advisory_audited: false,
-                release_ready: false,
-                m3_sixth_gate_closed: false
-              } else error("Original CSS crashtest browser/source/package result rejected")
-              end
-            end
-          ' > "$RUNNER_TEMP/security-159-css-reconciled.json"
+            --arg source "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" \
+            -f ci/security-159-css-evidence.jq \
+            > "$RUNNER_TEMP/security-159-css-reconciled.json"
           jq -e --arg sha "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
             .source_commit == $sha and .native_run_id == $run and
             .three_real_packaged_replays_verified == true and
