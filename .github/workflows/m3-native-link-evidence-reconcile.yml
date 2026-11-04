@@ -7,6 +7,8 @@ on:
     branches: [main]
     paths:
       - ci/m3-native-link-evidence-ledger.py
+      - ci/m3-current-local-tls-native-evidence.jq
+      - ci/tests/m3-current-local-tls-native-evidence-tests.sh
       - .github/workflows/m3-native-link-evidence-reconcile.yml
   workflow_run:
     workflows:
@@ -52,6 +54,7 @@ jobs:
           set -euo pipefail
           python3 -m py_compile ci/m3-native-link-evidence-ledger.py
           python3 ci/m3-native-link-evidence-ledger.py --self-test
+          bash ci/tests/m3-current-local-tls-native-evidence-tests.sh
 
   reconcile-real-native-run:
     if: >-
@@ -135,10 +138,56 @@ jobs:
              .compiled_package_savings_bytes == null and
              .additional_source_removal_authorized == false' \
             "$RUNNER_TEMP/m3-native-link-reconciled.json" >/dev/null
+      - name: Independently reconcile current packaged browser TLS certificate rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This runs ONLY after separately checking the completed successful
+          # native Actions workflow and its exact head SHA. Do not reuse a
+          # synthetic fixture or downgrade missing TLS output to a skip.
+          evidence="$RUNNER_TEMP/native-evidence"
+          mapfile -t links < <(find "$evidence" -type f -name m3-native-link-inputs.json -print)
+          mapfile -t local < <(find "$evidence" -type f -name m3-localhost-acceptance.json -print)
+          mapfile -t webext < <(find "$evidence" -type f -name 'webextension-smoke-*.json' -print)
+          test "${#links[@]}" -eq 1
+          test "${#local[@]}" -eq 1
+          test "${#webext[@]}" -eq 1
+          jq -n \
+            --slurpfile link "${links[0]}" \
+            --slurpfile local "${local[0]}" \
+            --slurpfile webextension "${webext[0]}" \
+            --arg source_sha "$NATIVE_SOURCE_SHA" \
+            --argjson run_id "$NATIVE_RUN_ID" \
+            -f ci/m3-current-local-tls-native-evidence.jq \
+            > "$RUNNER_TEMP/m3-current-local-tls-reconciled.json"
+          jq -e \
+            --arg sha "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            '
+              .schema_version == 1 and
+              .status == "bounded_current_native_local_certificate_rejection_crosscheck" and
+              .authenticated_source_sha == $sha and
+              .authenticated_workflow_run_id == $run and
+              .verified_current_native_loopback_self_signed_tls_denial == true and
+              .webdriver_insecure_cert_overrides_enabled == false and
+              .certificate_store_modified == false and
+              .safe_browsing_proven == false and
+              .sandbox_process_denial_proven == false and
+              .no_background_network_egress_proven == false and
+              .all_conditional_ffi_dlopen_proven == false and
+              .target_endeavouros_hyprland_tested == false and
+              .m3_sixth_gate_closed == false and
+              .additional_source_pruning_authorized == false and
+              .marginal_native_savings_bytes == null
+            ' "$RUNNER_TEMP/m3-current-local-tls-reconciled.json" >/dev/null
+          echo "PASS: independent source-linked current native package and W3C certificate rejection crosscheck"
+
       - name: Preserve only bounded reconciled source and runtime attestations
         uses: actions/upload-artifact@v4
         with:
           name: m3-native-link-reconciled-evidence
-          path: ${{ runner.temp }}/m3-native-link-reconciled.json
+          path: |
+            ${{ runner.temp }}/m3-native-link-reconciled.json
+            ${{ runner.temp }}/m3-current-local-tls-reconciled.json
           if-no-files-found: error
           retention-days: 14
