@@ -43,3 +43,17 @@ The currently running full compiled browser build [41853893418](https://github.c
 Source-matched native [run 41853893418](https://github.com/sguzman/vulpra/actions/runs/41853893418) built and packaged successfully. Its private Wayland/Weston test, localhost screenshot, and real WebDriver JavaScript redirect/302/final DOM passed. The new self-signed TLS navigation returned a WebDriver HTTP error that **did not match the strict `insecure certificate` assertion**, and the smoke stopped before extension/Nimbus final acceptance. The initial script logged no HTTP error code or response body, so the cause cannot yet be classified from that run. The original report is **not** a successful certificate rejection; the sixth M3 gate is still open.
 
 The smoke now writes a bounded failure-only JSON diagnostic on a mismatched W3C error (HTTP status, WebDriver error code and at most 400 characters of message). CI uploads that JSON **only as failure diagnostics**, separately from successful evidence. The strict acceptance parser, `acceptInsecureCerts=false`, ephemeral server, source baseline, trust store, and independent success-only reconciliation remain unchanged. This is a diagnostic change, **not** a workaround, TLS bypass, or proof of remediation. Overall 61%, M3 5/6=83%, Δ+0 percentage points.
+
+## Actual WebDriver result and W3C-accurate parser fix (2026-11-04 UTC)
+
+[**Native run 41864382237**](https://github.com/sguzman/vulpra/actions/runs/41864382237) compiled and packaged the real normal Vulpra, passed the private Weston graphical surface test, real localhost screenshot and JavaScript/302 navigation, and reached the self-signed localhost certificate check. Its **bounded new diagnostic** established the exact response:
+
+- **HTTP status: `400`**
+- **WebDriver error code: `insecure certificate`**
+- **WebDriver message: `""` (empty string)**
+
+The browser **did reject the certificate**. The checker erroneously demanded nonempty `message`, so it rejected a legitimate browser certificate-denial response. [W3C WebDriver §6.6 Errors](https://www.w3.org/TR/webdriver/#errors) specifies HTTP **400** for `insecure certificate` and an implementation-defined **string** for `message`, without a nonempty constraint. The standard itself illustrates an empty `message` on another valid WebDriver error response.
+
+The corrected checker accepts **only HTTP 400**, exact `value.error == "insecure certificate"`, and a present string `value.message` (which may be empty). This is **stricter on the HTTP code** and **correctly permissive on message length**. It still rejects successful navigation, different errors, missing/non-string messages, wrong status codes, any browser trust override, and nonlocal targets. Regression fixtures explicitly test the exact observed empty-message response and malformed/forged variants. `acceptInsecureCerts=false`, private test profile, fixture-health validation and ordinary OS trust rejection are unchanged.
+
+The failed native job **did not get to extension/Nimbus final acceptance** and cannot be retroactively treated as a fully passed job. A new real native run and independent evidence reconciliation are required before granting certificate/runtime acceptance. **M3 remains 5/6 (83%), overall 61%, Δ+0 pp** until those run outcomes are verified.
