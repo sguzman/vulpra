@@ -48,6 +48,37 @@ Actual current `config.status` frontend values were:
 
 Thus the **normal current-source build configuration still declares** protected browser/core features and does not select the three guarded promotional omissions. Actual built binary resource availability and runtime success remain separate.
 
+## Independent original-versus-current evaluated frontend count crosscheck
+
+An additional **independent read-only cross-artifact GitHub Actions CI [41747221902 — PASS](https://github.com/sguzman/vulpra/actions/runs/41747221902)**, job **126303156288**, compared the successfully generated frontend counts/flags in **two distinct, source-pinned, complete and independently executed evaluations**, rather than relying on summaries reported by one test. Its sanitized accepted artifact **13284331067** (`m3-original-current-native-front-count-agreement`) was independently downloaded and inspected: a **4,316-byte JSON** report (ZIP **1,333 bytes**).
+
+The three source-verified inputs were:
+
+- **Historical actual Mozilla BuildReader and CompileDB original-normal run [41746124117 PASS](https://github.com/sguzman/vulpra/actions/runs/41746124117)**, head `95c02d7d4e63bf3aab2c284df2651e10b2ba4df6`, artifact **13284685239** containing `full-normal-evaluated.json` and `compile-command-declarations.json`. The job itself checks out the **immutable original compiled source `b1482404dfb8b01342990ee99ea3df0f9756b5f7`** rather than treating its workflow HEAD as compiled source.
+- **Actual current-source configured Mozilla frontend [41746278259 PASS](https://github.com/sguzman/vulpra/actions/runs/41746278259)**, source `71be5255f3ea4faba8842ca00a85d0678387197e`, artifact **13283772259** containing `current-evaluated-native-summary.json`.
+- The exact historical original full-normal browser archive SHA-256 **`7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a`** was retained as provenance **only**. No current package/binary was built by either frontend evaluation.
+
+The independent `ci/m3-original-vs-current-evaluated-native-counts.jq` validator required all **ten paired actual generated counts** to match, **all twelve paired selected generated protected configuration values** to match, and source/run artifact authenticity. Its result was:
+
+| Actual native/frontend metric | Original source | Current `main` source |
+| --- | ---: | ---: |
+| Emitted Mozilla frontend objects | **19,139** | **19,139** |
+| Evaluated directory edges | **1,959** | **1,959** |
+| Native link targets | **1,342** | **1,342** |
+| Native library link edges | **1,424** | **1,424** |
+| Rust static-library targets | **4** | **4** |
+| Rust program targets | **2** | **2** |
+| Evaluated compile source inputs | **11,104** | **11,104** |
+| WebIDL binding units | **41** | **41** |
+| Evaluated installed-resource inputs | **2,928** | **2,928** |
+| Real generated C/C++ CompileDB command declarations | **12,028** | **12,028** |
+
+The **12/12 identical generated flags** are `MOZ_CRASHREPORTER=1`, `MOZ_DEVTOOLS=all`, `MOZ_NORMANDY=1`, `MOZ_SANDBOX=1`, `MOZ_SERVICES_SYNC=1`, `MOZ_UPDATER=1`, `MOZ_WAYLAND=1`, `MOZ_WIDGET_TOOLKIT=gtk`, `MOZ_X11=1`, and all three `VULPRA_NO_ASROUTER_PROMOS`, `VULPRA_NO_NEWTAB_ADSFEED`, `VULPRA_NO_NEWTAB_PROMOCARD` **empty/unset**. The verifier reran the full comparison against **8/8 deliberately forged upstream inputs** and rejected every mutation, including corrupted original/current source hashes, changed generated counts, changed protected flags, falsely claimed current native compilation and premature M3 gate closure.
+
+**Crucial limit:** `10/10` *aggregate counts* matching and `12/12` selected flag values matching **does not prove** identical per-object, per-graph-edge, per-file contents or individual compiler command records. The raw current frontend graph and raw CompileDB commands were intentionally not retained, so these records cannot honestly be compared bit-for-bit from this pair of artifacts. Neither run compiled current native code, linked current Rust/C++ objects, built a current Vulpra package or executed current-source runtime. This is a successful **declared frontend scope sanity crosscheck**, not source/build/FFI/dependency closure, equivalence or pruning authorization.
+
+The expensive native/frontend workflows and the inexpensive aggregate join were restored to manual-only after acceptance. Overall 61%, M3 5/6=83%, delta +0pp; no newly removed source or measured package-size savings.
+
 ## Validation, limitations and next work
 
 The current graph's own browser/native verifier passed, required a source-matched current checkout and generated config/graph/CompileDB, and independently rejected **five deliberately forged summary claims** (wrong current source identity, omitted configure, falsely claimed native compilation, wrongly closed M3 gate, and invented source-pruning authority). The standalone Python frontend bridge's reverse Rust graph fixture test passed. Workflow lint passed. The expensive workflow was returned to **manual-only `workflow_dispatch`** immediately after acceptance.
