@@ -37,3 +37,9 @@ This contract checks **internal ledger consistency with the previously accepted 
 4. **Real current-workstation ABI/Wayland parity:** tested only on a separate Vulpra profile and binary under EndeavourOS/Hyprland, keeping the installed Firefox Developer Edition and its profiles untouched; the historic M2 workstation success is not a test of this new current-source binary.
 
 No source deletion, newly measured native savings, complete conditional `dlopen`/FFI graph or sixth-gate closure. **Overall 61%, M3 5/6=83%, Δ+0 percentage points.**
+
+## Accepted CI validation (2026-11-04 UTC)
+
+[**Lightweight contract run 41842786384 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41842786384) executed the exact checked-in jq verifier and shell fixtures from `main`, reporting **18 protected feature records; four current normal-browser runtime witnesses, nine historical or diagnostic witnesses, three strictly bounded negative/fallback witnesses, and 28/28 deliberate forged claims rejected**. [Full workflow lint 41842786096 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41842786096). The acceptance fixture checks that all **14** current unverified runtime cases and **15** unverified negative/fallback cases remain explicitly open; an editable next-check description cannot itself turn a missing proof into a pass.
+
+**Scope:** this is genuine executed CI of the *acceptance contract*, not another browser build, a new runtime test, independent verification of every historical GitHub run, or workstation QA. The broad M3 sixth gate remains open, with current source compile and protected normal-build smoke evidence handled by prior successful native CI. No removals or measured marginal native savings; **overall 61%, M3 83% (5/6), Δ+0 pp**.
