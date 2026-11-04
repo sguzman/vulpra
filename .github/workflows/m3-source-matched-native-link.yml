@@ -43,6 +43,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          # This run must compile current pruned main, not replay the historical
+          # original full-normal source used by the M3 dependency register.
+          test "$GITHUB_SHA" != b1482404dfb8b01342990ee99ea3df0f9756b5f7
           python3 ci/m3-native-build-link-inputs.py --self-test
           python3 -m py_compile ci/m3-native-replay-packager.py
           python3 ci/m3-native-replay-packager.py --self-test
@@ -96,11 +99,20 @@ jobs:
           x=json.loads((Path(os.environ["RUNNER_TEMP"])/"m3-native-link-config.json").read_text())
           assert x["source_commit"]==os.environ["GITHUB_SHA"]
           f=x["observed_generated_substs"]
-          for k in ("MOZ_WAYLAND","MOZ_X11","MOZ_SANDBOX","ENABLE_WEBDRIVER"):
+          for k in ("MOZ_WAYLAND","MOZ_X11","MOZ_SANDBOX","ENABLE_WEBDRIVER",
+                    "MOZ_SERVICES_SYNC","MOZ_NORMANDY","MOZ_CRASHREPORTER",
+                    "MOZ_UPDATER"):
               assert f[k]["value"]=="1",(k,f[k])
           assert f["MOZ_DEVTOOLS"]["value"]=="all"
-          assert f["VULPRA_NO_ASROUTER_PROMOS"]["value"]==""
-          print("PASS: current source config identity, Wayland and protected features")
+          assert f["VULPRA_NO_ASROUTER_PROMOS"]["value"] in ("",None)
+          # These two opt-out substitutions are intentionally not in the
+          # older bounded config snapshot; read the generated files directly.
+          substs=Path(os.environ["GITHUB_WORKSPACE"])/"obj-vulpra-linux-m3-baseline/config.statusd/substs"
+          for k in ("VULPRA_NO_NEWTAB_ADSFEED","VULPRA_NO_NEWTAB_PROMOCARD"):
+              p=substs/k
+              value=json.loads(p.read_text()) if p.exists() else None
+              assert value in (None,False,0,""),(k,value)
+          print("PASS: current source identity, protected features and all three normal-build opt-outs")
           PY
 
       - name: Reserve sufficient swap for native Rust/C++ build
@@ -169,7 +181,11 @@ jobs:
           c=json.loads((p/"m3-native-link-config.json").read_text())
           assert a["source_commit"]==c["source_commit"]==os.environ["GITHUB_SHA"]
           assert a["package"]["package_sha256"]==b["archive_sha256"]
-          assert len(b["elf_members"])>=20
+          # Exact historical full-normal package had 28 native ELFs and 268
+          # direct DT_NEEDED declarations. Never silently accept omissions
+          # while claiming this is the protected normal-browser baseline.
+          assert len(b["elf_members"])==28,len(b["elf_members"])
+          assert b["direct_needed_edges"]==268,b["direct_needed_edges"]
           assert a["dist_native_loader_order"]["mozgtk_before_mozwayland"]
           assert a["packaging_transform_replay"]["deterministic_reproduction_verified"] is True
           assert a["packaging_transform_replay"]["staged_and_reproduced_libxul_sha256"]==a["package"]["libxul_member"]["sha256"]
