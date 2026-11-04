@@ -234,7 +234,10 @@
     "two_additional_159_advisory_fixes_verified_present_in_beta": true,
     "remaining_advisory_cases_not_exhaustively_checked": true,
     "third_159_advisory_fix_result_blobs_verified_present_in_beta": true,
-    "fourth_159_advisory_fix_result_blobs_verified_present_in_beta": true
+    "fourth_159_advisory_fix_result_blobs_verified_present_in_beta": true,
+    "verified_exact_patch_result_code_issues_in_new_batch": 3,
+    "verified_relevant_patch_hunk_issues_in_new_batch": 2,
+    "five_additional_159_advisory_fixes_code_present": true
   },
   "recommended_action": "Separate, source-matched security maintenance update and full browser regression before routine or public browsing; do not mix fixes into the immutable M3 original binary comparator",
   "follow_up_audit_head": "d96d1147cc386b6b097c13f5837ca994fc1e67c3",
@@ -444,7 +447,159 @@
       ],
       "classification": "three_upstream_fix_result_code_blobs_match_159_beta_stable_and_vulpra",
       "note": "Exact fixed-result code-file identity only; no assertion of direct commit ancestry, exploit resistance or comprehensive PSM security"
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117866",
+      "bug": 2059011,
+      "topic": "Canvas2D privilege escalation through use-after-free",
+      "patch_commit": "62e595ba156c7324fd691ed5c00002e803554af5",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "four_exact_fix_result_code_blobs_match_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "gfx/2d/DrawTargetCairo.cpp",
+          "vulpra_sha": "24c18750d6113481aa6b35a76061171e7f19910f",
+          "pinned_beta_sha": "24c18750d6113481aa6b35a76061171e7f19910f",
+          "upstream_fix_commit_result_sha": "24c18750d6113481aa6b35a76061171e7f19910f",
+          "upstream_stable_159_sha": "24c18750d6113481aa6b35a76061171e7f19910f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/2d/DrawTargetRecording.cpp",
+          "vulpra_sha": "1f8ad9ea5b574077c71c84bf21d9f7ef04c90506",
+          "pinned_beta_sha": "1f8ad9ea5b574077c71c84bf21d9f7ef04c90506",
+          "upstream_fix_commit_result_sha": "1f8ad9ea5b574077c71c84bf21d9f7ef04c90506",
+          "upstream_stable_159_sha": "1f8ad9ea5b574077c71c84bf21d9f7ef04c90506",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/2d/DrawTargetSkia.cpp",
+          "vulpra_sha": "2431e8e4e4ecba7234e76193e70bbd48956787b5",
+          "pinned_beta_sha": "2431e8e4e4ecba7234e76193e70bbd48956787b5",
+          "upstream_fix_commit_result_sha": "2431e8e4e4ecba7234e76193e70bbd48956787b5",
+          "upstream_stable_159_sha": "2431e8e4e4ecba7234e76193e70bbd48956787b5",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/2d/DrawTargetSkia.h",
+          "vulpra_sha": "a5b3907a950c38b60eb09b1fbd5d7a0d337fd1d2",
+          "pinned_beta_sha": "a5b3907a950c38b60eb09b1fbd5d7a0d337fd1d2",
+          "upstream_fix_commit_result_sha": "a5b3907a950c38b60eb09b1fbd5d7a0d337fd1d2",
+          "upstream_stable_159_sha": "a5b3907a950c38b60eb09b1fbd5d7a0d337fd1d2",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117867",
+      "bug": 2059110,
+      "topic": "Layout use-after-free in selection range lifetime",
+      "patch_commit": "c4044389e238759a9d6d64eff2e58f8e08801a2d",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "one_exact_fix_result_code_blob_matches_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "layout/generic/nsFrameSelection.cpp",
+          "vulpra_sha": "be22915490c18c5340b9fb8c86047a3e2234b7f2",
+          "pinned_beta_sha": "be22915490c18c5340b9fb8c86047a3e2234b7f2",
+          "upstream_fix_commit_result_sha": "be22915490c18c5340b9fb8c86047a3e2234b7f2",
+          "upstream_stable_159_sha": "be22915490c18c5340b9fb8c86047a3e2234b7f2",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117869",
+      "bug": 2068362,
+      "topic": "DOM Core & HTML use-after-free through event-handler eager compilation",
+      "patch_commit": "244b5a637f793b26b4ac50cb769e1e05c1fef6e4",
+      "upstream_compare_status": "ahead",
+      "upstream_commit_is_ancestor_of_pinned_beta": true,
+      "upstream_merge_base_sha": "244b5a637f793b26b4ac50cb769e1e05c1fef6e4",
+      "classification": "direct_fix_ancestor_and_one_exact_fix_result_code_blob",
+      "source_file_blobs": [
+        {
+          "path": "dom/events/EventListenerManager.cpp",
+          "vulpra_sha": "50bc794e2975b073a719348ba854d23fd754fabf",
+          "pinned_beta_sha": "50bc794e2975b073a719348ba854d23fd754fabf",
+          "upstream_fix_commit_result_sha": "50bc794e2975b073a719348ba854d23fd754fabf",
+          "upstream_stable_159_sha": "50bc794e2975b073a719348ba854d23fd754fabf",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117865",
+      "bug": 2058653,
+      "topic": "JavaScript GC use-after-free, ephemeron marking",
+      "patch_commit": "a52b040d2697ccdc47f3c2abb53c72cc23da35bb",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "specific_remediation_hunk_retained_despite_different_whole_file_blob",
+      "source_file_blobs": [
+        {
+          "path": "js/src/gc/Marking.cpp",
+          "vulpra_sha": "7d59a9e8402113aa22caa7d5c7afd4cab211be65",
+          "pinned_beta_sha": "7d59a9e8402113aa22caa7d5c7afd4cab211be65",
+          "upstream_stable_159_sha": "7d59a9e8402113aa22caa7d5c7afd4cab211be65",
+          "upstream_fix_commit_result_sha": "02c339e23a836ccfb3ebe7f7ab1e9ccf01e49f99",
+          "whole_file_fix_result_match": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "Zone* zone = edge.target()->zone();",
+        "if (targetColor == markColor() && zone->shouldMarkInZone(targetColor))"
+      ],
+      "note": "Exact introduced protection lines were observed in the pinned-beta-identical Vulpra source, but full blob differs from fix-result; this is limited hunk-presence evidence, not an execution test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117912",
+      "bug": 2079209,
+      "topic": "CSS same-origin-policy bypass via stylesheet cache image context",
+      "patch_commit": "ee6eaa5a9b93b8ac4340924834e5609b731300c0",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "specific_remediation_hunks_retained_despite_changed_implementation_blob",
+      "source_file_blobs": [
+        {
+          "path": "layout/style/Loader.cpp",
+          "vulpra_sha": "353561a7ad17fc8f4a68b8bd287f0330e4fbf1ac",
+          "pinned_beta_sha": "353561a7ad17fc8f4a68b8bd287f0330e4fbf1ac",
+          "upstream_stable_159_sha": "353561a7ad17fc8f4a68b8bd287f0330e4fbf1ac",
+          "upstream_fix_commit_result_sha": "8574121f53819714e642e71ac2d48d6b9c7964f0",
+          "whole_file_fix_result_match": false
+        },
+        {
+          "path": "layout/style/Loader.h",
+          "vulpra_sha": "22f6d4054f9c570463424b71e99fa418e6d93bdc",
+          "pinned_beta_sha": "22f6d4054f9c570463424b71e99fa418e6d93bdc",
+          "upstream_fix_commit_result_sha": "22f6d4054f9c570463424b71e99fa418e6d93bdc",
+          "upstream_stable_159_sha": "22f6d4054f9c570463424b71e99fa418e6d93bdc",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "mLoadedAsImage(aLoadData.mLoader->GetDocument() &&",
+        "if (mLoadedAsImage != aKey.mLoadedAsImage) {",
+        "mDocument && mDocument->IsBeingUsedAsImage(),",
+        "const bool mLoadedAsImage;"
+      ],
+      "note": "Relevant loaded-as-image cache-key initialization, equality and lookup path are present in Vulpra; Loader.cpp full blob differs from upstream fix-result due to source-history differences."
     }
   ],
-  "additional_source_audit_head": "ec5aa5c6d09aa7d1035b23c2b8c580800f2c7316"
+  "additional_source_audit_head": "c98b156a18ca3e0c37f78c6206a10e929304fb33"
 }

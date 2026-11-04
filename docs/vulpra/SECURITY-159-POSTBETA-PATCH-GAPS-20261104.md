@@ -54,7 +54,21 @@ This finding is **positive evidence of upstream patch inclusion and retained sou
 
 A fourth spot check covers **CVE-2026-117893 / Bug 2078946**, incorrect TLS short-write boundary handling in **Security: PSM**. Mozilla's [code fix `58f4688`](https://github.com/mozilla-firefox/firefox/commit/58f4688447b58e69ef29414b709f6d6850de4caa) modifies `NSSSocketControl.cpp`, `NSSSocketControl.h`, and `nsNSSIOLayer.cpp`. All **three/three** resulting code blobs match **exactly** across this fix-result commit, pinned 159.0b5, stable 159 and Vulpra `main` (three full SHA-1 blob identities retained in the JSON audit). Source identity verifies the fix-result code is present; commit ancestry for this fix was **not checked**, and this does not establish that all certificate-path or security behaviors are safe.
 
-This 6-CVE spot audit classifies **two confirmed missing patches** and **four fixes whose patched code is present in the beta**; **other MFSA 2026-118 cases remain unaudited**, and the separate full-security-maintenance issue remains open. No patch files, frozen comparison source or browser profiles were modified.
+### Five additional high-impact Firefox 159 issues checked (2026-11-04)
+
+The following source and patch records were independently checked against Mozilla's landed fix commits, `FIREFOX_159_0b5_RELEASE`, stable 159 and Vulpra `main`:
+
+| Advisory fix | Verifiable retained code | Evidence scope |
+| --- | --- | --- |
+| **CVE-2026-117866 / Bug 2059011** — Canvas2D use-after-free | [Fix `62e595b`](https://github.com/mozilla-firefox/firefox/commit/62e595ba156c7324fd691ed5c00002e803554af5): **4/4 identical patched-result code blobs** (Cairo, recording and Skia) across all four sources | Fixed-source identity, no runtime exploit probe |
+| **CVE-2026-117867 / Bug 2059110** — Layout use-after-free | [Fix `c404438`](https://github.com/mozilla-firefox/firefox/commit/c4044389e238759a9d6d64eff2e58f8e08801a2d): `nsFrameSelection.cpp` has the **same fixed-result blob** in all four sources | Source identity, not runtime memory-safety proof |
+| **CVE-2026-117869 / Bug 2068362** — DOM event-handler use-after-free | [Fix `244b5a6`](https://github.com/mozilla-firefox/firefox/commit/244b5a637f793b26b4ac50cb769e1e05c1fef6e4): **direct ancestor** of tagged beta, and its `EventListenerManager.cpp` resulting blob matches all four sources | Confirmed ancestry plus source identity |
+| **CVE-2026-117865 / Bug 2058653** — JavaScript GC ephemeron marking | [Fix `a52b040`](https://github.com/mozilla-firefox/firefox/commit/a52b040d2697ccdc47f3c2abb53c72cc23da35bb): the exact introduced `edge.target()->zone()` and `zone->shouldMarkInZone(targetColor)` guard appears in Vulpra's beta-identical `Marking.cpp` | **Relevant protection hunk present**, but whole-file Git blob differs from upstream fix-result and ancestry diverges; not a byte-identical fixed-result claim |
+| **CVE-2026-117912 / Bug 2079209** — CSS same-origin-policy bypass | [Fix `ee6eaa5`](https://github.com/mozilla-firefox/firefox/commit/ee6eaa5a9b93b8ac4340924834e5609b731300c0): `mLoadedAsImage` cache-key initialization, mismatch rejection and lookup argument appear in Vulpra `Loader.cpp`; `Loader.h` has exact fixed-result blob | **Relevant fix hunks present**, but `Loader.cpp` whole-file Git blob differs and ancestry diverges; not a byte-identical result claim |
+
+These classifications rely on **9 inspected changed code files** plus upstream commit metadata. The exact per-file blob hashes, source-match flags, upstream ancestry where verified, and literal protective hunks are retained in [the JSON audit](SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json). Test files added with those commits are not counted as source-code patch identities. This is **no substitute for security regression tests**, and does not establish that other patches are present.
+
+The **11-issue spot audit now has two confirmed missing fixes**, **seven fixes with patched-result code-file identity or authenticated ancestry**, and **two fixes whose specific protective hunks are present despite other whole-file differences**. The remaining advisory issues remain unreviewed; no security-readiness claim or native milestone credit is justified. Original comparison source and installed browser profiles are unchanged.
 
 ## Scope and required continuation
 
