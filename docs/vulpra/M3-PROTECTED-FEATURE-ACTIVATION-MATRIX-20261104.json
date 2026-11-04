@@ -1,0 +1,557 @@
+{
+  "schema_version": 1,
+  "kind": "m3_protected_feature_activation_acceptance_matrix",
+  "status": "partial_verified_coverage_with_explicit_unverified_paths",
+  "as_of": "2026-11-04",
+  "current_source_commit": "96454f7a1fbe6b505af440c6c2c5fc91e798756d",
+  "current_native_workflow_run": 41762298450,
+  "original_source_commit": "b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+  "features": [
+    {
+      "id": "wayland_graphics",
+      "area": "platform",
+      "protected_retain": true,
+      "configuration": {
+        "status": "observed_current",
+        "flag": "MOZ_WAYLAND",
+        "value": "1",
+        "run": 41762298450
+      },
+      "current_behavior": {
+        "status": "bounded_pass",
+        "run": 41762298450,
+        "source_commit": "96454f7a1fbe6b505af440c6c2c5fc91e798756d"
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Current CI private offline Weston rendered frame; real GPU/Hyprland and online startup unverified"
+    },
+    {
+      "id": "javascript_navigation",
+      "area": "web_platform",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "bounded_pass",
+        "run": 41762298450,
+        "source_commit": "96454f7a1fbe6b505af440c6c2c5fc91e798756d"
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Validate broader web navigation, process isolation and error-page paths"
+    },
+    {
+      "id": "webextensions",
+      "area": "extensions",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "bounded_pass",
+        "run": 41762298450,
+        "source_commit": "96454f7a1fbe6b505af440c6c2c5fc91e798756d"
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "bounded_pass",
+        "run": 41762298450,
+        "source": "current"
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Current unsigned temporary XPI messaging/storage/uninstall pass; signed extensions, persistence and permission failures unverified"
+    },
+    {
+      "id": "nimbus",
+      "area": "feature_management",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "bounded_pass",
+        "run": 41762298450,
+        "source_commit": "96454f7a1fbe6b505af440c6c2c5fc91e798756d"
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Current API and store initialized; actual remote experiments, enrollment and rollback unverified"
+    },
+    {
+      "id": "normandy_policy",
+      "area": "feature_management",
+      "protected_retain": true,
+      "configuration": {
+        "status": "observed_current",
+        "flag": "MOZ_NORMANDY",
+        "value": "1",
+        "run": 41762298450
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Current config enabled; exercise normal policy dispatch and error/disabled behavior"
+    },
+    {
+      "id": "newtab_promo_guards",
+      "area": "newtab",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41233793696,
+        "kind": "original_browser_optin"
+      },
+      "negative_fallback": {
+        "status": "bounded_pass",
+        "run": 41233793696,
+        "source": "historical"
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical opt-in guard fallback passed; current normal New Tab and error/guard semantics unverified"
+    },
+    {
+      "id": "sandbox",
+      "area": "security",
+      "protected_retain": true,
+      "configuration": {
+        "status": "observed_current",
+        "flag": "MOZ_SANDBOX",
+        "value": "1",
+        "run": 41762298450
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Current configure enables sandbox; verify child-process enforcement and denial paths"
+    },
+    {
+      "id": "certificate_safebrowsing",
+      "area": "security",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Verify certificate failure, phishing/malware protection and offline error fallback with current binary"
+    },
+    {
+      "id": "sync_fxaccounts",
+      "area": "account",
+      "protected_retain": true,
+      "configuration": {
+        "status": "observed_current",
+        "flag": "MOZ_SERVICES_SYNC",
+        "value": "1",
+        "run": 41762298450
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Verify current account sign-in/offline/error paths without real credentials"
+    },
+    {
+      "id": "devtools",
+      "area": "developer",
+      "protected_retain": true,
+      "configuration": {
+        "status": "observed_current",
+        "flag": "MOZ_DEVTOOLS",
+        "value": "all",
+        "run": 41762298450
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "unverified",
+        "run": null,
+        "kind": null
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Verify current DevTools UI/frontend/debugger and disabled/permission paths"
+    },
+    {
+      "id": "crash_reporting",
+      "area": "safety",
+      "protected_retain": true,
+      "configuration": {
+        "status": "observed_current",
+        "flag": "MOZ_CRASHREPORTER",
+        "value": "1",
+        "run": 41762298450
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41724548163,
+        "kind": "original_browser_workload"
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical real browser crashreporter launched; current crash-helper lifecycle/privacy/error paths unverified"
+    },
+    {
+      "id": "updater",
+      "area": "maintenance",
+      "protected_retain": true,
+      "configuration": {
+        "status": "observed_current",
+        "flag": "MOZ_UPDATER",
+        "value": "1",
+        "run": 41762298450
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41161508642,
+        "kind": "original_helper_diagnostic"
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical read-only updater channel diagnostic only; current update authenticity/rollback/errors unverified"
+    },
+    {
+      "id": "telemetry_glean",
+      "area": "privacy",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41741770814,
+        "kind": "original_browser_instrumented"
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical synthetic local browser-owned pingsender->libcurl refused connection; real consent/upload/erasure and current policy unverified"
+    },
+    {
+      "id": "ffmpeg_media",
+      "area": "media",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41266875131,
+        "kind": "original_host_abi_diagnostic"
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical Arch host FFmpeg C ABI diagnostics; current browser decoding/fallback unverified"
+    },
+    {
+      "id": "drm_clearkey",
+      "area": "media",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41161025114,
+        "kind": "original_module_diagnostic"
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical module invalid-interface diagnostic; real DRM decrypt/reject/fallback unverified"
+    },
+    {
+      "id": "webaudio_pulse",
+      "area": "media",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41714793962,
+        "kind": "original_browser_workload"
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical original browser played audio with Pulse bindings; current host/device errors unverified"
+    },
+    {
+      "id": "webauthn_usb",
+      "area": "security",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41674689904,
+        "kind": "original_browser_workload"
+      },
+      "negative_fallback": {
+        "status": "bounded_pass",
+        "run": 41674689904,
+        "source": "historical"
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical original browser no-key rejected with NotAllowedError; current real token/permission/fallback unverified"
+    },
+    {
+      "id": "inference_onnx",
+      "area": "inference",
+      "protected_retain": true,
+      "configuration": {
+        "status": "not_directly_observed",
+        "flag": null,
+        "value": null,
+        "run": null
+      },
+      "current_behavior": {
+        "status": "unverified",
+        "run": null,
+        "source_commit": null
+      },
+      "historical_behavior": {
+        "status": "bounded_pass",
+        "run": 41567402153,
+        "kind": "original_module_diagnostic"
+      },
+      "negative_fallback": {
+        "status": "unverified",
+        "run": null,
+        "source": null
+      },
+      "target_current_workstation_verified": false,
+      "complete_feature_dependency_closure": false,
+      "source_removal_authorized": false,
+      "next_check": "Historical ONNX external-provider diagnostic lifecycle; current browser model/inference/error paths unverified"
+    }
+  ],
+  "source_removal_authorized": false,
+  "all_protected_features_current_runtime_complete": false,
+  "all_negative_fallbacks_complete": false,
+  "conditional_native_ffi_dlopen_closure_proven": false,
+  "actual_current_workstation_parity_proven": false,
+  "m3_sixth_gate_closed": false
+}

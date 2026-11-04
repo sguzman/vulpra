@@ -1,0 +1,35 @@
+name: M3 Protected Feature Activation Matrix Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-protected-feature-activation-matrix.jq
+      - ci/tests/m3-protected-feature-activation-matrix-tests.sh
+      - docs/vulpra/M3-PROTECTED-FEATURE-ACTIVATION-MATRIX-20261104.json
+      - .github/workflows/m3-protected-feature-activation-matrix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-feature-acceptance-ledger:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Read exact source-bound matrix and verifier
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            ci/m3-protected-feature-activation-matrix.jq
+            ci/tests/m3-protected-feature-activation-matrix-tests.sh
+            docs/vulpra/M3-PROTECTED-FEATURE-ACTIVATION-MATRIX-20261104.json
+      - name: Reject forged protected feature acceptance or workstation parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq
+          bash ci/tests/m3-protected-feature-activation-matrix-tests.sh
