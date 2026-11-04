@@ -138,17 +138,38 @@ jobs:
           print("PASS: current source identity, protected features and all three normal-build opt-outs")
           PY
 
-      - name: Reserve sufficient swap for native Rust/C++ build
+      - name: Reserve bounded swap for native Rust/C++ build
         shell: bash
         run: |
           set -euo pipefail
-          free="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
-          (( free > 24*1024*1024*1024 + 8*1024*1024*1024 ))
-          sudo fallocate -l 24G /mnt/vulpra-m3-native-link.swap
+          # GitHub-hosted /mnt capacity varies. Keep at least 8 GiB for
+          # compilation output; use up to 24 GiB of swap, minimum 8 GiB.
+          # Do not silently proceed with insufficient swap or disk.
+          gib=$((1024*1024*1024))
+          free_bytes="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          [[ "$free_bytes" =~ ^[0-9]+$ ]]
+          headroom=$((8*gib))
+          minimum_swap=$((8*gib))
+          maximum_swap=$((24*gib))
+          df -h /mnt
+          if (( free_bytes < headroom+minimum_swap )); then
+            echo "::error::Insufficient /mnt free bytes ($free_bytes): require >= 16 GiB before native build"
+            exit 1
+          fi
+          available_swap=$((free_bytes-headroom))
+          if (( available_swap > maximum_swap )); then
+            available_swap="$maximum_swap"
+          fi
+          swap_gib=$((available_swap/gib))
+          (( swap_gib >= 8 && swap_gib <= 24 ))
+          echo "Reservable swap: $swap_gib GiB; preserving >= 8 GiB of disk headroom"
+          sudo fallocate -l "$swap_gib"G /mnt/vulpra-m3-native-link.swap
           sudo chmod 0600 /mnt/vulpra-m3-native-link.swap
           sudo mkswap /mnt/vulpra-m3-native-link.swap
           sudo swapon /mnt/vulpra-m3-native-link.swap
           grep -Fq /mnt/vulpra-m3-native-link.swap /proc/swaps
+          echo "PASS: bounded native-build swap active"
+          df -h /mnt
 
       - name: Compile complete normal exact-source native Vulpra
         shell: bash
