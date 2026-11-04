@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "kind": "post_beta_upstream_security_patch_presence_audit",
+  "verified_date_utc": "2026-11-04",
+  "vulpra_audited_head": "ea5022bd731662999b439739ab6213ff383ff081",
+  "upstream_tags": {
+    "beta": {
+      "name": "FIREFOX_159_0b5_RELEASE",
+      "commit": "34ac0671eb25f31f8c56ace36e1c413dd471eb8d"
+    },
+    "stable": {
+      "name": "FIREFOX_159_0_RELEASE",
+      "commit": "9a2dc53c369c7ae5172018b35988e1d2ffeff402",
+      "ahead_of_beta_commits": 6900
+    },
+    "stable_patch": {
+      "name": "FIREFOX_159_0_1_RELEASE",
+      "commit": "6181e6b5f28a8fbae1d5c3ef6f6626b5a2180213",
+      "ahead_of_stable_commits": 27
+    }
+  },
+  "findings": [
+    {
+      "advisory": "MFSA 2026-118",
+      "release_date": "2026-10-27",
+      "cve": "CVE-2026-117860",
+      "bug": 2046558,
+      "impact": "high",
+      "component": "DOM Navigation",
+      "description": "Same-origin policy bypass",
+      "fix_commit": "9a2dc53c369c7ae5172018b35988e1d2ffeff402",
+      "fixed_tag": "FIREFOX_159_0_RELEASE",
+      "changed_existing_files": 14,
+      "all_checked_vulpra_files_still_match_beta": true,
+      "fix_present_in_vulpra_main": false
+    },
+    {
+      "advisory": "MFSA 2026-123",
+      "release_date": "2026-11-03",
+      "cve": "CVE-2026-120572",
+      "bug": 2079035,
+      "impact": "high",
+      "component": "Layout Block and Inline",
+      "description": "Incorrect boundary conditions",
+      "fix_commit": "603a78af8401f8f30c388b3fa330589e35d8b727",
+      "fixed_tag": "FIREFOX_159_0_1_RELEASE",
+      "changed_existing_files": 3,
+      "new_upstream_crashtest_not_compared_as_code": true,
+      "all_checked_vulpra_files_still_match_beta": true,
+      "fix_present_in_vulpra_main": false
+    }
+  ],
+  "file_sha_crosswalk": [
+    {
+      "path": "docshell/base/BrowsingContext.cpp",
+      "vulpra_sha": "241224f6f85318ae068b2a8d5c0890db0c9e4bbc",
+      "pinned_beta_sha": "241224f6f85318ae068b2a8d5c0890db0c9e4bbc",
+      "upstream_fixed_sha": "0986f712c9246d9dee01a95237eb1b69e4b8349e",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "docshell/base/CanonicalBrowsingContext.cpp",
+      "vulpra_sha": "e0f4a668c6d267e98ad52b1435f5d10b028b8679",
+      "pinned_beta_sha": "e0f4a668c6d267e98ad52b1435f5d10b028b8679",
+      "upstream_fixed_sha": "86b2939a83873627e79ec19b87d13008e2e2109d",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "docshell/base/CanonicalBrowsingContext.h",
+      "vulpra_sha": "49a31c22232fe65703d5fc2b8f9ea5cfb398e8b7",
+      "pinned_beta_sha": "49a31c22232fe65703d5fc2b8f9ea5cfb398e8b7",
+      "upstream_fixed_sha": "4f00705f303872577da41df1d171c95425e3716a",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "docshell/shistory/SessionHistoryEntry.cpp",
+      "vulpra_sha": "319f965e0b779d7972893ab97a6982219f51beb9",
+      "pinned_beta_sha": "319f965e0b779d7972893ab97a6982219f51beb9",
+      "upstream_fixed_sha": "a16e4ec279d722fffbdaf797033f73bb66b9c928",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "docshell/shistory/SessionHistoryEntry.h",
+      "vulpra_sha": "2ee5b72e867132ff878d879d336c4c8c7b6436f3",
+      "pinned_beta_sha": "2ee5b72e867132ff878d879d336c4c8c7b6436f3",
+      "upstream_fixed_sha": "68e46ffedaf290a27e0bff507f8aca33f52b016b",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "docshell/shistory/nsSHEntryShared.h",
+      "vulpra_sha": "558a36de625e72324b60729a410ebc22391b7b7d",
+      "pinned_beta_sha": "558a36de625e72324b60729a410ebc22391b7b7d",
+      "upstream_fixed_sha": "368acfaf59cb92263684cce26c2426cb4079caf0",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "dom/ipc/ContentParent.cpp",
+      "vulpra_sha": "3e8987e97db1c14dba93f8e0a1132d20c386aea7",
+      "pinned_beta_sha": "3e8987e97db1c14dba93f8e0a1132d20c386aea7",
+      "upstream_fixed_sha": "e7ac12f052d64e780d36eceeb43d3308a5550b0e",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "dom/ipc/ContentParent.h",
+      "vulpra_sha": "f2ef070f7124ce5b0d4e6ecf55e6088f42562730",
+      "pinned_beta_sha": "f2ef070f7124ce5b0d4e6ecf55e6088f42562730",
+      "upstream_fixed_sha": "cffb55b774c4ae34f377aeaa8241b2461a28e265",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "dom/ipc/PContent.ipdl",
+      "vulpra_sha": "e41cbabe7103c4a7941d10b94262229500a3e87c",
+      "pinned_beta_sha": "e41cbabe7103c4a7941d10b94262229500a3e87c",
+      "upstream_fixed_sha": "3715db0dc9dd7411b6104a6dcf869427bb127f29",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "dom/ipc/ParentProcessChannelHandle.cpp",
+      "vulpra_sha": "1afc0cb89f74879d3e85207ea36712f3c5c84a4e",
+      "pinned_beta_sha": "1afc0cb89f74879d3e85207ea36712f3c5c84a4e",
+      "upstream_fixed_sha": "286d235f594175e8ca0aca44234e94f7b0b55f69",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "dom/ipc/ParentProcessChannelHandle.h",
+      "vulpra_sha": "ef6f7a71cd92ecf9031c3d29231d201ea59b5125",
+      "pinned_beta_sha": "ef6f7a71cd92ecf9031c3d29231d201ea59b5125",
+      "upstream_fixed_sha": "0b1fcd547ed54497cdf6e932a98eb9ca26ae2db1",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "dom/ipc/WindowGlobalParent.cpp",
+      "vulpra_sha": "2014c80a6eb5fdbead9533b2e405cc32d6522d0e",
+      "pinned_beta_sha": "2014c80a6eb5fdbead9533b2e405cc32d6522d0e",
+      "upstream_fixed_sha": "59c74d956b8687bf864d3bd1a66bc94e1915771d",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "dom/ipc/WindowGlobalParent.h",
+      "vulpra_sha": "c3386ba78041a2093d6981c30be3931892991cf7",
+      "pinned_beta_sha": "c3386ba78041a2093d6981c30be3931892991cf7",
+      "upstream_fixed_sha": "446101c1ad40f8338cc73aa8b058db3b79202812",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "netwerk/ipc/DocumentLoadListener.cpp",
+      "vulpra_sha": "b9465bbcb8884bad5c9e2d93515cd595aa861b49",
+      "pinned_beta_sha": "b9465bbcb8884bad5c9e2d93515cd595aa861b49",
+      "upstream_fixed_sha": "10b16322a4a55f7c5d4459489a70347ee1debc4f",
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117860",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "layout/generic/AbsoluteContainingBlock.cpp",
+      "vulpra_sha": "885ece81d8e394f3d08c4576b6dd8fd95a4c086b",
+      "pinned_beta_sha": "885ece81d8e394f3d08c4576b6dd8fd95a4c086b",
+      "upstream_fixed_sha": "0f15a8fc81753796e1050e82d598f7e63804e01f",
+      "advisory": "MFSA 2026-123",
+      "cve": "CVE-2026-120572",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "layout/generic/AbsoluteContainingBlock.h",
+      "vulpra_sha": "deac3bd8b0392c43a988292f30ed7adf758a8467",
+      "pinned_beta_sha": "deac3bd8b0392c43a988292f30ed7adf758a8467",
+      "upstream_fixed_sha": "eb95b77d9578ffbdb1a58b7c0f4be94ce6f263c3",
+      "advisory": "MFSA 2026-123",
+      "cve": "CVE-2026-120572",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    },
+    {
+      "path": "layout/generic/nsLineLayout.cpp",
+      "vulpra_sha": "57d0f421b9ababbec708fc9a64f6d40f471387f9",
+      "pinned_beta_sha": "57d0f421b9ababbec708fc9a64f6d40f471387f9",
+      "upstream_fixed_sha": "452ffc656ded21faba0beb0fd2927b7933834f4e",
+      "advisory": "MFSA 2026-123",
+      "cve": "CVE-2026-120572",
+      "vulpra_exact_beta_blob": true,
+      "vulpra_equals_fixed_release_blob": false
+    }
+  ],
+  "limits": {
+    "two_patches_authenticated": true,
+    "all_advisory_bugs_reviewed": false,
+    "exploitability_demonstrated": false,
+    "security_current": false,
+    "patched_source_compiled": false,
+    "original_baseline_unchanged": true,
+    "source_pruning_authorized": false,
+    "m3_sixth_gate_closed": false
+  },
+  "recommended_action": "Separate, source-matched security maintenance update and full browser regression before routine or public browsing; do not mix fixes into the immutable M3 original binary comparator"
+}

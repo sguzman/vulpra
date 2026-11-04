@@ -25,6 +25,10 @@ The new repository was created with a template MIT license covering only appropr
 
 For every future upstream revision: document its source tag and commit, review security advisories, produce a clean new upstream reference, compare and reapply personal patches, compile and test before shipping. Pinned release does not mean permanent abandonment of security updates.
 
+### Verified post-beta patch gaps (2026-11-04)
+
+[Security audit of Mozilla Firefox 159/159.0.1 patch presence](SECURITY-159-POSTBETA-PATCH-GAPS-20261104.md) directly compared all 17 source files changed by two upstream high-impact fixes against Vulpra's current `main`, frozen `FIREFOX_159_0b5_RELEASE`, and the respective stable release tags. **CVE-2026-117860** (14/14 unchanged beta source files) and **CVE-2026-120572** (3/3 unchanged beta source files) are **missing as those exact upstream patches**. The patch applicability and other security fixes are not exhaustively reviewed. This is a blocker for ordinary/sensitive or public use until a **separate** source update is built and comprehensively regression-tested. Do not alter `upstream-base` or mistake historical M3 packages for security-current artifacts. [GitHub issue #3](https://github.com/sguzman/vulpra/issues/3) remains open.
+
 ## License/branding audit
 
 Technical license integrity and upstream unofficial-branding selection checked in [run 40122675149](https://github.com/sguzman/vulpra/actions/runs/40122675149). This is not legal sign-off or clearance to distribute with Nightly/Firefox names; see [the dedicated audit](LICENSING-BRANDING.md).
