@@ -84,6 +84,19 @@ jobs:
           major="$("$HOME/.mozbuild/clang/bin/clang" --version | head -1 | sed -E 's/.*version ([0-9]+).*/\1/')"
           [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 19 ))
 
+      - name: Compile and test bounded current-native loader callsite examiner
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-current-compiled-loader-api-census.rs \
+            -o "$RUNNER_TEMP/m3-current-loader-census-tests"
+          "$RUNNER_TEMP/m3-current-loader-census-tests" --nocapture
+          rustc --edition=2021 -O ci/m3-current-compiled-loader-api-census.rs \
+            -o "$RUNNER_TEMP/m3-current-loader-census"
+          echo "PASS: current native loader observer compiled and tests executed"
+
       - name: Record exact-source generated configure substitutions
         shell: bash
         run: |
@@ -231,6 +244,57 @@ jobs:
           p.write_text(json.dumps(x,indent=2)+"\n")
           print("PASS: normal browser packaged runtime acceptance")
           PY
+
+      - name: Audit current-source linked native loader callsites
+        shell: bash
+        timeout-minutes: 40
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          "$RUNNER_TEMP/m3-current-loader-census" "$GITHUB_SHA" \
+            "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline/dist/bin/libxul.so" \
+            "$RUNNER_TEMP/m3-current-native-loader-callsite.json"
+          jq -e \
+            --arg source "$GITHUB_SHA" \
+            --arg binary "$(jq -r '.built_libxul_sha256' "$RUNNER_TEMP/m3-native-link-inputs.json")" \
+            '
+              .schema_version == 1 and
+              .source_commit == $source and
+              .binary == "libxul.so" and
+              .unstripped_native_elf_sha256 == $binary and
+              (.unstripped_native_elf_bytes > 10000000) and
+              .status == "compiled_direct_loader_api_callsite_census" and
+              (.native_instruction_lines > 1000) and
+              (.direct_loader_branches > 0) and
+              (.direct_loader_branches <= 100000) and
+              (.distinct_caller_loader_kind_records == (.direct_loader_callsite_records | length)) and
+              (.direct_loader_branches == ([.direct_loader_callsite_records[].native_branches] | add)) and
+              (.independently_accepted_ffmpeg_to_nspr_call_count == 1) and
+              (all(.direct_loader_callsite_records[];
+                (.caller_symbol | type == "string" and length > 0) and
+                (.loader_api | IN("PR_LoadLibraryWithFlags","PR_LoadLibrary",
+                  "PR_LoadLibraryByPathname","dlopen","dlmopen")) and
+                (.branch_kind | IN("call","tail-jump")) and
+                (.native_branches | type == "number" and . > 0))) and
+              .indirect_loader_calls_enumerated == false and
+              .every_dynamic_loader_api_enumerated == false and
+              .actual_dynamic_library_names_verified == false and
+              .conditional_runtime_routes_exercised == false and
+              .all_elf_consumers_covered == false and
+              .arch_workstation_verified == false and
+              .source_pruning_authorized == false and
+              .m3_sixth_gate_closed == false
+            ' "$RUNNER_TEMP/m3-current-native-loader-callsite.json" >/dev/null
+          echo "PASS: current linked native loader branches tied to source and unstripped libxul ELF; no full dlopen closure"
+
+      - name: Preserve bounded current-source native loader callsite evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-current-native-loader-callsite-evidence
+          path: ${{ runner.temp }}/m3-current-native-loader-callsite.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Preserve bounded native evidence and checksum without full archive
         if: always()
