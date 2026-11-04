@@ -1,0 +1,193 @@
+# M3 current MAIN (not old original) genuine Mozilla configure and evaluated
+# moz.build frontend + generated CompileDB declarations. NO native compiler,
+# package, browser runtime, installed profile or source removal.
+# The existing Python Mozilla API adapter is reused, not reimplemented.
+# Sparse historical native evidence is NOT substituted for current build.
+name: M3 Current Main Evaluated Mozilla Native Frontend
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-current-main-evaluated-native-frontend.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vulpra-current-main-evaluated-native-frontend
+  cancel-in-progress: false
+jobs:
+  evaluate-current-main-source:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      VULPRA_CURRENT_MAIN_EVALUATED_GRAPH: '1'
+      DEBIAN_FRONTEND: noninteractive
+      CARGO_BUILD_JOBS: '1'
+      MOZ_HEADLESS: '1'
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
+    steps:
+      - name: Checkout exact current main source — not historical compiled revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Authenticate exact checkout and protect historical baseline semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$SOURCE_SHA" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$SOURCE_SHA" != b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          python3 -m py_compile ci/m3-pinned-evaluated-mozbuild-graph.py
+          python3 ci/m3-pinned-evaluated-mozbuild-graph.py --self-test
+          grep -Fq 'current_main_configure_evaluated_mozbuild_frontend' ci/m3-pinned-evaluated-mozbuild-graph.py
+          grep -Fq 'VULPRA_CURRENT_MAIN_EVALUATED_GRAPH' ci/m3-pinned-evaluated-mozbuild-graph.py
+          grep -Fxq 'ac_add_options --disable-tests' ci/mozconfig-linux-m3-baseline
+          grep -Fxq 'ac_add_options --with-app-basename=Vulpra' ci/mozconfig-linux-m3-baseline
+          test ! -d obj-vulpra-linux-m3-baseline
+          mkdir -p "$RUNNER_TEMP/m3-current-front"
+      - name: Bootstrap current original-tree Mozilla toolchain for configure only
+        shell: bash
+        timeout-minutes: 42
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends python3 python3-venv python3-dev \
+            git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+      - name: Actually configure CURRENT MAIN source
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          ./mach configure
+          test -f obj-vulpra-linux-m3-baseline/config.status
+          test -d obj-vulpra-linux-m3-baseline/config.statusd/substs
+          test ! -d obj-vulpra-linux-m3-baseline/dist/vulpra
+          echo 'M3_CURRENT_CONFIGURE=PASS actual current source generated its own config.status'
+      - name: Use genuine current Mozilla BuildReader and TreeMetadataEmitter
+        shell: bash
+        timeout-minutes: 19
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          ./mach python ci/m3-pinned-evaluated-mozbuild-graph.py \
+            normal obj-vulpra-linux-m3-baseline/config.status \
+            "$RUNNER_TEMP/m3-current-front/current-evaluated-frontend.json"
+          output="$RUNNER_TEMP/m3-current-front/current-evaluated-frontend.json"
+          jq -e --arg src "$SOURCE_SHA" '
+            .schema_version==1 and
+            .status=="current_main_configure_evaluated_mozbuild_frontend" and
+            .current_source_commit==$src and
+            (.original_source_commit|not) and
+            .original_compiled_baseline_represented_by_this_output==false and
+            .current_browser_native_compiled_from_this_graph==false and
+            .variant=="normal" and
+            .evaluated_mozbuild_emission==true and
+            .native_linker_or_binary_executed==false and
+            .emitted_object_count>500 and
+            .evaluated_directory_edges>200 and
+            .actual_evaluated_linkable_node_count>0 and
+            .actual_evaluated_rust_library_target_count>0 and
+            .actual_evaluated_library_link_edge_count>0 and
+            .actual_evaluated_compile_source_input_count>0 and
+            .generated_configure_flag_values.MOZ_WIDGET_TOOLKIT.value=="gtk" and
+            .generated_configure_flag_values.MOZ_DEVTOOLS.value=="all" and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false and
+            .actual_linker_commands_executed==false and
+            .complete_compile_or_link_graph==false and
+            .ffi_and_runtime_dlopen_graph_proven==false
+          ' "$output" >/dev/null
+          echo 'M3_CURRENT_EVALUATED_FRONTEND=PASS real current Mozilla frontend emitted C/C++/Rust link-ownership graph; no binary compiled'
+      - name: Generate current C and C++ compiler commands without compilation
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          ./mach build-backend -b CompileDB
+          test -s obj-vulpra-linux-m3-baseline/compile_commands.json
+          jq -e '(type=="array") and (length>500) and
+                 all(.[]; (.file|type)=="string" and (.file|length)>0)' \
+            obj-vulpra-linux-m3-baseline/compile_commands.json >/dev/null
+          # Only bounded COUNTS and source-relative identity (not host
+          # paths, raw command strings, absolute objdir or environment).
+          jq -n --arg source "$SOURCE_SHA" \
+            --slurpfile g "$RUNNER_TEMP/m3-current-front/current-evaluated-frontend.json" \
+            --slurpfile cc obj-vulpra-linux-m3-baseline/compile_commands.json '
+            ($g[0]) as $e |
+            {
+              schema_version:1,
+              status:"current_main_evaluated_native_frontend_and_compile_command_declarations",
+              current_source_commit:$source,
+              compared_against_original_compiled_source_sha:"b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+              original_full_normal_archive_is_not_current_binary:true,
+              actual_current_main_configure_completed:true,
+              actual_current_mozbuild_frontend_emitted:true,
+              generated_current_compiledb_command_declarations:true,
+              generated_current_compile_db_entry_count:($cc[0]|length),
+              actual_evaluated_frontend_object_count:$e.emitted_object_count,
+              actual_evaluated_source_directory_edges:$e.evaluated_directory_edges,
+              actual_evaluated_link_target_count:$e.actual_evaluated_linkable_node_count,
+              actual_evaluated_link_dependency_edges:$e.actual_evaluated_library_link_edge_count,
+              actual_evaluated_rust_static_libraries:$e.actual_evaluated_rust_library_target_count,
+              actual_evaluated_rust_program_targets:$e.actual_evaluated_rust_program_target_count,
+              actual_evaluated_compile_source_inputs:$e.actual_evaluated_compile_source_input_count,
+              actual_evaluated_webidl_binding_units:$e.actual_evaluated_webidl_binding_unit_count,
+              actual_evaluated_install_resource_inputs:$e.actual_evaluated_install_resource_input_count,
+              actual_generated_configure_selected_flags:$e.generated_configure_flag_values,
+              current_source_native_compilation_executed:false,
+              current_source_browser_package_built:false,
+              cargo_feature_resolution_executed:false,
+              actual_native_linker_command_execution_proven:false,
+              all_runtime_optional_dlopen_or_ffi_edges_enumerated:false,
+              target_workstation_abi_parity_proven:false,
+              source_pruning_authorized:false,
+              native_package_bytes_saved:null,
+              m3_sixth_gate_closed:false
+            }
+            ' >"$RUNNER_TEMP/m3-current-front/current-evaluated-native-summary.json"
+          jq -e --arg src "$SOURCE_SHA" '
+            .current_source_commit==$src and
+            .actual_current_main_configure_completed==true and
+            .actual_current_mozbuild_frontend_emitted==true and
+            .generated_current_compiledb_command_declarations==true and
+            .generated_current_compile_db_entry_count>500 and
+            .actual_evaluated_link_target_count>0 and
+            .current_source_native_compilation_executed==false and
+            .m3_sixth_gate_closed==false and
+            .source_pruning_authorized==false
+          ' "$RUNNER_TEMP/m3-current-front/current-evaluated-native-summary.json" >/dev/null
+          # Negative controls must NEVER bless a fake current-compiled result.
+          for expr in \
+            '.current_source_native_compilation_executed=true' \
+            '.actual_current_main_configure_completed=false' \
+            '.m3_sixth_gate_closed=true' \
+            '.source_pruning_authorized=true' \
+            '.current_source_commit="forged"'; do
+            jq "$expr" "$RUNNER_TEMP/m3-current-front/current-evaluated-native-summary.json" \
+              >"$RUNNER_TEMP/m3-current-front/forged.json"
+            if jq -e --arg src "$SOURCE_SHA" '
+              .current_source_commit==$src and
+              .actual_current_main_configure_completed==true and
+              .current_source_native_compilation_executed==false and
+              .source_pruning_authorized==false and
+              .m3_sixth_gate_closed==false' \
+              "$RUNNER_TEMP/m3-current-front/forged.json" >/dev/null; then
+              echo 'FAIL: forged current-source build closure accepted' >&2; exit 1
+            fi
+          done
+          rm "$RUNNER_TEMP/m3-current-front/forged.json"
+          echo 'M3_CURRENT_NATIVE_DECLARATIONS=PASS actual current emitted frontend and CompileDB, 5 forged claims rejected, full compiled graph remains OPEN'
+      - name: Archive only bounded current-main counts and selected protected flags
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-current-main-evaluated-native-frontend
+          path: ${{ runner.temp }}/m3-current-front/current-evaluated-native-summary.json
+          if-no-files-found: error
+          retention-days: 14
