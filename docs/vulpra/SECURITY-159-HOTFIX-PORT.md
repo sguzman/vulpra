@@ -19,3 +19,11 @@ Before considering integration into the main browser or ordinary/sensitive/publi
 4. Verify source/package hashes, target EndeavourOS/Hyprland ABI and performance, and release documentation. Only then consider merging or replacing the frozen-M3 experimental build.
 
 **Progress remains overall 61%, M3 5/6 gates (83%).** No test or milestone credit is assigned to source transplant alone.
+
+## Native build and strict certificate-test result (2026-11-04 UTC)
+
+[Native run 41869946133](https://github.com/sguzman/vulpra/actions/runs/41869946133) **compiled the actual isolated patched browser**, packaged it, independently checked ELF/source/package linkage, launched an isolated Wayland/Weston browser, rendered a localhost screenshot, and executed WebDriver JavaScript navigation through the final DOM. The smoke stopped on the **test harness's overly strict requirement that the WebDriver insecure-certificate error have a nonempty message**. The actual response was **HTTP 400, error `insecure certificate`, message `""`**, which demonstrates certificate rejection, but the total CI result was **failure** and later WebExtension/Nimbus acceptance was not reached.
+
+The unmodified Vulpra browser baseline's [native run 41879471492](https://github.com/sguzman/vulpra/actions/runs/41879471492) subsequently **passed** the corrected WebDriver W3C parser and complete normal runtime checks, with independent [evidence reconciliation 41894896825](https://github.com/sguzman/vulpra/actions/runs/41894896825) **passed**. This maintenance branch now imports **the same, already CI-verified parser**: exact HTTP 400, `value.error == "insecure certificate"`, and a present (possibly empty) string message, retaining `acceptInsecureCerts=false`, the untrusted local fixture and private test profile. The upstream security-patch code blobs remain unchanged.
+
+**The security-patched branch still requires its own complete native packaged-browser smoke to pass on the corrected harness.** Full upstream security maintenance, upstream crashtest execution, and release readiness remain open. M3/overall percentage unchanged.

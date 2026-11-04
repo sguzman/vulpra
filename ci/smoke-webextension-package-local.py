@@ -211,13 +211,17 @@ def verify_js_navigation(port: int, base: str, server: http.server.ThreadingHTTP
             "final_document_text": last["text"]}
 
 def certificate_denial(status: int, body: object) -> bool:
-    """Fail closed: only W3C insecure-certificate navigation is accepted."""
-    if not 400 <= status < 600 or not isinstance(body, dict):
+    """Fail closed: exact W3C HTTP 400 insecure-certificate navigation only.
+
+    WebDriver's error message is an implementation-defined string. An empty
+    string is still valid and must not turn genuine TLS rejection into failure.
+    """
+    if status != 400 or not isinstance(body, dict):
         return False
     error = body.get("value")
     return (isinstance(error, dict) and
             error.get("error") == "insecure certificate" and
-            isinstance(error.get("message"), str) and bool(error["message"].strip()))
+            isinstance(error.get("message"), str))
 
 
 def certificate_failure_diagnostic(status: int, body: object) -> dict:
@@ -238,22 +242,29 @@ def certificate_failure_diagnostic(status: int, body: object) -> dict:
 
 def test_certificate_denial_parser() -> None:
     good = {"value": {"error": "insecure certificate", "message": "untrusted"}}
-    assert certificate_denial(500, good)
-    for status in (0, 200, 301, 399, 600):
+    empty_message = {"value": {"error": "insecure certificate", "message": ""}}
+    assert certificate_denial(400, good)
+    # Real native run 41864382237 returned HTTP 400, insecure certificate,
+    # and message="". W3C does not require a nonempty message.
+    assert certificate_denial(400, empty_message)
+    for status in (0, 200, 301, 399, 401, 404, 408, 500, 503, 600):
         assert not certificate_denial(status, good)
+        assert not certificate_denial(status, empty_message)
     bad = [
         {}, [], None, {"value": {}}, {"value": []},
         {"value": {"error": "unknown error", "message": "certificate"}},
         {"value": {"error": "timeout", "message": "certificate"}},
-        {"value": {"error": "insecure certificate", "message": ""}},
+        {"value": {"error": "insecure certificate"}},
         {"value": {"error": "insecure certificate", "message": None}},
         {"value": {"error": "insecure certificate", "message": 1}},
+        {"value": {"error": "insecure certificate", "message": []}},
         {"value": {"error": "success", "message": "certificate"}},
     ]
     for result in bad:
-        assert not certificate_denial(500, result)
-    print(f"PASS: strict certificate parser rejected {len(bad)+5}/"
-          f"{len(bad)+5} forged or non-certificate cases")
+        assert not certificate_denial(400, result)
+    print(f"PASS: strict certificate parser accepted 2/2 valid certificate"
+          f" responses (including the native empty-message case) and rejected"
+          f" {len(bad)+20}/{len(bad)+20} forged/incorrect-status cases")
     diagnostic = certificate_failure_diagnostic(500, {
         "value": {"error": "unknown error", "message": "M" * 600}
     })
