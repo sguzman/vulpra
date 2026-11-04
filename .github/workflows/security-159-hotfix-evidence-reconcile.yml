@@ -226,6 +226,72 @@ jobs:
             ' "$RUNNER_TEMP/security-159-local-tls-reconciled.json" >/dev/null
           echo "PASS: independent source-linked current native package and W3C certificate rejection crosscheck"
 
+      - name: Independently verify original Mozilla CSS crashtest browser evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Known security build before CSS replay was added. No CSS credit.
+          if test "$NATIVE_SOURCE_SHA" = 6e38e78724365b3dd6c02f4d0b0570028a5d2112; then
+            echo "::notice::Historical security build predates original CSS crashtest: not verified"
+            exit 0
+          fi
+          evidence="$RUNNER_TEMP/native-evidence"
+          css="$(find "$evidence" -type f -name security-159-css-crashtest-replay.json -print -quit)"
+          native="$(find "$evidence" -type f -name m3-native-link-inputs.json -print -quit)"
+          test -n "$css" && test -n "$native"
+          test "$(find "$evidence" -type f -name security-159-css-crashtest-replay.json | wc -l)" -eq 1
+          test "$(find "$evidence" -type f -name m3-native-link-inputs.json | wc -l)" -eq 1
+          jq -n \
+            --slurpfile replay "$css" --slurpfile native "$native" \
+            --arg source "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            if ($replay | length) != 1 or ($native | length) != 1 then
+              error("expected one CSS replay and one native report")
+            else
+              $replay[0] as $r | $native[0] as $n |
+              if (
+                $n.source_commit == $source and $n.workflow_run_id == $run and
+                $n.runtime_passed_after_link_audit == true and
+                ($n.package.package_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+                $r.schema_version == 1 and
+                $r.status == "passed_bounded_original_crashtest_replay" and
+                $r.source_commit == $source and
+                $r.fixture_git_blob_sha1 == "31a14963b356d869475bac62ca44991d9275a285" and
+                $r.fixture == "testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html" and
+                $r.real_packaged_browser == true and
+                $r.accept_insecure_certs == false and
+                $r.temporary_profile_preserved == true and
+                $r.official_wpt_harness_used == false and
+                $r.memory_safety_exploit_rejection_proven == false and
+                $r.security_current == false and $r.release_ready == false and
+                ($r.iterations | type == "array" and length == 3) and
+                ([$r.iterations[].iteration] == [0,1,2]) and
+                all($r.iterations[];
+                    (.height | type == "number" and . > 0 and . == floor))
+              ) then {
+                schema_version: 1,
+                status: "bounded_css_regression_source_linked_reconciliation",
+                source_commit: $source,
+                native_run_id: $run,
+                compiled_package_sha256: $n.package.package_sha256,
+                upstream_fixture_blob_sha1: $r.fixture_git_blob_sha1,
+                three_real_packaged_replays_verified: true,
+                full_wpt_harness_executed: false,
+                exploit_rejection_proven: false,
+                full_advisory_audited: false,
+                release_ready: false,
+                m3_sixth_gate_closed: false
+              } else error("Original CSS crashtest browser/source/package result rejected")
+              end
+            end
+          ' > "$RUNNER_TEMP/security-159-css-reconciled.json"
+          jq -e --arg sha "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            .source_commit == $sha and .native_run_id == $run and
+            .three_real_packaged_replays_verified == true and
+            .exploit_rejection_proven == false and .release_ready == false and
+            .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/security-159-css-reconciled.json" >/dev/null
+          echo "PASS: independent source-linked real packaged CSS crashtest; not WPT/ASAN or release acceptance"
+
       - name: Preserve only bounded reconciled source and runtime attestations
         uses: actions/upload-artifact@v4
         with:
@@ -233,5 +299,6 @@ jobs:
           path: |
             ${{ runner.temp }}/security-159-native-link-reconciled.json
             ${{ runner.temp }}/security-159-local-tls-reconciled.json
+            ${{ runner.temp }}/security-159-css-reconciled.json
           if-no-files-found: error
           retention-days: 14
