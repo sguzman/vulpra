@@ -60,6 +60,8 @@ jobs:
           python3 ci/m3-configure-only-substs.py --self-test
           python3 -m py_compile ci/smoke-webextension-package-local.py
           python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          # Source-only negative controls; real replay follows package/runtime.
+          python3 ci/security-159-crashtest-smoke.py --self-test
           python3 ci/tests/m3-promocard-bundle-contract.py
           python3 -m py_compile ci/m3-native-elf-package-graph.py
           echo "PASS: exact source and original unomitted normal Vulpra"
@@ -297,6 +299,33 @@ jobs:
           print("PASS: normal browser packaged runtime acceptance")
           PY
 
+      - name: Replay original Mozilla CSS security crashtest against native package
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/security-159-crashtest-smoke.py
+          report=".git/vulpra-native-build/security-159-css-crashtest-replay.json"
+          jq -e --arg source "$GITHUB_SHA" '
+            .schema_version == 1 and
+            .status == "passed_bounded_original_crashtest_replay" and
+            .source_commit == $source and
+            .fixture_git_blob_sha1 == "31a14963b356d869475bac62ca44991d9275a285" and
+            .fixture == "testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html" and
+            .real_packaged_browser == true and
+            .accept_insecure_certs == false and
+            .temporary_profile_preserved == true and
+            .official_wpt_harness_used == false and
+            .memory_safety_exploit_rejection_proven == false and
+            .security_current == false and
+            .release_ready == false and
+            (.iterations | type == "array" and length == 3) and
+            ([.iterations[].iteration] == [0,1,2]) and
+            all(.iterations[]; (.height | type == "number" and . > 0))
+          ' "$report" >/dev/null
+          echo "PASS: original upstream CSS crashtest executed in real packaged browser; not a full WPT/ASAN security proof"
+
       - name: Audit current-source linked native loader callsites
         shell: bash
         timeout-minutes: 40
@@ -361,6 +390,7 @@ jobs:
             .git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz.sha256
             .git/vulpra-native-build/m3-localhost-acceptance.json
             .git/vulpra-native-build/webextension-smoke-*.json
+            .git/vulpra-native-build/security-159-css-crashtest-replay.json
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
