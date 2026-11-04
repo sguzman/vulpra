@@ -1380,7 +1380,896 @@
         }
       ],
       "note": "The complete one-file upstream refactor postimage matches Firefox beta, stable and Vulpra exactly. Code-source inclusion only; no runtime exploit test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118006",
+      "bug": 2074202,
+      "topic": "WebRTC signaling privilege escalation / MediaTransportHandler destruction lifecycle",
+      "patch_commits": [
+        "3929ca6ec195aa7dde0fd4a41f4a329a808093a9",
+        "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+        "5b25d01db35b55164f9ff218807bc3fcb80213f8"
+      ],
+      "classification": "all_11_selected_fix_touched_paths_identical_between_pinned_beta_stable_159_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "netwerk/base/nsSocketTransportService2.h",
+          "upstream_last_touched_commit": "3929ca6ec195aa7dde0fd4a41f4a329a808093a9",
+          "upstream_selected_patch_result_sha": "c2ee6c2fba38001c02561879f37512c938c9d31b",
+          "pinned_beta_sha": "c2ee6c2fba38001c02561879f37512c938c9d31b",
+          "upstream_stable_159_sha": "c2ee6c2fba38001c02561879f37512c938c9d31b",
+          "vulpra_sha": "c2ee6c2fba38001c02561879f37512c938c9d31b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/media/webrtc/jsapi/MediaTransportHandler.cpp",
+          "upstream_last_touched_commit": "5b25d01db35b55164f9ff218807bc3fcb80213f8",
+          "upstream_selected_patch_result_sha": "2466129b6bfd48457f2d6600d4bfabc46cf62f4b",
+          "pinned_beta_sha": "b22712ae96c69a44a335d9909c01b008660302a2",
+          "upstream_stable_159_sha": "b22712ae96c69a44a335d9909c01b008660302a2",
+          "vulpra_sha": "b22712ae96c69a44a335d9909c01b008660302a2",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/media/webrtc/jsapi/MediaTransportHandler.h",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "4281503a06a8afc86c4d68607834d8af5ccb97f8",
+          "pinned_beta_sha": "4281503a06a8afc86c4d68607834d8af5ccb97f8",
+          "upstream_stable_159_sha": "4281503a06a8afc86c4d68607834d8af5ccb97f8",
+          "vulpra_sha": "4281503a06a8afc86c4d68607834d8af5ccb97f8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/media/webrtc/jsapi/MediaTransportHandlerIPC.cpp",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "ce8295e52fe222169b5dee106a968bf76e6aac5f",
+          "pinned_beta_sha": "ce8295e52fe222169b5dee106a968bf76e6aac5f",
+          "upstream_stable_159_sha": "ce8295e52fe222169b5dee106a968bf76e6aac5f",
+          "vulpra_sha": "ce8295e52fe222169b5dee106a968bf76e6aac5f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/media/webrtc/jsapi/MediaTransportHandlerIPC.h",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "430f044b797643d5c47c7244400b2448a55c403b",
+          "pinned_beta_sha": "430f044b797643d5c47c7244400b2448a55c403b",
+          "upstream_stable_159_sha": "430f044b797643d5c47c7244400b2448a55c403b",
+          "vulpra_sha": "430f044b797643d5c47c7244400b2448a55c403b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/media/webrtc/jsapi/moz.build",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "98517ce2ec4d358f06ec69c33a5da2d441192d8e",
+          "pinned_beta_sha": "37b2fa6fa950ee0e4bf7d3c5b373c780ac4d1d13",
+          "upstream_stable_159_sha": "37b2fa6fa950ee0e4bf7d3c5b373c780ac4d1d13",
+          "vulpra_sha": "37b2fa6fa950ee0e4bf7d3c5b373c780ac4d1d13",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/media/webrtc/tests/mochitests/mochitest_peerconnection.toml",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "91c77d7715647d896052810601d90be3ec49863b",
+          "pinned_beta_sha": "bf927ea1b71687c6e6dba5de031f88c004a95c85",
+          "upstream_stable_159_sha": "bf927ea1b71687c6e6dba5de031f88c004a95c85",
+          "vulpra_sha": "bf927ea1b71687c6e6dba5de031f88c004a95c85",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/media/webrtc/tests/mochitests/test_peerConnection_offline.html",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "97dcf07be53941c7d44d851ef1b39d9731dfd8d5",
+          "pinned_beta_sha": "97dcf07be53941c7d44d851ef1b39d9731dfd8d5",
+          "upstream_stable_159_sha": "97dcf07be53941c7d44d851ef1b39d9731dfd8d5",
+          "vulpra_sha": "97dcf07be53941c7d44d851ef1b39d9731dfd8d5",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "media/webrtc/signaling/gtest/mediapipeline_unittest.cpp",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "fd3bf9604024c3752d51c89f64cbeb292f7a10bc",
+          "pinned_beta_sha": "fd3bf9604024c3752d51c89f64cbeb292f7a10bc",
+          "upstream_stable_159_sha": "fd3bf9604024c3752d51c89f64cbeb292f7a10bc",
+          "vulpra_sha": "fd3bf9604024c3752d51c89f64cbeb292f7a10bc",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "media/webrtc/signaling/gtest/mediatransporthandler_unittest.cpp",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "bb41f67ff0a6d49fb365bc916a681ee81adbb42b",
+          "pinned_beta_sha": "bb41f67ff0a6d49fb365bc916a681ee81adbb42b",
+          "upstream_stable_159_sha": "bb41f67ff0a6d49fb365bc916a681ee81adbb42b",
+          "vulpra_sha": "bb41f67ff0a6d49fb365bc916a681ee81adbb42b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "media/webrtc/signaling/gtest/moz.build",
+          "upstream_last_touched_commit": "6e7cf87d85e7518749db2283fb513a5b0db84af9",
+          "upstream_selected_patch_result_sha": "d10412da5901e24bddcde657c66f9d46430856b7",
+          "pinned_beta_sha": "542890b5a6d807135efd304c1d0e80631313e469",
+          "upstream_stable_159_sha": "542890b5a6d807135efd304c1d0e80631313e469",
+          "vulpra_sha": "542890b5a6d807135efd304c1d0e80631313e469",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "checked_vulpra_main_head": "ba1a45ead670e73fe9640b0f86c39e60f78a198c",
+      "note": "All eleven unique touched paths across nsSocketTransportService, WebRTC signaling implementation and test/build files match beta, Firefox 159 stable and Vulpra. Includes thread shutdown lifecycle safeguards and tests. Later formatting commit changes a postimage not retained identically in beta/stable; comparison against the fixed release itself is exact. No runtime exploit test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118007",
+      "bug": 2075296,
+      "topic": "JavaScript GC use-after-free / cross-zone unique symbol wrapping and atom-marking",
+      "patch_commits": [
+        "febb26bdcf66da42606dba79d9461e009fe00d3c",
+        "5faf0b483e468272565214332b33ebac6a995271",
+        "67a2e22962212c83d26caddb9e060a5140827ec4",
+        "b067bc41fda4fced912eb2ce40109900a1114d6e",
+        "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+        "656b399bff950b11cb4f35ccdf7895b95e335a8c",
+        "7fa195f12cb697438e8206a772f50ca5414b5608",
+        "ab3482f26543073ae496013f77e0fc09bb096113",
+        "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+        "427c9a61347c910ebe2553ce8476c6cbc1413650"
+      ],
+      "classification": "all_74_ten_part_fix_touched_paths_identical_between_pinned_beta_stable_159_and_vulpra_subset_match_selected_upstream_commits",
+      "source_file_blobs": [
+        {
+          "path": "js/public/Zone.h",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "0db8cc89582c95e395b2f03ecf49fc4d1fd17241",
+          "pinned_beta_sha": "0db8cc89582c95e395b2f03ecf49fc4d1fd17241",
+          "upstream_stable_159_sha": "0db8cc89582c95e395b2f03ecf49fc4d1fd17241",
+          "vulpra_sha": "0db8cc89582c95e395b2f03ecf49fc4d1fd17241",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/public/Symbol.h",
+          "upstream_last_touched_commit": "7fa195f12cb697438e8206a772f50ca5414b5608",
+          "upstream_selected_patch_result_sha": "137a36f52e5a2042c7abbcc00969c5bc37075e50",
+          "pinned_beta_sha": "137a36f52e5a2042c7abbcc00969c5bc37075e50",
+          "upstream_stable_159_sha": "137a36f52e5a2042c7abbcc00969c5bc37075e50",
+          "vulpra_sha": "137a36f52e5a2042c7abbcc00969c5bc37075e50",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/debugger/Debugger.cpp",
+          "upstream_last_touched_commit": "febb26bdcf66da42606dba79d9461e009fe00d3c",
+          "upstream_selected_patch_result_sha": "734904920529c1a426772aae5513b37c7d5b76e7",
+          "pinned_beta_sha": "734904920529c1a426772aae5513b37c7d5b76e7",
+          "upstream_stable_159_sha": "734904920529c1a426772aae5513b37c7d5b76e7",
+          "vulpra_sha": "734904920529c1a426772aae5513b37c7d5b76e7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/debugger/Environment.cpp",
+          "upstream_last_touched_commit": "febb26bdcf66da42606dba79d9461e009fe00d3c",
+          "upstream_selected_patch_result_sha": "2ebe7043f22d97b4d606e6633085470e40b59406",
+          "pinned_beta_sha": "2ebe7043f22d97b4d606e6633085470e40b59406",
+          "upstream_stable_159_sha": "2ebe7043f22d97b4d606e6633085470e40b59406",
+          "vulpra_sha": "2ebe7043f22d97b4d606e6633085470e40b59406",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/debugger/Frame.cpp",
+          "upstream_last_touched_commit": "febb26bdcf66da42606dba79d9461e009fe00d3c",
+          "upstream_selected_patch_result_sha": "f02ae572b20867b1c1339a82337e5c9144c57617",
+          "pinned_beta_sha": "f02ae572b20867b1c1339a82337e5c9144c57617",
+          "upstream_stable_159_sha": "f02ae572b20867b1c1339a82337e5c9144c57617",
+          "vulpra_sha": "f02ae572b20867b1c1339a82337e5c9144c57617",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/debugger/Object.cpp",
+          "upstream_last_touched_commit": "febb26bdcf66da42606dba79d9461e009fe00d3c",
+          "upstream_selected_patch_result_sha": "dddede7b028f637e875abb58ec0f072caec853de",
+          "pinned_beta_sha": "dddede7b028f637e875abb58ec0f072caec853de",
+          "upstream_stable_159_sha": "dddede7b028f637e875abb58ec0f072caec853de",
+          "vulpra_sha": "dddede7b028f637e875abb58ec0f072caec853de",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/frontend/BytecodeCompiler.cpp",
+          "upstream_last_touched_commit": "febb26bdcf66da42606dba79d9461e009fe00d3c",
+          "upstream_selected_patch_result_sha": "335fa110582ef5e0626c3c70b816231fa8751685",
+          "pinned_beta_sha": "335fa110582ef5e0626c3c70b816231fa8751685",
+          "upstream_stable_159_sha": "335fa110582ef5e0626c3c70b816231fa8751685",
+          "vulpra_sha": "335fa110582ef5e0626c3c70b816231fa8751685",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/proxy/CrossCompartmentWrapper.cpp",
+          "upstream_last_touched_commit": "febb26bdcf66da42606dba79d9461e009fe00d3c",
+          "upstream_selected_patch_result_sha": "84c65fc84903277cfe99d6f80a5fa7b6c2ec54fc",
+          "pinned_beta_sha": "84c65fc84903277cfe99d6f80a5fa7b6c2ec54fc",
+          "upstream_stable_159_sha": "84c65fc84903277cfe99d6f80a5fa7b6c2ec54fc",
+          "vulpra_sha": "84c65fc84903277cfe99d6f80a5fa7b6c2ec54fc",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/proxy/Proxy.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "4ecf3ef44ec8bbdea9b395b32e672d9e04d50075",
+          "pinned_beta_sha": "4ecf3ef44ec8bbdea9b395b32e672d9e04d50075",
+          "upstream_stable_159_sha": "4ecf3ef44ec8bbdea9b395b32e672d9e04d50075",
+          "vulpra_sha": "4ecf3ef44ec8bbdea9b395b32e672d9e04d50075",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/shell/js.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "44ac9793342e7982cf0b17c30a11e0d673109b99",
+          "pinned_beta_sha": "44ac9793342e7982cf0b17c30a11e0d673109b99",
+          "upstream_stable_159_sha": "44ac9793342e7982cf0b17c30a11e0d673109b99",
+          "vulpra_sha": "44ac9793342e7982cf0b17c30a11e0d673109b99",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jsapi.cpp",
+          "upstream_last_touched_commit": "7fa195f12cb697438e8206a772f50ca5414b5608",
+          "upstream_selected_patch_result_sha": "acb743cf731bff72bc90faa14bdbba57d14a1e83",
+          "pinned_beta_sha": "04fb2a5e66e4e59fa9840a3a437825dc45e76f6c",
+          "upstream_stable_159_sha": "04fb2a5e66e4e59fa9840a3a437825dc45e76f6c",
+          "vulpra_sha": "04fb2a5e66e4e59fa9840a3a437825dc45e76f6c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/jsapi.h",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "aa406d46e3da90311690fd87e0ebb5f15457a807",
+          "pinned_beta_sha": "aa406d46e3da90311690fd87e0ebb5f15457a807",
+          "upstream_stable_159_sha": "aa406d46e3da90311690fd87e0ebb5f15457a807",
+          "vulpra_sha": "aa406d46e3da90311690fd87e0ebb5f15457a807",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jl",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "pinned_beta_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "upstream_stable_159_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "vulpra_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/Compartment-inl.h",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "a4aaf50bb072127704144171736aac07ea36db42",
+          "pinned_beta_sha": "a4aaf50bb072127704144171736aac07ea36db42",
+          "upstream_stable_159_sha": "a4aaf50bb072127704144171736aac07ea36db42",
+          "vulpra_sha": "a4aaf50bb072127704144171736aac07ea36db42",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/JSContext.h",
+          "upstream_last_touched_commit": "5faf0b483e468272565214332b33ebac6a995271",
+          "upstream_selected_patch_result_sha": "0ee80aa3d15e9aac35e91c34a95f53340924311d",
+          "pinned_beta_sha": "ada76cd543e98f8e8e26914515858784073d9fd7",
+          "upstream_stable_159_sha": "ada76cd543e98f8e8e26914515858784073d9fd7",
+          "vulpra_sha": "ada76cd543e98f8e8e26914515858784073d9fd7",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/vm/SymbolType.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "f45019955127572a02a4c9b9c262ca4e936b4871",
+          "pinned_beta_sha": "f45019955127572a02a4c9b9c262ca4e936b4871",
+          "upstream_stable_159_sha": "f45019955127572a02a4c9b9c262ca4e936b4871",
+          "vulpra_sha": "f45019955127572a02a4c9b9c262ca4e936b4871",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/JSContext.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "c9b0b24d0f21ad45bbb42112ae8bbad97d1f79a1",
+          "pinned_beta_sha": "707d0901edeed310c6c63f8c5ef51cc3856ae1f5",
+          "upstream_stable_159_sha": "707d0901edeed310c6c63f8c5ef51cc3856ae1f5",
+          "vulpra_sha": "707d0901edeed310c6c63f8c5ef51cc3856ae1f5",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/vm/JSContext-inl.h",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "00d578cf5dbe41ba35e3cacba48419e7ba087639",
+          "pinned_beta_sha": "00d578cf5dbe41ba35e3cacba48419e7ba087639",
+          "upstream_stable_159_sha": "00d578cf5dbe41ba35e3cacba48419e7ba087639",
+          "vulpra_sha": "00d578cf5dbe41ba35e3cacba48419e7ba087639",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/SymbolType.h",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "364a16917522fe597a12b64407d4f3c51d699cc8",
+          "pinned_beta_sha": "364a16917522fe597a12b64407d4f3c51d699cc8",
+          "upstream_stable_159_sha": "364a16917522fe597a12b64407d4f3c51d699cc8",
+          "vulpra_sha": "364a16917522fe597a12b64407d4f3c51d699cc8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/Compartment.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "7c2249c6df0a883989dc948311e01a70cad8afc4",
+          "pinned_beta_sha": "7c2249c6df0a883989dc948311e01a70cad8afc4",
+          "upstream_stable_159_sha": "7c2249c6df0a883989dc948311e01a70cad8afc4",
+          "vulpra_sha": "7c2249c6df0a883989dc948311e01a70cad8afc4",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/EqualityOperations.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "b9166b41fad1e3de4999d7be8e01a736cf584209",
+          "pinned_beta_sha": "b9166b41fad1e3de4999d7be8e01a736cf584209",
+          "upstream_stable_159_sha": "b9166b41fad1e3de4999d7be8e01a736cf584209",
+          "vulpra_sha": "b9166b41fad1e3de4999d7be8e01a736cf584209",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/JSAtomUtils.h",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "83042a7f82172684d2737e25353ffe9450d19453",
+          "pinned_beta_sha": "83042a7f82172684d2737e25353ffe9450d19453",
+          "upstream_stable_159_sha": "83042a7f82172684d2737e25353ffe9450d19453",
+          "vulpra_sha": "83042a7f82172684d2737e25353ffe9450d19453",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/AtomMarking-inl.h",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "0a3fc40d359928e265bdae42ceaa6d4cffdeffea",
+          "pinned_beta_sha": "0a3fc40d359928e265bdae42ceaa6d4cffdeffea",
+          "upstream_stable_159_sha": "0a3fc40d359928e265bdae42ceaa6d4cffdeffea",
+          "vulpra_sha": "0a3fc40d359928e265bdae42ceaa6d4cffdeffea",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/AtomMarking.cpp",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "3f2b0d26a21b7fd6d22f2a00b25bd78415e6cf2f",
+          "pinned_beta_sha": "3f2b0d26a21b7fd6d22f2a00b25bd78415e6cf2f",
+          "upstream_stable_159_sha": "3f2b0d26a21b7fd6d22f2a00b25bd78415e6cf2f",
+          "vulpra_sha": "3f2b0d26a21b7fd6d22f2a00b25bd78415e6cf2f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/AtomMarking.h",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "6b473c47132e03757da03168fa6e58d8872ec4ec",
+          "pinned_beta_sha": "6b473c47132e03757da03168fa6e58d8872ec4ec",
+          "upstream_stable_159_sha": "6b473c47132e03757da03168fa6e58d8872ec4ec",
+          "vulpra_sha": "6b473c47132e03757da03168fa6e58d8872ec4ec",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/Cell.h",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "64ee06b85e3949c58b0fe1345bad5a6abc62dbfe",
+          "pinned_beta_sha": "64ee06b85e3949c58b0fe1345bad5a6abc62dbfe",
+          "upstream_stable_159_sha": "64ee06b85e3949c58b0fe1345bad5a6abc62dbfe",
+          "vulpra_sha": "64ee06b85e3949c58b0fe1345bad5a6abc62dbfe",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/TraceMethods-inl.h",
+          "upstream_last_touched_commit": "b067bc41fda4fced912eb2ce40109900a1114d6e",
+          "upstream_selected_patch_result_sha": "45c02bce89307c752c13621e0fe4296090a4340b",
+          "pinned_beta_sha": "45c02bce89307c752c13621e0fe4296090a4340b",
+          "upstream_stable_159_sha": "45c02bce89307c752c13621e0fe4296090a4340b",
+          "vulpra_sha": "45c02bce89307c752c13621e0fe4296090a4340b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/Allocator.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "a53314a26cfca052de77f00fc305efe37e448dc3",
+          "pinned_beta_sha": "a53314a26cfca052de77f00fc305efe37e448dc3",
+          "upstream_stable_159_sha": "a53314a26cfca052de77f00fc305efe37e448dc3",
+          "vulpra_sha": "a53314a26cfca052de77f00fc305efe37e448dc3",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/Marking.cpp",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "7d59a9e8402113aa22caa7d5c7afd4cab211be65",
+          "pinned_beta_sha": "7d59a9e8402113aa22caa7d5c7afd4cab211be65",
+          "upstream_stable_159_sha": "7d59a9e8402113aa22caa7d5c7afd4cab211be65",
+          "vulpra_sha": "7d59a9e8402113aa22caa7d5c7afd4cab211be65",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/RootMarking.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "93e1a8d3dd203c0e3ebe0b27615566791505ec7f",
+          "pinned_beta_sha": "93e1a8d3dd203c0e3ebe0b27615566791505ec7f",
+          "upstream_stable_159_sha": "93e1a8d3dd203c0e3ebe0b27615566791505ec7f",
+          "vulpra_sha": "93e1a8d3dd203c0e3ebe0b27615566791505ec7f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/Sweeping.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "aaedbb814a676084a9ff0003ea05212324d6d790",
+          "pinned_beta_sha": "aaedbb814a676084a9ff0003ea05212324d6d790",
+          "upstream_stable_159_sha": "aaedbb814a676084a9ff0003ea05212324d6d790",
+          "vulpra_sha": "aaedbb814a676084a9ff0003ea05212324d6d790",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/Verifier.cpp",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "707927da3646eed6cfbaf1c53a29a0cba31f2bd8",
+          "pinned_beta_sha": "707927da3646eed6cfbaf1c53a29a0cba31f2bd8",
+          "upstream_stable_159_sha": "707927da3646eed6cfbaf1c53a29a0cba31f2bd8",
+          "vulpra_sha": "707927da3646eed6cfbaf1c53a29a0cba31f2bd8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/WeakMap-inl.h",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "8d11735cd6e02476bb85e8ea2ebd02fa289d6cf1",
+          "pinned_beta_sha": "8d11735cd6e02476bb85e8ea2ebd02fa289d6cf1",
+          "upstream_stable_159_sha": "8d11735cd6e02476bb85e8ea2ebd02fa289d6cf1",
+          "vulpra_sha": "8d11735cd6e02476bb85e8ea2ebd02fa289d6cf1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/WeakMap.h",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "954fa8be2b9f97676bb90c6f63069a8ed467f9ff",
+          "pinned_beta_sha": "954fa8be2b9f97676bb90c6f63069a8ed467f9ff",
+          "upstream_stable_159_sha": "954fa8be2b9f97676bb90c6f63069a8ed467f9ff",
+          "vulpra_sha": "954fa8be2b9f97676bb90c6f63069a8ed467f9ff",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/Zone.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "44339e4c1ae639b1ce50ed116dd07a882afaa0f4",
+          "pinned_beta_sha": "44339e4c1ae639b1ce50ed116dd07a882afaa0f4",
+          "upstream_stable_159_sha": "44339e4c1ae639b1ce50ed116dd07a882afaa0f4",
+          "vulpra_sha": "44339e4c1ae639b1ce50ed116dd07a882afaa0f4",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/Zone.h",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "220cb97abbdc1c43fbb822d79e3586bc6089e313",
+          "pinned_beta_sha": "220cb97abbdc1c43fbb822d79e3586bc6089e313",
+          "upstream_stable_159_sha": "220cb97abbdc1c43fbb822d79e3586bc6089e313",
+          "vulpra_sha": "220cb97abbdc1c43fbb822d79e3586bc6089e313",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gc/GC.cpp",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "3f5d7128140820976ad39263e0bfbb7277889685",
+          "pinned_beta_sha": "262d4283a97abc9fc6d54b2d03eaa4d16f603dcf",
+          "upstream_stable_159_sha": "262d4283a97abc9fc6d54b2d03eaa4d16f603dcf",
+          "vulpra_sha": "262d4283a97abc9fc6d54b2d03eaa4d16f603dcf",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/gc/GCRuntime.h",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "0027dc461f9958d333862fbbff44b9307acf2214",
+          "pinned_beta_sha": "0027dc461f9958d333862fbbff44b9307acf2214",
+          "upstream_stable_159_sha": "0027dc461f9958d333862fbbff44b9307acf2214",
+          "vulpra_sha": "0027dc461f9958d333862fbbff44b9307acf2214",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/ChromeUtils.cpp",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "4cbf593d0ee7efe6fd145b953553500844792700",
+          "pinned_beta_sha": "4cbf593d0ee7efe6fd145b953553500844792700",
+          "upstream_stable_159_sha": "4cbf593d0ee7efe6fd145b953553500844792700",
+          "vulpra_sha": "4cbf593d0ee7efe6fd145b953553500844792700",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/MaybeCrossOriginObject.cpp",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "7a1a95006caf5cb36439e381bf1a01c6e9134e0a",
+          "pinned_beta_sha": "7a1a95006caf5cb36439e381bf1a01c6e9134e0a",
+          "upstream_stable_159_sha": "7a1a95006caf5cb36439e381bf1a01c6e9134e0a",
+          "vulpra_sha": "7a1a95006caf5cb36439e381bf1a01c6e9134e0a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/nsGlobalWindowOuter.cpp",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "a224a8773b862ccb9af76c27e1166a0e6111ef93",
+          "pinned_beta_sha": "59a1a4671078a3fc3491a5200c30d908fd87cbf1",
+          "upstream_stable_159_sha": "59a1a4671078a3fc3491a5200c30d908fd87cbf1",
+          "vulpra_sha": "59a1a4671078a3fc3491a5200c30d908fd87cbf1",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/bindings/BindingUtils.h",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "19bf4535deb7296a079537acb1a1f8c676a10117",
+          "pinned_beta_sha": "9ade09b0bc6535b30a81c1bced057335adf961ef",
+          "upstream_stable_159_sha": "9ade09b0bc6535b30a81c1bced057335adf961ef",
+          "vulpra_sha": "9ade09b0bc6535b30a81c1bced057335adf961ef",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/bindings/Codegen.py",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "033958a2e00f057eca1393c75692782059b8acc8",
+          "pinned_beta_sha": "33560ca1e835d500e96ce3145c77876c49ef907c",
+          "upstream_stable_159_sha": "33560ca1e835d500e96ce3145c77876c49ef907c",
+          "vulpra_sha": "33560ca1e835d500e96ce3145c77876c49ef907c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/xpconnect/src/ExportHelpers.cpp",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "156ccae36fe784a0ab63269887ebe176f9914cba",
+          "pinned_beta_sha": "156ccae36fe784a0ab63269887ebe176f9914cba",
+          "upstream_stable_159_sha": "156ccae36fe784a0ab63269887ebe176f9914cba",
+          "vulpra_sha": "156ccae36fe784a0ab63269887ebe176f9914cba",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/xpconnect/src/Sandbox.cpp",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "34e0724f35b69447027d0791ee3755719f8a9803",
+          "pinned_beta_sha": "34e0724f35b69447027d0791ee3755719f8a9803",
+          "upstream_stable_159_sha": "34e0724f35b69447027d0791ee3755719f8a9803",
+          "vulpra_sha": "34e0724f35b69447027d0791ee3755719f8a9803",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/xpconnect/src/XPCWrappedNativeInfo.cpp",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "c46555c410fdb91bcf6ddd0ecbc39e0d43a0820c",
+          "pinned_beta_sha": "c46555c410fdb91bcf6ddd0ecbc39e0d43a0820c",
+          "upstream_stable_159_sha": "c46555c410fdb91bcf6ddd0ecbc39e0d43a0820c",
+          "vulpra_sha": "c46555c410fdb91bcf6ddd0ecbc39e0d43a0820c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/xpconnect/src/XPCWrappedNativeJSOps.cpp",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "0eb52acaf10e766befe7230f2bbfaf9369dd1791",
+          "pinned_beta_sha": "0eb52acaf10e766befe7230f2bbfaf9369dd1791",
+          "upstream_stable_159_sha": "0eb52acaf10e766befe7230f2bbfaf9369dd1791",
+          "vulpra_sha": "0eb52acaf10e766befe7230f2bbfaf9369dd1791",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/xpconnect/wrappers/XrayWrapper.cpp",
+          "upstream_last_touched_commit": "67a2e22962212c83d26caddb9e060a5140827ec4",
+          "upstream_selected_patch_result_sha": "4559682dee1b4f05b9215f85214e5db6004c43eb",
+          "pinned_beta_sha": "4559682dee1b4f05b9215f85214e5db6004c43eb",
+          "upstream_stable_159_sha": "4559682dee1b4f05b9215f85214e5db6004c43eb",
+          "vulpra_sha": "4559682dee1b4f05b9215f85214e5db6004c43eb",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/builtin/FinalizationRegistryObject.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "daa0fb7d0d0245775b8c366833de338755370471",
+          "pinned_beta_sha": "2d9dba4159fb42da46180015dcff2b4dc72fd5e2",
+          "upstream_stable_159_sha": "2d9dba4159fb42da46180015dcff2b4dc72fd5e2",
+          "vulpra_sha": "2d9dba4159fb42da46180015dcff2b4dc72fd5e2",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/builtin/TestingFunctions.cpp",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "163f580fc133f067a9aca441bc376046e8e6ffe8",
+          "pinned_beta_sha": "d69dddd6f1f423f7a773ebf40402f5c00bd72b02",
+          "upstream_stable_159_sha": "d69dddd6f1f423f7a773ebf40402f5c00bd72b02",
+          "vulpra_sha": "d69dddd6f1f423f7a773ebf40402f5c00bd72b02",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/builtin/WeakRefObject.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "4ef3fd4485ccee4547b4c6fd4aa55ed2cd2b2060",
+          "pinned_beta_sha": "4ef3fd4485ccee4547b4c6fd4aa55ed2cd2b2060",
+          "upstream_stable_159_sha": "4ef3fd4485ccee4547b4c6fd4aa55ed2cd2b2060",
+          "vulpra_sha": "4ef3fd4485ccee4547b4c6fd4aa55ed2cd2b2060",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/builtin/Symbol.cpp",
+          "upstream_last_touched_commit": "7fa195f12cb697438e8206a772f50ca5414b5608",
+          "upstream_selected_patch_result_sha": "0b27d03a7e0eb3bdec55f9ecbc90132767b740ce",
+          "pinned_beta_sha": "0b27d03a7e0eb3bdec55f9ecbc90132767b740ce",
+          "upstream_stable_159_sha": "0b27d03a7e0eb3bdec55f9ecbc90132767b740ce",
+          "vulpra_sha": "0b27d03a7e0eb3bdec55f9ecbc90132767b740ce",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-1994871.js",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "d10918b9a89848f6f97d5c8f8715abef1595da0d",
+          "pinned_beta_sha": "d10918b9a89848f6f97d5c8f8715abef1595da0d",
+          "upstream_stable_159_sha": "d10918b9a89848f6f97d5c8f8715abef1595da0d",
+          "vulpra_sha": "d10918b9a89848f6f97d5c8f8715abef1595da0d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-1997896.js",
+          "upstream_last_touched_commit": "736e0c5723f9ea6183e4b9a794837fe6eff53a50",
+          "upstream_selected_patch_result_sha": "9c7d2b8d41a69340d1ce6aa33f61bd481a454e42",
+          "pinned_beta_sha": "9c7d2b8d41a69340d1ce6aa33f61bd481a454e42",
+          "upstream_stable_159_sha": "9c7d2b8d41a69340d1ce6aa33f61bd481a454e42",
+          "vulpra_sha": "9c7d2b8d41a69340d1ce6aa33f61bd481a454e42",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2029769.js",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "3f462611e7d076bc9624f3b14f2b2f1c22161a3f",
+          "pinned_beta_sha": "3f462611e7d076bc9624f3b14f2b2f1c22161a3f",
+          "upstream_stable_159_sha": "3f462611e7d076bc9624f3b14f2b2f1c22161a3f",
+          "vulpra_sha": "3f462611e7d076bc9624f3b14f2b2f1c22161a3f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2042465.js",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "f14a9b02266ee2ceedb7302cd66f8aee5aaced6c",
+          "pinned_beta_sha": "f14a9b02266ee2ceedb7302cd66f8aee5aaced6c",
+          "upstream_stable_159_sha": "f14a9b02266ee2ceedb7302cd66f8aee5aaced6c",
+          "vulpra_sha": "f14a9b02266ee2ceedb7302cd66f8aee5aaced6c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2061775.js",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "efa178ccb6d8bcbf93f333d8d7d34ae6381bc8e1",
+          "pinned_beta_sha": "efa178ccb6d8bcbf93f333d8d7d34ae6381bc8e1",
+          "upstream_stable_159_sha": "efa178ccb6d8bcbf93f333d8d7d34ae6381bc8e1",
+          "vulpra_sha": "efa178ccb6d8bcbf93f333d8d7d34ae6381bc8e1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/marked-atoms.js",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "3f06be17873a5de0fd3d7f270323d2bfd1833f71",
+          "pinned_beta_sha": "3f06be17873a5de0fd3d7f270323d2bfd1833f71",
+          "upstream_stable_159_sha": "3f06be17873a5de0fd3d7f270323d2bfd1833f71",
+          "vulpra_sha": "3f06be17873a5de0fd3d7f270323d2bfd1833f71",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/symbols-as-weakmap-keys.js",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "2b293d740f8d6975c40b6c5d2799f896686a04ef",
+          "pinned_beta_sha": "2b293d740f8d6975c40b6c5d2799f896686a04ef",
+          "upstream_stable_159_sha": "2b293d740f8d6975c40b6c5d2799f896686a04ef",
+          "vulpra_sha": "2b293d740f8d6975c40b6c5d2799f896686a04ef",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/symbol-cross-zone-identity.js",
+          "upstream_last_touched_commit": "656b399bff950b11cb4f35ccdf7895b95e335a8c",
+          "upstream_selected_patch_result_sha": "7816cee6b32fbca327dda9ea74869084e5764136",
+          "pinned_beta_sha": "7816cee6b32fbca327dda9ea74869084e5764136",
+          "upstream_stable_159_sha": "7816cee6b32fbca327dda9ea74869084e5764136",
+          "vulpra_sha": "7816cee6b32fbca327dda9ea74869084e5764136",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/symbol-cross-zone-weakref-finalization.js",
+          "upstream_last_touched_commit": "656b399bff950b11cb4f35ccdf7895b95e335a8c",
+          "upstream_selected_patch_result_sha": "b9ceab436a92534bed1d8be480997d2dfa2d7d89",
+          "pinned_beta_sha": "b9ceab436a92534bed1d8be480997d2dfa2d7d89",
+          "upstream_stable_159_sha": "b9ceab436a92534bed1d8be480997d2dfa2d7d89",
+          "vulpra_sha": "b9ceab436a92534bed1d8be480997d2dfa2d7d89",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/symbol-description-atom-ref.js",
+          "upstream_last_touched_commit": "7fa195f12cb697438e8206a772f50ca5414b5608",
+          "upstream_selected_patch_result_sha": "e010a0c2c58548acfa517bdbd68666d93c53eccb",
+          "pinned_beta_sha": "e010a0c2c58548acfa517bdbd68666d93c53eccb",
+          "upstream_stable_159_sha": "e010a0c2c58548acfa517bdbd68666d93c53eccb",
+          "vulpra_sha": "e010a0c2c58548acfa517bdbd68666d93c53eccb",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2068369.js",
+          "upstream_last_touched_commit": "427c9a61347c910ebe2553ce8476c6cbc1413650",
+          "upstream_selected_patch_result_sha": "465d47fa4939910250b6439be981da5664c81911",
+          "pinned_beta_sha": "465d47fa4939910250b6439be981da5664c81911",
+          "upstream_stable_159_sha": "465d47fa4939910250b6439be981da5664c81911",
+          "vulpra_sha": "465d47fa4939910250b6439be981da5664c81911",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2068384.js",
+          "upstream_last_touched_commit": "427c9a61347c910ebe2553ce8476c6cbc1413650",
+          "upstream_selected_patch_result_sha": "da6c16899521a065a16255a2026e8b2a6f921424",
+          "pinned_beta_sha": "da6c16899521a065a16255a2026e8b2a6f921424",
+          "upstream_stable_159_sha": "da6c16899521a065a16255a2026e8b2a6f921424",
+          "vulpra_sha": "da6c16899521a065a16255a2026e8b2a6f921424",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2073649.js",
+          "upstream_last_touched_commit": "427c9a61347c910ebe2553ce8476c6cbc1413650",
+          "upstream_selected_patch_result_sha": "e0aa45a83a1c5df5813dad06b96255698b86f4ad",
+          "pinned_beta_sha": "e0aa45a83a1c5df5813dad06b96255698b86f4ad",
+          "upstream_stable_159_sha": "e0aa45a83a1c5df5813dad06b96255698b86f4ad",
+          "vulpra_sha": "e0aa45a83a1c5df5813dad06b96255698b86f4ad",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2074215.js",
+          "upstream_last_touched_commit": "427c9a61347c910ebe2553ce8476c6cbc1413650",
+          "upstream_selected_patch_result_sha": "adaf8c9f7347441595e793e03435fb40ca7bc765",
+          "pinned_beta_sha": "adaf8c9f7347441595e793e03435fb40ca7bc765",
+          "upstream_stable_159_sha": "adaf8c9f7347441595e793e03435fb40ca7bc765",
+          "vulpra_sha": "adaf8c9f7347441595e793e03435fb40ca7bc765",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2077750.js",
+          "upstream_last_touched_commit": "427c9a61347c910ebe2553ce8476c6cbc1413650",
+          "upstream_selected_patch_result_sha": "2299f5b9e6c7a51c3e7d64bc98f6e4a0f0557ff9",
+          "pinned_beta_sha": "2299f5b9e6c7a51c3e7d64bc98f6e4a0f0557ff9",
+          "upstream_stable_159_sha": "2299f5b9e6c7a51c3e7d64bc98f6e4a0f0557ff9",
+          "vulpra_sha": "2299f5b9e6c7a51c3e7d64bc98f6e4a0f0557ff9",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2078783.js",
+          "upstream_last_touched_commit": "427c9a61347c910ebe2553ce8476c6cbc1413650",
+          "upstream_selected_patch_result_sha": "0f8332ff4009c317f3a7a8e453d461a1deb7bec7",
+          "pinned_beta_sha": "0f8332ff4009c317f3a7a8e453d461a1deb7bec7",
+          "upstream_stable_159_sha": "0f8332ff4009c317f3a7a8e453d461a1deb7bec7",
+          "vulpra_sha": "0f8332ff4009c317f3a7a8e453d461a1deb7bec7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/VMFunctions.cpp",
+          "upstream_last_touched_commit": "d845966f7bf2d20968f4b5a70a7b208e3a3ecf10",
+          "upstream_selected_patch_result_sha": "9c17f376119be31f785e088ee6f5848d1c42f2e6",
+          "pinned_beta_sha": "9c17f376119be31f785e088ee6f5848d1c42f2e6",
+          "upstream_stable_159_sha": "9c17f376119be31f785e088ee6f5848d1c42f2e6",
+          "vulpra_sha": "9c17f376119be31f785e088ee6f5848d1c42f2e6",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jsapi-tests/testSymbol.cpp",
+          "upstream_last_touched_commit": "7fa195f12cb697438e8206a772f50ca5414b5608",
+          "upstream_selected_patch_result_sha": "fb69b830c14d1f0e4c9f0dae95e99da3c5bda833",
+          "pinned_beta_sha": "fb69b830c14d1f0e4c9f0dae95e99da3c5bda833",
+          "upstream_stable_159_sha": "fb69b830c14d1f0e4c9f0dae95e99da3c5bda833",
+          "vulpra_sha": "fb69b830c14d1f0e4c9f0dae95e99da3c5bda833",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gdb/mozilla/CellHeader.py",
+          "upstream_last_touched_commit": "ab3482f26543073ae496013f77e0fc09bb096113",
+          "upstream_selected_patch_result_sha": "7e7ab5f70bffe6fdf3c237c28c6ce709cd722971",
+          "pinned_beta_sha": "7e7ab5f70bffe6fdf3c237c28c6ce709cd722971",
+          "upstream_stable_159_sha": "7e7ab5f70bffe6fdf3c237c28c6ce709cd722971",
+          "vulpra_sha": "7e7ab5f70bffe6fdf3c237c28c6ce709cd722971",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gdb/mozilla/GCCellPtr.py",
+          "upstream_last_touched_commit": "ab3482f26543073ae496013f77e0fc09bb096113",
+          "upstream_selected_patch_result_sha": "a4efc2a9657e22b1014d8ef9691718c2e316f357",
+          "pinned_beta_sha": "a4efc2a9657e22b1014d8ef9691718c2e316f357",
+          "upstream_stable_159_sha": "a4efc2a9657e22b1014d8ef9691718c2e316f357",
+          "vulpra_sha": "a4efc2a9657e22b1014d8ef9691718c2e316f357",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gdb/mozilla/JSSymbol.py",
+          "upstream_last_touched_commit": "ab3482f26543073ae496013f77e0fc09bb096113",
+          "upstream_selected_patch_result_sha": "0cb44f699f821866dbc33edbdc93829d35a2283d",
+          "pinned_beta_sha": "0cb44f699f821866dbc33edbdc93829d35a2283d",
+          "upstream_stable_159_sha": "0cb44f699f821866dbc33edbdc93829d35a2283d",
+          "vulpra_sha": "0cb44f699f821866dbc33edbdc93829d35a2283d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/gdb/mozilla/prettyprinters.py",
+          "upstream_last_touched_commit": "ab3482f26543073ae496013f77e0fc09bb096113",
+          "upstream_selected_patch_result_sha": "b9aa28e9cde9781c9281a494961762fdd485daba",
+          "pinned_beta_sha": "b9aa28e9cde9781c9281a494961762fdd485daba",
+          "upstream_stable_159_sha": "b9aa28e9cde9781c9281a494961762fdd485daba",
+          "vulpra_sha": "b9aa28e9cde9781c9281a494961762fdd485daba",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "checked_vulpra_main_head": "ba1a45ead670e73fe9640b0f86c39e60f78a198c",
+      "note": "All 74 unique files/paths touched across ten upstream fix series commits checked against three source refs and are identical at beta/stable/Vulpra, including original JS jit tests. Selected intermediate upstream commit results may differ where files changed again or upstream subsequent modifications; use per-file comparison flags. This is source identity of the selected touched paths, not exploit-runtime tests, proof of all relevant security deltas, or complete ancestry."
     }
   ],
-  "additional_source_audit_head": "a15ad6179a056228cc7f89030c4c1c112b37049b"
+  "additional_source_audit_head": "ba1a45ead670e73fe9640b0f86c39e60f78a198c"
 }
