@@ -140,22 +140,53 @@ jobs:
           print("PASS: current source identity, protected features and all three normal-build opt-outs")
           PY
 
+      - name: Reclaim unrelated preinstalled runner SDKs for native browser compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Some GitHub 24.04 hosts have a 72 GiB cow-root, while earlier
+          # successful Vulpra jobs had 145 GiB. Do not weaken the swap and
+          # object-storage safety requirement merely because runner disks vary.
+          # These SDKs are NOT part of the Firefox build/bootstrap, test
+          # harness, system compiler, GitHub Actions Node runtime, mozbuild
+          # toolchains, or sccache. Never touch source, .git, objdir, HOME,
+          # /opt/hostedtoolcache/sccache, or real user browser profiles.
+          echo "Pre-cleanup runner disk:"
+          df -h /mnt
+          # Only delete exact optional preinstalled hosted-runner SDK roots.
+          for path in \
+            /usr/local/lib/android \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/local/share/powershell \
+            /opt/hostedtoolcache/CodeQL; do
+            if test -d "$path" && ! test -L "$path"; then
+              sudo du -sh "$path" || true
+              sudo rm -rf -- "$path"
+            fi
+          done
+          sudo apt-get clean
+          echo "Post-cleanup runner disk:"
+          df -h /mnt
+          echo "PASS: only unrelated preinstalled SDK paths cleared; protected Firefox toolchains unchanged"
+
       - name: Reserve bounded swap for native Rust/C++ build
         shell: bash
         run: |
           set -euo pipefail
-          # GitHub-hosted /mnt capacity varies. Keep at least 8 GiB for
-          # compilation output; use up to 24 GiB of swap, minimum 8 GiB.
+          # GitHub-hosted /mnt capacity varies. Reserve >= 16 GiB for
+          # compiled browser outputs and <= 24 GiB swap (minimum 8 GiB).
           # Do not silently proceed with insufficient swap or disk.
           gib=$((1024*1024*1024))
           free_bytes="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
           [[ "$free_bytes" =~ ^[0-9]+$ ]]
-          headroom=$((8*gib))
+          headroom=$((16*gib))
           minimum_swap=$((8*gib))
           maximum_swap=$((24*gib))
           df -h /mnt
           if (( free_bytes < headroom+minimum_swap )); then
-            echo "::error::Insufficient /mnt free bytes ($free_bytes): require >= 16 GiB before native build"
+            echo "::error::Insufficient /mnt free bytes ($free_bytes): require >= 24 GiB with swap + object headroom after optional SDK cleanup"
             exit 1
           fi
           available_swap=$((free_bytes-headroom))
@@ -164,7 +195,7 @@ jobs:
           fi
           swap_gib=$((available_swap/gib))
           (( swap_gib >= 8 && swap_gib <= 24 ))
-          echo "Reservable swap: $swap_gib GiB; preserving >= 8 GiB of disk headroom"
+          echo "Reservable swap: $swap_gib GiB; preserving >= 16 GiB of disk headroom"
           sudo fallocate -l "$swap_gib"G /mnt/vulpra-m3-native-link.swap
           sudo chmod 0600 /mnt/vulpra-m3-native-link.swap
           sudo mkswap /mnt/vulpra-m3-native-link.swap
