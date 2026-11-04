@@ -3,26 +3,31 @@
 # debug ELF exceeded the former 2 GiB check; the bounded source-side self-test
 # now explicitly covers that real size. Runtime and independent acceptance
 # remain mandatory, and source-only self-tests cannot stand in for either.
-name: M3 Source Matched Native Link Inputs and Runtime
+name: Security 159 Post-Beta Hotfix Native Build and Runtime
 
 on:
   push:
-    branches: [main]
+    branches: [security/firefox-159-postbeta-hotfixes]
     paths:
       - .github/workflows/m3-source-matched-native-link.yml
       - ci/smoke-webextension-package-local.py
+      - docs/vulpra/SECURITY-159-HOTFIX-PORT.json
+      - docshell/**
+      - dom/ipc/**
+      - layout/generic/**
+      - netwerk/ipc/**
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: vulpra-m3-source-matched-native-link
+  group: vulpra-security-159-native-link
   cancel-in-progress: false
 
 jobs:
   compile-link-package-runtime:
-    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/security/firefox-159-postbeta-hotfixes'
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     env:
@@ -44,7 +49,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          # This run must compile current pruned main, not replay the historical
+          # Fail before the expensive full native build if a security patch differs.
+          bash ci/security-159-postbeta-port-check.sh
+          # This run must compile the isolated security port, not the historical
           # original full-normal source used by the M3 dependency register.
           test "$GITHUB_SHA" != b1482404dfb8b01342990ee99ea3df0f9756b5f7
           python3 ci/m3-native-build-link-inputs.py --self-test
@@ -315,7 +322,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: m3-current-native-loader-callsite-evidence
+          name: security-159-native-loader-callsite-evidence
           path: ${{ runner.temp }}/m3-current-native-loader-callsite.json
           if-no-files-found: warn
           retention-days: 14
@@ -324,7 +331,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: m3-source-matched-native-link-evidence
+          name: security-159-source-matched-native-link-evidence
           path: |
             ${{ runner.temp }}/m3-native-link-config.json
             ${{ runner.temp }}/m3-native-link-inputs.json
@@ -349,7 +356,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: m3-native-link-failure-tail
+          name: security-159-native-link-failure-tail
           path: |
             ${{ runner.temp }}/m3-native-link-failure-tail.log
             .git/vulpra-native-build/webextension-tls-failure-*.json
