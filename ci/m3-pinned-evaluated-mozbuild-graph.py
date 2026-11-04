@@ -216,7 +216,16 @@ def main():
         raise ValueError("Configured original-source objdir mismatch")
     if Path.cwd().resolve(strict=True) != root:
         raise ValueError("Only run against pinned original source checkout")
-    if os.environ.get("SOURCE_SHA") != "b1482404dfb8b01342990ee99ea3df0f9756b5f7":
+    source_sha = os.environ.get("SOURCE_SHA", "")
+    current_checkout = os.environ.get("VULPRA_CURRENT_MAIN_EVALUATED_GRAPH") == "1"
+    if current_checkout:
+        # Explicit, CI-only current-main mode. Never label current source
+        # as the immutable original compiled baseline, or accept another SHA.
+        if (not re.fullmatch(r"[0-9a-f]{40}", source_sha) or
+                source_sha != os.environ.get("GITHUB_SHA") or
+                os.environ.get("GITHUB_REF") != "refs/heads/main"):
+            raise ValueError("Exact current main CI source provenance absent")
+    elif source_sha != "b1482404dfb8b01342990ee99ea3df0f9756b5f7":
         raise ValueError("Original source commit provenance absent")
     env = ConfigEnvironment(
         cfg.topsrcdir, cfg.topobjdir,
@@ -600,6 +609,14 @@ def main():
         "source_pruning_authorized": False,
         "m3_sixth_gate_closed": False,
     }
+    if current_checkout:
+        # Keep all historical ORIGINAL evaluator output unchanged while
+        # granting current-main CI its own clearly named provenance/status.
+        payload.pop("original_source_commit")
+        payload["current_source_commit"] = source_sha
+        payload["original_compiled_baseline_represented_by_this_output"] = False
+        payload["current_browser_native_compiled_from_this_graph"] = False
+        payload["status"] = "current_main_configure_evaluated_mozbuild_frontend"
     if emitted < 500 or len(edges) < 200:
         raise ValueError("Unexpectedly small actual emitted source build graph")
     Path(outfile).write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n")
