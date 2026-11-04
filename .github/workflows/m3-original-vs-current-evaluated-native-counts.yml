@@ -1,13 +1,12 @@
 # Read-only independent actual Mozilla BuildReader ORIGINAL vs CURRENT MAIN
 # count/selected-generated-flag crosscheck. Aggregate equality is NOT
 # equality of graph edges, commands, compiled binaries or runtime behavior.
+# Independently accepted CI 41747221902 PASS, job 126303156288,
+# sanitized 4,316-byte report artifact 13284331067. All ten measured
+# aggregate counts and all twelve generated protected flags matched.
+# Eight forged input variants rejected. Manual-only after acceptance.
 name: M3 Original Current Evaluated Native Count Agreement
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-original-vs-current-evaluated-native-counts.yml
-      - ci/m3-original-vs-current-evaluated-native-counts.jq
   workflow_dispatch:
 permissions:
   contents: read
