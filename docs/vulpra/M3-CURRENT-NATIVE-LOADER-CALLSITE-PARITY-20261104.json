@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "status": "verified_current_vs_original_compiled_direct_loader_callsite_parity",
+  "as_of": "2026-11-04",
+  "scope": "selected direct libxul.so loader call/jump branches in exact-source unstripped Linux native ELFs",
+  "historical": {
+    "source_commit": "b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+    "workflow_run": 41342247184,
+    "artifact_id": 13099309380,
+    "artifact_zip_sha256": "06e38ceacd997c1b274016261781892ad43626252a0157142c69fc62b908ec24",
+    "unstripped_libxul_sha256": "611a7ed79e581f84dcefb28bd12737f0c1ccacb8ee88b551a77256eb6616e1c7",
+    "unstripped_libxul_bytes": 2590405472
+  },
+  "current": {
+    "source_commit": "96454f7a1fbe6b505af440c6c2c5fc91e798756d",
+    "workflow_run": 41762298450,
+    "workflow_conclusion": "success",
+    "loader_census_artifact_id": 13292978622,
+    "loader_census_zip_sha256": "5dc78a1b0d2698c94bd2979b8b2d8094461087ca8e37d7093e1e7fe91abec579",
+    "native_link_artifact_id": 13292758940,
+    "native_link_zip_sha256": "e0f4bb8def5d777c99d28fc622dfe8c52a63e6b8d2c1b9e3c87bf22176a8966e",
+    "unstripped_libxul_sha256": "29c18dbee18eda918cfd0013e2e730ae47ddcf888ed5951327e26012aa76b3cf",
+    "unstripped_libxul_bytes": 2590378712,
+    "normal_package_sha256": "279de506d3e737de5c5925549ba690ae32529a4d4e16938b115aceac74c458da",
+    "package_compressed_bytes": 87149884,
+    "compiled_normal_native_browser": true,
+    "packaged_and_runtime_smoke_success": true,
+    "package_native_elf_members": 28,
+    "package_direct_needed_edges": 268
+  },
+  "reconciled": {
+    "committed_jq_script_blob_sha": "bf4d8a487568ebba8a6c41deee714bd5a775fa3c",
+    "source_run_binary_package_sha_join": true,
+    "historical_direct_loader_branches": 73,
+    "current_direct_loader_branches": 73,
+    "historical_caller_api_kind_records": 47,
+    "current_caller_api_kind_records": 47,
+    "changed_caller_api_kind_multiplicities": [],
+    "changed_records": 0,
+    "apis": [
+      {
+        "name": "PR_LoadLibrary",
+        "original_branches": 35,
+        "current_branches": 35,
+        "records": 20
+      },
+      {
+        "name": "PR_LoadLibraryWithFlags",
+        "original_branches": 14,
+        "current_branches": 14,
+        "records": 10
+      },
+      {
+        "name": "dlopen",
+        "original_branches": 24,
+        "current_branches": 24,
+        "records": 17
+      }
+    ],
+    "ffmpeg_to_nspr_direct_call_count": 1
+  },
+  "limitations": {
+    "indirect_loader_calls_complete": false,
+    "dynamic_soname_choices_proven": false,
+    "rust_cpp_ffi_symbol_resolution_complete": false,
+    "protected_feature_fallback_matrix_complete": false,
+    "target_endeavouros_hyprland_parity_proven": false,
+    "source_removal_authorized": false,
+    "marginal_compiled_size_saving_bytes": null,
+    "m3_sixth_gate_closed": false
+  },
+  "progress": {
+    "overall_percent": 61,
+    "m3_percent": 83,
+    "m3_gates_passed": 5,
+    "m3_gates_total": 6,
+    "delta_pp": 0
+  }
+}
