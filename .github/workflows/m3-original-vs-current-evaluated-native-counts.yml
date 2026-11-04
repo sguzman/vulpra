@@ -1,0 +1,148 @@
+# Read-only independent actual Mozilla BuildReader ORIGINAL vs CURRENT MAIN
+# count/selected-generated-flag crosscheck. Aggregate equality is NOT
+# equality of graph edges, commands, compiled binaries or runtime behavior.
+name: M3 Original Current Evaluated Native Count Agreement
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-original-vs-current-evaluated-native-counts.yml
+      - ci/m3-original-vs-current-evaluated-native-counts.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source_pinned_original_current_aggregates:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      ORIGINAL: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      CURRENT: 71be5255f3ea4faba8842ca00a85d0678387197e
+      ARCHIVE: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout only exact independent result verifier
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-original-vs-current-evaluated-native-counts.jq
+      - name: Authenticate two independent genuinely configured original/current sources
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$ORIGINAL" != "$CURRENT"
+          while read -r id sha path artifact; do
+            test -n "$id" || continue
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" |
+              jq -e --arg sha "$sha" --arg path "$path" '
+                .status=="completed" and .conclusion=="success" and
+                .head_sha==$sha and .path==$path
+              ' >/dev/null
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/artifacts?per_page=100" |
+              jq -e --arg name "$artifact" '
+                [.artifacts[]|select(.name==$name and
+                   .expired==false and .size_in_bytes>0)]|length==1
+              ' >/dev/null
+          done <<'RUNS'
+          41746124117 95c02d7d4e63bf3aab2c284df2651e10b2ba4df6 .github/workflows/m3-pinned-evaluated-mozbuild-graph.yml m3-original-fully-evaluated-normal-vs-combined-mozbuild-frontend
+          41746278259 71be5255f3ea4faba8842ca00a85d0678387197e .github/workflows/m3-current-main-evaluated-native-frontend.yml m3-current-main-evaluated-native-frontend
+          RUNS
+      - name: Download only accepted original/current generated frontend evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/original" "$RUNNER_TEMP/current"
+          gh run download 41746124117 --repo "$GITHUB_REPOSITORY" \
+            --name m3-original-fully-evaluated-normal-vs-combined-mozbuild-frontend \
+            --dir "$RUNNER_TEMP/original"
+          gh run download 41746278259 --repo "$GITHUB_REPOSITORY" \
+            --name m3-current-main-evaluated-native-frontend \
+            --dir "$RUNNER_TEMP/current"
+          test -s "$RUNNER_TEMP/original/full-normal-evaluated.json"
+          test -s "$RUNNER_TEMP/original/compile-command-declarations.json"
+          test -s "$RUNNER_TEMP/current/current-evaluated-native-summary.json"
+      - name: Compare exact aggregate and flags, then reject forged input evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          audit(){
+            jq -n \
+              --arg source "$ORIGINAL" --arg current_sha "$CURRENT" --arg original_archive "$ARCHIVE" \
+              --slurpfile original "$RUNNER_TEMP/original/full-normal-evaluated.json" \
+              --slurpfile current "$RUNNER_TEMP/current/current-evaluated-native-summary.json" \
+              --slurpfile compiledb "$RUNNER_TEMP/original/compile-command-declarations.json" \
+              -f ci/m3-original-vs-current-evaluated-native-counts.jq
+          }
+          audit >"$RUNNER_TEMP/m3-original-current-native-count-agreement.json"
+          jq -e --arg src "$ORIGINAL" --arg current "$CURRENT" --arg archive "$ARCHIVE" '
+            .schema_version==1 and
+            .status=="independent_original_vs_current_mozilla_evaluated_native_count_agreement" and
+            .original_compiled_source_commit==$src and
+            .current_evaluated_source_commit==$current and
+            .original_full_compiled_archive_sha256==$archive and
+            .source_bound_independent_original_and_current_buildreader_runs==true and
+            .original_frontend_evidence_from_original_sha==true and
+            .current_frontend_evidence_from_distinct_current_sha==true and
+            .original_full_compiled_package_is_not_current_compiled_binary==true and
+            .compared_generated_frontend_metric_count==10 and
+            (.counts|length)==10 and
+            all(.counts[]; .match==true and .original==.current and .original>0) and
+            .compared_actual_selected_generated_flag_count==12 and
+            (.selected_protected_flags|length)==12 and
+            all(.selected_protected_flags[]; .match==true and
+              .original_value==.current_value) and
+            .exact_per_edge_and_per_compiler_command_record_equality_proven==false and
+            .actual_current_native_compiler_or_linker_executed==false and
+            .generated_cargo_feature_dependency_closure_proven==false and
+            .actual_complete_future_dynamic_ffi_dependencies_proven==false and
+            .target_endeavouros_hyprland_abi_parity_proven==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0 and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/m3-original-current-native-count-agreement.json" >/dev/null
+          cp "$RUNNER_TEMP/original/full-normal-evaluated.json" "$RUNNER_TEMP/orig-real.json"
+          cp "$RUNNER_TEMP/original/compile-command-declarations.json" "$RUNNER_TEMP/db-real.json"
+          cp "$RUNNER_TEMP/current/current-evaluated-native-summary.json" "$RUNNER_TEMP/current-real.json"
+          count=0
+          reject(){
+            local src="$1" file="$2" expr="$3"
+            jq "$expr" "$RUNNER_TEMP/$src-real.json" >"$file"
+            if audit >/dev/null 2>&1; then
+              echo "FAIL: forged $src aggregate/config provenance accepted" >&2
+              exit 1
+            fi
+            cp "$RUNNER_TEMP/$src-real.json" "$file"
+            count=$((count+1))
+          }
+          reject orig "$RUNNER_TEMP/original/full-normal-evaluated.json" \
+            '.emitted_object_count+=1'
+          reject orig "$RUNNER_TEMP/original/full-normal-evaluated.json" \
+            '.original_source_commit="forged"'
+          reject orig "$RUNNER_TEMP/original/full-normal-evaluated.json" \
+            '.generated_configure_flag_values.MOZ_UPDATER.value="0"'
+          reject current "$RUNNER_TEMP/current/current-evaluated-native-summary.json" \
+            '.actual_evaluated_link_target_count+=1'
+          reject current "$RUNNER_TEMP/current/current-evaluated-native-summary.json" \
+            '.actual_generated_configure_selected_flags.MOZ_SERVICES_SYNC.value="0"'
+          reject current "$RUNNER_TEMP/current/current-evaluated-native-summary.json" \
+            '.current_source_native_compilation_executed=true'
+          reject db "$RUNNER_TEMP/original/compile-command-declarations.json" \
+            '.normal_compiler_command_entries+=1'
+          reject current "$RUNNER_TEMP/current/current-evaluated-native-summary.json" \
+            '.m3_sixth_gate_closed=true'
+          test "$count" -eq 8
+          echo 'M3_ORIGINAL_CURRENT_EVALUATED_COUNTS=PASS 10/10 native metrics and 12/12 generated flags agree; 8/8 forged inputs rejected; no native compilation claimed'
+      - name: Upload only bounded independent aggregate agreement
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-original-current-native-front-count-agreement
+          path: ${{ runner.temp }}/m3-original-current-native-count-agreement.json
+          if-no-files-found: error
+          retention-days: 14
