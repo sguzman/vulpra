@@ -1,0 +1,33 @@
+name: M3 Current Linked Native Loader Crosswalk Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-current-vs-original-linked-loader.jq
+      - ci/tests/m3-current-vs-original-linked-loader-tests.sh
+      - .github/workflows/m3-current-linked-loader-crosswalk-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  negative-fixtures:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source for bounded metadata tests
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            ci/m3-current-vs-original-linked-loader.jq
+            ci/tests/m3-current-vs-original-linked-loader-tests.sh
+      - name: Reject malformed native loader-callsite pair metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq
+          bash ci/tests/m3-current-vs-original-linked-loader-tests.sh
