@@ -230,7 +230,136 @@
     "patched_source_compiled": false,
     "original_baseline_unchanged": true,
     "source_pruning_authorized": false,
-    "m3_sixth_gate_closed": false
+    "m3_sixth_gate_closed": false,
+    "two_additional_159_advisory_fixes_verified_present_in_beta": true,
+    "remaining_advisory_cases_not_exhaustively_checked": true
   },
-  "recommended_action": "Separate, source-matched security maintenance update and full browser regression before routine or public browsing; do not mix fixes into the immutable M3 original binary comparator"
+  "recommended_action": "Separate, source-matched security maintenance update and full browser regression before routine or public browsing; do not mix fixes into the immutable M3 original binary comparator",
+  "follow_up_audit_head": "d96d1147cc386b6b097c13f5837ca994fc1e67c3",
+  "verified_present_in_beta": [
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117861",
+      "bug": 2053240,
+      "topic": "Sandbox escape in DOM: Navigation",
+      "patch_commit": "2335ef39b6a42febce70ac44e61453a75844c73b",
+      "upstream_commit_is_ancestor_of_pinned_beta": true,
+      "upstream_compare_status": "ahead",
+      "upstream_merge_base_sha": "2335ef39b6a42febce70ac44e61453a75844c73b",
+      "classification": "fix_in_pinned_beta_and_code_files_unchanged_in_vulpra_main",
+      "source_file_blobs": [
+        {
+          "path": "docshell/base/BrowsingContext.cpp",
+          "vulpra_sha": "241224f6f85318ae068b2a8d5c0890db0c9e4bbc",
+          "pinned_beta_sha": "241224f6f85318ae068b2a8d5c0890db0c9e4bbc",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "docshell/base/BrowsingContext.h",
+          "vulpra_sha": "5ad1e3b3d3e3abb0026439b4b21c457d5960ddf9",
+          "pinned_beta_sha": "5ad1e3b3d3e3abb0026439b4b21c457d5960ddf9",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "docshell/base/SyncedContext.h",
+          "vulpra_sha": "0df2efbe39c0329f4a2512eb8d036354c10931b4",
+          "pinned_beta_sha": "0df2efbe39c0329f4a2512eb8d036354c10931b4",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "docshell/base/SyncedContextInlines.h",
+          "vulpra_sha": "f819b1d90d438ab3948d840787bcabb6258e0c04",
+          "pinned_beta_sha": "f819b1d90d438ab3948d840787bcabb6258e0c04",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "dom/ipc/BrowserParent.cpp",
+          "vulpra_sha": "8b4018fefdf9d149c24d43e4493aceb07a9a9b25",
+          "pinned_beta_sha": "8b4018fefdf9d149c24d43e4493aceb07a9a9b25",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "dom/ipc/ContentParent.cpp",
+          "vulpra_sha": "3e8987e97db1c14dba93f8e0a1132d20c386aea7",
+          "pinned_beta_sha": "3e8987e97db1c14dba93f8e0a1132d20c386aea7",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "dom/ipc/WindowGlobalActor.cpp",
+          "vulpra_sha": "c5b9023408b288fd408d4b2994879805df270203",
+          "pinned_beta_sha": "c5b9023408b288fd408d4b2994879805df270203",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "dom/ipc/WindowGlobalActor.h",
+          "vulpra_sha": "e79d8c3d7bed16e6b6b340e739830b9b24947735",
+          "pinned_beta_sha": "e79d8c3d7bed16e6b6b340e739830b9b24947735",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "dom/ipc/WindowGlobalParent.cpp",
+          "vulpra_sha": "2014c80a6eb5fdbead9533b2e405cc32d6522d0e",
+          "pinned_beta_sha": "2014c80a6eb5fdbead9533b2e405cc32d6522d0e",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "dom/ipc/WindowGlobalParent.h",
+          "vulpra_sha": "c3386ba78041a2093d6981c30be3931892991cf7",
+          "pinned_beta_sha": "c3386ba78041a2093d6981c30be3931892991cf7",
+          "vulpra_matches_pinned_beta": true
+        }
+      ],
+      "affected_existing_files_count": 10
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117862",
+      "bug": 2054644,
+      "topic": "Privilege escalation due to incorrect boundaries in Networking HTTP cache",
+      "patch_commit": "b61c80e501f1d8fab7643c928709baa502f7cd66",
+      "upstream_commit_is_ancestor_of_pinned_beta": true,
+      "upstream_compare_status": "ahead",
+      "upstream_merge_base_sha": "b61c80e501f1d8fab7643c928709baa502f7cd66",
+      "classification": "fix_in_pinned_beta_and_code_files_unchanged_in_vulpra_main",
+      "source_file_blobs": [
+        {
+          "path": "netwerk/protocol/http/CacheEntryWriteHandleParent.h",
+          "vulpra_sha": "cee26c82fe66fb259a5507627983b3246eb6ebc3",
+          "pinned_beta_sha": "cee26c82fe66fb259a5507627983b3246eb6ebc3",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "netwerk/protocol/http/HttpBaseChannel.cpp",
+          "vulpra_sha": "2d53f5deee9d2dbaf55f6e4fbf4ba4ff2f97f1b8",
+          "pinned_beta_sha": "2d53f5deee9d2dbaf55f6e4fbf4ba4ff2f97f1b8",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "netwerk/protocol/http/HttpBaseChannel.h",
+          "vulpra_sha": "6986a5fc2fe1f0ed98c20794e19cd7a65966893d",
+          "pinned_beta_sha": "6986a5fc2fe1f0ed98c20794e19cd7a65966893d",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "netwerk/protocol/http/HttpChannelParent.cpp",
+          "vulpra_sha": "79fa33f044f37a9833938b86c3b48fac3646ba91",
+          "pinned_beta_sha": "79fa33f044f37a9833938b86c3b48fac3646ba91",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "netwerk/protocol/http/HttpChannelParent.h",
+          "vulpra_sha": "6394deb9233c449944b90232b57c9fb26e61f4c8",
+          "pinned_beta_sha": "6394deb9233c449944b90232b57c9fb26e61f4c8",
+          "vulpra_matches_pinned_beta": true
+        },
+        {
+          "path": "netwerk/protocol/http/nsHttpChannel.cpp",
+          "vulpra_sha": "d17a57fd8b96d618a1452c95d4d5e27bc0cd88db",
+          "pinned_beta_sha": "d17a57fd8b96d618a1452c95d4d5e27bc0cd88db",
+          "vulpra_matches_pinned_beta": true
+        }
+      ],
+      "affected_existing_files_count": 6
+    }
+  ]
 }

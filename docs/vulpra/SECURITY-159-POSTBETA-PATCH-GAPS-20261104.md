@@ -39,6 +39,19 @@ Each source path was fetched directly at both the Vulpra `main` HEAD and the cor
 | `CVE-2026-120572` | `layout/generic/AbsoluteContainingBlock.h` | `deac3bd8b039` | `eb95b77d9578` |
 | `CVE-2026-120572` | `layout/generic/nsLineLayout.cpp` | `57d0f421b9ab` | `452ffc656ded` |
 
+## Two separately verified 159 advisory fixes already present in the beta
+
+**Do not classify every Firefox 159 advisory as a missing Vulpra fix.** The official Mozilla [MFSA 2026-118](https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/) also covers two high-impact issues whose actual upstream patches were already integrated before the frozen beta:
+
+| Advisory issue | Upstream code fix and Git ancestry | Current Vulpra verification |
+| --- | --- | --- |
+| **CVE-2026-117861** / Bug 2053240 — sandbox escape, DOM Navigation | [Mozilla commit `2335ef39`](https://github.com/mozilla-firefox/firefox/commit/2335ef39b6a42febce70ac44e61453a75844c73b), with upstream compare `merge_base_commit` **equal** to that fix when comparing fix → `FIREFOX_159_0b5_RELEASE`; therefore direct ancestor of the beta | **10/10** existing code files from that fix still have the exact same Git blob SHA on current Vulpra `main` as the original tagged beta |
+| **CVE-2026-117862** / Bug 2054644 — privilege escalation, HTTP networking cache | [Mozilla commit `b61c80e`](https://github.com/mozilla-firefox/firefox/commit/b61c80e501f1d8fab7643c928709baa502f7cd66), also authenticated as a direct ancestor of `FIREFOX_159_0b5_RELEASE` via Git comparison merge base | **6/6** code files touched by the fix have identical beta/current Vulpra Git blobs; all six also have identical beta/Firefox 159 stable Git blobs |
+
+This finding is **positive evidence of upstream patch inclusion and retained source code**, not independent exploit testing or complete security readiness. It is independent of the **two genuinely missing** patches above. The exact 16 file SHA values and upstream parent commits are recorded in the [machine-readable audit](SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json), with verified provenance `main` at `d96d1147`.
+
+This 4-CVE spot audit classifies **two confirmed missing patches** and **two confirmed included-before-beta fixes**; **other MFSA 2026-118 cases remain unaudited**, and the separate full-security-maintenance issue remains open. No patch files, frozen comparison source or browser profiles were modified.
+
 ## Scope and required continuation
 
 **These two exact upstream patch changes are missing.** The audit does not prove that the corresponding exploit is reachable in every Vulpra configuration, that a missing patch necessarily makes a specific user action exploitable, or that other Mozilla security fixes are missing or present. Do not extrapolate these two findings to an exhaustive CVE inventory. Some upstream fixes may predate the beta; others may require applicability/patch-review rather than cherry-picking.
