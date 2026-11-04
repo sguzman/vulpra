@@ -1228,7 +1228,159 @@
       ],
       "checked_vulpra_main_head": "ed76a0fc03708d426498b47092b3099f7b970ae7",
       "note": "All 16 code files touched by selected upstream fix commit match the shipped Firefox 159 stable tag, the pinned 159.0b5 tag, and Vulpra main exactly. Only 5/16 match this selected upstream commit's own postimage; 11 differ identically across stable/beta/Vulpra, consistent with subsequent upstream revisions. This establishes stable-source identity over the selected file set, not patch ancestry, full vulnerability elimination or runtime exploit acceptance. Upstream revert/reland sequence not independently reconstructed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117878",
+      "bug": 2075431,
+      "topic": "Storage: IndexedDB use-after-free / database path and file validation",
+      "patch_commit": "7277b624f1d9b70f22275ea850bd34c59c001a40",
+      "classification": "one_exact_upstream_fix_result_code_blob_matches_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/indexedDB/ActorsParent.cpp",
+          "upstream_fix_commit_result_sha": "05f7d8a0b0c7adb6ee9383eec925d253f8e8a8bd",
+          "pinned_beta_sha": "05f7d8a0b0c7adb6ee9383eec925d253f8e8a8bd",
+          "upstream_stable_159_sha": "05f7d8a0b0c7adb6ee9383eec925d253f8e8a8bd",
+          "vulpra_sha": "05f7d8a0b0c7adb6ee9383eec925d253f8e8a8bd",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "The upstream patch changes a debug assertion to a release check and rationalizes database filepath handling. Exact single code-file postimage matches beta, stable and Vulpra; later same-bug refactor commit 712cafdf not separately authenticated in this check. No runtime exploit test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117879",
+      "bug": 2075432,
+      "topic": "Layout: Tables continuation border-collapse model boundary error",
+      "patch_commit": "a8d29a532006f82dc09ff167a004105347dc85a8",
+      "classification": "all_three_fix_touched_paths_identical_in_beta_stable_vulpra_two_exact_selected_commit_postimages_and_protective_table_init_logic",
+      "source_file_blobs": [
+        {
+          "path": "layout/tables/nsCellMap.cpp",
+          "upstream_fix_commit_result_sha": "905b1931b833811b8c7f2faa84cf81c391ac1376",
+          "pinned_beta_sha": "905b1931b833811b8c7f2faa84cf81c391ac1376",
+          "upstream_stable_159_sha": "905b1931b833811b8c7f2faa84cf81c391ac1376",
+          "vulpra_sha": "905b1931b833811b8c7f2faa84cf81c391ac1376",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/tables/nsTableFrame.cpp",
+          "upstream_fix_commit_result_sha": "04d3e3cde861b3e76e82d3d789db6284d319cbbb",
+          "pinned_beta_sha": "645e60758a7503a7a745669123bc9a652aa195e2",
+          "upstream_stable_159_sha": "645e60758a7503a7a745669123bc9a652aa195e2",
+          "vulpra_sha": "645e60758a7503a7a745669123bc9a652aa195e2",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-tables/table-continuation-border-model-crash-print.html",
+          "upstream_fix_commit_result_sha": "1b4cec925b343e7d4d6c45a97a33bbca86130bda",
+          "pinned_beta_sha": "1b4cec925b343e7d4d6c45a97a33bbca86130bda",
+          "upstream_stable_159_sha": "1b4cec925b343e7d4d6c45a97a33bbca86130bda",
+          "vulpra_sha": "1b4cec925b343e7d4d6c45a97a33bbca86130bda",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "aPrevInFlow ? static_cast<nsTableFrame*>(aPrevInFlow)->IsBorderCollapse()",
+        "SetBorderCollapse(borderCollapse);"
+      ],
+      "note": "All three fixed-release touched paths identical in beta, stable and Vulpra; two also identical to selected re-landed commit. Vulpra nsTableFrame.cpp differs from that selected commit but retains the continuation border-collapse protection. Original WPT print crashtest source exists; not executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117880",
+      "bug": 2075996,
+      "topic": "XML pretty printer use-after-free from document root mutation",
+      "patch_commit": "01c4f7862c6ba1fd4f2629a7c633c6bd6fb456d9",
+      "classification": "all_six_fix_touched_paths_identical_in_beta_stable_vulpra_five_exact_selected_commit_postimages_and_xml_root_guard",
+      "source_file_blobs": [
+        {
+          "path": "dom/xml/crashtests/2075996-1.html",
+          "upstream_fix_commit_result_sha": "f07d1a39d073f894e01591c381a881a3f94669fa",
+          "pinned_beta_sha": "f07d1a39d073f894e01591c381a881a3f94669fa",
+          "upstream_stable_159_sha": "f07d1a39d073f894e01591c381a881a3f94669fa",
+          "vulpra_sha": "f07d1a39d073f894e01591c381a881a3f94669fa",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/xml/crashtests/2075996-2.html",
+          "upstream_fix_commit_result_sha": "9e10c74b93eeac69131b991e411eead89f885046",
+          "pinned_beta_sha": "9e10c74b93eeac69131b991e411eead89f885046",
+          "upstream_stable_159_sha": "9e10c74b93eeac69131b991e411eead89f885046",
+          "vulpra_sha": "9e10c74b93eeac69131b991e411eead89f885046",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/xml/crashtests/2075996.sjs",
+          "upstream_fix_commit_result_sha": "d8dcedee1333c0fa2aca8029b1b7b5bc8ca7530e",
+          "pinned_beta_sha": "d8dcedee1333c0fa2aca8029b1b7b5bc8ca7530e",
+          "upstream_stable_159_sha": "d8dcedee1333c0fa2aca8029b1b7b5bc8ca7530e",
+          "vulpra_sha": "d8dcedee1333c0fa2aca8029b1b7b5bc8ca7530e",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/xml/crashtests/crashtests.list",
+          "upstream_fix_commit_result_sha": "8945f90c92dab58ece4a937c1e65f66613fbb85d",
+          "pinned_beta_sha": "8945f90c92dab58ece4a937c1e65f66613fbb85d",
+          "upstream_stable_159_sha": "8945f90c92dab58ece4a937c1e65f66613fbb85d",
+          "vulpra_sha": "8945f90c92dab58ece4a937c1e65f66613fbb85d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/xml/nsXMLContentSink.cpp",
+          "upstream_fix_commit_result_sha": "5d6caa7f1c824558fdca1dc2900601791e2c3175",
+          "pinned_beta_sha": "7e8622085a5d1e612d3b4d4daea9ed3ed5ea0edf",
+          "upstream_stable_159_sha": "7e8622085a5d1e612d3b4d4daea9ed3ed5ea0edf",
+          "vulpra_sha": "7e8622085a5d1e612d3b4d4daea9ed3ed5ea0edf",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/xml/nsXMLPrettyPrinter.cpp",
+          "upstream_fix_commit_result_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66",
+          "pinned_beta_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66",
+          "upstream_stable_159_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66",
+          "vulpra_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "if (mDocument->GetRootElement() != mDocElement) {",
+        "mPrettyPrintXML = false;",
+        "return NS_OK;"
+      ],
+      "note": "All six fix-touched paths match stable, beta, Vulpra; five match selected fix commit postimage. Content sink differs but retains actual root consistency guard verified in Vulpra. Both original HTML fixtures and .sjs are source-present and listed; browser crashtests not run."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117884",
+      "bug": 2076410,
+      "topic": "Networking use-after-free via JSStreamConsumer stream cleanup",
+      "patch_commit": "bf319ddf6e5efd9db78ff1686c1580d62e402e27",
+      "classification": "one_exact_upstream_fix_result_code_blob_matches_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/fetch/FetchUtil.cpp",
+          "upstream_fix_commit_result_sha": "c6038facec4061479d551a1ae83f74553f49dcd0",
+          "pinned_beta_sha": "c6038facec4061479d551a1ae83f74553f49dcd0",
+          "upstream_stable_159_sha": "c6038facec4061479d551a1ae83f74553f49dcd0",
+          "vulpra_sha": "c6038facec4061479d551a1ae83f74553f49dcd0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "The complete one-file upstream refactor postimage matches Firefox beta, stable and Vulpra exactly. Code-source inclusion only; no runtime exploit test."
     }
   ],
-  "additional_source_audit_head": "ed76a0fc03708d426498b47092b3099f7b970ae7"
+  "additional_source_audit_head": "a15ad6179a056228cc7f89030c4c1c112b37049b"
 }
