@@ -14,6 +14,9 @@ on:
       - .github/workflows/security-159-hotfix-evidence-reconcile.yml
   workflow_run:
     workflows:
+      # The source workflow was renamed on the maintenance branch, but still
+      # has M3's workflow-file ID on the default branch. Include both names.
+      - M3 Source Matched Native Link Inputs and Runtime
       - Security 159 Post-Beta Hotfix Native Build and Runtime
     types: [completed]
 
@@ -65,18 +68,24 @@ jobs:
   reconcile-real-native-run:
     if: >-
       github.repository == 'sguzman/vulpra' &&
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
-      github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
-      github.event.workflow_run.name == 'Security 159 Post-Beta Hotfix Native Build and Runtime' &&
-      github.event.workflow_run.conclusion == 'success'
+      (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
+         github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
+         github.event.workflow_run.name == 'Security 159 Post-Beta Hotfix Native Build and Runtime' &&
+         github.event.workflow_run.conclusion == 'success') ||
+        (github.event_name == 'push' &&
+         github.ref == 'refs/heads/main')
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 18
     needs: validate-negative-fixtures
     env:
       GH_TOKEN: ${{ github.token }}
-      NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
-      NATIVE_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+      # On push, independently reconcile one immutable, already successful
+      # historical security-native run; never claim an unperformed CSS test.
+      NATIVE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || 41909948021 }}
+      NATIVE_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '6e38e78724365b3dd6c02f4d0b0570028a5d2112' }}
     steps:
       - name: Checkout only bounded verifier, not native build source
         uses: actions/checkout@v4
@@ -237,6 +246,12 @@ jobs:
           # Known security build before CSS replay was added. No CSS credit.
           if test "$NATIVE_SOURCE_SHA" = 6e38e78724365b3dd6c02f4d0b0570028a5d2112; then
             echo "::notice::Historical security build predates original CSS crashtest: not verified"
+            jq -n --arg source "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID"               '{schema_version:1,status:"not_executed_before_css_replay_integration",
+                source_commit:$source,native_run_id:$run,
+                three_real_packaged_replays_verified:false,
+                full_wpt_harness_executed:false,
+                exploit_rejection_proven:false,release_ready:false,
+                m3_sixth_gate_closed:false}'               > "$RUNNER_TEMP/security-159-css-reconciled.json"
             exit 0
           fi
           evidence="$RUNNER_TEMP/native-evidence"
