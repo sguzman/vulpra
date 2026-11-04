@@ -839,7 +839,207 @@
           "fix_result_blob_matches_vulpra": true
         }
       ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117873",
+      "bug": 2071733,
+      "topic": "Audio/Video FFmpeg playback decoded-frame plane boundary checks",
+      "patch_commit": "2a50cba249b942a9a97b232d6e46fbf6c25a6abc",
+      "classification": "exact_fixed_ffmpeg_buffer_utilities_blob_and_checked_plane_extent_guards_in_changed_decoder_source",
+      "source_file_blobs": [
+        {
+          "path": "dom/media/platforms/ffmpeg/FFmpegVideoDecoder.cpp",
+          "upstream_fix_commit_result_sha": "f2da8b71c90bad2a1833d8700673257da33032e8",
+          "pinned_beta_sha": "ce8305cf1b0689ccde4a2fcba3fbd2b7a4ada384",
+          "upstream_stable_159_sha": "ce8305cf1b0689ccde4a2fcba3fbd2b7a4ada384",
+          "vulpra_sha": "ce8305cf1b0689ccde4a2fcba3fbd2b7a4ada384",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/media/platforms/ffmpeg/FFmpegVideoUtils.h",
+          "upstream_fix_commit_result_sha": "aba5fba7c484df976e2cf4475d50ceb38570c33d",
+          "pinned_beta_sha": "aba5fba7c484df976e2cf4475d50ceb38570c33d",
+          "upstream_stable_159_sha": "aba5fba7c484df976e2cf4475d50ceb38570c33d",
+          "vulpra_sha": "aba5fba7c484df976e2cf4475d50ceb38570c33d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "const CheckedInt<int> bufferSize(bufferExtent);",
+        "if (!bufferSize.isValid() || bufferSize.value() <= 0) {",
+        "FramePlanesFitBackingBuffers(mFrame, b)",
+        "mLib->av_buffer_create(aFrame->data[0], bufferSize.value(),"
+      ],
+      "note": "Patch-result decoder whole-file blob differs, but native beta and Vulpra retain the exact added buffer extent and FFmpeg plane bounds checks. Utilities header is byte-identical. Direct native FFmpeg playback exploit regression was not executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117874",
+      "bug": 2073685,
+      "topic": "Internationalization use-after-free through cross-realm TransformStream callbacks",
+      "patch_commit": "671c6f648c03a658fda1b089189f4e0d9122ef0c",
+      "classification": "six_exact_upstream_fix_result_code_blobs_and_one_exact_original_crashtest_fixture_match",
+      "source_file_blobs": [
+        {
+          "path": "dom/compression/BaseAlgorithms.cpp",
+          "upstream_fix_commit_result_sha": "d5fe06684d682534f643c42f8733bd8c34a6101a",
+          "pinned_beta_sha": "d5fe06684d682534f643c42f8733bd8c34a6101a",
+          "upstream_stable_159_sha": "d5fe06684d682534f643c42f8733bd8c34a6101a",
+          "vulpra_sha": "d5fe06684d682534f643c42f8733bd8c34a6101a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/compression/BaseAlgorithms.h",
+          "upstream_fix_commit_result_sha": "1deb2b1190d52fd134b613d6b2b66fb00e8cd6e7",
+          "pinned_beta_sha": "1deb2b1190d52fd134b613d6b2b66fb00e8cd6e7",
+          "upstream_stable_159_sha": "1deb2b1190d52fd134b613d6b2b66fb00e8cd6e7",
+          "vulpra_sha": "1deb2b1190d52fd134b613d6b2b66fb00e8cd6e7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/encoding/TextDecoderStream.cpp",
+          "upstream_fix_commit_result_sha": "f12c5305fdb2632e4d37cb1a7a12362d96009e30",
+          "pinned_beta_sha": "f12c5305fdb2632e4d37cb1a7a12362d96009e30",
+          "upstream_stable_159_sha": "f12c5305fdb2632e4d37cb1a7a12362d96009e30",
+          "vulpra_sha": "f12c5305fdb2632e4d37cb1a7a12362d96009e30",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/encoding/TextEncoderStream.cpp",
+          "upstream_fix_commit_result_sha": "9296c11dbba71cf71aa58600880a243d8c367f99",
+          "pinned_beta_sha": "9296c11dbba71cf71aa58600880a243d8c367f99",
+          "upstream_stable_159_sha": "9296c11dbba71cf71aa58600880a243d8c367f99",
+          "vulpra_sha": "9296c11dbba71cf71aa58600880a243d8c367f99",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/streams/TransformerCallbackHelpers.cpp",
+          "upstream_fix_commit_result_sha": "379a546cb8bb1e23c08bba7c707367fce5b31ea2",
+          "pinned_beta_sha": "379a546cb8bb1e23c08bba7c707367fce5b31ea2",
+          "upstream_stable_159_sha": "379a546cb8bb1e23c08bba7c707367fce5b31ea2",
+          "vulpra_sha": "379a546cb8bb1e23c08bba7c707367fce5b31ea2",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/streams/TransformerCallbackHelpers.h",
+          "upstream_fix_commit_result_sha": "6ebf3831052a1b426242fd8f0cd89b51ee4faef5",
+          "pinned_beta_sha": "6ebf3831052a1b426242fd8f0cd89b51ee4faef5",
+          "upstream_stable_159_sha": "6ebf3831052a1b426242fd8f0cd89b51ee4faef5",
+          "vulpra_sha": "6ebf3831052a1b426242fd8f0cd89b51ee4faef5",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "source_regression_fixture_blob": {
+        "path": "testing/web-platform/tests/encoding/streams/crashtests/from-cross-realm.html",
+        "upstream_fix_commit_result_sha": "0fcae0e25525fbf5c2e75efdf517ff46e9097207",
+        "pinned_beta_sha": "0fcae0e25525fbf5c2e75efdf517ff46e9097207",
+        "upstream_stable_159_sha": "0fcae0e25525fbf5c2e75efdf517ff46e9097207",
+        "vulpra_sha": "0fcae0e25525fbf5c2e75efdf517ff46e9097207",
+        "fix_result_blob_matches_beta": true,
+        "fix_result_blob_matches_vulpra": true
+      },
+      "note": "All six changed code files plus the upstream cross-realm crashtest fixture exactly match the upstream fixed commit-result Git blobs in pinned beta, stable 159, and Vulpra. Browser did not execute the crashtest in this audit."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117875",
+      "bug": 2073686,
+      "topic": "Layout Scrolling and Overflow use-after-free during scrollbar fade",
+      "patch_commit": "6772a78a107a79e9e8b181a1bd528364beaf3202",
+      "classification": "one_exact_upstream_fix_result_code_blob_matches_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "layout/generic/ScrollbarActivity.cpp",
+          "upstream_fix_commit_result_sha": "5797a5a5c9571a33ca937838506737c63c093f5d",
+          "pinned_beta_sha": "5797a5a5c9571a33ca937838506737c63c093f5d",
+          "upstream_stable_159_sha": "5797a5a5c9571a33ca937838506737c63c093f5d",
+          "vulpra_sha": "5797a5a5c9571a33ca937838506737c63c093f5d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117876",
+      "bug": 2074167,
+      "topic": "Layout Text and Fonts use-after-free in SVG glyph handling",
+      "patch_commit": "d8b0cd3f8ed35b6c7094e274d180ed3ef5e7e637",
+      "classification": "one_exact_upstream_fix_result_code_blob_matches_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "gfx/thebes/gfxSVGGlyphs.cpp",
+          "upstream_fix_commit_result_sha": "d2bad1d3495c5d9a31a10ca186f93beaea514419",
+          "pinned_beta_sha": "d2bad1d3495c5d9a31a10ca186f93beaea514419",
+          "upstream_stable_159_sha": "d2bad1d3495c5d9a31a10ca186f93beaea514419",
+          "vulpra_sha": "d2bad1d3495c5d9a31a10ca186f93beaea514419",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118005",
+      "bug": 2073653,
+      "topic": "WebRTC encoded-frame use-after-free involving cross-realm ArrayBuffer compartments",
+      "patch_commit": "3f373ae59cb09e60f4044f9bb37fe27247986234",
+      "classification": "three_exact_upstream_fix_result_blobs_and_verified_wrap_object_hunks_in_different_cpp_blob",
+      "source_file_blobs": [
+        {
+          "path": "dom/media/webrtc/jsapi/RTCEncodedFrameBase.cpp",
+          "upstream_fix_commit_result_sha": "747524a81df50ba517c6551e3210671ebf632bb1",
+          "pinned_beta_sha": "908a73144df3099a76244f5b5279b0e5372f4512",
+          "upstream_stable_159_sha": "908a73144df3099a76244f5b5279b0e5372f4512",
+          "vulpra_sha": "908a73144df3099a76244f5b5279b0e5372f4512",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/media/webrtc/jsapi/RTCEncodedFrameBase.h",
+          "upstream_fix_commit_result_sha": "ad60fc5a934af5044059d8c723b6f1edea60a157",
+          "pinned_beta_sha": "ad60fc5a934af5044059d8c723b6f1edea60a157",
+          "upstream_stable_159_sha": "ad60fc5a934af5044059d8c723b6f1edea60a157",
+          "vulpra_sha": "ad60fc5a934af5044059d8c723b6f1edea60a157",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/webidl/RTCEncodedAudioFrame.webidl",
+          "upstream_fix_commit_result_sha": "05538a311236d7828fe673284e75666a664f591b",
+          "pinned_beta_sha": "05538a311236d7828fe673284e75666a664f591b",
+          "upstream_stable_159_sha": "05538a311236d7828fe673284e75666a664f591b",
+          "vulpra_sha": "05538a311236d7828fe673284e75666a664f591b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/webidl/RTCEncodedVideoFrame.webidl",
+          "upstream_fix_commit_result_sha": "c49507c953d38f53f8966c69d77ae2f3a28574c3",
+          "pinned_beta_sha": "c49507c953d38f53f8966c69d77ae2f3a28574c3",
+          "upstream_stable_159_sha": "c49507c953d38f53f8966c69d77ae2f3a28574c3",
+          "vulpra_sha": "c49507c953d38f53f8966c69d77ae2f3a28574c3",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "void RTCEncodedFrameBase::SetData(const ArrayBuffer& aData, ErrorResult& aRv)",
+        "if (!JS_WrapObject(cx, &data))",
+        "if (!JS_WrapObject(aCx, &data))",
+        "if (NS_WARN_IF(!JS_WrapObject(aCx, &buffer)))"
+      ],
+      "note": "The repaired cross-compartment ArrayBuffer handling is observed in pinned beta. Source cpp blob differs while other three patched files match exactly. Separate upstream RTCEncodedFrame-copy-construction test commit not audited for source presence; no runtime exploit regression was executed."
     }
   ],
-  "additional_source_audit_head": "b100f0ba13b62021544bc5cf5a9a75b810447427"
+  "additional_source_audit_head": "9ac0be92371951959bce12dccad0107372647f10"
 }

@@ -1,5 +1,20 @@
 # Firefox 159 post-beta security patch-presence audit — 2026-11-04 UTC
 
+## New source audit: five previously unreviewed high-impact CVEs — 2026-11-04 UTC
+
+This is a new extension of the existing 17-issue spot audit, **not a re-count of previously verified CVEs**. Actual upstream fix commits from [Mozilla's Firefox 159 advisory](https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/) were compared against the pinned `FIREFOX_159_0b5_RELEASE` source, official stable Firefox 159, and Vulpra `main`:
+
+| CVE | Verified source presence | Qualification |
+| --- | --- | --- |
+| **CVE-2026-117873**, FFmpeg frame bounds, Bug 2071733 | The `FFmpegVideoUtils.h` patch-result Git blob is **exactly identical** in all four sources. `FFmpegVideoDecoder.cpp` has different whole-file hashes but retains the actual checked buffer extent and per-plane backing buffer conditions | No live native-decoding regression or exploit proof |
+| **CVE-2026-117874**, internationalization use-after-free, Bug 2073685 | **6/6 original patched C++ code file blobs**, plus its original cross-realm HTML crashtest, are byte-identical in fixed commit, beta, stable and Vulpra | No browser crashtest execution here |
+| **CVE-2026-117875**, scrollbar use-after-free, Bug 2073686 | **1/1** existing patched code file matches all four sources exactly | No runtime regression |
+| **CVE-2026-117876**, SVG glyph use-after-free, Bug 2074167 | **1/1** existing patched code file matches all four sources exactly | No runtime regression |
+| **CVE-2026-118005**, WebRTC frame buffer use-after-free, Bug 2073653 | **3/4** original patched file blobs match exactly; `RTCEncodedFrameBase.cpp` is different as a whole but retains the `JS_WrapObject` cross-compartment guards | No live WebRTC cross-realm replay |
+
+**Revised cumulative spot-audit totals: 22 CVEs examined, two original-beta missing fixes, 15 with exact patch-result code-file identities or verified fix ancestry, and five with bounded protective-hunk matches but differing whole-file hashes.** The newly discovered checks indicate that all five additional reviewed vulnerabilities have relevant fixes in the original beta/Vulpra code; they do **not** establish completeness of all Mozilla Firefox 159 advisories. The two confirmed missing original-beta fixes remain transplanted only on the isolated security branch, and its full patched native runtime acceptance remains outstanding.
+
+
 ## Verified result: two missing high-impact upstream fixes
 
 The Vulpra `main` source at `ea5022bd731662999b439739ab6213ff383ff081` still contains **two concretely verified post-159.0b5 security patch gaps**, independently anchored to official upstream Git tags, upstream landed fix commits, and byte-identical Git source blobs. This is a **source-patch presence audit**, not an exploitation demonstration.
