@@ -1,0 +1,33 @@
+name: Security 159 Original CSS Crashtest Fixture Contract
+on:
+  push:
+    branches: [security/firefox-159-postbeta-hotfixes]
+    paths:
+      - ci/security-159-crashtest-smoke.py
+      - .github/workflows/security-159-crashtest-fixture.yml
+      - testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-original-crashtest-contract:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/security/firefox-159-postbeta-hotfixes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out exact original fixture and test
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-159-crashtest-smoke.py
+            ci/smoke-webextension-package-local.py
+            testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html
+      - name: Validate unchanged upstream fixture and reject forged DOM results
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/security-159-crashtest-smoke.py
+          python3 ci/security-159-crashtest-smoke.py --self-test
+          echo "LIMIT: a real packaged security-patched browser is needed for replay"
