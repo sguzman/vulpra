@@ -237,7 +237,8 @@
     "fourth_159_advisory_fix_result_blobs_verified_present_in_beta": true,
     "verified_exact_patch_result_code_issues_in_new_batch": 3,
     "verified_relevant_patch_hunk_issues_in_new_batch": 2,
-    "five_additional_159_advisory_fixes_code_present": true
+    "five_additional_159_advisory_fixes_code_present": true,
+    "four_additional_159_advisory_fixes_code_present": true
   },
   "recommended_action": "Separate, source-matched security maintenance update and full browser regression before routine or public browsing; do not mix fixes into the immutable M3 original binary comparator",
   "follow_up_audit_head": "d96d1147cc386b6b097c13f5837ca994fc1e67c3",
@@ -599,7 +600,107 @@
         "const bool mLoadedAsImage;"
       ],
       "note": "Relevant loaded-as-image cache-key initialization, equality and lookup path are present in Vulpra; Loader.cpp full blob differs from upstream fix-result due to source-history differences."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117872",
+      "bug": 2068410,
+      "topic": "JavaScript Standard Library use-after-free through array length initialization",
+      "patch_commit": "bf82d965a621cc4d7bd91b546347a8d491a71bf2",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "two_exact_fix_result_code_blobs_match_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "js/src/builtin/Array.cpp",
+          "vulpra_sha": "2c68b8d3066100512fc303dc01274af19c72c648",
+          "pinned_beta_sha": "2c68b8d3066100512fc303dc01274af19c72c648",
+          "upstream_fix_commit_result_sha": "2c68b8d3066100512fc303dc01274af19c72c648",
+          "upstream_stable_159_sha": "2c68b8d3066100512fc303dc01274af19c72c648",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/ArrayObject.h",
+          "vulpra_sha": "5f5ba9ef0de92b6efbde2dbd2c51662332183399",
+          "pinned_beta_sha": "5f5ba9ef0de92b6efbde2dbd2c51662332183399",
+          "upstream_fix_commit_result_sha": "5f5ba9ef0de92b6efbde2dbd2c51662332183399",
+          "upstream_stable_159_sha": "5f5ba9ef0de92b6efbde2dbd2c51662332183399",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117922",
+      "bug": 2079692,
+      "topic": "Networking WebSocket use-after-free, OnUpgradeFailed main-thread dispatch",
+      "patch_commit": "b5e0496b140550be2d82768a6829814588b4828e",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "one_exact_fix_result_code_blob_matches_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "netwerk/protocol/websocket/WebSocketChannel.cpp",
+          "vulpra_sha": "5555c0e1eca6d243837b60c5bf224df4a653ae86",
+          "pinned_beta_sha": "5555c0e1eca6d243837b60c5bf224df4a653ae86",
+          "upstream_fix_commit_result_sha": "5555c0e1eca6d243837b60c5bf224df4a653ae86",
+          "upstream_stable_159_sha": "5555c0e1eca6d243837b60c5bf224df4a653ae86",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118008",
+      "bug": 2075440,
+      "topic": "DOM Navigation privilege escalation via PDF embed fallback remote type",
+      "patch_commit": "44c8fd8df124546b1aec37bd794eed0a97140cf3",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "one_exact_fix_result_code_blob_matches_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "toolkit/components/pdfjs/content/PdfEmbedFallbackParent.sys.mjs",
+          "vulpra_sha": "952d08d39b4d072c569ce1dcf0b561147ad2c556",
+          "pinned_beta_sha": "952d08d39b4d072c569ce1dcf0b561147ad2c556",
+          "upstream_fix_commit_result_sha": "952d08d39b4d072c569ce1dcf0b561147ad2c556",
+          "upstream_stable_159_sha": "952d08d39b4d072c569ce1dcf0b561147ad2c556",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ]
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117871",
+      "bug": 2068400,
+      "topic": "Graphics invalid pointer in swizzle stride handling",
+      "patch_commit": "48440d86a6ba6de2516c77520f8eef311cf04d98",
+      "upstream_compare_status": "diverged",
+      "upstream_commit_is_ancestor_of_pinned_beta": false,
+      "classification": "relevant_stride_gap_protection_hunk_retained_despite_different_whole_file_blob",
+      "source_file_blobs": [
+        {
+          "path": "gfx/2d/Swizzle.cpp",
+          "vulpra_sha": "1e1d050db5739c2d996a4e0fa18656be4812d29e",
+          "pinned_beta_sha": "1e1d050db5739c2d996a4e0fa18656be4812d29e",
+          "upstream_stable_159_sha": "1e1d050db5739c2d996a4e0fa18656be4812d29e",
+          "upstream_fix_commit_result_sha": "5cb49a03faa02121b3857bab34f122a053926944",
+          "whole_file_fix_result_match": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "if (!aSrcStrideGap && !aDstStrideGap) {",
+        "CheckedInt32 area = CheckedInt32(aSize.width) * CheckedInt32(aSize.height);",
+        "int32_t srcGap = GetStrideGap(aSize.width, aSrcFormat, aSrcStride);",
+        "int32_t dstGap = GetStrideGap(aSize.width, aDstFormat, aDstStride);",
+        "if (srcGap < 0 || dstGap < 0) {"
+      ],
+      "note": "Exact relevant gap-based collapse and checked stride code observed in Vulpra; whole-file blob differs from upstream fix result and ancestry diverges. Not a runtime proof."
     }
   ],
-  "additional_source_audit_head": "c98b156a18ca3e0c37f78c6206a10e929304fb33"
+  "additional_source_audit_head": "166c51c47810a00bd264482d07a08c26cea1a230"
 }

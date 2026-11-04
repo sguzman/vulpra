@@ -70,6 +70,21 @@ These classifications rely on **9 inspected changed code files** plus upstream c
 
 The **11-issue spot audit now has two confirmed missing fixes**, **seven fixes with patched-result code-file identity or authenticated ancestry**, and **two fixes whose specific protective hunks are present despite other whole-file differences**. The remaining advisory issues remain unreviewed; no security-readiness claim or native milestone credit is justified. Original comparison source and installed browser profiles are unchanged.
 
+## Four additional Firefox 159 high-impact fixes checked (2026-11-04)
+
+Mozilla's [MFSA 2026-118](https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/) identifies all four issues as high impact. Each fix's landed upstream code was compared with `FIREFOX_159_0b5_RELEASE`, stable 159 and Vulpra `main`; divergent Git ancestry **does not imply** a missing fix when source code matches.
+
+| Advisory issue | Code evidence | Limits |
+| --- | --- | --- |
+| **CVE-2026-117872 / Bug 2068410**, JavaScript Standard Library use-after-free | [Fix `bf82d96`](https://github.com/mozilla-firefox/firefox/commit/bf82d965a621cc4d7bd91b546347a8d491a71bf2): **2/2** existing changed code files, `js/src/builtin/Array.cpp` and `js/src/vm/ArrayObject.h`, have the exact fix-result Git blobs in Vulpra, beta and stable | No added jit-test counted as existing code; no execution or exploit probe |
+| **CVE-2026-117922 / Bug 2079692**, WebSocket use-after-free | [Fix `b5e0496`](https://github.com/mozilla-firefox/firefox/commit/b5e0496b140550be2d82768a6829814588b4828e): patched `WebSocketChannel.cpp` Git blob matches across all four sources | Fixed-source identity only |
+| **CVE-2026-118008 / Bug 2075440**, DOM Navigation privilege escalation | [Fix `44c8fd8`](https://github.com/mozilla-firefox/firefox/commit/44c8fd8df124546b1aec37bd794eed0a97140cf3): patched `PdfEmbedFallbackParent.sys.mjs` Git blob matches across all four sources | Fixed-source identity only |
+| **CVE-2026-117871 / Bug 2068400**, Graphics invalid pointer | [Fix `48440d8`](https://github.com/mozilla-firefox/firefox/commit/48440d86a6ba6de2516c77520f8eef311cf04d98): Vulpra's `Swizzle.cpp` contains the introduced gap-based `CollapseSize` guard and checked source/destination stride-gap calculations | **Relevant protective code only**: whole-file blob differs from fix-result; ancestry diverges, no runtime proof |
+
+All changed-code SHA identities and relevant protective hunks are recorded in the [machine-readable audit](SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json). These findings do not establish security readiness, patch provenance across every dependency, or browser-level regression acceptance.
+
+**Current spot audit: 15 CVEs checked, two confirmed missing patches; ten additional issues with exact resulting code-file identities or verified fix ancestry, plus three where relevant security-remediation hunks are present but full fixed-result file identity differs.** Most of the large Firefox 159 advisory still requires review, and a separate security-updated native build is release-blocking.
+
 ## Scope and required continuation
 
 **These two exact upstream patch changes are missing.** The audit does not prove that the corresponding exploit is reachable in every Vulpra configuration, that a missing patch necessarily makes a specific user action exploitable, or that other Mozilla security fixes are missing or present. Do not extrapolate these two findings to an exhaustive CVE inventory. Some upstream fixes may predate the beta; others may require applicability/patch-review rather than cherry-picking.
