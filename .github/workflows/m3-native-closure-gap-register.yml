@@ -1,0 +1,193 @@
+# Read-only, fail-closed M3 SIXTH-GATE BLOCKER register. Joins verified
+# source-pinned 28 original packaged ELF owners, Ubuntu+Arch direct loader,
+# 7 feature-only native binaries, 21 bounded graphical conditional loads,
+# 41 current-vs-original source byte identities, real browser-owned
+# pingsender libcurl execution and 20 scoped source removal candidates.
+# Does NOT authorize pruning or claim full dynamic / feature closure.
+name: M3 Native 28 ELF Dependency Closure Blocker Register
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/m3-native-closure-gap-register.yml
+      - ci/m3-native-closure-gap-register.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-28-and-current-scope-blockers:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    env:
+      ORIGINAL_SOURCE: b1482404dfb8b01342990ee99ea3df0f9756b5f7
+      ORIGINAL_ARCHIVE: 7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a
+    steps:
+      - name: Checkout original dependency register and current candidate ledgers
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-native-closure-gap-register.jq
+            docs/vulpra/DEBLOAT-CANDIDATES.json
+            docs/vulpra/PROGRESS.json
+      - name: Authenticate five independent historical original compiled evidence artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          while read -r run sha artifact; do
+            test -n "$run" || continue
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" |
+              jq -e --arg sha "$sha" '
+                .status=="completed" and .conclusion=="success" and .head_sha==$sha
+              ' >/dev/null
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts?per_page=100" |
+              jq -e --arg name "$artifact" '
+                [.artifacts[]|select(.name==$name and .expired==false and .size_in_bytes>0)]
+                |length==1' >/dev/null
+          done <<'RUNS'
+          41515803526 cda3fb08d1d55fd94f4063921b6d4cc9644b225c m3-original-per-elf-ubuntu-arch-source-loader-crosswalk
+          41523391875 274db808bd618c76b7212ac4ae06b4032cfbd935 m3-original-seven-feature-only-loader-candidates
+          41522017287 51372521dc2ae325d137813741e1235c3faaa60e m3-original-21-conditional-vs-per-elf-loader
+          41210567100 d7ecd8edeae0835eb62c8187ecaf814257f926b8 m3-original-current-41-native-feature-source-drift
+          41741770814 333baf74074b47c547f553654200fe598beacb2b m3-original-browser-pingsender-real-curl-perform
+          RUNS
+          jq -e '.schema_version==1 and .m3_decision_classification.complete_feature_dependency_inventory==false and
+            (.candidates|length)==20' docs/vulpra/DEBLOAT-CANDIDATES.json >/dev/null
+          jq -e '.overall.percent==61 and (.milestones[]|select(.id=="M3")|
+             .percent==83 and .acceptance_gates.passed==5 and
+             .acceptance_gates.total==6)' docs/vulpra/PROGRESS.json >/dev/null
+      - name: Download only bounded sanitized original artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for group in \
+            '41515803526 m3-original-per-elf-ubuntu-arch-source-loader-crosswalk platform original-28-per-elf-ubuntu-arch-crosswalk.json' \
+            '41523391875 m3-original-seven-feature-only-loader-candidates feature m3-original-feature-only-native-loader-candidates.json' \
+            '41522017287 m3-original-21-conditional-vs-per-elf-loader dynamic m3-original-21-dynamic-vs-per-elf-loader.json' \
+            '41210567100 m3-original-current-41-native-feature-source-drift drift m3-original-current-native-feature-source-drift.json' \
+            '41741770814 m3-original-browser-pingsender-real-curl-perform pingsender m3-original-browser-pingsender-real-curl-perform.json'; do
+            read -r run artifact label filename <<<"$group"
+            mkdir -p "$RUNNER_TEMP/$label"
+            gh run download "$run" --repo "$GITHUB_REPOSITORY" \
+              --name "$artifact" --dir "$RUNNER_TEMP/$label"
+            test -s "$RUNNER_TEMP/$label/$filename"
+            jq -e '.schema_version==1' "$RUNNER_TEMP/$label/$filename" >/dev/null
+          done
+      - name: Reconcile all original native boundaries and report precisely open sixth-gate requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/platform/original-28-per-elf-ubuntu-arch-crosswalk.json" "$RUNNER_TEMP/platform-real.json"
+          cp "$RUNNER_TEMP/feature/m3-original-feature-only-native-loader-candidates.json" "$RUNNER_TEMP/feature-real.json"
+          cp "$RUNNER_TEMP/dynamic/m3-original-21-dynamic-vs-per-elf-loader.json" "$RUNNER_TEMP/dynamic-real.json"
+          cp "$RUNNER_TEMP/drift/m3-original-current-native-feature-source-drift.json" "$RUNNER_TEMP/drift-real.json"
+          cp "$RUNNER_TEMP/pingsender/m3-original-browser-pingsender-real-curl-perform.json" "$RUNNER_TEMP/pingsender-real.json"
+          cp docs/vulpra/DEBLOAT-CANDIDATES.json "$RUNNER_TEMP/candidate-real.json"
+          cp docs/vulpra/PROGRESS.json "$RUNNER_TEMP/progress-real.json"
+          audit(){
+            jq -n \
+              --arg source "$ORIGINAL_SOURCE" --arg archive "$ORIGINAL_ARCHIVE" \
+              --arg current "$GITHUB_SHA" \
+              --slurpfile platform "$RUNNER_TEMP/platform/original-28-per-elf-ubuntu-arch-crosswalk.json" \
+              --slurpfile feature "$RUNNER_TEMP/feature/m3-original-feature-only-native-loader-candidates.json" \
+              --slurpfile dynamic "$RUNNER_TEMP/dynamic/m3-original-21-dynamic-vs-per-elf-loader.json" \
+              --slurpfile drift "$RUNNER_TEMP/drift/m3-original-current-native-feature-source-drift.json" \
+              --slurpfile pingsender "$RUNNER_TEMP/pingsender/m3-original-browser-pingsender-real-curl-perform.json" \
+              --slurpfile candidates docs/vulpra/DEBLOAT-CANDIDATES.json \
+              --slurpfile progress docs/vulpra/PROGRESS.json \
+              -f ci/m3-native-closure-gap-register.jq
+          }
+          output="$RUNNER_TEMP/m3-native-closure-gap-register.json"
+          audit >"$output"
+          jq -e --arg sha "$ORIGINAL_ARCHIVE" --arg src "$ORIGINAL_SOURCE" --arg current "$GITHUB_SHA" '
+            .schema_version==1 and
+            .status=="source_pinned_m3_original_28_elf_current_source_and_dependency_closure_gap_register" and
+            .original_source_commit==$src and .original_archive_sha256==$sha and
+            .current_commit==$current and
+            .verified_original_elf_inventory==28 and
+            (.per_original_elf|length)==28 and
+            ([.per_original_elf[].elf]|unique|length)==28 and
+            .original_elf_source_manifests_identical_to_current==27 and
+            .original_protected_boundary_files_identical_to_current==14 and
+            .original_elf_direct_dependencies_resolved_in_ubuntu_and_arch==268 and
+            ([.per_original_elf[].ubuntu_direct_needed_count]|add)==268 and
+            ([.per_original_elf[].arch_direct_needed_count]|add)==268 and
+            .unique_original_runtime_binding_requesters_in_bounded_workloads==28 and
+            .original_graphical_conditional_request_edges_outside_loader_lists==21 and
+            ([.per_original_elf[].bounded_graphical_dynamic_request_edges]|add)==21 and
+            .selected_feature_only_elf_count==7 and
+            ([.per_original_elf[]|select(.selected_feature_only_binary==true)]|length)==7 and
+            .selected_feature_only_named_loader_branches==8 and
+            ([.per_original_elf[].original_feature_only_named_direct_loader_branches|
+              select(.!=null)]|add)==8 and
+            ([.per_original_elf[]|select(.true_browser_owned_pingsender_libcurl_perform_witness_in_joined_inputs)]|
+              map(.elf))==["pingsender"] and
+            ([.per_original_elf[]|select(.safely_prunable_based_on_this_register)]|length)==0 and
+            (.remaining_acceptance_blockers|length)==4 and
+            .selected_candidate_decision_counts=={
+              "keep":13,"remove_source":4,"review":0,"conditional_compile":3
+            } and
+            .previously_accepted_non_linux_source_removed_files==14867 and
+            .previously_accepted_non_linux_source_removed_git_blob_bytes==129967585 and
+            .new_source_removal_during_this_audit==false and
+            .new_compiled_browser_package_bytes_saved==null and
+            .complete_current_source_evaluated_build_graph_proven==false and
+            .complete_future_optional_dlopen_or_ffi_graph_proven==false and
+            .successful_end_to_end_feature_runtime_coverage_for_every_elf_proven==false and
+            .production_endeavouros_hyprland_native_abi_parity_proven==false and
+            .m3_sixth_gate_closed==false and
+            .source_pruning_authorized==false and .native_bytes_saved==0
+          ' "$output" >/dev/null
+          # Negative tests: reject corruption of every independently authenticated
+          # input class, instead of merely mutating an OUTPUT after generation.
+          cases=0
+          check_forgery(){
+            local src="$1" dest="$2" expr="$3"
+            jq "$expr" "$RUNNER_TEMP/$src-real.json" >"$dest"
+            if audit >/dev/null 2>&1; then
+              echo "FAIL: forged $src dependency-closure input accepted" >&2
+              exit 1
+            fi
+            cp "$RUNNER_TEMP/$src-real.json" "$dest"
+            cases=$((cases+1))
+          }
+          check_forgery platform "$RUNNER_TEMP/platform/original-28-per-elf-ubuntu-arch-crosswalk.json" \
+            '.rows[0].direct_needed_arch+=1'
+          check_forgery platform "$RUNNER_TEMP/platform/original-28-per-elf-ubuntu-arch-crosswalk.json" \
+            '.original_archive_sha256="invalid"'
+          check_forgery feature "$RUNNER_TEMP/feature/m3-original-feature-only-native-loader-candidates.json" \
+            '(.rows[]|select(.elf=="pingsender")|.compiled_named_direct_loader_api_branch_count)=5'
+          check_forgery dynamic "$RUNNER_TEMP/dynamic/m3-original-21-dynamic-vs-per-elf-loader.json" \
+            '.rows[0].requested_library="invented.so"'
+          check_forgery drift "$RUNNER_TEMP/drift/m3-original-current-native-feature-source-drift.json" \
+            '.modified_feature_boundary_files=1'
+          check_forgery pingsender "$RUNNER_TEMP/pingsender/m3-original-browser-pingsender-real-curl-perform.json" \
+            '.actual_real_libcurl_perform_return_code=0'
+          # Candidate and progress files are actual current checkout source.
+          jq '.m3_decision_classification.categories.keep=12' \
+            "$RUNNER_TEMP/candidate-real.json" >docs/vulpra/DEBLOAT-CANDIDATES.json
+          if audit >/dev/null 2>&1; then echo 'FAIL: altered candidate policy accepted' >&2; exit 1; fi
+          cp "$RUNNER_TEMP/candidate-real.json" docs/vulpra/DEBLOAT-CANDIDATES.json
+          cases=$((cases+1))
+          jq '(.milestones[]|select(.id=="M3")|.acceptance_gates.passed)=6' \
+            "$RUNNER_TEMP/progress-real.json" >docs/vulpra/PROGRESS.json
+          if audit >/dev/null 2>&1; then echo 'FAIL: forged M3 closure accepted' >&2; exit 1; fi
+          cp "$RUNNER_TEMP/progress-real.json" docs/vulpra/PROGRESS.json
+          cases=$((cases+1))
+          test "$cases" -eq 8
+          echo 'M3_NATIVE_CLOSURE_GAP_REGISTER=PASS 28/28 source ELF rows, 268/268 direct needed, 21 bounded conditional edges, 7 feature-only, 20 classified candidates, four explicit open blockers, 8/8 corrupt inputs rejected'
+      - name: Preserve only sanitized per-ELF blocker report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-native-closure-gap-register
+          path: ${{ runner.temp }}/m3-native-closure-gap-register.json
+          if-no-files-found: warn
+          retention-days: 14
