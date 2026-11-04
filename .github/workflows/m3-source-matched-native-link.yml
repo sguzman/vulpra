@@ -211,7 +211,13 @@ jobs:
           tar -xf .git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz -C "$folder"
           app="$(find "$folder" -maxdepth 5 -type f -name application.ini -print -quit)"
           test -n "$app"
-          VULPRA_WAYLAND_TEST_SECONDS=10 bash packaging/test-wayland.sh "$(dirname "$app")"
+          # Ordinary Ubuntu-host Weston smoke must remain offline with a strict
+          # non-local network guard. Gecko intentionally fails a prohibited
+          # background request when this guard runs in online startup mode.
+          # Scope both settings to this graphical probe; WebDriver exercises
+          # localhost JavaScript separately and normal browser mode is unchanged.
+          VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            VULPRA_WAYLAND_TEST_SECONDS=10 bash packaging/test-wayland.sh "$(dirname "$app")"
           python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
           PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
           python3 - <<'PY'
