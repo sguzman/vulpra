@@ -84,7 +84,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       # On push, independently reconcile one immutable, already successful
       # historical security-native run; never claim an unperformed CSS test.
-      NATIVE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || 41909948021 }}
+      NATIVE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '41909948021' }}
       NATIVE_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '6e38e78724365b3dd6c02f4d0b0570028a5d2112' }}
     steps:
       - name: Checkout only bounded verifier, not native build source
