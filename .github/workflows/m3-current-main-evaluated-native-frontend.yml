@@ -3,12 +3,12 @@
 # package, browser runtime, installed profile or source removal.
 # The existing Python Mozilla API adapter is reused, not reimplemented.
 # Sparse historical native evidence is NOT substituted for current build.
+# Verified source-matched current main configure + Mozilla frontend + C/C++
+# CompileDB accepted CI 41746278259, job 126299976839,
+# artifact 13283772259 (2,381-byte JSON; 992-byte ZIP); 5/5 forged
+# output assertions rejected, no browser build. Manual-only after acceptance.
 name: M3 Current Main Evaluated Mozilla Native Frontend
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-current-main-evaluated-native-frontend.yml
   workflow_dispatch:
 permissions:
   contents: read
