@@ -262,6 +262,10 @@ def test_certificate_denial_parser() -> None:
     assert len(diagnostic["webdriver_message"]) == 400
     assert diagnostic["runtime_certificate_denial_verified"] is False
     assert certificate_failure_diagnostic(503, [])["webdriver_error"] is None
+    with tempfile.TemporaryDirectory(prefix="vulpra-tls-fixture-") as tmp:
+        evidence = Path(tmp) / "failure.json"
+        evidence.write_text(json.dumps(diagnostic, indent=2) + "\n")
+        assert json.loads(evidence.read_text()) == diagnostic
     print("PASS: failure-only TLS diagnostics are bounded and never accepted")
 
 
@@ -318,7 +322,7 @@ def verify_local_certificate_denial(port: int, base: str, work: Path,
                 raise RuntimeError("Malformed WebDriver TLS error response") from error
             if not certificate_denial(exc.code, body):
                 diagnostic = certificate_failure_diagnostic(exc.code, body)
-                failure_report.write_text(json.dumps(diagnostic, indent=2) + "\\n")
+                failure_report.write_text(json.dumps(diagnostic, indent=2) + "\n")
                 raise RuntimeError(
                     "Browser failed TLS test without strict certificate rejection; "
                     f"bounded failure evidence: {failure_report}; "
