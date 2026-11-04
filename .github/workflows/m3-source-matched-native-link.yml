@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/m3-source-matched-native-link.yml
+      - ci/smoke-webextension-package-local.py
   workflow_dispatch:
 
 permissions:
@@ -50,6 +51,8 @@ jobs:
           python3 -m py_compile ci/m3-native-replay-packager.py
           python3 ci/m3-native-replay-packager.py --self-test
           python3 ci/m3-configure-only-substs.py --self-test
+          python3 -m py_compile ci/smoke-webextension-package-local.py
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
           python3 ci/tests/m3-promocard-bundle-contract.py
           python3 -m py_compile ci/m3-native-elf-package-graph.py
           echo "PASS: exact source and original unomitted normal Vulpra"
@@ -233,6 +236,27 @@ jobs:
             VULPRA_WAYLAND_TEST_SECONDS=10 bash packaging/test-wayland.sh "$(dirname "$app")"
           python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
           PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          # Independently fail if current packaged browser did not report
+          # strict loopback self-signed TLS rejection under ordinary trust.
+          webext="$(find .git/vulpra-native-build -maxdepth 1 -type f -name 'webextension-smoke-*.json' -print -quit)"
+          test -n "$webext"
+          jq -e '
+            .status == "pass" and
+            .security.original_firefox_profile_preserved == true and
+            .security.temporary_home == true and
+            (.security.local_untrusted_tls_denial as $tls |
+              $tls.verified == true and
+              $tls.local_self_signed_only == true and
+              $tls.fixture_health_passed == true and
+              $tls.ordinary_tls_client_rejected == true and
+              $tls.webdriver_accept_insecure_certs == false and
+              $tls.webdriver_error == "insecure certificate" and
+              $tls.certificate_store_modified == false and
+              $tls.safebrowsing_tested == false and
+              $tls.sandbox_denial_tested == false and
+              $tls.no_external_egress_proven == false)
+          ' "$webext" >/dev/null
+          echo "PASS: strict current-browser TLS rejection; not Safe Browsing or sandbox enforcement"
           python3 - <<'PY'
           import json,os
           from pathlib import Path
