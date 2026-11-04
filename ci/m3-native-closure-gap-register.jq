@@ -54,6 +54,8 @@ def validname: type=="string" and test("^[A-Za-z0-9][A-Za-z0-9_.+-]{0,100}$");
     $f.original_feature_only_elf_count==7 and ($f.rows|length)==7 and
     ($F|keys|sort)==$feature_names and
     $f.feature_only_named_direct_loader_branches==8 and
+    ([$f.rows[].compiled_named_direct_loader_api_branch_count]|add)==8 and
+    ([ $f.rows[]|select((.compiled_dynamic_loader_api_import_names|length)>0)]|length)==4 and
     $f.feature_only_compiled_loader_importer_count==4 and
     $f.all_future_optional_or_required_loader_routes_proven==false and
     $f.m3_sixth_gate_closed==false and $f.source_pruning_authorized==false;
@@ -74,15 +76,27 @@ def validname: type=="string" and test("^[A-Za-z0-9][A-Za-z0-9_.+-]{0,100}$");
     ($d.rows|length)==21 and
     ([$d.rows[].requester]|unique|sort)==["libnspr4.so","libxul.so","vulpra"] and
     ($d.rows|map([.requester,.requested_library]|join(":"))|unique|length)==21 and
+    $d.original_packaged_dynamic_request_targets==18 and
+    $d.conditional_host_library_targets==3 and
+    ($d.conditional_host_library_names|sort)==["libavcodec.so.60","libgbm.so.1","libpulse.so.0"] and
+    $d.original_bootstrap_manifest_source_candidate_edges==14 and
+    $d.other_original_source_candidate_edges==7 and
+    $d.observed_requester_basename_counts=={"vulpra":14,"libnspr4.so":5,"libxul.so":2} and
     $d.original_trace_is_one_bounded_graphical_workload==true and
     $d.complete_future_dlopen_ffi_or_feature_graph_proven==false and
     $d.m3_sixth_gate_closed==false and $d.source_pruning_authorized==false;
     "bounded original dynamic loader trace drift"),
-  insist(all($d.rows[]; (.requester|validname) and
-    (.requested_library|validname) and $E[.requester]!=null and
-    .requested_library_in_requester_ubuntu_glibc_list==false and
-    .requested_library_in_requester_arch_glibc_list==false);
-    "unbounded or not-independent original dynamic loader relationship"),
+  insist(all($d.rows[]; . as $edge |
+    ($edge.requester|validname) and
+    ($edge.requested_library|validname) and
+    $E[$edge.requester]!=null and
+    ($E[$edge.requested_library]!=null or
+     ($d.conditional_host_library_names|index($edge.requested_library))!=null) and
+    $edge.requested_library_in_requester_ubuntu_glibc_list==false and
+    $edge.requested_library_in_requester_arch_glibc_list==false) and
+    ([$d.rows[]|select($E[.requested_library]!=null)]|length)==18 and
+    ([$d.rows[]|select($E[.requested_library]==null)]|length)==3;
+    "unbounded, forged or non-independent original dynamic loader relationship"),
   insist($dr.schema_version==1 and
     $dr.status=="source_pinned_original_to_current_native_feature_manifest_drift" and
     $dr.original_compiled_source_commit==$source and
