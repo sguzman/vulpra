@@ -233,7 +233,8 @@
     "m3_sixth_gate_closed": false,
     "two_additional_159_advisory_fixes_verified_present_in_beta": true,
     "remaining_advisory_cases_not_exhaustively_checked": true,
-    "third_159_advisory_fix_result_blobs_verified_present_in_beta": true
+    "third_159_advisory_fix_result_blobs_verified_present_in_beta": true,
+    "fourth_159_advisory_fix_result_blobs_verified_present_in_beta": true
   },
   "recommended_action": "Separate, source-matched security maintenance update and full browser regression before routine or public browsing; do not mix fixes into the immutable M3 original binary comparator",
   "follow_up_audit_head": "d96d1147cc386b6b097c13f5837ca994fc1e67c3",
@@ -400,6 +401,50 @@
       ],
       "classification": "three_fix_result_code_blobs_match_pinned_beta_and_vulpra_even_though_git_history_diverged",
       "note": "Source blob identity proves code from these three patch-result files is present; divergent Git branches do not establish ancestor relationship"
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117893",
+      "bug": 2078946,
+      "topic": "Incorrect boundary conditions in Security: PSM (TLS short-write handling)",
+      "patch_commit": "58f4688447b58e69ef29414b709f6d6850de4caa",
+      "upstream_commit_ancestry_checked": false,
+      "affected_existing_files_count": 3,
+      "source_file_blobs": [
+        {
+          "path": "security/manager/ssl/NSSSocketControl.cpp",
+          "vulpra_sha": "8f06cab16764033d660081b6a9dde62f8c82ef0d",
+          "pinned_beta_sha": "8f06cab16764033d660081b6a9dde62f8c82ef0d",
+          "upstream_fix_commit_result_sha": "8f06cab16764033d660081b6a9dde62f8c82ef0d",
+          "upstream_stable_159_sha": "8f06cab16764033d660081b6a9dde62f8c82ef0d",
+          "vulpra_matches_pinned_beta": true,
+          "vulpra_matches_upstream_fix_commit_result": true,
+          "vulpra_matches_upstream_stable_159": true
+        },
+        {
+          "path": "security/manager/ssl/NSSSocketControl.h",
+          "vulpra_sha": "7b66553ab145b91b56692f14eb8a0bec79451ce6",
+          "pinned_beta_sha": "7b66553ab145b91b56692f14eb8a0bec79451ce6",
+          "upstream_fix_commit_result_sha": "7b66553ab145b91b56692f14eb8a0bec79451ce6",
+          "upstream_stable_159_sha": "7b66553ab145b91b56692f14eb8a0bec79451ce6",
+          "vulpra_matches_pinned_beta": true,
+          "vulpra_matches_upstream_fix_commit_result": true,
+          "vulpra_matches_upstream_stable_159": true
+        },
+        {
+          "path": "security/manager/ssl/nsNSSIOLayer.cpp",
+          "vulpra_sha": "c51a1456d50e31b7252847c7e4489256704fcbc3",
+          "pinned_beta_sha": "c51a1456d50e31b7252847c7e4489256704fcbc3",
+          "upstream_fix_commit_result_sha": "c51a1456d50e31b7252847c7e4489256704fcbc3",
+          "upstream_stable_159_sha": "c51a1456d50e31b7252847c7e4489256704fcbc3",
+          "vulpra_matches_pinned_beta": true,
+          "vulpra_matches_upstream_fix_commit_result": true,
+          "vulpra_matches_upstream_stable_159": true
+        }
+      ],
+      "classification": "three_upstream_fix_result_code_blobs_match_159_beta_stable_and_vulpra",
+      "note": "Exact fixed-result code-file identity only; no assertion of direct commit ancestry, exploit resistance or comprehensive PSM security"
     }
-  ]
+  ],
+  "additional_source_audit_head": "ec5aa5c6d09aa7d1035b23c2b8c580800f2c7316"
 }

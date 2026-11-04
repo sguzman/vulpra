@@ -39,7 +39,7 @@ Each source path was fetched directly at both the Vulpra `main` HEAD and the cor
 | `CVE-2026-120572` | `layout/generic/AbsoluteContainingBlock.h` | `deac3bd8b039` | `eb95b77d9578` |
 | `CVE-2026-120572` | `layout/generic/nsLineLayout.cpp` | `57d0f421b9ab` | `452ffc656ded` |
 
-## Two separately verified 159 advisory fixes already present in the beta
+## Verified 159 advisory fixes already present in the beta
 
 **Do not classify every Firefox 159 advisory as a missing Vulpra fix.** The official Mozilla [MFSA 2026-118](https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/) also covers two high-impact issues whose actual upstream patches were already integrated before the frozen beta:
 
@@ -52,7 +52,9 @@ A third spot check, **CVE-2026-117868 / Bug 2059961** (DOM Networking WebTranspo
 
 This finding is **positive evidence of upstream patch inclusion and retained source code**, not independent exploit testing or complete security readiness. It is independent of the **two genuinely missing** patches above. The exact 16 file SHA values and upstream parent commits are recorded in the [machine-readable audit](SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json), with verified provenance `main` at `d96d1147`.
 
-This 5-CVE spot audit classifies **two confirmed missing patches** and **three fixes whose patched code is present in the beta**; **other MFSA 2026-118 cases remain unaudited**, and the separate full-security-maintenance issue remains open. No patch files, frozen comparison source or browser profiles were modified.
+A fourth spot check covers **CVE-2026-117893 / Bug 2078946**, incorrect TLS short-write boundary handling in **Security: PSM**. Mozilla's [code fix `58f4688`](https://github.com/mozilla-firefox/firefox/commit/58f4688447b58e69ef29414b709f6d6850de4caa) modifies `NSSSocketControl.cpp`, `NSSSocketControl.h`, and `nsNSSIOLayer.cpp`. All **three/three** resulting code blobs match **exactly** across this fix-result commit, pinned 159.0b5, stable 159 and Vulpra `main` (three full SHA-1 blob identities retained in the JSON audit). Source identity verifies the fix-result code is present; commit ancestry for this fix was **not checked**, and this does not establish that all certificate-path or security behaviors are safe.
+
+This 6-CVE spot audit classifies **two confirmed missing patches** and **four fixes whose patched code is present in the beta**; **other MFSA 2026-118 cases remain unaudited**, and the separate full-security-maintenance issue remains open. No patch files, frozen comparison source or browser profiles were modified.
 
 ## Scope and required continuation
 
