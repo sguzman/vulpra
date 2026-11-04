@@ -1039,7 +1039,196 @@
         "if (NS_WARN_IF(!JS_WrapObject(aCx, &buffer)))"
       ],
       "note": "The repaired cross-compartment ArrayBuffer handling is observed in pinned beta. Source cpp blob differs while other three patched files match exactly. Separate upstream RTCEncodedFrame-copy-construction test commit not audited for source presence; no runtime exploit regression was executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117864",
+      "bug": 2058614,
+      "topic": "Form Manager Lit template-literal safety / sandbox escape",
+      "patch_commits": [
+        "7543595667ef859ad83cba275f114cd08ea94079",
+        "276e954dae00a968addc4e51cdfc4ed5c01791c2"
+      ],
+      "classification": "two_exact_patch_result_blobs_match_pinned_beta_stable_and_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "toolkit/content/widgets/vendor/lit.all.mjs",
+          "upstream_fix_commit_result_sha": "421a9ce3c1f59ff345126ba78b58283023ea9110",
+          "pinned_beta_sha": "421a9ce3c1f59ff345126ba78b58283023ea9110",
+          "upstream_stable_159_sha": "421a9ce3c1f59ff345126ba78b58283023ea9110",
+          "vulpra_sha": "421a9ce3c1f59ff345126ba78b58283023ea9110",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "toolkit/content/vendor/lit/0007-Freeze-template-literals-to-match-the-spec.patch",
+          "upstream_fix_commit_result_sha": "804843994b654371eec05b14aa963b72aaedc1c8",
+          "pinned_beta_sha": "804843994b654371eec05b14aa963b72aaedc1c8",
+          "upstream_stable_159_sha": "804843994b654371eec05b14aa963b72aaedc1c8",
+          "vulpra_sha": "804843994b654371eec05b14aa963b72aaedc1c8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "checked_vulpra_main_head": "ed76a0fc03708d426498b47092b3099f7b970ae7",
+      "note": "Both upstream landed patch-result blobs exactly match Firefox 159.0b5, stable 159 and Vulpra main. Source-level identity only; no exploit runtime test or broader Form Manager audit."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117877",
+      "bug": 2074209,
+      "topic": "Font-palette cache use-after-free / lifetime of per-font entries",
+      "patch_commit": "b193e850fbf39925b5dfa8c0f8a741371458ee12",
+      "classification": "all_sixteen_upstream_stable_blobs_equal_beta_and_vulpra_five_also_equal_selected_fix_commit",
+      "source_file_blobs": [
+        {
+          "path": "dom/canvas/CanvasRenderingContext2D.cpp",
+          "upstream_fix_commit_result_sha": "bf131b51274f78b74c53b78a427875d258698593",
+          "pinned_beta_sha": "2f28cb5686188778c4f836a2a4ac942d7494b1d2",
+          "upstream_stable_159_sha": "2f28cb5686188778c4f836a2a4ac942d7494b1d2",
+          "vulpra_sha": "2f28cb5686188778c4f836a2a4ac942d7494b1d2",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/canvas/CanvasRenderingContext2D.h",
+          "upstream_fix_commit_result_sha": "25a7b7921ca6ada774885d3dc37e7d45ea80b2be",
+          "pinned_beta_sha": "37df36fb6f950fb0f8eab37151cc4c8eb90e9572",
+          "upstream_stable_159_sha": "37df36fb6f950fb0f8eab37151cc4c8eb90e9572",
+          "vulpra_sha": "37df36fb6f950fb0f8eab37151cc4c8eb90e9572",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "gfx/src/nsFontMetrics.cpp",
+          "upstream_fix_commit_result_sha": "981df9465f4062fed33d0c9f28bf06d3ede69fbb",
+          "pinned_beta_sha": "981df9465f4062fed33d0c9f28bf06d3ede69fbb",
+          "upstream_stable_159_sha": "981df9465f4062fed33d0c9f28bf06d3ede69fbb",
+          "vulpra_sha": "981df9465f4062fed33d0c9f28bf06d3ede69fbb",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/thebes/FontPaletteCache.cpp",
+          "upstream_fix_commit_result_sha": "8a80c4d500c652e2cb0f5ed9f3da8c8e012eae54",
+          "pinned_beta_sha": "8a80c4d500c652e2cb0f5ed9f3da8c8e012eae54",
+          "upstream_stable_159_sha": "8a80c4d500c652e2cb0f5ed9f3da8c8e012eae54",
+          "vulpra_sha": "8a80c4d500c652e2cb0f5ed9f3da8c8e012eae54",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/thebes/FontPaletteCache.h",
+          "upstream_fix_commit_result_sha": "ab38286c352f9d5ca696b196468b627fa4307f49",
+          "pinned_beta_sha": "ab38286c352f9d5ca696b196468b627fa4307f49",
+          "upstream_stable_159_sha": "ab38286c352f9d5ca696b196468b627fa4307f49",
+          "vulpra_sha": "ab38286c352f9d5ca696b196468b627fa4307f49",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/thebes/gfxFont.cpp",
+          "upstream_fix_commit_result_sha": "36fe717f27787036f6dc6c27a8d5aaccc5427973",
+          "pinned_beta_sha": "f4a983fcb965b391604f62d37b6ceebb7ee8b3ad",
+          "upstream_stable_159_sha": "f4a983fcb965b391604f62d37b6ceebb7ee8b3ad",
+          "vulpra_sha": "f4a983fcb965b391604f62d37b6ceebb7ee8b3ad",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "gfx/thebes/gfxFont.h",
+          "upstream_fix_commit_result_sha": "9b32f858780a9d0cca82030c0b356f2c837b63a8",
+          "pinned_beta_sha": "5dff682e0b7d34ab598ccc7d6301e1f97dcfd16e",
+          "upstream_stable_159_sha": "5dff682e0b7d34ab598ccc7d6301e1f97dcfd16e",
+          "vulpra_sha": "5dff682e0b7d34ab598ccc7d6301e1f97dcfd16e",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "gfx/thebes/gfxFontEntry.cpp",
+          "upstream_fix_commit_result_sha": "4aa3c21f6c26f2f23a449f85c65410ce179d1185",
+          "pinned_beta_sha": "8dcb93137d3f70d210cdc921246fdc265fb6133c",
+          "upstream_stable_159_sha": "8dcb93137d3f70d210cdc921246fdc265fb6133c",
+          "vulpra_sha": "8dcb93137d3f70d210cdc921246fdc265fb6133c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "gfx/thebes/gfxFontEntry.h",
+          "upstream_fix_commit_result_sha": "a17fb01e67cfff2eb081251617e0587eb0cfaaf6",
+          "pinned_beta_sha": "b4bb5867fdf5dd6b25282b73e2d7d54d7e34b8f2",
+          "upstream_stable_159_sha": "b4bb5867fdf5dd6b25282b73e2d7d54d7e34b8f2",
+          "vulpra_sha": "b4bb5867fdf5dd6b25282b73e2d7d54d7e34b8f2",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "gfx/thebes/gfxTextRun.cpp",
+          "upstream_fix_commit_result_sha": "7ad68c0e56c53bbd0b3c367269d3c8fcf32c927d",
+          "pinned_beta_sha": "121abbea9808dd46cbbcd67f5783f645a0db4fbb",
+          "upstream_stable_159_sha": "121abbea9808dd46cbbcd67f5783f645a0db4fbb",
+          "vulpra_sha": "121abbea9808dd46cbbcd67f5783f645a0db4fbb",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "gfx/thebes/gfxTextRun.h",
+          "upstream_fix_commit_result_sha": "1a6058b242c85c83ae1af7bf948162ed9d2f952e",
+          "pinned_beta_sha": "4d38f9bc6d4c098cdeb016b54ba77b9003d56334",
+          "upstream_stable_159_sha": "4d38f9bc6d4c098cdeb016b54ba77b9003d56334",
+          "vulpra_sha": "4d38f9bc6d4c098cdeb016b54ba77b9003d56334",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/base/nsPresContext.cpp",
+          "upstream_fix_commit_result_sha": "7ed815c92756330515a37821fa3abca6892ac356",
+          "pinned_beta_sha": "415fe207ad5146470ad2d268400f2f91821bdcce",
+          "upstream_stable_159_sha": "415fe207ad5146470ad2d268400f2f91821bdcce",
+          "vulpra_sha": "415fe207ad5146470ad2d268400f2f91821bdcce",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/base/nsPresContext.h",
+          "upstream_fix_commit_result_sha": "573a419c4ab3bc0e3a467b80dfe0193464d6004b",
+          "pinned_beta_sha": "573a419c4ab3bc0e3a467b80dfe0193464d6004b",
+          "upstream_stable_159_sha": "573a419c4ab3bc0e3a467b80dfe0193464d6004b",
+          "vulpra_sha": "573a419c4ab3bc0e3a467b80dfe0193464d6004b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/generic/TextOverflow.cpp",
+          "upstream_fix_commit_result_sha": "94313a1357b2a269c3916226c610cea35b41507c",
+          "pinned_beta_sha": "94313a1357b2a269c3916226c610cea35b41507c",
+          "upstream_stable_159_sha": "94313a1357b2a269c3916226c610cea35b41507c",
+          "vulpra_sha": "94313a1357b2a269c3916226c610cea35b41507c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/generic/nsTextFrame.cpp",
+          "upstream_fix_commit_result_sha": "f956bdb25485adfe6fe42c86c58895b8f7d32ba9",
+          "pinned_beta_sha": "84053daa372c55704e959700204562a445be9dad",
+          "upstream_stable_159_sha": "84053daa372c55704e959700204562a445be9dad",
+          "vulpra_sha": "84053daa372c55704e959700204562a445be9dad",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/mathml/nsMathMLChar.cpp",
+          "upstream_fix_commit_result_sha": "4dab302bfab60e3178b0bc79fd51b352091de5b2",
+          "pinned_beta_sha": "3271dabaec88e807d4ad825f8694a6c0be9c6abe",
+          "upstream_stable_159_sha": "3271dabaec88e807d4ad825f8694a6c0be9c6abe",
+          "vulpra_sha": "3271dabaec88e807d4ad825f8694a6c0be9c6abe",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "checked_vulpra_main_head": "ed76a0fc03708d426498b47092b3099f7b970ae7",
+      "note": "All 16 code files touched by selected upstream fix commit match the shipped Firefox 159 stable tag, the pinned 159.0b5 tag, and Vulpra main exactly. Only 5/16 match this selected upstream commit's own postimage; 11 differ identically across stable/beta/Vulpra, consistent with subsequent upstream revisions. This establishes stable-source identity over the selected file set, not patch ancestry, full vulnerability elimination or runtime exploit acceptance. Upstream revert/reland sequence not independently reconstructed."
     }
   ],
-  "additional_source_audit_head": "9ac0be92371951959bce12dccad0107372647f10"
+  "additional_source_audit_head": "ed76a0fc03708d426498b47092b3099f7b970ae7"
 }
