@@ -4,13 +4,12 @@
 # 41 current-vs-original source byte identities, real browser-owned
 # pingsender libcurl execution and 20 scoped source removal candidates.
 # Does NOT authorize pruning or claim full dynamic / feature closure.
+# Accepted source-pinned aggregate CI 41745377006 PASS, job 126296929534,
+# sanitized artifact 13283765728 (37022-byte JSON), 8/8 forged original
+# evidence/candidate/progress inputs rejected, 4 explicit open blockers.
+# Return expensive original evidence retrieval to manual-only after acceptance.
 name: M3 Native 28 ELF Dependency Closure Blocker Register
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/m3-native-closure-gap-register.yml
-      - ci/m3-native-closure-gap-register.jq
   workflow_dispatch:
 permissions:
   contents: read
