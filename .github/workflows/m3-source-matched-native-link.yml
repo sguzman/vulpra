@@ -350,6 +350,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-native-link-failure-tail
-          path: ${{ runner.temp }}/m3-native-link-failure-tail.log
+          path: |
+            ${{ runner.temp }}/m3-native-link-failure-tail.log
+            .git/vulpra-native-build/webextension-tls-failure-*.json
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14

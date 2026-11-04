@@ -220,6 +220,22 @@ def certificate_denial(status: int, body: object) -> bool:
             isinstance(error.get("message"), str) and bool(error["message"].strip()))
 
 
+def certificate_failure_diagnostic(status: int, body: object) -> dict:
+    """Bounded failure-only evidence; never a certificate-acceptance record."""
+    value = body.get("value") if isinstance(body, dict) else None
+    error = value.get("error") if isinstance(value, dict) else None
+    message = value.get("message") if isinstance(value, dict) else None
+    return {
+        "schema_version": 1,
+        "status": "fail",
+        "check": "local_self_signed_tls_denial",
+        "http_status": status,
+        "webdriver_error": error[:96] if isinstance(error, str) else None,
+        "webdriver_message": message[:400] if isinstance(message, str) else None,
+        "runtime_certificate_denial_verified": False,
+    }
+
+
 def test_certificate_denial_parser() -> None:
     good = {"value": {"error": "insecure certificate", "message": "untrusted"}}
     assert certificate_denial(500, good)
@@ -238,9 +254,19 @@ def test_certificate_denial_parser() -> None:
         assert not certificate_denial(500, result)
     print(f"PASS: strict certificate parser rejected {len(bad)+5}/"
           f"{len(bad)+5} forged or non-certificate cases")
+    diagnostic = certificate_failure_diagnostic(500, {
+        "value": {"error": "unknown error", "message": "M" * 600}
+    })
+    assert diagnostic["status"] == "fail"
+    assert diagnostic["webdriver_error"] == "unknown error"
+    assert len(diagnostic["webdriver_message"]) == 400
+    assert diagnostic["runtime_certificate_denial_verified"] is False
+    assert certificate_failure_diagnostic(503, [])["webdriver_error"] is None
+    print("PASS: failure-only TLS diagnostics are bounded and never accepted")
 
 
-def verify_local_certificate_denial(port: int, base: str, work: Path) -> dict:
+def verify_local_certificate_denial(port: int, base: str, work: Path,
+                                    failure_report: Path) -> dict:
     """Verify the current packaged browser rejects an untrusted local origin.
 
     No browser SSL override, CA store change, public URL or real profile.
@@ -291,7 +317,15 @@ def verify_local_certificate_denial(port: int, base: str, work: Path) -> dict:
             except (ValueError, UnicodeError) as error:
                 raise RuntimeError("Malformed WebDriver TLS error response") from error
             if not certificate_denial(exc.code, body):
-                raise RuntimeError("Browser failed TLS test without strict certificate rejection")
+                diagnostic = certificate_failure_diagnostic(exc.code, body)
+                failure_report.write_text(json.dumps(diagnostic, indent=2) + "\\n")
+                raise RuntimeError(
+                    "Browser failed TLS test without strict certificate rejection; "
+                    f"bounded failure evidence: {failure_report}; "
+                    f"HTTP {diagnostic['http_status']}, "
+                    f"WebDriver error={diagnostic['webdriver_error']!r}, "
+                    f"message={diagnostic['webdriver_message']!r}"
+                )
         return {
             "verified": True,
             "local_self_signed_only": True,
@@ -568,7 +602,9 @@ def main() -> int:
                 base = f"/session/{session_id}"
                 js_result = verify_js_navigation(port, base, server)
                 print("PASS: real WebDriver JS redirect, HTTP 302 and final DOM", flush=True)
-                tls_result = verify_local_certificate_denial(port, base, work)
+                tls_result = verify_local_certificate_denial(
+                    port, base, work, logdir / f"webextension-tls-failure-{stamp}.json"
+                )
                 print("PASS: real browser denied self-signed localhost HTTPS", flush=True)
                 url = f"http://127.0.0.1:{server.server_port}/extension"
                 def navigate(suffix: str) -> None:
