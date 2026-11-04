@@ -24,6 +24,9 @@ jobs:
     if: >-
       github.repository == 'sguzman/vulpra' &&
       github.event_name == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
+      github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
+      github.event.workflow_run.name == 'Security 159 Post-Beta Hotfix Native Build and Runtime' &&
       github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 3

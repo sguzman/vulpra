@@ -24,6 +24,9 @@ jobs:
     if: >-
       github.repository == 'sguzman/vulpra' &&
       github.event_name == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.name == 'M3 Source Matched Native Link Inputs and Runtime' &&
       github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 3
