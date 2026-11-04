@@ -1,0 +1,234 @@
+# Cross-check every native-build JSON against one exact source and compiled binary.
+# Does not rebuild Firefox or trust a lone successful workflow label.
+name: Security 159 Hotfix Native Evidence Reconciliation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-native-link-evidence-ledger.py
+      - ci/m3-current-local-tls-native-evidence.jq
+      - ci/tests/m3-current-local-tls-native-evidence-tests.sh
+      - .github/workflows/security-159-hotfix-evidence-reconcile.yml
+  workflow_run:
+    workflows:
+      - Security 159 Post-Beta Hotfix Native Build and Runtime
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  reject-unsuccessful-original-native-run:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Explicitly reject failed, timed-out, cancelled or skipped native builds
+        shell: bash
+        env:
+          ORIGINAL_NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
+          ORIGINAL_NATIVE_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          echo "::error::Native browser run ${ORIGINAL_NATIVE_RUN_ID} concluded '${ORIGINAL_NATIVE_CONCLUSION}'; no full package/runtime acceptance is possible."
+          exit 1
+
+  validate-negative-fixtures:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout bounded evidence validator
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Reject fabricated native config/hash/runtime attestations
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/m3-native-link-evidence-ledger.py
+          python3 ci/m3-native-link-evidence-ledger.py --self-test
+          bash ci/tests/m3-current-local-tls-native-evidence-tests.sh
+
+  reconcile-real-native-run:
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
+      github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    needs: validate-negative-fixtures
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NATIVE_RUN_ID: ${{ github.event.workflow_run.id }}
+      NATIVE_SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Checkout only bounded verifier, not native build source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci
+      - name: Independently confirm successful original native run and exact head SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NATIVE_RUN_ID" \
+            > "$RUNNER_TEMP/native-run-metadata.json"
+          jq -e \
+            --arg sha "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            '.id == $run and .head_sha == $sha and
+             .status == "completed" and .conclusion == "success" and
+             .name == "Security 159 Post-Beta Hotfix Native Build and Runtime" and
+              .head_branch == "security/firefox-159-postbeta-hotfixes"' \
+            "$RUNNER_TEMP/native-run-metadata.json" >/dev/null
+          echo "PASS: original full native workflow actually succeeded at expected SHA"
+      - name: Independently verify exact Mozilla security patch-result source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Expectations are pinned in this DEFAULT-branch verifier, not in
+          # the untrusted source branch manifest used for comparison.
+          manifest="$(gh api "repos/$GITHUB_REPOSITORY/contents/docs/vulpra/SECURITY-159-HOTFIX-PORT.json?ref=$NATIVE_SOURCE_SHA" --jq .sha)"
+          test "$manifest" = c2b865acdfa91572b71291f51b6052f338ffd6fb
+          count=0
+          while IFS=$'\t' read -r path expected; do
+            test -n "$path" && test -n "$expected"
+            actual="$(gh api "repos/$GITHUB_REPOSITORY/contents/$path?ref=$NATIVE_SOURCE_SHA" --jq .sha)"
+            if test "$actual" != "$expected"; then
+              echo "::error::Security source patch-result mismatch: $path"
+              exit 1
+            fi
+            count=$((count+1))
+          done <<'EXPECTED_SOURCE_BLOBS'
+          docshell/base/BrowsingContext.cpp	0986f712c9246d9dee01a95237eb1b69e4b8349e
+          docshell/base/CanonicalBrowsingContext.cpp	86b2939a83873627e79ec19b87d13008e2e2109d
+          docshell/base/CanonicalBrowsingContext.h	4f00705f303872577da41df1d171c95425e3716a
+          docshell/shistory/SessionHistoryEntry.cpp	a16e4ec279d722fffbdaf797033f73bb66b9c928
+          docshell/shistory/SessionHistoryEntry.h	68e46ffedaf290a27e0bff507f8aca33f52b016b
+          docshell/shistory/nsSHEntryShared.h	368acfaf59cb92263684cce26c2426cb4079caf0
+          dom/ipc/ContentParent.cpp	e7ac12f052d64e780d36eceeb43d3308a5550b0e
+          dom/ipc/ContentParent.h	cffb55b774c4ae34f377aeaa8241b2461a28e265
+          dom/ipc/PContent.ipdl	3715db0dc9dd7411b6104a6dcf869427bb127f29
+          dom/ipc/ParentProcessChannelHandle.cpp	286d235f594175e8ca0aca44234e94f7b0b55f69
+          dom/ipc/ParentProcessChannelHandle.h	0b1fcd547ed54497cdf6e932a98eb9ca26ae2db1
+          dom/ipc/WindowGlobalParent.cpp	59c74d956b8687bf864d3bd1a66bc94e1915771d
+          dom/ipc/WindowGlobalParent.h	446101c1ad40f8338cc73aa8b058db3b79202812
+          netwerk/ipc/DocumentLoadListener.cpp	10b16322a4a55f7c5d4459489a70347ee1debc4f
+          layout/generic/AbsoluteContainingBlock.cpp	0f15a8fc81753796e1050e82d598f7e63804e01f
+          layout/generic/AbsoluteContainingBlock.h	eb95b77d9578ffbdb1a58b7c0f4be94ce6f263c3
+          layout/generic/nsLineLayout.cpp	452ffc656ded21faba0beb0fd2927b7933834f4e
+          testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html	31a14963b356d869475bac62ca44991d9275a285
+          EXPECTED_SOURCE_BLOBS
+          test "$count" -eq 18
+          echo "PASS: independent API verification of 17 upstream patched code blobs, original regression fixture and immutable port manifest"
+
+      - name: Retrieve one bounded original run evidence artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name security-159-source-matched-native-link-evidence \
+            --dir "$RUNNER_TEMP/native-evidence"
+      - name: Reconcile all source, binary, SHA and real runtime evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,subprocess,sys
+          root=Path(os.environ["RUNNER_TEMP"])/"native-evidence"
+          names={
+            "config":"m3-native-link-config.json",
+            "link":"m3-native-link-inputs.json",
+            "elf":"m3-native-link-elf-package-graph.json",
+            "localhost":"m3-localhost-acceptance.json",
+            "webextension":"webextension-smoke-*.json",
+            "sidecar":"vulpra-local-m3-native-link-ci.tar.xz.sha256",
+          }
+          args=[]
+          for k,pattern in names.items():
+              matches=list(root.rglob(pattern))
+              if len(matches)!=1:
+                  raise SystemExit("FAIL: expected one "+k+" record; found "+str(len(matches)))
+              args += ["--"+k,str(matches[0])]
+          args += ["--source-sha",os.environ["NATIVE_SOURCE_SHA"],
+                   "--run-id",os.environ["NATIVE_RUN_ID"],
+                   "--output",str(Path(os.environ["RUNNER_TEMP"])/"security-159-native-link-reconciled.json")]
+          subprocess.run([sys.executable,"ci/m3-native-link-evidence-ledger.py",*args],check=True)
+          PY
+          jq -e \
+            --arg sha "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            '.source_commit==$sha and .workflow_run_id==$run and
+             .status=="passed_full_native_evidence_reconciliation" and
+             .GTK_before_Wayland == true and
+             .Wayland_JS_WebExtension_Nimbus_passed == true and
+             .complete_resolved_linker_symbol_map == false and
+             .lean_full_source_matched_pair_done == false and
+             .compiled_package_savings_bytes == null and
+             .additional_source_removal_authorized == false' \
+            "$RUNNER_TEMP/security-159-native-link-reconciled.json" >/dev/null
+      - name: Independently reconcile current packaged browser TLS certificate rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This runs ONLY after separately checking the completed successful
+          # native Actions workflow and its exact head SHA. Do not reuse a
+          # synthetic fixture or downgrade missing TLS output to a skip.
+          evidence="$RUNNER_TEMP/native-evidence"
+          mapfile -t links < <(find "$evidence" -type f -name m3-native-link-inputs.json -print)
+          mapfile -t local < <(find "$evidence" -type f -name m3-localhost-acceptance.json -print)
+          mapfile -t webext < <(find "$evidence" -type f -name 'webextension-smoke-*.json' -print)
+          test "${#links[@]}" -eq 1
+          test "${#local[@]}" -eq 1
+          test "${#webext[@]}" -eq 1
+          jq -n \
+            --slurpfile link "${links[0]}" \
+            --slurpfile local "${local[0]}" \
+            --slurpfile webextension "${webext[0]}" \
+            --arg source_sha "$NATIVE_SOURCE_SHA" \
+            --argjson run_id "$NATIVE_RUN_ID" \
+            -f ci/m3-current-local-tls-native-evidence.jq \
+            > "$RUNNER_TEMP/security-159-local-tls-reconciled.json"
+          jq -e \
+            --arg sha "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            '
+              .schema_version == 1 and
+              .status == "bounded_current_native_local_certificate_rejection_crosscheck" and
+              .authenticated_source_sha == $sha and
+              .authenticated_workflow_run_id == $run and
+              .verified_current_native_loopback_self_signed_tls_denial == true and
+              .webdriver_insecure_cert_overrides_enabled == false and
+              .certificate_store_modified == false and
+              .safe_browsing_proven == false and
+              .sandbox_process_denial_proven == false and
+              .no_background_network_egress_proven == false and
+              .all_conditional_ffi_dlopen_proven == false and
+              .target_endeavouros_hyprland_tested == false and
+              .m3_sixth_gate_closed == false and
+              .additional_source_pruning_authorized == false and
+              .marginal_native_savings_bytes == null
+            ' "$RUNNER_TEMP/security-159-local-tls-reconciled.json" >/dev/null
+          echo "PASS: independent source-linked current native package and W3C certificate rejection crosscheck"
+
+      - name: Preserve only bounded reconciled source and runtime attestations
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-159-native-link-reconciled-evidence
+          path: |
+            ${{ runner.temp }}/security-159-native-link-reconciled.json
+            ${{ runner.temp }}/security-159-local-tls-reconciled.json
+          if-no-files-found: error
+          retention-days: 14
