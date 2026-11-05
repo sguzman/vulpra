@@ -163,3 +163,29 @@ The three high-impact fixes below were traced from the [Firefox 159 advisory](ht
 - **CVE-2026-117883 / Bug 2076271 — HTML stream parser executor use-after-free.** [Fix `cc7a5b8`](https://github.com/mozilla-firefox/firefox/commit/cc7a5b83a2d85a767c4f16dd61a23af8bcd080d8) touches `dom/xhr/XMLHttpRequestMainThread.cpp` and `parser/html/nsHtml5StreamParser.cpp`, with **2/2 exact fix-postimage Git blobs** across beta/stable/Vulpra. Vulpra's cycle collection unlink logic calls `Terminate()` and preserves executor references until the parser is done. No exploit regression was run.
 
 The source guard added to the existing security evidence workflow ([integration `1abc238`](https://github.com/sguzman/vulpra/commit/1abc2380e8c5146da2f308879b73e6ad0a1dca2f), [source-change triggers `e4f289d`](https://github.com/sguzman/vulpra/commit/e4f289d2be811a231e87b47f6bfc50ec8cdbc023)) covers the separate **85 WebRTC/JavaScript GC files** for CVE-2026-118006 and CVE-2026-118007. Its first complete CI run and Actionlint passed; the source-trigger expansion also passed its independent workflow and Actionlint. The newly audited three CVEs are not added to the 85-path guarded cohort merely by being in the register.
+
+## Nine more high-impact source checks and general CI coverage (2026-11-04)
+
+[MFSA 2026-118](https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/) was checked against the upstream Mozilla fix commits, the exact pinned `FIREFOX_159_0b5_RELEASE` tree, `FIREFOX_159_0_RELEASE`, and Vulpra `main`. **Nine distinct new high-impact CVEs** have source-positive evidence in [the Git blob register](./SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json):
+
+| CVE | Mozilla bug | Scope and fixed-source evidence |
+| --- | --- | --- |
+| **CVE-2026-117885** (Grid UAF) | 2076983 | Two relevant paths equal beta/stable/Vulpra, one matching selected relanding postimage; Grid measurement code contains guarded cached-property lookup and post-reflow refresh, original crashtest only source-present |
+| **CVE-2026-117887** (DOM table-cell UAF) | 2077385 | One exact upstream postimage; `CellIndex()` retains its row with `RefPtr` |
+| **CVE-2026-118010** (Accessibility UAF) | 2077770 | One source path identical across beta/stable/Vulpra but different from selected upstream postimage; `mARIAOwnsHash` relocation-removal guard confirmed |
+| **CVE-2026-117896** (DOM form-submit UAF) | 2079032 | Two exact upstream fix postimages; weak submit-element pointers replaced with `RefPtr` |
+| **CVE-2026-117897** (Table bounds) | 2079036 | Three exact upstream postimages including the original border-collapse crashtest |
+| **CVE-2026-117898** (JIT UAF) | 2079040 | Six source paths identical across the three refs, three exact postimages; `StringToAtom` has a distinct `result: StringId` operand, upstream jit-test present but not executed |
+| **CVE-2026-117899** (HTTP/2 UAF) | 2079046 | Two exact upstream postimages; `CleanupStream` holds `RefPtr<Http2Session>` |
+| **CVE-2026-117900** (HTML Editor UAF) | 2079053 | One exact upstream postimage; rejects nodes from different documents |
+| **CVE-2026-117901** (screen-orientation UAF) | 2079054 | One exact upstream postimage; retains responsible `Document` via `RefPtr` |
+
+**Important mapping correction:** Mozilla's **CVE-2026-117886** is a separate *Graphics: Text / Bug 2077162* vulnerability. The HTML form fix belongs to **CVE-2026-117896** and is recorded under its proper identifier. **117886 and 117863 are still unverified by this source register**. A source comparison does not prove exploit rejection.
+
+**Audit state:** 42 distinct CVEs covered by scoped source checks, of which **40** have evidence of their fixes already present in the pinned beta, plus **2** originally absent in that beta (`CVE-2026-117860` and `CVE-2026-120572`) and independently tested on the separate security branch. This is **not** complete MFSA 2026-118 coverage. MFSA 2026-123 (Firefox 159.0.1) lists `CVE-2026-120572` as its single reported high-impact fix, already included in the isolated patched source but not merged or released.
+
+### CI source-integrity hardening
+
+The previous WebRTC/GC-specific guard verified only 85 blobs across two CVEs. [Verifier expansion `3907a2f`](https://github.com/sguzman/vulpra/commit/3907a2f57e191ef4e49321f45014d40d9b93fa50) now checks **all 40 source-positive entries, 206 documented path-to-Git-object claims** (204 distinct paths), while retaining explicit WebRTC/GC cohort invariants. The register also had one 39-character XML pretty-printer SHA copied in error; [correction `2ad58d0`](https://github.com/sguzman/vulpra/commit/2ad58d05da2a197164599ae92cb4755166dd9dbd) repaired the exact previously verified 40-character Git object identifier, and the new verifier rejects truncated hashes.
+
+[Workflow expansion `af2f414`](https://github.com/sguzman/vulpra/commit/af2f414d448b3b2d07f1a8ec492fc39bc443e43e) runs that check for changes to every top-level source/test directory represented in the currently audited paths, and additionally requires failure on forged non-WebRTC evidence and truncated hashes. These are Git-object source-integrity tests, **not** compiled binary or real-browser security tests. The native security branch, M3 pruning baseline and release acceptance remain unchanged.
