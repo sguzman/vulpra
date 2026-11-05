@@ -13,14 +13,21 @@ on:
       - ci/tests/security-159-css-evidence-tests.sh
       - ci/security-159-check-source-crosswalk.sh
       - docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
-      # Any future modifications to audited source paths must re-run the
-      # fail-closed SHA crosswalk, not merely edits to the manifest/script.
+      # Every source-positive audit entry must be rechecked if underlying
+      # tracked code or fixture paths change, not only when JSON changes.
+      - 'accessible/**'
+      - 'docshell/**'
+      - 'dom/**'
+      - 'editor/**'
+      - 'gfx/**'
       - 'js/**'
-      - 'dom/base/**'
-      - 'dom/bindings/**'
-      - 'dom/media/webrtc/**'
-      - 'media/webrtc/**'
-      - netwerk/base/nsSocketTransportService2.h
+      - 'layout/**'
+      - 'media/**'
+      - 'netwerk/**'
+      - 'parser/**'
+      - 'security/**'
+      - 'testing/**'
+      - 'toolkit/**'
       - .github/workflows/security-159-hotfix-evidence-reconcile.yml
   workflow_run:
     workflows:
@@ -35,7 +42,7 @@ permissions:
   actions: read
 
 jobs:
-  verify-web-rtc-gc-source-crosswalk:
+  verify-all-registered-159-source-blobs:
     # This job is anchored to main's source tree, never to the security build
     # artifact or an event's untrusted fork SHA.
     if: github.repository == 'sguzman/vulpra' && github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -50,14 +57,14 @@ jobs:
           sparse-checkout: |
             ci/security-159-check-source-crosswalk.sh
             docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
-      - name: Fail closed on the recorded 85 source-object identities
+      - name: Fail closed on 40 source-positive CVEs and 206 tracked Git object claims
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash -n ci/security-159-check-source-crosswalk.sh
           bash ci/security-159-check-source-crosswalk.sh
-      - name: Reject forged hashes, duplicate paths, and false postimage claims
+      - name: Reject forged hashes, duplicate paths and false patch result flags
         shell: bash
         run: |
           set -euo pipefail
@@ -67,13 +74,15 @@ jobs:
           jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-118006") | .source_file_blobs[0]) |= (.pinned_beta_sha = ("0" * 40) | .upstream_stable_159_sha = ("0" * 40) | .vulpra_sha = ("0" * 40))' "$original" > "$tmp/forged-hash.json"
           jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-118007") | .source_file_blobs[1].path) = (.verified_present_in_beta[] | select(.cve == "CVE-2026-118007") | .source_file_blobs[0].path)' "$original" > "$tmp/duplicate-path.json"
           jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-118007") | .source_file_blobs[0].fix_result_blob_matches_beta) |= not' "$original" > "$tmp/forged-postimage.json"
+          jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-117885") | .source_file_blobs[0].vulpra_sha) = ("0" * 40)' "$original" > "$tmp/non-webrtc-cve-forged-hash.json"
+          jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-117880") | .source_file_blobs[] | select(.path == "dom/xml/nsXMLPrettyPrinter.cpp") | .vulpra_sha) = "1234"' "$original" > "$tmp/truncated-git-sha.json"
           for bad in "$tmp"/*.json; do
             if bash ci/security-159-check-source-crosswalk.sh "$bad" >/dev/null 2>&1; then
               echo "::error::Verifier accepted fabricated source evidence: $bad"
               exit 1
             fi
           done
-          echo "PASS: 3/3 forged source crosswalk fixtures rejected"
+          echo "PASS: 5/5 forged source crosswalk fixtures rejected"
 
   reject-unsuccessful-original-native-run:
     if: >-
