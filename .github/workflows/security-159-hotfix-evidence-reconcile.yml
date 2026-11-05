@@ -64,7 +64,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash -n ci/security-159-check-source-crosswalk.sh
           bash ci/security-159-check-source-crosswalk.sh
-      - name: Reject seven forged source identities and advisory-coverage claims
+      - name: Reject eight forged source, advisory and obsolete-patch claims
         shell: bash
         run: |
           set -euo pipefail
@@ -78,13 +78,14 @@ jobs:
           jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-117880") | .source_file_blobs[] | select(.path == "dom/xml/nsXMLPrettyPrinter.cpp") | .vulpra_sha) = "1234"' "$original" > "$tmp/truncated-git-sha.json"
           jq '(.advisory_coverage.mfsa_2026_118_high.expected_cve_ids) |= .[:-1]' "$original" > "$tmp/missing-high-cve.json"
           jq '(.advisory_coverage.mfsa_2026_123_high.expected_cve_ids) = []' "$original" > "$tmp/missing-followup-fix.json"
+          jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-117886") | .removed_source_path_verification[0].absent_in_vulpra_main) = false' "$original" > "$tmp/forged-ots-patch-absence.json"
           for bad in "$tmp"/*.json; do
             if bash ci/security-159-check-source-crosswalk.sh "$bad" >/dev/null 2>&1; then
               echo "::error::Verifier accepted fabricated source evidence: $bad"
               exit 1
             fi
           done
-          echo "PASS: 7/7 forged source and advisory coverage fixtures rejected"
+          echo "PASS: 8/8 forged source and advisory coverage fixtures rejected"
 
   reject-unsuccessful-original-native-run:
     if: >-
