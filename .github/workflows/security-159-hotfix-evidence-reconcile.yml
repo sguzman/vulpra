@@ -13,6 +13,14 @@ on:
       - ci/tests/security-159-css-evidence-tests.sh
       - ci/security-159-check-source-crosswalk.sh
       - docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
+      # Any future modifications to audited source paths must re-run the
+      # fail-closed SHA crosswalk, not merely edits to the manifest/script.
+      - 'js/**'
+      - 'dom/base/**'
+      - 'dom/bindings/**'
+      - 'dom/media/webrtc/**'
+      - 'media/webrtc/**'
+      - netwerk/base/nsSocketTransportService2.h
       - .github/workflows/security-159-hotfix-evidence-reconcile.yml
   workflow_run:
     workflows:
