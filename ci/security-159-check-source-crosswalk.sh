@@ -168,3 +168,36 @@ jq -rn --slurpfile evidence "$manifest" '
   ($all | map(select(. as $id | $reviewed | index($id) == null))) as $remaining |
   "MFSA 2026-118: \($reviewed | length)/\($all | length) high-impact CVEs scoped and \($remaining | length) still unaudited; MFSA 2026-123: CVE-2026-120572 isolated-patch evidence recorded; NOT release-ready"
 '
+
+
+# Preserve the verified removal of obsolete locally patched OTS source.
+jq -e '
+  ([.verified_present_in_beta[] |
+    select(.cve == "CVE-2026-117886") |
+    .removed_source_path_verification[]] | length) == 1
+  and all(.verified_present_in_beta[] | .removed_source_path_verification[]?;
+    (.path | type == "string" and test("^[A-Za-z0-9_./-]+$")
+      and (startswith("/") | not) and (contains("../") | not))
+    and .absent_in_pinned_beta == true
+    and .absent_in_stable_159 == true
+    and .absent_in_vulpra_main == true
+  )
+' "$manifest" >/dev/null || {
+  echo "Obsolete OpenType Sanitizer patch removal evidence is inconsistent" >&2
+  exit 1
+}
+
+removed=0
+while IFS= read -r path; do
+  if git rev-parse --verify "HEAD:$path" >/dev/null 2>&1; then
+    echo "Obsolete security patch path was reintroduced: $path" >&2
+    exit 1
+  fi
+  removed=$((removed + 1))
+done < <(jq -r '.verified_present_in_beta[] |
+  .removed_source_path_verification[]? | .path' "$manifest")
+if (( removed != 1 )); then
+  echo "Unexpected number of verified obsolete OpenType Sanitizer patches: $removed" >&2
+  exit 1
+fi
+echo "PASS: obsolete OTS local patch remains absent from Vulpra HEAD"
