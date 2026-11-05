@@ -11,6 +11,8 @@ on:
       - ci/tests/m3-current-local-tls-native-evidence-tests.sh
       - ci/security-159-css-evidence.jq
       - ci/tests/security-159-css-evidence-tests.sh
+      - ci/security-159-check-source-crosswalk.sh
+      - docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
       - .github/workflows/security-159-hotfix-evidence-reconcile.yml
   workflow_run:
     workflows:
@@ -25,6 +27,46 @@ permissions:
   actions: read
 
 jobs:
+  verify-web-rtc-gc-source-crosswalk:
+    # This job is anchored to main's source tree, never to the security build
+    # artifact or an event's untrusted fork SHA.
+    if: github.repository == 'sguzman/vulpra' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact tracked security source objects
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci/security-159-check-source-crosswalk.sh
+            docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
+      - name: Fail closed on the recorded 85 source-object identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/security-159-check-source-crosswalk.sh
+          bash ci/security-159-check-source-crosswalk.sh
+      - name: Reject forged hashes, duplicate paths, and false postimage claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          original=docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-118006") | .source_file_blobs[0]) |= (.pinned_beta_sha = ("0" * 40) | .upstream_stable_159_sha = ("0" * 40) | .vulpra_sha = ("0" * 40))' "$original" > "$tmp/forged-hash.json"
+          jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-118007") | .source_file_blobs[1].path) = (.verified_present_in_beta[] | select(.cve == "CVE-2026-118007") | .source_file_blobs[0].path)' "$original" > "$tmp/duplicate-path.json"
+          jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-118007") | .source_file_blobs[0].fix_result_blob_matches_beta) |= not' "$original" > "$tmp/forged-postimage.json"
+          for bad in "$tmp"/*.json; do
+            if bash ci/security-159-check-source-crosswalk.sh "$bad" >/dev/null 2>&1; then
+              echo "::error::Verifier accepted fabricated source evidence: $bad"
+              exit 1
+            fi
+          done
+          echo "PASS: 3/3 forged source crosswalk fixtures rejected"
+
   reject-unsuccessful-original-native-run:
     if: >-
       github.repository == 'sguzman/vulpra' &&
