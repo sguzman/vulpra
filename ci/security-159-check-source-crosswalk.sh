@@ -63,3 +63,75 @@ for entry in "CVE-2026-118006:11:3" "CVE-2026-118007:74:10"; do
 done
 
 echo "Source-only crosswalk PASS; no browser security or release acceptance implied"
+
+
+# All other audited, source-positive CVEs must also retain their code blobs.
+# Unlike the fixed WebRTC/GC cohort above, this is deliberately data-driven:
+# adding a verified CVE to the register immediately adds all of its referenced
+# source paths to the mandatory Git-object check, with no allowlist changes.
+jq -e --argjson minimum_cves 40 --argjson minimum_paths 206 '
+  (.verified_present_in_beta | type == "array" and length >= $minimum_cves)
+  and (.findings | type == "array" and length == 2)
+  and ([.findings[].cve] | sort) == ["CVE-2026-117860", "CVE-2026-120572"]
+  and ([.verified_present_in_beta[].cve] | unique | length) == (.verified_present_in_beta | length)
+  and ([.verified_present_in_beta[].cve, .findings[].cve] | unique | length) ==
+      ((.verified_present_in_beta | length) + (.findings | length))
+  and ([.verified_present_in_beta[].source_file_blobs[]] | length) >= $minimum_paths
+  and all(.verified_present_in_beta[];
+    (.cve | type == "string" and test("^CVE-[0-9]{4}-[0-9]{4,}$"))
+    and (.source_file_blobs | type == "array" and length > 0)
+    and ([.source_file_blobs[].path] | unique | length) == (.source_file_blobs | length)
+    and all(.source_file_blobs[];
+      (.path | type == "string" and test("^[A-Za-z0-9_./-]+$")
+        and (startswith("/") | not) and (contains("../") | not))
+      and (.vulpra_sha | type == "string" and test("^[0-9a-f]{40}$"))
+      and (.pinned_beta_sha | type == "string" and test("^[0-9a-f]{40}$"))
+      and (.vulpra_sha == .pinned_beta_sha)
+      and (if has("upstream_stable_159_sha") then
+             .upstream_stable_159_sha == .vulpra_sha
+           else true end)
+      and (if has("vulpra_matches_pinned_beta") then
+             .vulpra_matches_pinned_beta == (.vulpra_sha == .pinned_beta_sha)
+           else true end)
+      and (if has("fix_result_blob_matches_beta") then
+             ((.upstream_fix_commit_result_sha //
+               .upstream_selected_patch_result_sha) == .pinned_beta_sha) ==
+               .fix_result_blob_matches_beta
+           else true end)
+      and (if has("fix_result_blob_matches_vulpra") then
+             ((.upstream_fix_commit_result_sha //
+               .upstream_selected_patch_result_sha) == .vulpra_sha) ==
+               .fix_result_blob_matches_vulpra
+           else true end)
+    )
+  )
+  and ([.verified_present_in_beta[].source_file_blobs[]]
+       | group_by(.path)
+       | all(.[]; ([.[].vulpra_sha] | unique | length) == 1))
+' "$manifest" >/dev/null || {
+  echo "Source-positive security register has missing, inconsistent or forged evidence" >&2
+  exit 1
+}
+
+registered="$(jq -r '.verified_present_in_beta | length' "$manifest")"
+recorded="$(jq -r '[.verified_present_in_beta[].source_file_blobs[]] | length' "$manifest")"
+tested=0
+while IFS=$'\t' read -r path expected; do
+  actual="$(git rev-parse --verify "HEAD:$path" 2>/dev/null)" || {
+    echo "Missing tracked audited source path: $path" >&2
+    exit 1
+  }
+  if [[ "$actual" != "$expected" ]]; then
+    echo "Security source mismatch: $path" >&2
+    exit 1
+  fi
+  tested=$((tested + 1))
+done < <(jq -r '.verified_present_in_beta[].source_file_blobs[]
+            | [.path, .vulpra_sha] | @tsv' "$manifest")
+
+if (( tested != recorded )); then
+  echo "Audited source rows were not all inspected ($tested/$recorded)" >&2
+  exit 1
+fi
+echo "PASS: $registered source-positive CVEs; $tested/$recorded tracked source claims verified"
+echo "Source-only evidence; not full MFSA coverage, browser exploit QA or a release gate"
