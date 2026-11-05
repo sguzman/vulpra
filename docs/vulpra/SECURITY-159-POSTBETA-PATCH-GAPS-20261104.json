@@ -2269,7 +2269,151 @@
       ],
       "checked_vulpra_main_head": "ba1a45ead670e73fe9640b0f86c39e60f78a198c",
       "note": "All 74 unique files/paths touched across ten upstream fix series commits checked against three source refs and are identical at beta/stable/Vulpra, including original JS jit tests. Selected intermediate upstream commit results may differ where files changed again or upstream subsequent modifications; use per-file comparison flags. This is source identity of the selected touched paths, not exploit-runtime tests, proof of all relevant security deltas, or complete ancestry."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117881",
+      "bug": 2076267,
+      "topic": "DOM NodeIterator use-after-free / retain strongly referenced node pointers",
+      "patch_commit": "26da06ebb689a513d38cb6a8d373c6f85c01db68",
+      "classification": "both_selected_fix_code_postimages_identical_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/NodeIterator.cpp",
+          "upstream_fix_commit_result_sha": "7c5b5cccf5a5fb4e290227a715ae6346f36b405b",
+          "pinned_beta_sha": "7c5b5cccf5a5fb4e290227a715ae6346f36b405b",
+          "upstream_stable_159_sha": "7c5b5cccf5a5fb4e290227a715ae6346f36b405b",
+          "vulpra_sha": "7c5b5cccf5a5fb4e290227a715ae6346f36b405b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/NodeIterator.h",
+          "upstream_fix_commit_result_sha": "129d9aab1fdab4fcb49a6c10217996a54901ddd1",
+          "pinned_beta_sha": "129d9aab1fdab4fcb49a6c10217996a54901ddd1",
+          "upstream_stable_159_sha": "129d9aab1fdab4fcb49a6c10217996a54901ddd1",
+          "vulpra_sha": "129d9aab1fdab4fcb49a6c10217996a54901ddd1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Both upstream modified code blobs are exact postimage matches across Firefox 159 beta/stable and Vulpra. Verified NodePointer uses strong nsCOMPtr<nsINode> in Vulpra. No runtime exploit or targeted crashtest executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117882",
+      "bug": 2076268,
+      "topic": "Layout generated-content counter and CSS containment use-after-free",
+      "patch_commits": [
+        "84edf83684a29ceb7fbcbb1f3061dae64f830b2c",
+        "b0af5bf7cd945a4cdced2d13f554b9026931ca1b"
+      ],
+      "classification": "all_seven_selected_upstream_touched_paths_identical_in_beta_stable_vulpra_six_exact_fix_postimages_nonexact_frame_constructor_retains_reference_guard",
+      "source_file_blobs": [
+        {
+          "path": "layout/base/nsCSSFrameConstructor.cpp",
+          "upstream_fix_commit_result_sha": "c961a95763f00b1574e83bbb89b38d22c7b33f9c",
+          "pinned_beta_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "upstream_stable_159_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "vulpra_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-contain/crashtests/contain-style-discarded-item.html",
+          "upstream_fix_commit_result_sha": "928ccc0715242cc43bdc36dddaf32342be8a74d7",
+          "pinned_beta_sha": "928ccc0715242cc43bdc36dddaf32342be8a74d7",
+          "upstream_stable_159_sha": "928ccc0715242cc43bdc36dddaf32342be8a74d7",
+          "vulpra_sha": "928ccc0715242cc43bdc36dddaf32342be8a74d7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/base/ContainStyleScopeManager.cpp",
+          "upstream_fix_commit_result_sha": "832149e93e8a92942627b7c121287acf49ef4bbf",
+          "pinned_beta_sha": "832149e93e8a92942627b7c121287acf49ef4bbf",
+          "upstream_stable_159_sha": "832149e93e8a92942627b7c121287acf49ef4bbf",
+          "vulpra_sha": "832149e93e8a92942627b7c121287acf49ef4bbf",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/base/nsCounterManager.cpp",
+          "upstream_fix_commit_result_sha": "ff378ca5c261c4232bc1b02822edf5555c758808",
+          "pinned_beta_sha": "ff378ca5c261c4232bc1b02822edf5555c758808",
+          "upstream_stable_159_sha": "ff378ca5c261c4232bc1b02822edf5555c758808",
+          "vulpra_sha": "ff378ca5c261c4232bc1b02822edf5555c758808",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/base/nsCounterManager.h",
+          "upstream_fix_commit_result_sha": "91fef59d53deaf2cdcfaf833e1a815af8cab0479",
+          "pinned_beta_sha": "91fef59d53deaf2cdcfaf833e1a815af8cab0479",
+          "upstream_stable_159_sha": "91fef59d53deaf2cdcfaf833e1a815af8cab0479",
+          "vulpra_sha": "91fef59d53deaf2cdcfaf833e1a815af8cab0479",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-contain/crashtests/contain-style-first-letter-colgroup.html",
+          "upstream_fix_commit_result_sha": "0b2a2147b8ac7ea0fdcfe3c920948095d5bd1912",
+          "pinned_beta_sha": "0b2a2147b8ac7ea0fdcfe3c920948095d5bd1912",
+          "upstream_stable_159_sha": "0b2a2147b8ac7ea0fdcfe3c920948095d5bd1912",
+          "vulpra_sha": "0b2a2147b8ac7ea0fdcfe3c920948095d5bd1912",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-contain/crashtests/contain-style-first-letter.html",
+          "upstream_fix_commit_result_sha": "6e1208a654a04faec59fbfc331d46aeaacfa8c48",
+          "pinned_beta_sha": "6e1208a654a04faec59fbfc331d46aeaacfa8c48",
+          "upstream_stable_159_sha": "6e1208a654a04faec59fbfc331d46aeaacfa8c48",
+          "vulpra_sha": "6e1208a654a04faec59fbfc331d46aeaacfa8c48",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<nsAtom> mCounterListName;",
+        "nsGenConInitializer(UniquePtr<nsGenConNode> aNode, nsAtom* aCounterListName)"
+      ],
+      "note": "Two upstream remediation commits touch seven code/WPT fixture files. All seven same Git blobs across 159 beta/stable/Vulpra; six equal selected postimage. Non-identical nsCSSFrameConstructor.cpp still has refcounted mCounterListName to avoid previous raw list reference; source check only. Three original CSS crashtests present, not replayed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117883",
+      "bug": 2076271,
+      "topic": "HTML stream parser executor lifetime use-after-free",
+      "patch_commit": "cc7a5b83a2d85a767c4f16dd61a23af8bcd080d8",
+      "classification": "both_selected_fix_code_postimages_identical_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/xhr/XMLHttpRequestMainThread.cpp",
+          "upstream_fix_commit_result_sha": "0e1cd90df038e58b530ab6121ea51aca90364e9b",
+          "pinned_beta_sha": "0e1cd90df038e58b530ab6121ea51aca90364e9b",
+          "upstream_stable_159_sha": "0e1cd90df038e58b530ab6121ea51aca90364e9b",
+          "vulpra_sha": "0e1cd90df038e58b530ab6121ea51aca90364e9b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "parser/html/nsHtml5StreamParser.cpp",
+          "upstream_fix_commit_result_sha": "9191a8b1bf68d3ff945d0e8089e3e1fd3c7cce9c",
+          "pinned_beta_sha": "9191a8b1bf68d3ff945d0e8089e3e1fd3c7cce9c",
+          "upstream_stable_159_sha": "9191a8b1bf68d3ff945d0e8089e3e1fd3c7cce9c",
+          "vulpra_sha": "9191a8b1bf68d3ff945d0e8089e3e1fd3c7cce9c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "tmp->Terminate();",
+        "don't set them to `nullptr` here to make sure that",
+        "executor stays around for as long as the stream"
+      ],
+      "note": "Both code blobs exact upstream commit postimages in all three repos/tags. Vulpra parser unlinks safely with Terminate and preserves executor lifetime in observed implementation. Source-level evidence only; no runtime exploit replay."
     }
   ],
-  "additional_source_audit_head": "ba1a45ead670e73fe9640b0f86c39e60f78a198c"
+  "additional_source_audit_head": "e4f289d2be811a231e87b47f6bfc50ec8cdbc023"
 }
