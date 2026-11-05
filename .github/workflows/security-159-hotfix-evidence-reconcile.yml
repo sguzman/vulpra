@@ -64,7 +64,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           bash -n ci/security-159-check-source-crosswalk.sh
           bash ci/security-159-check-source-crosswalk.sh
-      - name: Reject forged hashes, duplicate paths and false patch result flags
+      - name: Reject seven forged source identities and advisory-coverage claims
         shell: bash
         run: |
           set -euo pipefail
@@ -76,13 +76,15 @@ jobs:
           jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-118007") | .source_file_blobs[0].fix_result_blob_matches_beta) |= not' "$original" > "$tmp/forged-postimage.json"
           jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-117885") | .source_file_blobs[0].vulpra_sha) = ("0" * 40)' "$original" > "$tmp/non-webrtc-cve-forged-hash.json"
           jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-117880") | .source_file_blobs[] | select(.path == "dom/xml/nsXMLPrettyPrinter.cpp") | .vulpra_sha) = "1234"' "$original" > "$tmp/truncated-git-sha.json"
+          jq '(.advisory_coverage.mfsa_2026_118_high.expected_cve_ids) |= .[:-1]' "$original" > "$tmp/missing-high-cve.json"
+          jq '(.advisory_coverage.mfsa_2026_123_high.expected_cve_ids) = []' "$original" > "$tmp/missing-followup-fix.json"
           for bad in "$tmp"/*.json; do
             if bash ci/security-159-check-source-crosswalk.sh "$bad" >/dev/null 2>&1; then
               echo "::error::Verifier accepted fabricated source evidence: $bad"
               exit 1
             fi
           done
-          echo "PASS: 5/5 forged source crosswalk fixtures rejected"
+          echo "PASS: 7/7 forged source and advisory coverage fixtures rejected"
 
   reject-unsuccessful-original-native-run:
     if: >-
