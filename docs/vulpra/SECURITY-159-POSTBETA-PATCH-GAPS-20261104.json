@@ -1346,10 +1346,10 @@
         },
         {
           "path": "dom/xml/nsXMLPrettyPrinter.cpp",
-          "upstream_fix_commit_result_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66",
-          "pinned_beta_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66",
-          "upstream_stable_159_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66",
-          "vulpra_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66",
+          "upstream_fix_commit_result_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66f",
+          "pinned_beta_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66f",
+          "upstream_stable_159_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66f",
+          "vulpra_sha": "a20ada9be82bf4d68602acf7bf82553c4810b66f",
           "fix_result_blob_matches_beta": true,
           "fix_result_blob_matches_vulpra": true
         }
