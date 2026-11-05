@@ -2721,7 +2721,91 @@
         "RefPtr<Document> doc = GetResponsibleDocument();"
       ],
       "note": "Exact upstream fix-result code blob in beta, stable and Vulpra; document strong reference verified at vulnerability location by upstream patch. No runtime exploit replay."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117886",
+      "bug": 2077162,
+      "topic": "Graphics: Text OpenType Sanitizer boundary conditions; upstream OTS vendoring and local patch re-apply",
+      "patch_commits": [
+        "f3afc6070391e920c60a0b6212aa44351bff428f",
+        "81cf801eb5c4d13d9eda9548f796dabf9836f89a",
+        "34ae62af242280ddafd049af823fa6ed3bcafc7b"
+      ],
+      "classification": "all_six_final_selected_vendor_and_reapplied_patch_source_blobs_exact_upstream_fix_postimages_beta_stable_vulpra_obsolete_local_patch_absent",
+      "upstream_ots_revision": "6540e90426c17de7ddcae650409a9af5a450ea7a",
+      "source_file_blobs": [
+        {
+          "path": "gfx/ots/include/opentype-sanitiser.h",
+          "upstream_last_touched_commit": "34ae62af242280ddafd049af823fa6ed3bcafc7b",
+          "upstream_selected_patch_result_sha": "27d4d5e815b74fcb5a45dfd2cec5da231f77af13",
+          "pinned_beta_sha": "27d4d5e815b74fcb5a45dfd2cec5da231f77af13",
+          "upstream_stable_159_sha": "27d4d5e815b74fcb5a45dfd2cec5da231f77af13",
+          "vulpra_sha": "27d4d5e815b74fcb5a45dfd2cec5da231f77af13",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/ots/moz.yaml",
+          "upstream_last_touched_commit": "f3afc6070391e920c60a0b6212aa44351bff428f",
+          "upstream_selected_patch_result_sha": "ca77d575d472872f4fad44a3cbcf136352acb524",
+          "pinned_beta_sha": "ca77d575d472872f4fad44a3cbcf136352acb524",
+          "upstream_stable_159_sha": "ca77d575d472872f4fad44a3cbcf136352acb524",
+          "vulpra_sha": "ca77d575d472872f4fad44a3cbcf136352acb524",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/ots/src/glat.cc",
+          "upstream_last_touched_commit": "34ae62af242280ddafd049af823fa6ed3bcafc7b",
+          "upstream_selected_patch_result_sha": "296e208628c7ae9c06f6fe7ec7c21275207e7f6d",
+          "pinned_beta_sha": "296e208628c7ae9c06f6fe7ec7c21275207e7f6d",
+          "upstream_stable_159_sha": "296e208628c7ae9c06f6fe7ec7c21275207e7f6d",
+          "vulpra_sha": "296e208628c7ae9c06f6fe7ec7c21275207e7f6d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/ots/src/glyf.cc",
+          "upstream_last_touched_commit": "f3afc6070391e920c60a0b6212aa44351bff428f",
+          "upstream_selected_patch_result_sha": "2ef046edd72e98ef853c0274fe49d9753d51e3b6",
+          "pinned_beta_sha": "2ef046edd72e98ef853c0274fe49d9753d51e3b6",
+          "upstream_stable_159_sha": "2ef046edd72e98ef853c0274fe49d9753d51e3b6",
+          "vulpra_sha": "2ef046edd72e98ef853c0274fe49d9753d51e3b6",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/ots/src/ots.cc",
+          "upstream_last_touched_commit": "34ae62af242280ddafd049af823fa6ed3bcafc7b",
+          "upstream_selected_patch_result_sha": "df7366adef3c28305031e8cbb5ac1ca1b7354edc",
+          "pinned_beta_sha": "df7366adef3c28305031e8cbb5ac1ca1b7354edc",
+          "upstream_stable_159_sha": "df7366adef3c28305031e8cbb5ac1ca1b7354edc",
+          "vulpra_sha": "df7366adef3c28305031e8cbb5ac1ca1b7354edc",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/ots/src/silf.cc",
+          "upstream_last_touched_commit": "34ae62af242280ddafd049af823fa6ed3bcafc7b",
+          "upstream_selected_patch_result_sha": "5ac80b1864b44d63a907b20a1f8b4c26cdffe094",
+          "pinned_beta_sha": "5ac80b1864b44d63a907b20a1f8b4c26cdffe094",
+          "upstream_stable_159_sha": "5ac80b1864b44d63a907b20a1f8b4c26cdffe094",
+          "vulpra_sha": "5ac80b1864b44d63a907b20a1f8b4c26cdffe094",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "removed_source_path_verification": [
+        {
+          "path": "gfx/ots/ots-cff-charstring-ops-limit.patch",
+          "absent_in_pinned_beta": true,
+          "absent_in_stable_159": true,
+          "absent_in_vulpra_main": true
+        }
+      ],
+      "note": "All six paths modified by the OTS vendor update and subsequent local-patch reapplication have final upstream patch-result blob SHA identities in pinned beta, Firefox 159 stable, and Vulpra. The outdated OTS CFF patch removed by the intermediate upstream commit is absent in all three refs. gfx/ots/moz.yaml declares OTS revision 6540e90426c17de7ddcae650409a9af5a450ea7a; this source audit does not execute crafted-font tests nor constitute complete vendoring provenance."
     }
   ],
-  "additional_source_audit_head": "f18133c27a832f2f90c15643762b2e5e822a679e"
+  "additional_source_audit_head": "3311e1bd4f8880068028e0e8ce863d3d513e9466"
 }
