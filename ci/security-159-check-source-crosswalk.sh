@@ -135,3 +135,36 @@ if (( tested != recorded )); then
 fi
 echo "PASS: $registered source-positive CVEs; $tested/$recorded tracked source claims verified"
 echo "Source-only evidence; not full MFSA coverage, browser exploit QA or a release gate"
+
+
+# Require the entire vendor-published high-impact CVE scope, not only
+# the subset with source-level evidence. These exact published CVE ranges were
+# checked against MFSA 2026-118 (Firefox 159) and 2026-123 (Firefox 159.0.1).
+# Fail closed when an advisory entry disappears from this pinned denominator.
+jq -e '
+  ([range(117860; 117955) | "CVE-2026-\(.)"] +
+   [range(118005; 118018) | "CVE-2026-\(.)"]) as $expected |
+  ($expected | length == 108)
+  and (.advisory_coverage.mfsa_2026_118_high.expected_cve_ids == $expected)
+  and (.advisory_coverage.mfsa_2026_118_high.advisory == "MFSA 2026-118")
+  and (.advisory_coverage.mfsa_2026_118_high.impact == "high")
+  and (.advisory_coverage.mfsa_2026_123_high.expected_cve_ids == ["CVE-2026-120572"])
+  and ([.findings[] | select(.cve == "CVE-2026-120572")] | length == 1)
+  and (
+    ([.verified_present_in_beta[].cve,
+      (.findings[] | select(.cve == "CVE-2026-117860") | .cve)] | unique) as $reviewed |
+    ($reviewed | length >= 42)
+    and all($reviewed[]; . as $id | $expected | index($id) != null)
+  )
+' "$manifest" >/dev/null || {
+  echo "Firefox 159 high-impact advisory coverage was changed, truncated or misclassified" >&2
+  exit 1
+}
+
+jq -rn --slurpfile evidence "$manifest" '
+  ($evidence[0].advisory_coverage.mfsa_2026_118_high.expected_cve_ids) as $all |
+  ([$evidence[0].verified_present_in_beta[].cve,
+    ($evidence[0].findings[] | select(.cve == "CVE-2026-117860") | .cve)] | unique) as $reviewed |
+  ($all | map(select(. as $id | $reviewed | index($id) == null))) as $remaining |
+  "MFSA 2026-118: \($reviewed | length)/\($all | length) high-impact CVEs scoped and \($remaining | length) still unaudited; MFSA 2026-123: CVE-2026-120572 isolated-patch evidence recorded; NOT release-ready"
+'
