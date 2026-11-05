@@ -2413,7 +2413,315 @@
         "executor stays around for as long as the stream"
       ],
       "note": "Both code blobs exact upstream commit postimages in all three repos/tags. Vulpra parser unlinks safely with Terminate and preserves executor lifetime in observed implementation. Source-level evidence only; no runtime exploit replay."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117885",
+      "bug": 2076983,
+      "topic": "Layout Grid use-after-free during measuring reflow",
+      "patch_commits": [
+        "b585040adde788099d085bd0f5fb93b1a3eeaa2e",
+        "17806667f08fe0a9f1eaa4aa23b8b4434c61f6d8",
+        "fbcd1e9bd4c87be1b852bf120ff07dc44b1d5e53"
+      ],
+      "classification": "both_selected_relanding_paths_identical_beta_stable_vulpra_one_exact_relanding_postimage_and_measuring_reflow_guard",
+      "source_file_blobs": [
+        {
+          "path": "layout/generic/nsGridContainerFrame.cpp",
+          "upstream_fix_commit_result_sha": "76051c4d630eee5bc311576a2e893a4df49276af",
+          "pinned_beta_sha": "9de0a663a25c313431e620d5d52a1b1c814278e1",
+          "upstream_stable_159_sha": "9de0a663a25c313431e620d5d52a1b1c814278e1",
+          "vulpra_sha": "9de0a663a25c313431e620d5d52a1b1c814278e1",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-grid/observer-chain-crash.html",
+          "upstream_fix_commit_result_sha": "5b2eb6fa73c9b6833ebd0b41fabb807b29223c36",
+          "pinned_beta_sha": "5b2eb6fa73c9b6833ebd0b41fabb807b29223c36",
+          "upstream_stable_159_sha": "5b2eb6fa73c9b6833ebd0b41fabb807b29223c36",
+          "vulpra_sha": "5b2eb6fa73c9b6833ebd0b41fabb807b29223c36",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "Reflowing or FinishReflowChild might invalidate the cache",
+        "aChild->GetProperty(GridItemCachedBAxisMeasurement::Prop())"
+      ],
+      "note": "Reverted initial patch, followed by relanding fbcd1e9. Both touched paths identical in beta, stable and Vulpra; observer-chain crashtest exactly matches relanding postimage. Grid code file differs from selected relanding postimage but contains guarded cached-property access and post-reflow refresh. Original WPT fixture source-only; no browser crashtest."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117887",
+      "bug": 2077385,
+      "topic": "DOM HTMLTableCellElement CellIndex use-after-free",
+      "patch_commit": "f4ffe6b44b7323190a35e8da477588d412c4db31",
+      "classification": "exact_selected_fix_postimage_matches_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/html/HTMLTableCellElement.cpp",
+          "upstream_fix_commit_result_sha": "98afbf9db90cc7a45c7a8d573dbf492bfc0e32f8",
+          "pinned_beta_sha": "98afbf9db90cc7a45c7a8d573dbf492bfc0e32f8",
+          "upstream_stable_159_sha": "98afbf9db90cc7a45c7a8d573dbf492bfc0e32f8",
+          "vulpra_sha": "98afbf9db90cc7a45c7a8d573dbf492bfc0e32f8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<HTMLTableRowElement> row = GetRow();"
+      ],
+      "note": "Single post-fix source blob exact at all three refs; verified strong row lifetime guard. No exploit test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118010",
+      "bug": 2077770,
+      "topic": "Accessibility relocated ARIA-owned child use-after-free",
+      "patch_commit": "89305e6de9a108c05623151c9a056fdfb5b10021",
+      "classification": "beta_stable_vulpra_source_identical_patch_hunk_present_selected_fix_postimage_differs",
+      "source_file_blobs": [
+        {
+          "path": "accessible/generic/DocAccessible.cpp",
+          "upstream_fix_commit_result_sha": "56eb0bd11420b0f081a8d79390c4b65918e41423",
+          "pinned_beta_sha": "14e32179779d6645ff629e42fa0818223b51e5f4",
+          "upstream_stable_159_sha": "14e32179779d6645ff629e42fa0818223b51e5f4",
+          "vulpra_sha": "14e32179779d6645ff629e42fa0818223b51e5f4",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "if (aChild->IsRelocated()) {",
+        "mARIAOwnsHash.Get(parent)",
+        "owned->RemoveElement(aChild);"
+      ],
+      "note": "Selected upstream result blob differs, but code at 159 beta, stable, Vulpra matches exactly and contains the ARIA ownership-hash removal guard. No targeted accessibility runtime replay."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117896",
+      "bug": 2079032,
+      "topic": "DOM Core and HTML use-after-free from weak form submit element pointers",
+      "patch_commit": "41948261158f4a9a815c137e009850794ed58590",
+      "classification": "two_exact_upstream_fix_postimage_code_blobs_present_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/html/HTMLFormElement.cpp",
+          "upstream_fix_commit_result_sha": "30379a94dcb7f8385eac736eda6507b62a00afc1",
+          "pinned_beta_sha": "30379a94dcb7f8385eac736eda6507b62a00afc1",
+          "upstream_stable_159_sha": "30379a94dcb7f8385eac736eda6507b62a00afc1",
+          "vulpra_sha": "30379a94dcb7f8385eac736eda6507b62a00afc1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/html/HTMLFormElement.h",
+          "upstream_fix_commit_result_sha": "51f6f186b87554f62bc524ff42284b55298d450d",
+          "pinned_beta_sha": "51f6f186b87554f62bc524ff42284b55298d450d",
+          "upstream_stable_159_sha": "51f6f186b87554f62bc524ff42284b55298d450d",
+          "vulpra_sha": "51f6f186b87554f62bc524ff42284b55298d450d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<nsGenericHTMLFormElement> mDefaultSubmitElement;",
+        "RefPtr<nsGenericHTMLFormElement> mFirstSubmitInElements;"
+      ],
+      "note": "CVE identifier checked against official Mozilla advisory; this is CVE-2026-117896, not 117886 (the latter is Graphics: Text Bug 2077162 and remains unaudited). Both original form-fix postimages exact across beta/stable/Vulpra, with strong lifetime pointers verified. No browser regression."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117897",
+      "bug": 2079036,
+      "topic": "Layout table border-collapse damage-area boundary conditions",
+      "patch_commit": "989bfc7f72fe17d9d0849c32ad79e52b9d49ceab",
+      "classification": "three_exact_fix_postimage_code_and_wpt_blobs_match_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "layout/tables/nsTableCellFrame.cpp",
+          "upstream_fix_commit_result_sha": "068a9ec3ff3eae8886712abe5e01c74d8ac63806",
+          "pinned_beta_sha": "068a9ec3ff3eae8886712abe5e01c74d8ac63806",
+          "upstream_stable_159_sha": "068a9ec3ff3eae8886712abe5e01c74d8ac63806",
+          "vulpra_sha": "068a9ec3ff3eae8886712abe5e01c74d8ac63806",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/tables/nsTableFrame.cpp",
+          "upstream_fix_commit_result_sha": "645e60758a7503a7a745669123bc9a652aa195e2",
+          "pinned_beta_sha": "645e60758a7503a7a745669123bc9a652aa195e2",
+          "upstream_stable_159_sha": "645e60758a7503a7a745669123bc9a652aa195e2",
+          "vulpra_sha": "645e60758a7503a7a745669123bc9a652aa195e2",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html",
+          "upstream_fix_commit_result_sha": "6d716acb679c1f174e75a4d3d6ddfc85dcba7852",
+          "pinned_beta_sha": "6d716acb679c1f174e75a4d3d6ddfc85dcba7852",
+          "upstream_stable_159_sha": "6d716acb679c1f174e75a4d3d6ddfc85dcba7852",
+          "vulpra_sha": "6d716acb679c1f174e75a4d3d6ddfc85dcba7852",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "tableFrame->GetColCount() - colIndex",
+        "tableFrame->GetRowCount() - rowIndex"
+      ],
+      "note": "Both touched code source files and original WPT crashtest exactly match the upstream patch-result blobs in all three refs. Source test available but not executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117898",
+      "bug": 2079040,
+      "topic": "JavaScript JIT use-after-free due to StringToAtom redefining input operand",
+      "patch_commit": "f8ee10bfd0ad22ca964bb897b466c83ffbaab20e",
+      "classification": "all_six_fix_touched_code_and_jit_test_files_match_beta_stable_vulpra_three_exact_selected_patch_postimages_and_separate_result_operand",
+      "source_file_blobs": [
+        {
+          "path": "js/src/jit-test/tests/cacheir/bug2079040.js",
+          "upstream_fix_commit_result_sha": "38322951360126fa84d3ba05bb02956203fc68af",
+          "pinned_beta_sha": "38322951360126fa84d3ba05bb02956203fc68af",
+          "upstream_stable_159_sha": "38322951360126fa84d3ba05bb02956203fc68af",
+          "vulpra_sha": "38322951360126fa84d3ba05bb02956203fc68af",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/CacheIRCompiler.cpp",
+          "upstream_fix_commit_result_sha": "1cf65a9bc437dba39a27d1e380189009ebfa9f4b",
+          "pinned_beta_sha": "1cf65a9bc437dba39a27d1e380189009ebfa9f4b",
+          "upstream_stable_159_sha": "1cf65a9bc437dba39a27d1e380189009ebfa9f4b",
+          "vulpra_sha": "1cf65a9bc437dba39a27d1e380189009ebfa9f4b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/CacheIROps.yaml",
+          "upstream_fix_commit_result_sha": "196137a3984702aacc55a31a14b77abb8dc2ddbd",
+          "pinned_beta_sha": "196137a3984702aacc55a31a14b77abb8dc2ddbd",
+          "upstream_stable_159_sha": "196137a3984702aacc55a31a14b77abb8dc2ddbd",
+          "vulpra_sha": "196137a3984702aacc55a31a14b77abb8dc2ddbd",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/CacheIRWriter.h",
+          "upstream_fix_commit_result_sha": "86d3566780c12cb9dfa6d06699cded9cdaa093fa",
+          "pinned_beta_sha": "08a44c134f82bc3e07fa2d80ceb1fe7feed14e1a",
+          "upstream_stable_159_sha": "08a44c134f82bc3e07fa2d80ceb1fe7feed14e1a",
+          "vulpra_sha": "08a44c134f82bc3e07fa2d80ceb1fe7feed14e1a",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/jit/WarpCacheIRTranspiler.cpp",
+          "upstream_fix_commit_result_sha": "476ee74872e59cecce1952ce04a76c3e10f72c1c",
+          "pinned_beta_sha": "6492966db88cbd9ae78e3a03541b1e02f25c4696",
+          "upstream_stable_159_sha": "6492966db88cbd9ae78e3a03541b1e02f25c4696",
+          "vulpra_sha": "6492966db88cbd9ae78e3a03541b1e02f25c4696",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/vm/PortableBaselineInterpret.cpp",
+          "upstream_fix_commit_result_sha": "0bdda2234522ad31a97a68cfce5fbf38b5156d06",
+          "pinned_beta_sha": "ec80deec911be8b1de2ed0cbd8da7b1e2440c6f4",
+          "upstream_stable_159_sha": "ec80deec911be8b1de2ed0cbd8da7b1e2440c6f4",
+          "vulpra_sha": "ec80deec911be8b1de2ed0cbd8da7b1e2440c6f4",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "- name: StringToAtom",
+        "str: StringId",
+        "result: StringId"
+      ],
+      "note": "All six fix-touched blobs SHA-identical in beta/stable/Vulpra; three match selected commit's postimages. Confirmed explicit separate output operand in CacheIROps.yaml and removal of custom writer code. Original jit-test file present but not executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117899",
+      "bug": 2079046,
+      "topic": "HTTP/2 stream session use-after-free",
+      "patch_commit": "48bfc983860d374a828b3bfbb4376593962a7b77",
+      "classification": "both_exact_upstream_fix_code_postimages_match_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "netwerk/protocol/http/Http2Session.cpp",
+          "upstream_fix_commit_result_sha": "92fe5508d50e8e52cd49923da7c11f0a6873303f",
+          "pinned_beta_sha": "92fe5508d50e8e52cd49923da7c11f0a6873303f",
+          "upstream_stable_159_sha": "92fe5508d50e8e52cd49923da7c11f0a6873303f",
+          "vulpra_sha": "92fe5508d50e8e52cd49923da7c11f0a6873303f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "netwerk/protocol/http/nsHttpConnection.cpp",
+          "upstream_fix_commit_result_sha": "33d5659b50abe3e40eb90da8c1fca72c0ce62694",
+          "pinned_beta_sha": "33d5659b50abe3e40eb90da8c1fca72c0ce62694",
+          "upstream_stable_159_sha": "33d5659b50abe3e40eb90da8c1fca72c0ce62694",
+          "vulpra_sha": "33d5659b50abe3e40eb90da8c1fca72c0ce62694",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<Http2Session> self(this);"
+      ],
+      "note": "Two exact upstream code postimages and verified strong session lifetime reference in CleanupStream. No HTTP/2 runtime exploit test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117900",
+      "bug": 2079053,
+      "topic": "HTML editor anonymous-node cross-document use-after-free",
+      "patch_commit": "8d2b3da7e72c0d2f6ceb26e56424240ec29d7f4b",
+      "classification": "exact_selected_fix_code_postimage_matches_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "editor/libeditor/HTMLAnonymousNodeEditor.cpp",
+          "upstream_fix_commit_result_sha": "6ebea711b1c3f9e16eca81ed77cc09b1d6275f12",
+          "pinned_beta_sha": "6ebea711b1c3f9e16eca81ed77cc09b1d6275f12",
+          "upstream_stable_159_sha": "6ebea711b1c3f9e16eca81ed77cc09b1d6275f12",
+          "vulpra_sha": "6ebea711b1c3f9e16eca81ed77cc09b1d6275f12",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "aParentContent.GetComposedDoc() != doc"
+      ],
+      "note": "Exact upstream fix-result code blob across beta/stable/Vulpra; cross-document guard verified in Vulpra. No targeted runtime exploit replay."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117901",
+      "bug": 2079054,
+      "topic": "DOM ScreenOrientation document lifetime use-after-free",
+      "patch_commit": "db80f141134ce4460323b0b0acc25e9a307cf6e5",
+      "classification": "exact_selected_fix_code_postimage_matches_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/ScreenOrientation.cpp",
+          "upstream_fix_commit_result_sha": "b3e8b28eb6aec41342c3a567b8a56ccc96ea4218",
+          "pinned_beta_sha": "b3e8b28eb6aec41342c3a567b8a56ccc96ea4218",
+          "upstream_stable_159_sha": "b3e8b28eb6aec41342c3a567b8a56ccc96ea4218",
+          "vulpra_sha": "b3e8b28eb6aec41342c3a567b8a56ccc96ea4218",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<Document> doc = GetResponsibleDocument();"
+      ],
+      "note": "Exact upstream fix-result code blob in beta, stable and Vulpra; document strong reference verified at vulnerability location by upstream patch. No runtime exploit replay."
     }
   ],
-  "additional_source_audit_head": "e4f289d2be811a231e87b47f6bfc50ec8cdbc023"
+  "additional_source_audit_head": "f18133c27a832f2f90c15643762b2e5e822a679e"
 }
