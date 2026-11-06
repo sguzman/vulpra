@@ -3717,6 +3717,52 @@
         "RefPtr<HTMLMediaElement> kungFuDeathGrip(this);"
       ],
       "note": "The final beta/stable/Vulpra HTMLMediaElement.cpp source is byte-identical, and PlaybackEnded() retains the upstream Bug 2079171 strong self-reference ahead of potentially reentrant AddRemoveSelfReference(). It differs from the selected patch-result full-file SHA due to subsequent changes. No real ended playback exploit or memory sanitizer test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117926",
+      "bug": 2079924,
+      "topic": "SVG text reflow incorrect boundary conditions",
+      "patch_commits": [
+        "738acb085e68784781741c448c272d83854780fc",
+        "722171699537fd34644d8d5381db080756f3cb0b",
+        "d0950615e81b77637ec7eed02b75daa6a35efc4e"
+      ],
+      "classification": "final_relanced_upstream_code_and_crashtest_beta_stable_vulpra_identical_two_exact_postimages",
+      "source_file_blobs": [
+        {
+          "path": "layout/generic/nsIFrame.cpp",
+          "upstream_fix_commit_result_sha": "ff45bfe2ed4d5742868dd8850e01854b97f6d05a",
+          "pinned_beta_sha": "133e04ffae7a07f1be0eac56f0cb8065293ab200",
+          "upstream_stable_159_sha": "133e04ffae7a07f1be0eac56f0cb8065293ab200",
+          "vulpra_sha": "133e04ffae7a07f1be0eac56f0cb8065293ab200",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/svg/SVGObserverUtils.cpp",
+          "upstream_fix_commit_result_sha": "729a4c512cbbc3c6e7472b3183e54e56cb1b4dbb",
+          "pinned_beta_sha": "729a4c512cbbc3c6e7472b3183e54e56cb1b4dbb",
+          "upstream_stable_159_sha": "729a4c512cbbc3c6e7472b3183e54e56cb1b4dbb",
+          "vulpra_sha": "729a4c512cbbc3c6e7472b3183e54e56cb1b4dbb",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/svg/text/crashtests/unicode-bidi-crash.html",
+          "upstream_fix_commit_result_sha": "1d47357ff79cb12608a75d5cf020e1bd286e725e",
+          "pinned_beta_sha": "1d47357ff79cb12608a75d5cf020e1bd286e725e",
+          "upstream_stable_159_sha": "1d47357ff79cb12608a75d5cf020e1bd286e725e",
+          "vulpra_sha": "1d47357ff79cb12608a75d5cf020e1bd286e725e",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "SVGUtils::AnyOuterSVGIsCallingReflowSVG(svgTextFrame)",
+        "NS_STATE_SVG_TEXT_CORRESPONDENCE_DIRTY"
+      ],
+      "note": "Upstream first landed the SVG text-correspondence dirty guard in 738acb0 and reverted that landing in 7221716; the later 3-path bug commit d095061 contains the corrective reflow guard and original unicode-bidi crash fixture. The final beta/stable/Vulpra files have exact Git SHA parity, and the SVGObserverUtils.cpp and WPT crash fixture match the later selected fix-result blob exactly. nsIFrame.cpp has later edits but retains the AnyOuterSVGIsCallingReflowSVG guard. No WPT browser regression, sanitizer or exploit run for this CVE."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
