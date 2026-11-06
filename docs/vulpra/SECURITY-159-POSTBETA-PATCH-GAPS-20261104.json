@@ -3374,6 +3374,152 @@
         "PointerLockManager::Unlock(\"Document::RestorePreviousFullscreenState\");"
       ],
       "note": "The pinned beta, stable release and Vulpra share the same Document.cpp Git blob; inspection confirms refcounted fullscreen exitElements and PointerLockManager::Unlock after fullscreen cleanup/event work, preserving the Bug 2079786 protective changes. Full-file blob differs from the selected upstream patch result due to subsequent source revisions. No real fullscreen/pointer-lock exploit or graphical regression test executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117905",
+      "bug": 2079061,
+      "topic": "Audio/Video playback HTMLMediaElement and TextTrackManager reentrant lifetime use-after-free",
+      "patch_commit": "9f8119a9bf91e9b916e8090de2a347e5e57ccccb",
+      "classification": "beta_stable_vulpra_source_identical_lifetime_guards_present_one_exact_patch_postimage",
+      "source_file_blobs": [
+        {
+          "path": "dom/media/mediaelement/HTMLMediaElement.cpp",
+          "upstream_fix_commit_result_sha": "23a897cae830c7e81435c5a632caba8425950431",
+          "pinned_beta_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "upstream_stable_159_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "vulpra_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/media/webvtt/TextTrackManager.cpp",
+          "upstream_fix_commit_result_sha": "61d72676dd973d113a6aa5636e51538bfb0ce294",
+          "pinned_beta_sha": "61d72676dd973d113a6aa5636e51538bfb0ce294",
+          "upstream_stable_159_sha": "61d72676dd973d113a6aa5636e51538bfb0ce294",
+          "vulpra_sha": "61d72676dd973d113a6aa5636e51538bfb0ce294",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<HTMLMediaElement> kungFuDeathGrip(this);",
+        "RefPtr<TextTrackManager> kungFuDeathGrip(this);"
+      ],
+      "note": "Both affected source files match pinned 159.0b5, 159 stable, and Vulpra exactly. The TextTrackManager source matches upstream patch postimage; HTMLMediaElement.cpp differs from the selected patch commit because of later changes, but its protective strong refs in PauseInternal, ChangeReadyState, and FireTimeUpdate were inspected in Vulpra. No actual media playback re-entrancy, WebDriver exploit or sanitizer regression performed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117916",
+      "bug": 2079257,
+      "topic": "XSLT XPath prefix atom strong-reference lifetime use-after-free",
+      "patch_commits": [
+        "4f4cf257050385a9a18ef2e99b0c96d16a93e527",
+        "dfd2b7ebf3a21411f31e7ed1743f8e409708cfe3"
+      ],
+      "classification": "all_three_upstream_code_patch_postimages_exact_beta_stable_vulpra_crashtest_not_present",
+      "source_file_blobs": [
+        {
+          "path": "dom/xslt/xpath/txMozillaXPathTreeWalker.cpp",
+          "upstream_fix_commit_result_sha": "990888793e6dac95c13c96c531d787053f0f983b",
+          "pinned_beta_sha": "990888793e6dac95c13c96c531d787053f0f983b",
+          "upstream_stable_159_sha": "990888793e6dac95c13c96c531d787053f0f983b",
+          "vulpra_sha": "990888793e6dac95c13c96c531d787053f0f983b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/xslt/xpath/txXPathTreeWalker.h",
+          "upstream_fix_commit_result_sha": "bc63eb21b900b9a9fb3a0484d63baeaeab28798c",
+          "pinned_beta_sha": "bc63eb21b900b9a9fb3a0484d63baeaeab28798c",
+          "upstream_stable_159_sha": "bc63eb21b900b9a9fb3a0484d63baeaeab28798c",
+          "vulpra_sha": "bc63eb21b900b9a9fb3a0484d63baeaeab28798c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/xslt/xslt/txInstructions.cpp",
+          "upstream_fix_commit_result_sha": "87e83b5fc33d3bd7902f93de9e4f5eabbf46e400",
+          "pinned_beta_sha": "87e83b5fc33d3bd7902f93de9e4f5eabbf46e400",
+          "upstream_stable_159_sha": "87e83b5fc33d3bd7902f93de9e4f5eabbf46e400",
+          "vulpra_sha": "87e83b5fc33d3bd7902f93de9e4f5eabbf46e400",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "upstream_test_fixture_absence": [
+        "dom/xslt/crashtests/2079257.html",
+        "dom/xslt/crashtests/2079257.xml",
+        "dom/xslt/crashtests/2079257.xsl"
+      ],
+      "note": "The code patch from upstream Bug 2079257 is present byte-for-byte in three source paths in Firefox beta, stable, and Vulpra. A separate upstream commit adds three 2079257 regression fixtures; these files were verified absent from all three compared release trees, and crashtests.list differs. Do not claim original fixture regression is included or has been executed. No XSLT exploit or sanitizer test performed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117927",
+      "bug": 2080102,
+      "topic": "SVG image document nested draw re-entrancy use-after-free",
+      "patch_commit": "3a6acbe1080b01e8b390b7fecdf9696b6a50c914",
+      "classification": "two_exact_upstream_patch_postimage_blobs_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "image/AutoRestoreSVGState.h",
+          "upstream_fix_commit_result_sha": "b3b63acd813d310c1ce63c761f361d07782b149f",
+          "pinned_beta_sha": "b3b63acd813d310c1ce63c761f361d07782b149f",
+          "upstream_stable_159_sha": "b3b63acd813d310c1ce63c761f361d07782b149f",
+          "vulpra_sha": "b3b63acd813d310c1ce63c761f361d07782b149f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "image/SVGDocumentWrapper.cpp",
+          "upstream_fix_commit_result_sha": "8fcb9ffe08d9e82068f9629b9aeefc93fa7daeaf",
+          "pinned_beta_sha": "8fcb9ffe08d9e82068f9629b9aeefc93fa7daeaf",
+          "upstream_stable_159_sha": "8fcb9ffe08d9e82068f9629b9aeefc93fa7daeaf",
+          "vulpra_sha": "8fcb9ffe08d9e82068f9629b9aeefc93fa7daeaf",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Both upstream Bug 2080102 changed files have exact Git blob equality across the selected fix postimage, Firefox beta 159.0b5, stable 159, and Vulpra. Re-entrancy guard is set before time-flush or refresh-driver tick. No live nested SVG draw, sanitizer, or exploit regression executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117928",
+      "bug": 2081280,
+      "topic": "CSS stylesheet-cache reuse same-origin policy bypass in SVG-as-image",
+      "patch_commit": "f2727bd6db14f8fbf5409fd4822ffa93b9e1ed1a",
+      "classification": "three_exact_upstream_patch_postimage_blobs_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "layout/style/Loader.cpp",
+          "upstream_fix_commit_result_sha": "353561a7ad17fc8f4a68b8bd287f0330e4fbf1ac",
+          "pinned_beta_sha": "353561a7ad17fc8f4a68b8bd287f0330e4fbf1ac",
+          "upstream_stable_159_sha": "353561a7ad17fc8f4a68b8bd287f0330e4fbf1ac",
+          "vulpra_sha": "353561a7ad17fc8f4a68b8bd287f0330e4fbf1ac",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/svg/as-image/external-resource-data-url-import-helper.sub.svg",
+          "upstream_fix_commit_result_sha": "a2cd6433bc971ca405d5470a52340f0407453224",
+          "pinned_beta_sha": "a2cd6433bc971ca405d5470a52340f0407453224",
+          "upstream_stable_159_sha": "a2cd6433bc971ca405d5470a52340f0407453224",
+          "vulpra_sha": "a2cd6433bc971ca405d5470a52340f0407453224",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/svg/as-image/external-resource-data-url-import.sub.html",
+          "upstream_fix_commit_result_sha": "83c522cfa97f6791fc152921efdab95daff8e54e",
+          "pinned_beta_sha": "83c522cfa97f6791fc152921efdab95daff8e54e",
+          "upstream_stable_159_sha": "83c522cfa97f6791fc152921efdab95daff8e54e",
+          "vulpra_sha": "83c522cfa97f6791fc152921efdab95daff8e54e",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "The guarded CSS inline-sheet cache and both upstream cross-origin resource regression fixtures match exact selected fix-result objects in beta, stable, and Vulpra. This is code/test source presence only: actual network isolation, policy enforcement and cross-origin test execution have not been verified."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
