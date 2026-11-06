@@ -11,6 +11,10 @@ on:
     paths:
       - .github/workflows/m3-source-matched-native-link.yml
       - ci/smoke-webextension-package-local.py
+      - ci/security-159-crashtest-smoke.py
+      - layout/svg/crashtests/2079252.html
+      - testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html
+      - testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html
       - docs/vulpra/SECURITY-159-HOTFIX-PORT.json
       - docshell/**
       - dom/ipc/**
@@ -330,7 +334,7 @@ jobs:
           print("PASS: normal browser packaged runtime acceptance")
           PY
 
-      - name: Replay original Mozilla CSS security crashtest against native package
+      - name: Replay four original Mozilla security crashtests in native package
         shell: bash
         timeout-minutes: 15
         run: |
@@ -356,6 +360,38 @@ jobs:
             all(.iterations[]; (.height | type == "number" and . > 0))
           ' "$report" >/dev/null
           echo "PASS: original upstream CSS crashtest executed in real packaged browser; not a full WPT/ASAN security proof"
+          extra=".git/vulpra-native-build/security-159-additional-crashtest-replay.json"
+          jq -e --arg source "$GITHUB_SHA" '
+            .schema_version == 1 and
+            .status == "passed_bounded_original_extra_crashtests" and
+            .source_commit == $source and
+            .real_packaged_browser == true and
+            .accept_insecure_certs == false and
+            .temporary_profile_preserved == true and
+            .original_mozilla_fixture_hashes_verified == true and
+            .official_wpt_harness_used == false and
+            .memory_safety_exploit_rejection_proven == false and
+            .security_current == false and
+            .release_ready == false and
+            (.cases | type == "array" and length == 3) and
+            ([.cases[].name] | sort == ["multicol","svg","table"]) and
+            all(.cases[]; (.git_blob_sha1 | type == "string" and test("^[0-9a-f]{40}$")) and
+              (.iterations | type == "array" and length == 2) and
+              ([.iterations[].iteration] == [0,1]) and
+              all(.iterations[]; (.height | type == "number" and . > 0))) and
+            all(.cases[];
+              if .name == "svg" then
+                .fixture == "layout/svg/crashtests/2079252.html" and
+                .git_blob_sha1 == "a8d78aae061029dcc7cb72e86a18647b2d483625"
+              elif .name == "table" then
+                .fixture == "testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html" and
+                .git_blob_sha1 == "6d716acb679c1f174e75a4d3d6ddfc85dcba7852"
+              elif .name == "multicol" then
+                .fixture == "testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html" and
+                .git_blob_sha1 == "bfb5f0894b80bf39633afcf37be9fdcbb68ab96c"
+              else false end)
+          ' "$extra" >/dev/null
+          echo "PASS: six additional original upstream security crashtest executions, true packaged browser, bounded source-linked evidence; not exploit-memory proof"
 
       - name: Audit current-source linked native loader callsites
         shell: bash
@@ -422,6 +458,7 @@ jobs:
             .git/vulpra-native-build/m3-localhost-acceptance.json
             .git/vulpra-native-build/webextension-smoke-*.json
             .git/vulpra-native-build/security-159-css-crashtest-replay.json
+            .git/vulpra-native-build/security-159-additional-crashtest-replay.json
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
