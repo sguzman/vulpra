@@ -57,7 +57,7 @@ jobs:
           sparse-checkout: |
             ci/security-159-check-source-crosswalk.sh
             docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
-      - name: Fail closed on 40 source-positive CVEs and 206 tracked Git object claims
+      - name: Fail closed on all source-positive CVEs and every tracked Git object claim
         shell: bash
         run: |
           set -euo pipefail
@@ -86,6 +86,82 @@ jobs:
             fi
           done
           echo "PASS: 8/8 forged source and advisory coverage fixtures rejected"
+
+      - name: Emit bounded, fail-closed release-advisory coverage worklist
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
+          output="$RUNNER_TEMP/security-159-high-impact-coverage.json"
+          jq -n --slurpfile ledger "$source" --arg head "$GITHUB_SHA" '
+            ($ledger[0]) as $a |
+            ($a.advisory_coverage.mfsa_2026_118_high.expected_cve_ids) as $expected |
+            ([$a.verified_present_in_beta[].cve,
+              ($a.findings[] | select(.cve == "CVE-2026-117860") | .cve)]
+              | unique | sort) as $audited |
+            ([$expected[] | select(. as $id | $audited | index($id) == null)]
+              | unique | sort) as $remaining |
+            ([$a.public_source_access_blockers[]?
+              | select(.cve as $id | $remaining | index($id) != null)
+              | {cve, bug, verification_status, bugzilla_url}]
+              | sort_by(.cve)) as $blockers |
+            ([ $a.verified_present_in_beta[].source_file_blobs[] ]) as $source_rows |
+            {
+              schema_version: 1,
+              source_commit: $head,
+              advisory: "MFSA 2026-118",
+              severity: "high",
+              declared_high_impact_cves: ($expected | length),
+              audited_high_impact_cves: ($audited | length),
+              confirmed_in_pinned_beta_from_scoped_source: ($a.verified_present_in_beta | length),
+              missing_from_original_beta_patched_only_on_isolated_branch: 1,
+              unaudited_high_impact_cves: ($remaining | length),
+              unaudited_cve_ids: $remaining,
+              public_source_access_blockers: $blockers,
+              recorded_source_hash_claims: ($source_rows | length),
+              distinct_audited_source_paths: ([$source_rows[].path] | unique | length),
+              followup_advisory: "MFSA 2026-123",
+              followup_high_cve_ids: ["CVE-2026-120572"],
+              followup_patch_on_isolated_branch_only: true,
+              complete_security_audit: false,
+              real_exploit_regression_tested_by_this_check: false,
+              target_endeavouros_hyprland_tested_by_this_check: false,
+              security_release_ready: false
+            }
+          ' > "$output"
+          jq -e --arg head "$GITHUB_SHA" '
+            .schema_version == 1 and .source_commit == $head and
+            .advisory == "MFSA 2026-118" and
+            .declared_high_impact_cves == 108 and
+            .audited_high_impact_cves >= 50 and
+            .confirmed_in_pinned_beta_from_scoped_source >= 49 and
+            .missing_from_original_beta_patched_only_on_isolated_branch == 1 and
+            .audited_high_impact_cves + .unaudited_high_impact_cves ==
+              .declared_high_impact_cves and
+            (.unaudited_cve_ids | unique | length) == .unaudited_high_impact_cves and
+            (.public_source_access_blockers | all(.[]; .cve as $id |
+              . as $blocker | $id != "" and $blocker.verification_status != "")) and
+            .recorded_source_hash_claims >= 230 and
+            .distinct_audited_source_paths >= 227 and
+            .followup_advisory == "MFSA 2026-123" and
+            .followup_high_cve_ids == ["CVE-2026-120572"] and
+            .followup_patch_on_isolated_branch_only == true and
+            .complete_security_audit == false and
+            .real_exploit_regression_tested_by_this_check == false and
+            .target_endeavouros_hyprland_tested_by_this_check == false and
+            .security_release_ready == false
+          ' "$output" >/dev/null
+          jq '{source_commit, advisory, audited_high_impact_cves,
+               unaudited_high_impact_cves, public_source_access_blockers,
+               security_release_ready}' "$output"
+
+      - name: Archive source-linked open security-audit worklist
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-159-high-impact-source-audit-worklist
+          path: ${{ runner.temp }}/security-159-high-impact-coverage.json
+          if-no-files-found: error
+          retention-days: 14
 
   reject-unsuccessful-original-native-run:
     if: >-
