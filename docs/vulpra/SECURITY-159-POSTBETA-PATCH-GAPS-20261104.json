@@ -3191,5 +3191,27 @@
       ],
       "interpretation": "The security fix is transplanted only to the isolated maintenance branch and remains absent from original pinned beta/main."
     }
+  },
+  "public_source_access_blockers": [
+    {
+      "cve": "CVE-2026-117863",
+      "bug": 2056783,
+      "advisory": "MFSA 2026-118",
+      "impact": "high",
+      "component": "Audio/Video",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_upstream_fix_commit_identified",
+      "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2056783",
+      "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117863",
+      "last_checked_date": "2026-11-06",
+      "note": "Public Bugzilla reports Access Denied, and GitHub commit search for Bug 2056783 returns no matching upstream commit. Neither beta fix presence nor missing patch has been established. This remains part of 58 not-yet-source-verified high-impact Firefox 159 advisory CVEs. Do not assign positive security credit."
+    }
+  ],
+  "public_security_advisory_listing_checked": {
+    "date": "2026-11-06",
+    "source": "https://www.mozilla.org/en-US/security/advisories/",
+    "latest_desktop_firefox_entry": "MFSA 2026-123",
+    "release": "Firefox 159.0.1",
+    "latest_date": "2026-11-03",
+    "source_coverage_note": "Advisory listing current at check time only. No ongoing monitoring configured; verify again before release."
   }
 }
