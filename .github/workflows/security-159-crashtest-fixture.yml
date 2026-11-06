@@ -6,9 +6,9 @@ on:
       - ci/security-159-crashtest-smoke.py
       - .github/workflows/security-159-crashtest-fixture.yml
       - testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html
-      layout/svg/crashtests/2079252.html
-      testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html
-      testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html
+      - layout/svg/crashtests/2079252.html
+      - testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html
+      - testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html
   workflow_dispatch:
 permissions:
   contents: read
