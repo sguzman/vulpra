@@ -2805,9 +2805,262 @@
         }
       ],
       "note": "All six paths modified by the OTS vendor update and subsequent local-patch reapplication have final upstream patch-result blob SHA identities in pinned beta, Firefox 159 stable, and Vulpra. The outdated OTS CFF patch removed by the intermediate upstream commit is absent in all three refs. gfx/ots/moz.yaml declares OTS revision 6540e90426c17de7ddcae650409a9af5a450ea7a; this source audit does not execute crafted-font tests nor constitute complete vendoring provenance."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117888",
+      "bug": 2078649,
+      "topic": "Graphics Canvas2D uninitialized memory and cross-process WebGL texture/surface handling",
+      "patch_commit": "b5a7d53b596825c7ceeb35307d205ce8c8867341",
+      "classification": "all_seven_changed_paths_match_beta_stable_vulpra_four_exact_selected_patch_postimages",
+      "source_file_blobs": [
+        {
+          "path": "dom/canvas/DrawTargetWebgl.cpp",
+          "upstream_fix_commit_result_sha": "4254a2467d4ea657ce60d42a418853880e1ed888",
+          "pinned_beta_sha": "39b12ad586e94d0c170cea0e4cd1fd855c33d54f",
+          "upstream_stable_159_sha": "39b12ad586e94d0c170cea0e4cd1fd855c33d54f",
+          "vulpra_sha": "39b12ad586e94d0c170cea0e4cd1fd855c33d54f",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/canvas/DrawTargetWebgl.h",
+          "upstream_fix_commit_result_sha": "cc980c44ac0f343ddd1ce8c44efe935eca09a575",
+          "pinned_beta_sha": "e8899f5c96f4c065bc47a0d04de5a1ea397d0a37",
+          "upstream_stable_159_sha": "e8899f5c96f4c065bc47a0d04de5a1ea397d0a37",
+          "vulpra_sha": "e8899f5c96f4c065bc47a0d04de5a1ea397d0a37",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/canvas/DrawTargetWebglInternal.h",
+          "upstream_fix_commit_result_sha": "ed72c54cd846ce728aad4eabee21a1a62284ee36",
+          "pinned_beta_sha": "92a92be9c33985d83d21476a46ecac1118bf1d4f",
+          "upstream_stable_159_sha": "92a92be9c33985d83d21476a46ecac1118bf1d4f",
+          "vulpra_sha": "92a92be9c33985d83d21476a46ecac1118bf1d4f",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "gfx/2d/RecordedEvent.h",
+          "upstream_fix_commit_result_sha": "a3a81b300c734c78b002f66cec48853d3590e6c4",
+          "pinned_beta_sha": "a3a81b300c734c78b002f66cec48853d3590e6c4",
+          "upstream_stable_159_sha": "a3a81b300c734c78b002f66cec48853d3590e6c4",
+          "vulpra_sha": "a3a81b300c734c78b002f66cec48853d3590e6c4",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/2d/RecordedEventImpl.h",
+          "upstream_fix_commit_result_sha": "88ec520156fcf4d84098f546286aeb2ca138729f",
+          "pinned_beta_sha": "88ec520156fcf4d84098f546286aeb2ca138729f",
+          "upstream_stable_159_sha": "88ec520156fcf4d84098f546286aeb2ca138729f",
+          "vulpra_sha": "88ec520156fcf4d84098f546286aeb2ca138729f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/layers/ipc/CanvasTranslator.cpp",
+          "upstream_fix_commit_result_sha": "2c1b6d6718c93f8d09536dafca714100dc15b37a",
+          "pinned_beta_sha": "2c1b6d6718c93f8d09536dafca714100dc15b37a",
+          "upstream_stable_159_sha": "2c1b6d6718c93f8d09536dafca714100dc15b37a",
+          "vulpra_sha": "2c1b6d6718c93f8d09536dafca714100dc15b37a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/layers/ipc/CanvasTranslator.h",
+          "upstream_fix_commit_result_sha": "2b783e782e2f54fc07115c6e2f50909ec4c9bac8",
+          "pinned_beta_sha": "2b783e782e2f54fc07115c6e2f50909ec4c9bac8",
+          "upstream_stable_159_sha": "2b783e782e2f54fc07115c6e2f50909ec4c9bac8",
+          "vulpra_sha": "2b783e782e2f54fc07115c6e2f50909ec4c9bac8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Seven upstream changed source paths checked at Firefox 159.0b5, 159 stable and Vulpra main: all seven Git blob hashes identical across those three refs; 4/7 match original selected patch postimage and the other three have a later shared postimage. Vulpra constructor includes ContentParentId source parameter. No actual Canvas2D security regression or memory sanitizer."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117894",
+      "bug": 2078983,
+      "topic": "WebRTC Signaling incorrect boundary conditions in encoded frame lifetime",
+      "patch_commit": "631b21b70f19e626670b746fbe8b4c913a301f93",
+      "classification": "one_exact_selected_patch_postimage_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/media/webrtc/jsapi/RTCEncodedFrameBase.cpp",
+          "upstream_fix_commit_result_sha": "908a73144df3099a76244f5b5279b0e5372f4512",
+          "pinned_beta_sha": "908a73144df3099a76244f5b5279b0e5372f4512",
+          "upstream_stable_159_sha": "908a73144df3099a76244f5b5279b0e5372f4512",
+          "vulpra_sha": "908a73144df3099a76244f5b5279b0e5372f4512",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Single upstream commit postimage matches 159 beta, stable and Vulpra. Vulpra destructor no longer invokes DetachData, matching upstream patch. Source-only, no WebRTC browser runtime probe."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117895",
+      "bug": 2078994,
+      "topic": "DOM Core & HTML fullscreen state use-after-free",
+      "patch_commit": "272c1e4ec390c32e10e9333894b650feffbe2310",
+      "classification": "selected_patch_path_identical_beta_stable_vulpra_nonidentical_upstream_postimage",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/Document.cpp",
+          "upstream_fix_commit_result_sha": "df7d4263e4e30206b1863df081cd490ca24299e8",
+          "pinned_beta_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "upstream_stable_159_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "vulpra_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "note": "One affected source file identical between 159 beta/stable/Vulpra; blob differs from selected upstream commit. No assertion of matching original patch ancestry or direct exploit guard validation; further focused regression needed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117913",
+      "bug": 2079252,
+      "topic": "SVG text-run lifetime use-after-free",
+      "patch_commit": "7f7851f753201ba458cdd5a1750b9e5290cc036a",
+      "classification": "three_exact_selected_fix_code_and_crashtest_postimages_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "layout/svg/SVGTextFrame.cpp",
+          "upstream_fix_commit_result_sha": "fe6b97aa55e07cb6ff691cb85e59770ec9fa81ee",
+          "pinned_beta_sha": "fe6b97aa55e07cb6ff691cb85e59770ec9fa81ee",
+          "upstream_stable_159_sha": "fe6b97aa55e07cb6ff691cb85e59770ec9fa81ee",
+          "vulpra_sha": "fe6b97aa55e07cb6ff691cb85e59770ec9fa81ee",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/svg/crashtests/2079252.html",
+          "upstream_fix_commit_result_sha": "a8d78aae061029dcc7cb72e86a18647b2d483625",
+          "pinned_beta_sha": "a8d78aae061029dcc7cb72e86a18647b2d483625",
+          "upstream_stable_159_sha": "a8d78aae061029dcc7cb72e86a18647b2d483625",
+          "vulpra_sha": "a8d78aae061029dcc7cb72e86a18647b2d483625",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/svg/crashtests/crashtests.list",
+          "upstream_fix_commit_result_sha": "08618a4b31e117dfff6e624d500ccc677e7ba134",
+          "pinned_beta_sha": "08618a4b31e117dfff6e624d500ccc677e7ba134",
+          "upstream_stable_159_sha": "08618a4b31e117dfff6e624d500ccc677e7ba134",
+          "vulpra_sha": "08618a4b31e117dfff6e624d500ccc677e7ba134",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<const gfxTextRun> textRun = it.TextRun();"
+      ],
+      "note": "Three exact upstream source Git blobs, including original crashtest and manifest. Vulpra retains strong gfxTextRun reference while evaluating position. Browser crashtest was not executed in this audit."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117915",
+      "bug": 2079255,
+      "topic": "Layout Block/Inline reflow incorrect boundary conditions",
+      "patch_commit": "84cec52ebaf55d3b51ac86c0853163a71d6310d6",
+      "classification": "two_upstream_touched_paths_beta_stable_vulpra_identical_wpt_exact_original_postimage",
+      "source_file_blobs": [
+        {
+          "path": "layout/generic/nsBlockFrame.cpp",
+          "upstream_fix_commit_result_sha": "fc85976a02913a4505df2862e6ad86d3a26f7b8c",
+          "pinned_beta_sha": "24092e5a88c6da054867d533aecf3573c51df43d",
+          "upstream_stable_159_sha": "24092e5a88c6da054867d533aecf3573c51df43d",
+          "vulpra_sha": "24092e5a88c6da054867d533aecf3573c51df43d",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html",
+          "upstream_fix_commit_result_sha": "bfb5f0894b80bf39633afcf37be9fdcbb68ab96c",
+          "pinned_beta_sha": "bfb5f0894b80bf39633afcf37be9fdcbb68ab96c",
+          "upstream_stable_159_sha": "bfb5f0894b80bf39633afcf37be9fdcbb68ab96c",
+          "vulpra_sha": "bfb5f0894b80bf39633afcf37be9fdcbb68ab96c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Both source paths identical in beta, stable and Vulpra. Original CSS multicol crashtest exactly matches selected commit postimage; nsBlockFrame changed further before tagged beta and does not exactly match selected commit. Crashtest not executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117918",
+      "bug": 2079676,
+      "topic": "Graphics Canvas2D use-after-free via OffscreenCanvasDisplayHelper",
+      "patch_commit": "b3cb7d1aba25441b8248bc1eeaf74e2994acdee3",
+      "classification": "both_exact_selected_upstream_fix_postimages_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/canvas/OffscreenCanvasDisplayHelper.cpp",
+          "upstream_fix_commit_result_sha": "cc5c8ad787a58f3763a10d029b984ceb3a3f07e0",
+          "pinned_beta_sha": "cc5c8ad787a58f3763a10d029b984ceb3a3f07e0",
+          "upstream_stable_159_sha": "cc5c8ad787a58f3763a10d029b984ceb3a3f07e0",
+          "vulpra_sha": "cc5c8ad787a58f3763a10d029b984ceb3a3f07e0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/canvas/OffscreenCanvasDisplayHelper.h",
+          "upstream_fix_commit_result_sha": "f7db258e2e1ac8ad40966f0ed3931cc3f189635a",
+          "pinned_beta_sha": "f7db258e2e1ac8ad40966f0ed3931cc3f189635a",
+          "upstream_stable_159_sha": "f7db258e2e1ac8ad40966f0ed3931cc3f189635a",
+          "vulpra_sha": "f7db258e2e1ac8ad40966f0ed3931cc3f189635a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Two exact upstream fix-result code files match beta, stable, Vulpra. No asynchronous worker/canvas exploit test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117919",
+      "bug": 2079677,
+      "topic": "DOM Core & HTML use-after-free while notifying legend/fieldset",
+      "patch_commit": "5d090afb26d21aca1decae79c440c498705f1c21",
+      "classification": "exact_selected_upstream_fix_postimage_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/html/HTMLFieldSetElement.cpp",
+          "upstream_fix_commit_result_sha": "cb633d9fe29cd3cff735e4a5c6b381e4e1059d84",
+          "pinned_beta_sha": "cb633d9fe29cd3cff735e4a5c6b381e4e1059d84",
+          "upstream_stable_159_sha": "cb633d9fe29cd3cff735e4a5c6b381e4e1059d84",
+          "vulpra_sha": "cb633d9fe29cd3cff735e4a5c6b381e4e1059d84",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "One exact upstream fix-result source file matching all three references. No runtime reproduction."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117920",
+      "bug": 2079681,
+      "topic": "DOM HTML Parser use-after-free during suspended mutation notification",
+      "patch_commit": "2f2d052fb8b8f7a2737e6391c545c3f59c6b14f3",
+      "classification": "exact_selected_upstream_fix_postimage_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/MutationObservers.cpp",
+          "upstream_fix_commit_result_sha": "9db1180188f827ecfccd66869570ac850825a6e5",
+          "pinned_beta_sha": "9db1180188f827ecfccd66869570ac850825a6e5",
+          "upstream_stable_159_sha": "9db1180188f827ecfccd66869570ac850825a6e5",
+          "vulpra_sha": "9db1180188f827ecfccd66869570ac850825a6e5",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "One exact selected upstream source Git blob in beta/stable/Vulpra. This confirms presence of touched source, not browser exploit rejection."
     }
   ],
-  "additional_source_audit_head": "3311e1bd4f8880068028e0e8ce863d3d513e9466",
+  "additional_source_audit_head": "74238c0273d81a007a9b805d015cd00605da18ed",
   "advisory_coverage": {
     "provenance": "Mozilla's publicly posted advisories, reviewed 2026-11-04 America/Mexico_City; this is a manually pinned CVE enumeration and not a live advisory feed.",
     "mfsa_2026_118_high": {
