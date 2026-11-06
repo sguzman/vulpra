@@ -57,7 +57,7 @@ verify_manifest() {
     .additional_source_pruning_authorized == false and
     .m3_sixth_gate_closed == false and
     (.note | type == "string" and length > 100)
-  ' "$source" >/dev/null
+  ' "$source" >/dev/null || return 1
   while read -r path sha; do
     jq -e --arg path "$path" --arg sha "$sha" '
       [.source_file_blobs[] | select(.path == $path)] as $match |
@@ -65,10 +65,10 @@ verify_manifest() {
       $match[0].original_git_blob_sha == $sha and
       $match[0].compiled_current_git_blob_sha == $sha and
       $match[0].main_git_blob_sha_at_audit == $sha
-    ' "$source" >/dev/null
+    ' "$source" >/dev/null || return 1
     count=$((count + 1))
   done < <(expected_rows)
-  test "$count" -eq 11
+  test "$count" -eq 11 || return 1
 }
 verify_run_json() {
   jq -e --arg repo "$repo" --arg sha "$compiled" --argjson run "$native_run" '
@@ -78,7 +78,7 @@ verify_run_json() {
     .path == ".github/workflows/m3-source-matched-native-link.yml" and
     .event == "push" and .run_attempt == 1 and
     .status == "completed" and .conclusion == "success"
-  ' "$1" >/dev/null
+  ' "$1" >/dev/null || return 1
 }
 self_test() {
   verify_manifest "$manifest"
