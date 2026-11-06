@@ -1,0 +1,40 @@
+name: Vulpra Mozilla Stable Security Release Drift
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/security-159-upstream-version-guard.sh
+      - .github/workflows/security-159-upstream-release-drift.yml
+  schedule:
+    - cron: '17 10 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-upstream-version:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout source-pinned official release comparator
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci/security-159-upstream-version-guard.sh
+      - name: Reject eight misleading official release states
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-159-upstream-version-guard.sh
+          bash ci/security-159-upstream-version-guard.sh --self-test
+      - name: Fetch Mozilla official desktop Firefox release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/security-159-upstream-version-guard.sh --check-live
+          echo "LIMIT: source patch audit, native vulnerability QA and security release acceptance are separate gates"
