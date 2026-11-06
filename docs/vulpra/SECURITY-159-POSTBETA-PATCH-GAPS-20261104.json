@@ -4792,6 +4792,126 @@
         "button->DisconnectRadioGroupContainer();"
       ],
       "note": "All eight upstream Bug 2082086 touched paths have exact beta/stable/Vulpra SHA equality. Six match patch postimage exactly; Document.cpp/.h and HTMLInputElement.cpp were revised later and differ from selected upstream snapshot but retain refcounted RadioGroupContainer ownership, cycle-collection traverse/unlink and radio-button disconnect on container unlink (direct source inspected). No actual radio selection/GC reentrant runtime or sanitizer test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117934",
+      "bug": 2081977,
+      "topic": "Layout repeated table headers and replicated fixed-position frames generated pseudo-content lifetime during print/pagination",
+      "patch_commits": [
+        "932c4f6ad9d471b4fa86f55de9beafe17a6f443e",
+        "a6e4e54eb51749b07196094b3256f3f38667b625"
+      ],
+      "classification": "all_eleven_unique_changed_code_and_original_regression_source_paths_identical_beta_stable_vulpra_eight_exact_patch_postimages",
+      "source_file_blobs": [
+        {
+          "path": "layout/base/crashtests/crashtests.list",
+          "upstream_fix_commit_result_sha": "e119c950efd3350f83fa630d82faf85772a6e7ea",
+          "pinned_beta_sha": "e119c950efd3350f83fa630d82faf85772a6e7ea",
+          "upstream_stable_159_sha": "e119c950efd3350f83fa630d82faf85772a6e7ea",
+          "vulpra_sha": "e119c950efd3350f83fa630d82faf85772a6e7ea",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/base/crashtests/repeated-counter-marker.html",
+          "upstream_fix_commit_result_sha": "78097493a2253e92868f79ecb5a9be47baeab353",
+          "pinned_beta_sha": "78097493a2253e92868f79ecb5a9be47baeab353",
+          "upstream_stable_159_sha": "78097493a2253e92868f79ecb5a9be47baeab353",
+          "vulpra_sha": "78097493a2253e92868f79ecb5a9be47baeab353",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/base/crashtests/repeated-counter-marker.sjs",
+          "upstream_fix_commit_result_sha": "673a7a09c2cb89d8a7c74b97af3e6cbd7177ecef",
+          "pinned_beta_sha": "673a7a09c2cb89d8a7c74b97af3e6cbd7177ecef",
+          "upstream_stable_159_sha": "673a7a09c2cb89d8a7c74b97af3e6cbd7177ecef",
+          "vulpra_sha": "673a7a09c2cb89d8a7c74b97af3e6cbd7177ecef",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/base/crashtests/repeated-generated-content.html",
+          "upstream_fix_commit_result_sha": "a70a96f61766fbc0b4fcfce442f3fe83069e06f0",
+          "pinned_beta_sha": "a70a96f61766fbc0b4fcfce442f3fe83069e06f0",
+          "upstream_stable_159_sha": "a70a96f61766fbc0b4fcfce442f3fe83069e06f0",
+          "vulpra_sha": "a70a96f61766fbc0b4fcfce442f3fe83069e06f0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/base/nsCSSFrameConstructor.cpp",
+          "upstream_fix_commit_result_sha": "0502afa802b4cbd8622f8e770fe160f7e116b329",
+          "pinned_beta_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "upstream_stable_159_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "vulpra_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/base/nsCSSFrameConstructor.h",
+          "upstream_fix_commit_result_sha": "a260a0641434a82213287fd7dd1f7f14ea1679b8",
+          "pinned_beta_sha": "a260a0641434a82213287fd7dd1f7f14ea1679b8",
+          "upstream_stable_159_sha": "a260a0641434a82213287fd7dd1f7f14ea1679b8",
+          "vulpra_sha": "a260a0641434a82213287fd7dd1f7f14ea1679b8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/generic/nsIFrame.cpp",
+          "upstream_fix_commit_result_sha": "b480d5e4a051c396452dce7a7a06f32c825e84c1",
+          "pinned_beta_sha": "133e04ffae7a07f1be0eac56f0cb8065293ab200",
+          "upstream_stable_159_sha": "133e04ffae7a07f1be0eac56f0cb8065293ab200",
+          "vulpra_sha": "133e04ffae7a07f1be0eac56f0cb8065293ab200",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/generic/nsIFrame.h",
+          "upstream_fix_commit_result_sha": "0a6f99946514cd1f2eb4c7a781a77dfe3f026854",
+          "pinned_beta_sha": "847d3f2e210f674c0c988b5e97f04c4b5932db2e",
+          "upstream_stable_159_sha": "847d3f2e210f674c0c988b5e97f04c4b5932db2e",
+          "vulpra_sha": "847d3f2e210f674c0c988b5e97f04c4b5932db2e",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/style/RestyleManager.cpp",
+          "upstream_fix_commit_result_sha": "f6ce68c9ad38e017d5f0e14e5ee4d9249c52cf4a",
+          "pinned_beta_sha": "f6ce68c9ad38e017d5f0e14e5ee4d9249c52cf4a",
+          "upstream_stable_159_sha": "f6ce68c9ad38e017d5f0e14e5ee4d9249c52cf4a",
+          "vulpra_sha": "f6ce68c9ad38e017d5f0e14e5ee4d9249c52cf4a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/css/printing/fixed-container-query-removal-crash-print.html",
+          "upstream_fix_commit_result_sha": "0a1ffe434a1d80025636989a05861c10f2fedaf0",
+          "pinned_beta_sha": "0a1ffe434a1d80025636989a05861c10f2fedaf0",
+          "upstream_stable_159_sha": "0a1ffe434a1d80025636989a05861c10f2fedaf0",
+          "vulpra_sha": "0a1ffe434a1d80025636989a05861c10f2fedaf0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/css/printing/table-row-group-container-query-crash-print.html",
+          "upstream_fix_commit_result_sha": "cc0c36e1e89e99ab927d2e1b2a983344e01ba263",
+          "pinned_beta_sha": "cc0c36e1e89e99ab927d2e1b2a983344e01ba263",
+          "upstream_stable_159_sha": "cc0c36e1e89e99ab927d2e1b2a983344e01ba263",
+          "vulpra_sha": "cc0c36e1e89e99ab927d2e1b2a983344e01ba263",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "if (aState.mCreatingExtraFrames) {",
+        "if (!existing || !existing->GetPrimaryFrame()) {",
+        "static bool IsInFragmentedTable(nsIFrame* aFrame)",
+        "aFrame->IsInReplicatedFixedPosTree()",
+        "RecreateFramesForContent(mDocument->GetRootElement(), InsertionKind::Async);"
+      ],
+      "note": "Both upstream Bug 2081977 commits and all 11 distinct changed source/test files checked against selected upstream original postimages, pinned Firefox beta, Firefox stable, and Vulpra: all 11 match across beta/stable/Vulpra, eight exact selected upstream postimages, three final C++ code objects differ due later layout fixes. Inspected pseudo-element reuse when constructing extra repeated frames and explicit page-level full reconstruction instead of unsafe incremental removal of a fragmented table or replicated fixed element; additional ContainsReplicatedFixedPosPlaceholders protection present. Original crashtests and WPT print tests are present in source only, not executed; no ASAN memory-safety proof."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
