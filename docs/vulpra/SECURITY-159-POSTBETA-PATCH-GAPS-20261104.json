@@ -3994,6 +3994,241 @@
         "RefPtr<BrowserChild> browserChild(mBrowserChild);"
       ],
       "note": "Original upstream Bug 2081969 changed three files, all source SHA exact matches among patch postimage, pinned Firefox beta, stable, and Vulpra. Inspected temporary strong BrowserChild refs before mouse/touch event flushing. No actual async refresh/reentrancy race test or sanitizer QA."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118012",
+      "bug": 2081998,
+      "topic": "DOM ScrollTimeline scrollingElement body lifetime across quirks-mode layout flush",
+      "patch_commit": "8d28e690398276b325117904b8df124cc034fd7e",
+      "classification": "three_changed_paths_identical_beta_stable_vulpra_one_exact_postimage_other_two_later_revisions",
+      "source_file_blobs": [
+        {
+          "path": "dom/animation/ScrollTimeline.cpp",
+          "upstream_fix_commit_result_sha": "293a36bfd82893256cf203b37142dcbc459d11e4",
+          "pinned_beta_sha": "293a36bfd82893256cf203b37142dcbc459d11e4",
+          "upstream_stable_159_sha": "293a36bfd82893256cf203b37142dcbc459d11e4",
+          "vulpra_sha": "293a36bfd82893256cf203b37142dcbc459d11e4",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/Document.cpp",
+          "upstream_fix_commit_result_sha": "e9e2dadc7759ee50975b95c24fbc2758006e25b1",
+          "pinned_beta_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "upstream_stable_159_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "vulpra_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/base/Document.h",
+          "upstream_fix_commit_result_sha": "8d9a21728b53bf26cd77c6eaffa5c9d23a5a62bd",
+          "pinned_beta_sha": "8d5870ae7c2d09a637e5230780a8cd62fece1e2e",
+          "upstream_stable_159_sha": "8d5870ae7c2d09a637e5230780a8cd62fece1e2e",
+          "vulpra_sha": "8d5870ae7c2d09a637e5230780a8cd62fece1e2e",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "FlushPendingNotifications(FlushType::Frames);",
+        "// Get the body element after we flush to make sure it is up-to-date.",
+        "RefPtr<HTMLBodyElement> body = GetBodyElement();"
+      ],
+      "note": "Bug 2081998 source in all three touched files matches exact pinned beta, 159 stable, and Vulpra. ScrollTimeline matches the upstream code commit SHA; Document.cpp/.h were changed after that commit but preserve flush-before-body-fetch, with RefPtr body after layout flushing. No actual synchronous script reentry, quirks scroll-timeline execution or sanitizer test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117935",
+      "bug": 2082000,
+      "topic": "DOM WebIDL proxy wrapper initialization failure and expando tracing lifetime",
+      "patch_commit": "725cb0d437189f748de24bc87ca2a3c0de0cce61",
+      "classification": "four_code_generation_and_proxy_paths_identical_beta_stable_vulpra_three_exact_patch_postimages",
+      "source_file_blobs": [
+        {
+          "path": "dom/bindings/BindingUtils.h",
+          "upstream_fix_commit_result_sha": "9ade09b0bc6535b30a81c1bced057335adf961ef",
+          "pinned_beta_sha": "9ade09b0bc6535b30a81c1bced057335adf961ef",
+          "upstream_stable_159_sha": "9ade09b0bc6535b30a81c1bced057335adf961ef",
+          "vulpra_sha": "9ade09b0bc6535b30a81c1bced057335adf961ef",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/bindings/Codegen.py",
+          "upstream_fix_commit_result_sha": "4c22bdccd6483478855a043347b235e08de67a55",
+          "pinned_beta_sha": "33560ca1e835d500e96ce3145c77876c49ef907c",
+          "upstream_stable_159_sha": "33560ca1e835d500e96ce3145c77876c49ef907c",
+          "vulpra_sha": "33560ca1e835d500e96ce3145c77876c49ef907c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/bindings/DOMJSProxyHandler.cpp",
+          "upstream_fix_commit_result_sha": "d2fdfd6bfbdfcd36409dba6a51ddfa800fdfa981",
+          "pinned_beta_sha": "d2fdfd6bfbdfcd36409dba6a51ddfa800fdfa981",
+          "upstream_stable_159_sha": "d2fdfd6bfbdfcd36409dba6a51ddfa800fdfa981",
+          "vulpra_sha": "d2fdfd6bfbdfcd36409dba6a51ddfa800fdfa981",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/bindings/DOMJSProxyHandler.h",
+          "upstream_fix_commit_result_sha": "b325450566c663acba9711d8bff248148a30cfa1",
+          "pinned_beta_sha": "b325450566c663acba9711d8bff248148a30cfa1",
+          "upstream_stable_159_sha": "b325450566c663acba9711d8bff248148a30cfa1",
+          "vulpra_sha": "b325450566c663acba9711d8bff248148a30cfa1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "js::SetProxyPrivate(mReflector, JS::UndefinedValue());",
+        "DOMProxyHandler::ClearExpandoOnWrapFailure(aReflector);",
+        "void DOMProxyHandler::ClearExpandoOnWrapFailure(JSObject* obj)"
+      ],
+      "note": "All four paths match beta/stable/Vulpra; BindingUtils.h and DOMJSProxyHandler.cpp/.h exact match upstream fix postimages. Codegen.py differs because of later modifications, but inspected its explicit ClearExpandoOnWrapFailure codegen before failed wrapping, and handler clears expando and suppresses tracing for failed wrapper. No WebIDL binding failure runtime exercise or sanitizer test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117936",
+      "bug": 2082001,
+      "topic": "DOM custom element ElementInternals form ownership use-after-free",
+      "patch_commit": "55a805b5cd01e5213abbd155e929dcad1a41f6f5",
+      "classification": "two_elementinternals_paths_identical_beta_stable_vulpra_one_exact_postimage",
+      "source_file_blobs": [
+        {
+          "path": "dom/html/ElementInternals.cpp",
+          "upstream_fix_commit_result_sha": "c4c70a64195111f9817ec344b9f11460e5931569",
+          "pinned_beta_sha": "b12684d78212f083d49e229d9f13c3131aa4ca80",
+          "upstream_stable_159_sha": "b12684d78212f083d49e229d9f13c3131aa4ca80",
+          "vulpra_sha": "b12684d78212f083d49e229d9f13c3131aa4ca80",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/html/ElementInternals.h",
+          "upstream_fix_commit_result_sha": "c77734ef60f2a4007cc52cdfc270676420518cd9",
+          "pinned_beta_sha": "c77734ef60f2a4007cc52cdfc270676420518cd9",
+          "upstream_stable_159_sha": "c77734ef60f2a4007cc52cdfc270676420518cd9",
+          "vulpra_sha": "c77734ef60f2a4007cc52cdfc270676420518cd9",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<HTMLFormElement> mForm;",
+        "mCustomStateSet, mForm);"
+      ],
+      "note": "Both affected files identical across beta/stable/Vulpra; header matches original upstream patch SHA, .cpp has later modifications but traverses mForm in cycle collection and preserves RefPtr form member. This is source lifetime review, not a dynamically executed custom-element/form reentry regression."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117937",
+      "bug": 2082005,
+      "topic": "JavaScript Engine SavedStacks FirstSubsumedFrame move constructor uninitialized JSContext pointer",
+      "patch_commit": "42d81ac17e740355f9c709620e68367c25faebe5",
+      "classification": "both_code_and_jsapi_test_exact_upstream_postimages_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "js/public/Stack.h",
+          "upstream_fix_commit_result_sha": "9e7d8a6c739e2a688865b212918e4312b949e6ee",
+          "pinned_beta_sha": "9e7d8a6c739e2a688865b212918e4312b949e6ee",
+          "upstream_stable_159_sha": "9e7d8a6c739e2a688865b212918e4312b949e6ee",
+          "vulpra_sha": "9e7d8a6c739e2a688865b212918e4312b949e6ee",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jsapi-tests/testSavedStacks.cpp",
+          "upstream_fix_commit_result_sha": "1fecc79211acc4de0b226fc585c72e4011cb1cf0",
+          "pinned_beta_sha": "1fecc79211acc4de0b226fc585c72e4011cb1cf0",
+          "upstream_stable_159_sha": "1fecc79211acc4de0b226fc585c72e4011cb1cf0",
+          "vulpra_sha": "1fecc79211acc4de0b226fc585c72e4011cb1cf0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "FirstSubsumedFrame(FirstSubsumedFrame&& rhs)",
+        "    : cx(rhs.cx),"
+      ],
+      "note": "Both Bug 2082005 changed paths are byte-for-byte identical between original patch postimage, Firefox 159.0b5, stable, and Vulpra; verified JSContext is initialized by move constructor before destructor drops principals. Native JSAPI regression source is present, not executed during this audit."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117938",
+      "bug": 2082009,
+      "topic": "Layout generated content frame state bits lost on paginated headers and fixed frame replication",
+      "patch_commit": "1fb5606f16d9977294b432464085ac788e83623f",
+      "classification": "three_layout_and_print_regression_paths_identical_beta_stable_vulpra_two_exact_test_postimages",
+      "source_file_blobs": [
+        {
+          "path": "layout/base/nsCSSFrameConstructor.cpp",
+          "upstream_fix_commit_result_sha": "a4a41d60ddd382275f607b8c918038b9a5eac2a8",
+          "pinned_beta_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "upstream_stable_159_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "vulpra_sha": "e19809a3b27975ff22cfae034d1357a63ae9b40c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "testing/web-platform/tests/css/printing/fixed-generated-content-whitespace-crash-print.html",
+          "upstream_fix_commit_result_sha": "c29c3de49868c2428ccdc63f9fb131740d3527f7",
+          "pinned_beta_sha": "c29c3de49868c2428ccdc63f9fb131740d3527f7",
+          "upstream_stable_159_sha": "c29c3de49868c2428ccdc63f9fb131740d3527f7",
+          "vulpra_sha": "c29c3de49868c2428ccdc63f9fb131740d3527f7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/css/printing/repeated-generated-content-whitespace-crash-print.html",
+          "upstream_fix_commit_result_sha": "ab074f7062d7380b0d8e90f6ab9c0c13ac7239e6",
+          "pinned_beta_sha": "ab074f7062d7380b0d8e90f6ab9c0c13ac7239e6",
+          "upstream_stable_159_sha": "ab074f7062d7380b0d8e90f6ab9c0c13ac7239e6",
+          "vulpra_sha": "ab074f7062d7380b0d8e90f6ab9c0c13ac7239e6",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "headerFooterFrame->AddStateBits(NS_FRAME_GENERATED_CONTENT);",
+        "flags += ItemFlag::IsGeneratedContent;"
+      ],
+      "note": "All three source/test files match beta, stable, Vulpra exactly; both upstream original printing test files also match the selected patch postimage. Frame constructor has later edits but inspected preservation of NS_FRAME_GENERATED_CONTENT for table-header duplication and fixed replicated frames. Original printing WPT tests are source-present, not executed; no paginated runtime sanitizer evidence."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117939",
+      "bug": 2082030,
+      "topic": "XML and HTML parser custom element definition lifetime use-after-free during element creation",
+      "patch_commit": "b66e9e7c969d3d371b2aef7a75963bd4718d7c55",
+      "classification": "two_parser_paths_identical_beta_stable_vulpra_fix_postimages_differ_due_later_revisions",
+      "source_file_blobs": [
+        {
+          "path": "dom/xml/nsXMLContentSink.cpp",
+          "upstream_fix_commit_result_sha": "a8870e43f945e0d0cd6c8e5f4fed47bd8f8fba33",
+          "pinned_beta_sha": "7e8622085a5d1e612d3b4d4daea9ed3ed5ea0edf",
+          "upstream_stable_159_sha": "7e8622085a5d1e612d3b4d4daea9ed3ed5ea0edf",
+          "vulpra_sha": "7e8622085a5d1e612d3b4d4daea9ed3ed5ea0edf",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "parser/html/nsHtml5TreeOperation.cpp",
+          "upstream_fix_commit_result_sha": "2ad605a58e39e65e2f9049f8f4c995053fe5cdf1",
+          "pinned_beta_sha": "931dbe9f86b1433731b785240c568f2e85f60eb4",
+          "upstream_stable_159_sha": "931dbe9f86b1433731b785240c568f2e85f60eb4",
+          "vulpra_sha": "931dbe9f86b1433731b785240c568f2e85f60eb4",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<CustomElementDefinition> customElementDefinition;"
+      ],
+      "note": "Both Bug 2082030 changed paths match pinned beta, 159 stable, and Vulpra exactly but differ in full-file SHA from selected upstream commit after later edits. Inspected strong RefPtr custom element definition in both XML and HTML new-element paths. No XML/HTML custom-element constructor reentry or sanitizer test performed."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
