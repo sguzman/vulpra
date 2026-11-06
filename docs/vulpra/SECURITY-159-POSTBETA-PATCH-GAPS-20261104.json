@@ -3296,6 +3296,84 @@
         "(void)kungFuDeathGrip;"
       ],
       "note": "The selected upstream Bug 2079253 patch adds a strong Document reference during SMILAnimationController::DoSample(). The pinned Firefox 159 beta, stable 159, and Vulpra files have identical Git blobs and retain both protective lines. Their complete file SHA differs from the selected upstream patch-result blob because of other source changes. Other public Bug 2079253 commits include a different landing and a removal on another history path, so this finding is explicitly limited to final beta/stable source and the retained guard. No SVG exploit test, race test, or sanitizer run was executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117923",
+      "bug": 2079781,
+      "topic": "Audio/Video HTMLMediaElement pending play promise runner lifetime use-after-free",
+      "patch_commit": "f5a6549e5ce0f463ff767bf56cc231ce07c11b44",
+      "classification": "two_exact_upstream_fix_result_source_blobs_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/media/mediaelement/HTMLMediaElement.cpp",
+          "upstream_fix_commit_result_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "pinned_beta_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "upstream_stable_159_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "vulpra_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/media/mediaelement/HTMLMediaElement.h",
+          "upstream_fix_commit_result_sha": "5e47510804625dff2ca0b463b1aa3ef1244cc8ec",
+          "pinned_beta_sha": "5e47510804625dff2ca0b463b1aa3ef1244cc8ec",
+          "upstream_stable_159_sha": "5e47510804625dff2ca0b463b1aa3ef1244cc8ec",
+          "vulpra_sha": "5e47510804625dff2ca0b463b1aa3ef1244cc8ec",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Both files in the upstream Bug 2079781 patch match their exact patch-result blobs in pinned beta, Firefox 159 stable and Vulpra main. The patch retains pending-play runner references and adds cycle collector traverse/unlink handling. No media playback, GC, race or exploit regression executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117924",
+      "bug": 2079783,
+      "topic": "XSLT compiler observer callback re-entry use-after-free",
+      "patch_commit": "4a4e8bdeb879f11af600fdfdd31675a26fe40535",
+      "classification": "beta_stable_vulpra_source_identical_reentry_guard_retained_patch_postimage_differs",
+      "source_file_blobs": [
+        {
+          "path": "dom/xslt/xslt/txStylesheetCompiler.cpp",
+          "upstream_fix_commit_result_sha": "0510d5a1e8cd192d3a4e612256a4412354e25ce6",
+          "pinned_beta_sha": "5e1c187070c04cf26705d9b643b7cd2f1ab93703",
+          "upstream_stable_159_sha": "5e1c187070c04cf26705d9b643b7cd2f1ab93703",
+          "vulpra_sha": "5e1c187070c04cf26705d9b643b7cd2f1ab93703",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "if (RefPtr<txACompileObserver> observer = std::move(mObserver)) {",
+        "observer->onDoneCompiling(this, mStatus, aErrorText, aParam);",
+        "observer->onDoneCompiling(this, mStatus);"
+      ],
+      "note": "The guarded compiler source is Git-identical in beta, stable and Vulpra, with observer ownership moved out before onDoneCompiling in both cancel() and maybeDoneCompiling() as in upstream Bug 2079783. Later source edits cause an expected full-blob difference from its selected patch commit. The seven changed files in the separate upstream crash-test commit have not been audited here; no live XSLT regression or exploit executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117925",
+      "bug": 2079786,
+      "topic": "DOM fullscreen pointer-lock release lifetime use-after-free",
+      "patch_commit": "a591061b2d106e49abff985a6a9aed457e27e016",
+      "classification": "beta_stable_vulpra_source_identical_refcounted_exit_elements_and_unlock_order_retained",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/Document.cpp",
+          "upstream_fix_commit_result_sha": "a499d2769ecac269d445b1285617dda23ac65123",
+          "pinned_beta_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "upstream_stable_159_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "vulpra_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "AutoTArray<RefPtr<Element>, 8> exitElements;",
+        "PointerLockManager::Unlock(\"Document::RestorePreviousFullscreenState\");"
+      ],
+      "note": "The pinned beta, stable release and Vulpra share the same Document.cpp Git blob; inspection confirms refcounted fullscreen exitElements and PointerLockManager::Unlock after fullscreen cleanup/event work, preserving the Bug 2079786 protective changes. Full-file blob differs from the selected upstream patch result due to subsequent source revisions. No real fullscreen/pointer-lock exploit or graphical regression test executed."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
