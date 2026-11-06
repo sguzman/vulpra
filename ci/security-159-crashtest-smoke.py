@@ -180,6 +180,7 @@ def existing_browser_driver(repo: Path):
 
 def run_browser(repo: Path) -> None:
     raw = load_fixture(repo)
+    extra = load_extra_fixtures(repo)
     driver = existing_browser_driver(repo)
     geckodriver = shutil.which("geckodriver")
     if not geckodriver:
@@ -205,15 +206,22 @@ def run_browser(repo: Path) -> None:
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
-                if self.path.split("?", 1)[0] != "/crashtest":
+                route = self.path.split("?", 1)[0]
+                if route == "/crashtest":
+                    body = raw
+                elif route.startswith("/regression/"):
+                    body = extra.get(route.rsplit("/", 1)[-1])
+                else:
+                    body = None
+                if body is None:
                     self.send_error(404)
                     return
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
-                self.send_header("Content-Length", str(len(raw)))
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(raw)
+                self.wfile.write(body)
 
             def log_message(self, *_args):
                 pass
@@ -280,6 +288,37 @@ def run_browser(repo: Path) -> None:
                     if process.poll() is not None:
                         raise RuntimeError("Browser driver exited during crashtest")
                     checks.append({"iteration": i, "height": state["height"]})
+                extra_checks = []
+                for name in sorted(extra):
+                    script, asynchronous = EXTRA_PROBES[name]
+                    trial = []
+                    for i in range(EXTRA_REPETITIONS):
+                        case_url = (
+                            f"http://127.0.0.1:{server.server_port}"
+                            f"/regression/{name}?iteration={i}"
+                        )
+                        driver.request(port, "POST", session + "/url",
+                                       {"url": case_url}, timeout_seconds=35)
+                        state = driver.request(
+                            port, "POST",
+                            session + ("/execute/async" if asynchronous
+                                       else "/execute/sync"),
+                            {"script": script, "args": []},
+                            timeout_seconds=20)
+                        if not valid_extra_dom(name, state, case_url):
+                            raise RuntimeError(
+                                f"Original {name} crashtest did not complete"
+                                f" ({i}): {state!r}")
+                        if process.poll() is not None:
+                            raise RuntimeError(
+                                f"Driver exited during {name} crashtest")
+                        trial.append({"iteration": i, "height": state["height"]})
+                    extra_checks.append({
+                        "name": name,
+                        "fixture": str(EXTRA_FIXTURES[name][0]),
+                        "git_blob_sha1": EXTRA_FIXTURES[name][1],
+                        "iterations": trial,
+                    })
                 if sentinel_file.read_bytes() != sentinel:
                     raise RuntimeError("Private Firefox profile sentinel modified")
                 source = subprocess.check_output(
@@ -300,6 +339,27 @@ def run_browser(repo: Path) -> None:
                 }
                 output = evidence_dir / "security-159-css-crashtest-replay.json"
                 output.write_text(json.dumps(report, indent=2) + "\n")
+                additional_report = {
+                    "schema_version": 1,
+                    "status": "passed_bounded_original_extra_crashtests",
+                    "source_commit": source,
+                    "cases": extra_checks,
+                    "real_packaged_browser": True,
+                    "accept_insecure_certs": False,
+                    "temporary_profile_preserved": True,
+                    "original_mozilla_fixture_hashes_verified": True,
+                    "official_wpt_harness_used": False,
+                    "memory_safety_exploit_rejection_proven": False,
+                    "security_current": False,
+                    "release_ready": False,
+                }
+                additional_path = (
+                    evidence_dir / "security-159-additional-crashtest-replay.json"
+                )
+                additional_path.write_text(
+                    json.dumps(additional_report, indent=2) + chr(10))
+                print("PASS: 3 additional original SVG/table/multicol"
+                      " crashtests replayed twice in packaged Vulpra")
                 print("PASS: exact original upstream CSS crashtest executed "
                       f"{REPETITIONS} times in real isolated packaged Vulpra")
                 print("LIMIT: no ASAN, full WPT harness or exploit safety proof")
