@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay the exact Mozilla Bug 2079035 HTML in a private packaged browser.
+"""Replay original Mozilla CSS/SVG/layout crash fixtures in packaged Vulpra.
 
 This is a limited original-crashtest execution and DOM/liveness witness, not
 a sanitizer run, proof of exploit resistance, or a security-current browser.
@@ -22,6 +22,89 @@ FIXTURE = Path("testing/web-platform/tests/css/css-position/crashtests/"
                "inline-containing-block-delete-continuations-001.html")
 BLOB_SHA1 = "31a14963b356d869475bac62ca44991d9275a285"
 REPETITIONS = 3
+
+# Additional original Mozilla regressions; checked byte-for-byte as Git blobs.
+EXTRA_FIXTURES = {
+    "svg": (Path("layout/svg/crashtests/2079252.html"),
+            "a8d78aae061029dcc7cb72e86a18647b2d483625",
+            (b"t.getExtentOfChar(", b'd.firstChild.data = "ww"')),
+    "table": (Path("testing/web-platform/tests/css/css-tables/crashtests/"
+                   "border-collapse-dynamic-crash.html"),
+              "6d716acb679c1f174e75a4d3d6ddfc85dcba7852",
+              (b"c.colSpan = 60", b't.rows[5].cells[3].firstChild.data = "bbbb"')),
+    "multicol": (Path("testing/web-platform/tests/css/css-multicol/crashtests/"
+                      "block-break-before.html"),
+                 "bfb5f0894b80bf39633afcf37be9fdcbb68ab96c",
+                 (b'u0.scrollIntoView()', b'mc.style.width = "400px"')),
+}
+EXTRA_REPETITIONS = 2
+
+# The table fixture's original onload handler needs two animation frames.
+# Probe its observable effects without modifying the upstream test HTML.
+EXTRA_PROBES = {
+    "svg": (
+        "return {url:document.URL,state:document.readyState,"
+        "count:document.querySelectorAll('#t tspan').length,"
+        "characters:document.getElementById('t').getNumberOfChars(),"
+        "last:document.getElementById('t').lastElementChild?.textContent,"
+        "height:document.documentElement.offsetHeight};", False),
+    "table": (
+        "const done=arguments[arguments.length-1];"
+        "const deadline=Date.now()+7000;"
+        "function read(){const t=document.getElementById('t');"
+        "const c=t?.rows[3]?.cells[1];"
+        "return {url:document.URL,state:document.readyState,"
+        "colspan:c?.colSpan,css_class:c?.className,"
+        "text:t?.rows[5]?.cells[3]?.firstChild?.data,"
+        "left:document.getElementById('d')?.style.left,"
+        "height:document.documentElement.offsetHeight};}"
+        "function poll(){const s=read();"
+        "if(s.colspan===60&&s.text==='bbbb'&&s.left==='10px')done(s);"
+        "else if(Date.now()>deadline)done(s);"
+        "else setTimeout(poll,45);}poll();", True),
+    "multicol": (
+        "return {url:document.URL,state:document.readyState,"
+        "width:document.getElementById('mc')?.style.width,"
+        "break_before:document.getElementById('g3')?.style.breakBefore,"
+        "u0:!!document.getElementById('u0'),"
+        "height:document.documentElement.offsetHeight};", False),
+}
+
+
+def load_extra_fixtures(repo: Path) -> dict[str, bytes]:
+    verified = {}
+    for name, (path, expected, triggers) in EXTRA_FIXTURES.items():
+        raw = (repo / path).read_bytes()
+        git_blob = b"blob " + str(len(raw)).encode() + b"\0" + raw
+        if hashlib.sha1(git_blob).hexdigest() != expected:
+            raise RuntimeError(f"Upstream {name} crashtest Git blob changed")
+        for trigger in triggers:
+            if trigger not in raw:
+                raise RuntimeError(f"Original {name} crash trigger changed")
+        verified[name] = raw
+    return verified
+
+
+def valid_extra_dom(name: str, value: object, url: str) -> bool:
+    if not (isinstance(value, dict) and value.get("url") == url
+            and value.get("state") == "complete"
+            and type(value.get("height")) is int and value["height"] > 0):
+        return False
+    if name == "svg":
+        return (value.get("count") == 49
+                and type(value.get("characters")) is int
+                and value["characters"] >= 49 and value.get("last") == "ww")
+    if name == "table":
+        return (value.get("colspan") == 60
+                and value.get("css_class") == "x"
+                and value.get("text") == "bbbb"
+                and value.get("left") == "10px")
+    if name == "multicol":
+        return (value.get("width") == "400px"
+                and value.get("break_before") == "always"
+                and value.get("u0") is True)
+    return False
+
 
 
 def load_fixture(repo: Path) -> bytes:
@@ -59,8 +142,30 @@ def self_test(repo: Path) -> None:
                   {"height": 0}, {"height": "150"}):
         assert not valid_dom({**good, **delta}, url)
     assert not valid_dom(None, url)
-    print("PASS: upstream security regression file exact; 8/8 forged"
-          " DOM and liveness claims rejected; no browser run")
+    extra = load_extra_fixtures(repo)
+    assert sorted(extra) == ["multicol", "svg", "table"]
+    forged = 0
+    for name in sorted(extra):
+        case_url = f"http://127.0.0.1:1/regression/{name}?iteration=0"
+        value = dict(url=case_url, state="complete", height=150)
+        if name == "svg":
+            value.update(count=49, characters=100, last="ww")
+            corrupt = [dict(count=48), dict(last="x"), dict(characters=0)]
+        elif name == "table":
+            value.update(colspan=60, css_class="x", text="bbbb", left="10px")
+            corrupt = [dict(colspan=1), dict(text="aaa"), dict(left="0px")]
+        else:
+            value.update(width="400px", break_before="always", u0=True)
+            corrupt = [dict(width="200px"), dict(break_before="auto"),
+                       dict(u0=False)]
+        assert valid_extra_dom(name, value, case_url)
+        for change in corrupt + [dict(url="https://external.invalid/"),
+                                 dict(height=0), dict(state="loading")]:
+            assert not valid_extra_dom(name, {**value, **change}, case_url)
+            forged += 1
+    assert forged == 18
+    print("PASS: 4 exact original crashtest blobs and triggers;"
+          " 26/26 forged DOM/liveness claims rejected; no browser run")
 
 
 def existing_browser_driver(repo: Path):
