@@ -3272,6 +3272,30 @@
         }
       ],
       "note": "Single source fix postimage exact in beta/stable/Vulpra. No media playback regression or exploit test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117914",
+      "bug": 2079253,
+      "topic": "SVG SMIL animation controller lifetime use-after-free",
+      "patch_commit": "a8ef5d9dd6dd2b9505ceee139082d3107b466b74",
+      "classification": "beta_stable_vulpra_exact_same_source_blob_with_protective_document_lifetime_guard_retained",
+      "source_file_blobs": [
+        {
+          "path": "dom/smil/SMILAnimationController.cpp",
+          "upstream_fix_commit_result_sha": "9f2135d497ae2c7179c2f2813bf9232e2b3993d7",
+          "pinned_beta_sha": "abe82a9fc36dba8860de21d9f9cfa4247493d103",
+          "upstream_stable_159_sha": "abe82a9fc36dba8860de21d9f9cfa4247493d103",
+          "vulpra_sha": "abe82a9fc36dba8860de21d9f9cfa4247493d103",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "nsCOMPtr<dom::Document> kungFuDeathGrip(mDocument);",
+        "(void)kungFuDeathGrip;"
+      ],
+      "note": "The selected upstream Bug 2079253 patch adds a strong Document reference during SMILAnimationController::DoSample(). The pinned Firefox 159 beta, stable 159, and Vulpra files have identical Git blobs and retain both protective lines. Their complete file SHA differs from the selected upstream patch-result blob because of other source changes. Other public Bug 2079253 commits include a different landing and a removal on another history path, so this finding is explicitly limited to final beta/stable source and the retained guard. No SVG exploit test, race test, or sanitizer run was executed."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
@@ -3417,7 +3441,7 @@
       "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2056783",
       "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117863",
       "last_checked_date": "2026-11-06",
-      "note": "Public Bugzilla reports Access Denied, and GitHub commit search for Bug 2056783 returns no matching upstream commit. Neither beta fix presence nor missing patch has been established. This remains part of 58 not-yet-source-verified high-impact Firefox 159 advisory CVEs. Do not assign positive security credit."
+      "note": "Public Bugzilla reports Access Denied, and GitHub commit search for Bug 2056783 returns no matching upstream commit. Neither beta fix presence nor missing patch has been established. This remains unaudited in the high-impact Firefox 159 advisory. Do not assign positive security credit."
     }
   ],
   "public_security_advisory_listing_checked": {
