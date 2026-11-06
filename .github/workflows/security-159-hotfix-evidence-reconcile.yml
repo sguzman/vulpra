@@ -10,6 +10,8 @@ on:
       - ci/m3-current-local-tls-native-evidence.jq
       - ci/tests/m3-current-local-tls-native-evidence-tests.sh
       - ci/security-159-css-evidence.jq
+      - ci/security-159-extra-crashtest-evidence.jq
+      - ci/tests/security-159-extra-evidence-tests.sh
       - ci/tests/security-159-css-evidence-tests.sh
       - ci/security-159-check-source-crosswalk.sh
       - docs/vulpra/SECURITY-159-POSTBETA-PATCH-GAPS-20261104.json
@@ -202,6 +204,7 @@ jobs:
           python3 ci/m3-native-link-evidence-ledger.py --self-test
           bash ci/tests/m3-current-local-tls-native-evidence-tests.sh
           bash ci/tests/security-159-css-evidence-tests.sh
+          bash ci/tests/security-159-extra-evidence-tests.sh
 
   reconcile-real-native-run:
     if: >-
@@ -411,6 +414,39 @@ jobs:
           ' "$RUNNER_TEMP/security-159-css-reconciled.json" >/dev/null
           echo "PASS: independent source-linked real packaged CSS crashtest; not WPT/ASAN or release acceptance"
 
+      - name: Independently reconcile original SVG, table and multicol browser replays
+        # Historical native builds lack these tests; successful new builds must
+        # supply all three cases, not a synthetic or optional skip.
+        if: github.event_name == 'workflow_run'
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/native-evidence"
+          mapfile -t extras < <(find "$evidence" -type f -name security-159-additional-crashtest-replay.json -print)
+          mapfile -t native < <(find "$evidence" -type f -name m3-native-link-inputs.json -print)
+          test "${#extras[@]}" -eq 1
+          test "${#native[@]}" -eq 1
+          jq -n \
+            --slurpfile replay "${extras[0]}" \
+            --slurpfile native "${native[0]}" \
+            --arg source "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            -f ci/security-159-extra-crashtest-evidence.jq \
+            > "$RUNNER_TEMP/security-159-extra-crashtest-reconciled.json"
+          jq -e --arg sha "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            .schema_version == 1 and
+            .status == "bounded_extra_crashtests_source_linked_reconciliation" and
+            .source_commit == $sha and .native_run_id == $run and
+            .real_packaged_fixture_replays == 6 and
+            (.original_mozilla_fixture_blobs | length == 3) and
+            .full_wpt_harness_executed == false and
+            .exploit_rejection_proven == false and
+            .full_advisory_audited == false and
+            .release_ready == false and
+            .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/security-159-extra-crashtest-reconciled.json" >/dev/null
+          echo "PASS: six exact-source SVG/table/multicol browser replays independently verified; not memory safety proof"
+
       - name: Preserve only bounded reconciled source and runtime attestations
         uses: actions/upload-artifact@v4
         with:
@@ -419,5 +455,6 @@ jobs:
             ${{ runner.temp }}/security-159-native-link-reconciled.json
             ${{ runner.temp }}/security-159-local-tls-reconciled.json
             ${{ runner.temp }}/security-159-css-reconciled.json
+            ${{ runner.temp }}/security-159-extra-crashtest-reconciled.json
           if-no-files-found: error
           retention-days: 14
