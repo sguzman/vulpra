@@ -27,7 +27,7 @@ validate_release_feed() {
 self_test() {
   local temp
   temp="$(mktemp -d)"
-  trap 'rm -rf -- "$temp"' RETURN
+  trap "rm -rf -- '$temp'" EXIT
   printf '{"LATEST_FIREFOX_VERSION":"159.0.1"}\n' > "$temp/good.json"
   validate_release_feed "$temp/good.json" >/dev/null
   local failures=0
@@ -54,7 +54,7 @@ self_test() {
 check_live() {
   local temp
   temp="$(mktemp)"
-  trap 'rm -f -- "$temp"' RETURN
+  trap "rm -f -- '$temp'" EXIT
   curl --fail --location --silent --show-error \
     --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 60 \
     --proto '=https' --tlsv1.2 "$MOZILLA_RELEASE_JSON" -o "$temp"
