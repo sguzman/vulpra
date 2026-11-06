@@ -108,8 +108,36 @@ self_test() {
 .m3_sixth_gate_closed = true
 .observed_ffi_links[0].cpp_consumer = "not-libxul.so"
 MUTATIONS
-  test "$failures" -eq 15
-  echo "PASS: 15/15 forged source, identity, FFI and M3 acceptance claims rejected"
+  test "$failures" -eq 15 || return 1
+  # Cross-check the separately authenticated historical build-run identity.
+  jq -n --arg repo "$repo" --arg sha "$compiled" --argjson id "$native_run" '
+    {id:$id,head_sha:$sha,head_branch:"main",head_repository:{full_name:$repo},
+     name:"M3 Source Matched Native Link Inputs and Runtime",
+     path:".github/workflows/m3-source-matched-native-link.yml",
+     event:"push",run_attempt:1,status:"completed",conclusion:"success"}
+  ' > "$tmp/run-valid.json"
+  verify_run_json "$tmp/run-valid.json" || return 1
+  local run_failures=0
+  while IFS= read -r mutation; do
+    jq "$mutation" "$tmp/run-valid.json" > "$tmp/run-forged.json"
+    if verify_run_json "$tmp/run-forged.json" >/dev/null 2>&1; then
+      echo "FAIL: forged native workflow success accepted: $mutation" >&2; return 1
+    fi
+    run_failures=$((run_failures + 1))
+  done <<'RUN_MUTATIONS'
+.id = 123
+.head_sha = ("0" * 40)
+.head_repository.full_name = "not-vulpra/other"
+.head_branch = "security/firefox-159-postbeta-hotfixes"
+.name = "unrelated workflow"
+.path = ".github/workflows/unrelated.yml"
+.event = "workflow_dispatch"
+.run_attempt = 2
+.status = "in_progress"
+.conclusion = "failure"
+RUN_MUTATIONS
+  test "$run_failures" -eq 10 || return 1
+  echo "PASS: 25/25 forged source, run identity, FFI and M3 acceptance claims rejected"
 }
 check_live() {
   verify_manifest "$manifest"
