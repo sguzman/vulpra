@@ -45,7 +45,11 @@ fn parse_nm(line: &str, archive: bool) -> Option<(&str, &str)> {
     let mut cols = rest.split_whitespace();
     let symbol = cols.next()?;
     let kind = cols.next()?;
-    if !SYMBOLS.contains(&symbol) || !matches!(kind,"T"|"t"|"W"|"w") {
+    // A C-ABI Rust #[no_mangle] export must be a strong definition in
+    // its staticlib. A final linked ELF may localize that strong symbol.
+    // Weak W/w placeholders must never satisfy this evidence contract.
+    if !SYMBOLS.contains(&symbol) ||
+        !(if archive { kind == "T" } else { matches!(kind,"T"|"t") }) {
         return None;
     }
     if archive {
@@ -189,6 +193,12 @@ fn main() {
         assert_eq!(parse_nm("libgkrust.a[one.rcgu.o]: unrelated T",true),None);
         assert_eq!(parse_nm("libxul.so: GkRust_Init T",true),None);
         assert_eq!(parse_nm("libgkrust.a[../bad]: GkRust_Init T",true),None);
+        assert_eq!(parse_nm("libgkrust.a[one.rcgu.o]: GkRust_Init W 0 8",true),None);
+        assert_eq!(parse_nm("libgkrust.a[one.rcgu.o]: GkRust_Init w 0 8",true),None);
+        assert_eq!(parse_nm("libgkrust.a[one.rcgu.o]: GkRust_Init t 0 8",true),None);
+        assert_eq!(parse_nm("libxul.so: GkRust_Init W 0 8",false),None);
+        assert_eq!(parse_nm("libxul.so: GkRust_Init w 0 8",false),None);
+        assert_eq!(parse_nm("libxul.so: GkRust_Init t 0 8",false),Some(("GkRust_Init","libxul.so")));
     }
     #[test] fn real_compiled_native_archive_and_elf() {
         use std::time::{SystemTime,UNIX_EPOCH};
