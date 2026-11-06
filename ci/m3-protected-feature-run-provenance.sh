@@ -59,7 +59,7 @@ self_test() {
   verify_matrix "$matrix"
   local tmp id sha name workflow mutation failed=0
   tmp="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp"' EXIT
+  trap "rm -rf -- '$tmp'" EXIT
   IFS='|' read -r id sha name workflow < <(expected_runs | head -n 1)
   jq -n --argjson id "$id" --arg sha "$sha" --arg name "$name" --arg workflow "$workflow" --arg repo "$repo" '
     {id:$id,head_sha:$sha,head_branch:"main",
@@ -109,7 +109,7 @@ check_live() {
   fi
   local tmp id sha name workflow passed=0
   tmp="$(mktemp -d)"
-  trap 'rm -rf -- "$tmp"' EXIT
+  trap "rm -rf -- '$tmp'" EXIT
   while IFS='|' read -r id sha name workflow; do
     gh api "repos/$repo/actions/runs/$id" > "$tmp/run.json"
     if ! verify_run "$tmp/run.json" "$id" "$sha" "$name" "$workflow"; then
