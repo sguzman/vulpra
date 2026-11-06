@@ -157,3 +157,31 @@ delta +0 pp**. No new source deletion or compiled-package savings.
 The existing 30-case synthetic jq contract was additionally run against a **genuine, externally authenticated** previous full-current compiled native link report from [workflow **41762298450**](https://github.com/sguzman/vulpra/actions/runs/41762298450), at exact source `96454f7a1fbe6b505af440c6c2c5fc91e798756d`. The read-only [compatibility replay](../../ci/tests/m3-current-ffi-real-link-compatibility.sh) independently checked the successful GitHub run's source/repository/workflow metadata, downloaded its existing `m3-source-matched-native-link-evidence` artifact, confirmed the linked source/ELF and native runtime acceptance, and exercised the unchanged [FFI evidence join](../../ci/m3-current-ffi-native-evidence.jq) with explicitly **synthetic** two-member FFI input tied to that authentic historic `libxul` hash. It then falsified that ELF hash and required rejection.
 
 [**Compatibility CI 42267196487 PASS**](https://github.com/sguzman/vulpra/actions/runs/42267196487): authentic old native report accepted as a **report-format input**, forged linked ELF identity rejected, and all pre-existing **30/30** fake evidence fixtures rejected. [Workflow lint 42267195946 PASS](https://github.com/sguzman/vulpra/actions/runs/42267195946). **No actual FFI archive-member names or compiled-current binary edge were proven by this synthetic FFI replay.** Those remain dependent on the genuinely compiling [native workflow 42264023349](https://github.com/sguzman/vulpra/actions/runs/42264023349) and its later independent real-artifact reconciliation. The M3 sixth gate, protected feature fallbacks and target workstation acceptance remain open; overall 61%, M3 83%, delta +0 pp.
+
+
+### Rust archive symbol-strength hardening — 2026-11-06 UTC
+
+Review of the pending compiled-current FFI observer found that its original
+`nm` filter accepted weak `W/w` symbol definitions as though they were
+strong, source-owned Rust `#[no_mangle]` C ABI exports. The narrow audit
+contract now rejects weak archive and linked-ELF definitions; the archive
+must expose each selected symbol as strong global text `T`, while a linked
+consumer may preserve a strong `T` or localize it to `t`.
+
+The correction at [`2b22772`](https://github.com/sguzman/vulpra/commit/2b22772895a97892f61ccadb514b4c0146624daf)
+passed parser-fixture [**CI 42272137547**](https://github.com/sguzman/vulpra/actions/runs/42272137547).
+The further [`412d14c`](https://github.com/sguzman/vulpra/commit/412d14c097e81a0d48487865de2e21c1f049d20a)
+added a **real C-compiled weak archive and weak final ELF** regression:
+both the archive/ELF-only weak scenario and strong archive/weak ELF
+scenario must fail; [**CI 42272211452 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42272211452),
+2/2 Rust tests. Existing valid strong compiled fixtures remain accepted.
+
+**Scope/time boundary:** The full current native workflow
+[**42264023349**](https://github.com/sguzman/vulpra/actions/runs/42264023349)
+was launched from `83785b264f232ea7c777abd0a0dd8511ef322ecc`,
+*before* both symbol-strength hardening commits. The in-flight build uses
+the earlier inspector and cannot be misrepresented as native acceptance of
+the later strengthened rules. The newer tests cover compiler-produced
+negative fixtures only. No newer real native Rust archive/ELF census had
+completed at this checkpoint, no package source or installed desktop was
+modified, and M3 stays **5/6 (83%)**, overall **61%**, Δ0 pp.
