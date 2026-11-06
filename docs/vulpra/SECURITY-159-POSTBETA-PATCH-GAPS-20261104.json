@@ -4584,6 +4584,214 @@
         "HidesContentForLayout() && !GetNextContinuation()"
       ],
       "note": "Flex frame and original crashtest files have exact upstream postimages; grid frame has later edits but all three source files match 159 beta, 159 stable and Vulpra. Inspected continuation check for hidden content flex/grid reflow. Original multi-column WPT crashtest present, but not run in this audit; no memory-sanitizer evidence."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117952",
+      "bug": 2082139,
+      "topic": "Incomplete compressed JavaScript bytecode and failed alternate cache-data writer validation",
+      "patch_commits": [
+        "e97177c8c2584e307754c7640da69c9b76e083dc",
+        "53327da3a768906ccfbced81e46fea0d64636ee6",
+        "2dc3c68cfc7f7c53f41508dda9019a0f1e871c25",
+        "d74aa51d713cde71a87626ba6f306d8496e5f80e"
+      ],
+      "classification": "source_and_tests_final_beta_stable_vulpra_identical_7_exact_postimages_one_test_registry_later_revision_reverted_and_relanded",
+      "source_file_blobs": [
+        {
+          "path": "dom/script/ScriptCompression.cpp",
+          "upstream_fix_commit_result_sha": "f3ebffa2b84df3e2cfb13a39efab8cf925498641",
+          "pinned_beta_sha": "f3ebffa2b84df3e2cfb13a39efab8cf925498641",
+          "upstream_stable_159_sha": "f3ebffa2b84df3e2cfb13a39efab8cf925498641",
+          "vulpra_sha": "f3ebffa2b84df3e2cfb13a39efab8cf925498641",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "netwerk/cache2/CacheFile.cpp",
+          "upstream_fix_commit_result_sha": "018017bf8537444b7e56b598b6cb777c4963a4ff",
+          "pinned_beta_sha": "018017bf8537444b7e56b598b6cb777c4963a4ff",
+          "upstream_stable_159_sha": "018017bf8537444b7e56b598b6cb777c4963a4ff",
+          "vulpra_sha": "018017bf8537444b7e56b598b6cb777c4963a4ff",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "netwerk/cache2/CacheFileChunk.cpp",
+          "upstream_fix_commit_result_sha": "0ef21c4a8a7bc527d48a2c901c43099586e3e8ba",
+          "pinned_beta_sha": "0ef21c4a8a7bc527d48a2c901c43099586e3e8ba",
+          "upstream_stable_159_sha": "0ef21c4a8a7bc527d48a2c901c43099586e3e8ba",
+          "vulpra_sha": "0ef21c4a8a7bc527d48a2c901c43099586e3e8ba",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "netwerk/cache2/CacheFileInputStream.h",
+          "upstream_fix_commit_result_sha": "0d77f8eb55b83bcb37c8adc40728c3a4acac38c1",
+          "pinned_beta_sha": "0d77f8eb55b83bcb37c8adc40728c3a4acac38c1",
+          "upstream_stable_159_sha": "0d77f8eb55b83bcb37c8adc40728c3a4acac38c1",
+          "vulpra_sha": "0d77f8eb55b83bcb37c8adc40728c3a4acac38c1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/test/gtest/TestScriptCompression.cpp",
+          "upstream_fix_commit_result_sha": "9e760c34ffdc9f0fcc475cea2b13c0a02b2f79d2",
+          "pinned_beta_sha": "9e760c34ffdc9f0fcc475cea2b13c0a02b2f79d2",
+          "upstream_stable_159_sha": "9e760c34ffdc9f0fcc475cea2b13c0a02b2f79d2",
+          "vulpra_sha": "9e760c34ffdc9f0fcc475cea2b13c0a02b2f79d2",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/test/gtest/moz.build",
+          "upstream_fix_commit_result_sha": "aaf31169b44149bd6042cea4eb2e08c87c1378e7",
+          "pinned_beta_sha": "aaf31169b44149bd6042cea4eb2e08c87c1378e7",
+          "upstream_stable_159_sha": "aaf31169b44149bd6042cea4eb2e08c87c1378e7",
+          "vulpra_sha": "aaf31169b44149bd6042cea4eb2e08c87c1378e7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "netwerk/test/unit/test_alt-data_failed_write.js",
+          "upstream_fix_commit_result_sha": "7fbb2f1239127c6f2a938f3fa5ce0a97442e221b",
+          "pinned_beta_sha": "7fbb2f1239127c6f2a938f3fa5ce0a97442e221b",
+          "upstream_stable_159_sha": "7fbb2f1239127c6f2a938f3fa5ce0a97442e221b",
+          "vulpra_sha": "7fbb2f1239127c6f2a938f3fa5ce0a97442e221b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "netwerk/test/unit/xpcshell.toml",
+          "upstream_fix_commit_result_sha": "48945498a26e358e056aea64f1aea0cbcd2a308f",
+          "pinned_beta_sha": "cf3edc4594fc96cbc543f757888b2093a981d029",
+          "upstream_stable_159_sha": "cf3edc4594fc96cbc543f757888b2093a981d029",
+          "vulpra_sha": "cf3edc4594fc96cbc543f757888b2093a981d029",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "int ret = inflate(&zstream, Z_FINISH);",
+        "ret == Z_STREAM_END && zstream.avail_in == 0 && zstream.avail_out == 0",
+        "ReleaseOutsideLock(RefPtr<nsIInputStream>(input));",
+        "input->CloseWithStatusLocked(mStatus);"
+      ],
+      "note": "Verified all eight code/test path blobs in original Bug 2082139 upstream fix commits, pinned Firefox 159 beta, stable, and Vulpra. The test registry xpcshell.toml has later revisions; other seven match the selected source postimages. Upstream transiently reverted the patch due xpcshell failures, but selected final beta/stable Vulpra code includes complete compressed-bytecode validation and propagates failed alt-data writes to existing readers, confirmed through source inspection. No xpcshell/gtests were executed during this source audit, and this is not evidence of runtime exploit resistance."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118013",
+      "bug": 2082040,
+      "topic": "Layout subdocument frame embedded BrowsingContext update during script execution reentrancy",
+      "patch_commit": "b48bed5acc18ec2ffcf01e0cab60c58bfe890dd8",
+      "classification": "exact_upstream_patch_result_matches_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "layout/generic/nsSubDocumentFrame.cpp",
+          "upstream_fix_commit_result_sha": "59e06e56ff9c952327e161569595c7f522e79c61",
+          "pinned_beta_sha": "59e06e56ff9c952327e161569595c7f522e79c61",
+          "upstream_stable_159_sha": "59e06e56ff9c952327e161569595c7f522e79c61",
+          "vulpra_sha": "59e06e56ff9c952327e161569595c7f522e79c61",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "MOZ_ASSERT(!nsContentUtils::IsSafeToRunScript());",
+        "nsAutoScriptBlocker sb;",
+        "UpdateEmbeddedBrowsingContextDependentData();"
+      ],
+      "note": "Bug 2082040 one changed file is exact postimage SHA and byte-identical across original Firefox 159 beta, stable, and Vulpra. Inspected ShowViewer uses AutoWeakFrame checks around potentially reentrant operations then nsAutoScriptBlocker before updating embedded browsing context; function asserts script is blocked. No live iframe reentrancy exploit or ASAN test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118016",
+      "bug": 2082086,
+      "topic": "DOM radio group container refcounted ownership and cycle-collector teardown lifetime",
+      "patch_commit": "feb58931ff875fcc070689a75c874a0764cc2f12",
+      "classification": "eight_radio_group_ownership_paths_beta_stable_vulpra_equal_six_exact_patch_postimages",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/Document.cpp",
+          "upstream_fix_commit_result_sha": "3a3c149ffaecb93c44fda38425fa10de5b0c247a",
+          "pinned_beta_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "upstream_stable_159_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "vulpra_sha": "24fc4978206ae6eba18971f243d680a8b8802e65",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/base/Document.h",
+          "upstream_fix_commit_result_sha": "48350023b8036ab7522145b60f940248fcc61ebb",
+          "pinned_beta_sha": "8d5870ae7c2d09a637e5230780a8cd62fece1e2e",
+          "upstream_stable_159_sha": "8d5870ae7c2d09a637e5230780a8cd62fece1e2e",
+          "vulpra_sha": "8d5870ae7c2d09a637e5230780a8cd62fece1e2e",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/base/FragmentOrElement.cpp",
+          "upstream_fix_commit_result_sha": "35f2ff466715c0ca1416f5b3df91e88e78c87257",
+          "pinned_beta_sha": "35f2ff466715c0ca1416f5b3df91e88e78c87257",
+          "upstream_stable_159_sha": "35f2ff466715c0ca1416f5b3df91e88e78c87257",
+          "vulpra_sha": "35f2ff466715c0ca1416f5b3df91e88e78c87257",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/FragmentOrElement.h",
+          "upstream_fix_commit_result_sha": "3ceaf4a237f296173b639c53d1f707f9b1e3dc06",
+          "pinned_beta_sha": "3ceaf4a237f296173b639c53d1f707f9b1e3dc06",
+          "upstream_stable_159_sha": "3ceaf4a237f296173b639c53d1f707f9b1e3dc06",
+          "vulpra_sha": "3ceaf4a237f296173b639c53d1f707f9b1e3dc06",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/RadioGroupContainer.cpp",
+          "upstream_fix_commit_result_sha": "c208c6aa5caa6a9b5c998cef1fc55ceafcad0e86",
+          "pinned_beta_sha": "c208c6aa5caa6a9b5c998cef1fc55ceafcad0e86",
+          "upstream_stable_159_sha": "c208c6aa5caa6a9b5c998cef1fc55ceafcad0e86",
+          "vulpra_sha": "c208c6aa5caa6a9b5c998cef1fc55ceafcad0e86",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/RadioGroupContainer.h",
+          "upstream_fix_commit_result_sha": "4be15f8f97d7f541843ffe9bfe9e637046484a6b",
+          "pinned_beta_sha": "4be15f8f97d7f541843ffe9bfe9e637046484a6b",
+          "upstream_stable_159_sha": "4be15f8f97d7f541843ffe9bfe9e637046484a6b",
+          "vulpra_sha": "4be15f8f97d7f541843ffe9bfe9e637046484a6b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/html/HTMLInputElement.cpp",
+          "upstream_fix_commit_result_sha": "4ee43d29d8c08c8d52eb06d27751234a378dac78",
+          "pinned_beta_sha": "b5b4573e81ab313175680f97c1f309d54e34e40b",
+          "upstream_stable_159_sha": "b5b4573e81ab313175680f97c1f309d54e34e40b",
+          "vulpra_sha": "b5b4573e81ab313175680f97c1f309d54e34e40b",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/html/HTMLInputElement.h",
+          "upstream_fix_commit_result_sha": "3827cffbd6ac476c5227b949d248f018e321a45a",
+          "pinned_beta_sha": "3827cffbd6ac476c5227b949d248f018e321a45a",
+          "upstream_stable_159_sha": "3827cffbd6ac476c5227b949d248f018e321a45a",
+          "vulpra_sha": "3827cffbd6ac476c5227b949d248f018e321a45a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "NS_INLINE_DECL_CYCLE_COLLECTING_NATIVE_REFCOUNTING(RadioGroupContainer)",
+        "NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(RadioGroupContainer)",
+        "RefPtr<RadioGroupContainer> mRadioGroupContainer;",
+        "button->DisconnectRadioGroupContainer();"
+      ],
+      "note": "All eight upstream Bug 2082086 touched paths have exact beta/stable/Vulpra SHA equality. Six match patch postimage exactly; Document.cpp/.h and HTMLInputElement.cpp were revised later and differ from selected upstream snapshot but retain refcounted RadioGroupContainer ownership, cycle-collection traverse/unlink and radio-button disconnect on container unlink (direct source inspected). No actual radio selection/GC reentrant runtime or sanitizer test."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
