@@ -39,3 +39,53 @@ The categories are **blockers**, not four newly passed acceptance gates. A compl
 This analysis ran as a read-only, source-pinned GitHub Actions crosswalk. It did **not** recompile or execute the original browser, touch installed Firefox or user profiles, delete any new source, change feature preferences, or save new native package bytes. Previously accepted non-Linux source-only pruning remains a separate historic result and must never be mistaken for changes in this iteration.
 
 **Vulpra overall 61%, M3 debloating 5/6 (83%), session Δ +0 percentage points. Sixth M3 gate remains OPEN.** The machine-readable register has every original ELF row and all four explicit blockers so future steps can be selected and audited without re-deriving or overstating the existing evidence.
+
+
+## Original/current compiled-source Rust/C++ FFI anchors — verified 2026-11-06 UTC
+
+A new source-level parity register,
+[M3-CURRENT-RUST-CXX-FFI-SOURCE-ANCHORS-20261106.json](M3-CURRENT-RUST-CXX-FFI-SOURCE-ANCHORS-20261106.json),
+binds **11 exact original/current source/build files** to their Git blobs,
+including XPCOM startup, gkrust staticlib, crashhelper C++ entrypoint,
+Rust crash-helper export, Cargo declarations, native moz.build ownership and
+generated cbindgen header declarations. The pinned original compiled source is
+`b1482404dfb8b01342990ee99ea3df0f9756b5f7`; the successful current
+compiled source is `96454f7a1fbe6b505af440c6c2c5fc91e798756d`,
+from [native CI 41762298450](https://github.com/sguzman/vulpra/actions/runs/41762298450).
+They are **distinct source revisions** even though these **eleven selected
+files** retain identical Git blob IDs in both revisions and current `main`.
+
+[**Source crosswalk CI 42259038308 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42259038308),
+at [verifier commit `7b12ffe`](https://github.com/sguzman/vulpra/commit/7b12ffe5d9dfb2131b736a27ccb072f5f292460b),
+independently authenticated **11/11 HEAD tracked Git objects**, **22/22
+GitHub Contents API objects** at the exact historic original and compiled
+current commits, and the successful run's exact workflow ID, head SHA, origin,
+main branch and event. It rejected **25/25** deliberately falsified
+source hashes/paths, FFI declarations, workflow identities and claimed M3
+completion. It then compiled and executed the pre-existing std-only Rust
+`ci/m3-static-rust-cpp-ffi-source-witness.rs` observer against these
+source-identical inputs; its **2/2 unit tests passed**, and its bounded
+source-structure report verified **three named Rust/C++ FFI exports** from
+**two Rust staticlib roots**: `GkRust_Init`, `GkRust_Shutdown` in
+`libgkrust.a` for `libxul.so`, and
+`crash_generator_logic_desktop` from `libcrash_helper_server.a` for
+`crashhelper`. These are **source declarations/call-site anchors**, not
+newly authenticated machine branches in the compiled current ELF.
+
+The first CI [42258667046](https://github.com/sguzman/vulpra/actions/runs/42258667046)
+correctly failed: under a negated Bash function call, an earlier falsified
+hash assertion was masked by the function's final successful row-count test.
+[Correction `4d97b95`](https://github.com/sguzman/vulpra/commit/4d97b95eefd06b08938bf2ffd8b64ef0437057a3)
+explicitly propagates every jq assertion failure. [Final CI 42259038308](https://github.com/sguzman/vulpra/actions/runs/42259038308)
+passed all source, live GitHub and native-run identity checks. [Workflow
+lint 42258667042](https://github.com/sguzman/vulpra/actions/runs/42258667042)
+passed when the new workflow was introduced.
+
+**Unresolved gate:** no new browser build was performed, no complete Cargo
+archive-member or symbol-to-source linker map of the current native binary
+was generated, indirect and conditional C++/Rust FFI and dlopen branches
+are not fully enumerated, protected feature fallback behavior is not
+complete, and no actual target EndeavourOS/Hyprland workstation acceptance
+was performed. The three selected interfaces and eleven source paths cannot
+justify removal of any additional source or compiled native binary. Product
+M3 remains **83% (5/6 gates)**, overall **61%, delta +0 pp**.
