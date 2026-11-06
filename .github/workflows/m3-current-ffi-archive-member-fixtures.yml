@@ -1,0 +1,50 @@
+name: M3 Current Rust Archive Member GNU NM Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-current-ffi-archive-members.rs
+      - .github/workflows/m3-current-ffi-archive-member-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-real-native-fixture:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only bounded Rust native observer
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-current-ffi-archive-members.rs
+      - name: Compile and execute real GNU ar, nm, compiler and ELF fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v rustc
+          command -v ar
+          command -v nm
+          command -v cc
+          command -v sha256sum
+          rustc --edition=2021 -D warnings --test \
+            ci/m3-current-ffi-archive-members.rs \
+            -o "$RUNNER_TEMP/m3-ffi-archive-tests"
+          "$RUNNER_TEMP/m3-ffi-archive-tests" --nocapture
+          rustc --edition=2021 -D warnings -O \
+            ci/m3-current-ffi-archive-members.rs \
+            -o "$RUNNER_TEMP/m3-current-ffi-archive-members"
+          if "$RUNNER_TEMP/m3-current-ffi-archive-members" \
+            0123456789abcdef0123456789abcdef01234567 \
+            /missing/gkrust.a /missing/libxul.so "$RUNNER_TEMP/forged.json"; then
+            echo "FAIL: accepted missing compiled native input" >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/forged.json"
+          echo "PASS: real compiled ELF/archive member test, wrong-definition and missing-file negative tests"
