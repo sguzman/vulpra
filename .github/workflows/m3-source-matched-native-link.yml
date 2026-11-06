@@ -99,6 +99,12 @@ jobs:
           rustc --edition=2021 -O ci/m3-current-compiled-loader-api-census.rs \
             -o "$RUNNER_TEMP/m3-current-loader-census"
           echo "PASS: current native loader observer compiled and tests executed"
+          rustc --edition=2021 -D warnings --test ci/m3-current-ffi-archive-members.rs \
+            -o "$RUNNER_TEMP/m3-current-ffi-archive-members-tests"
+          "$RUNNER_TEMP/m3-current-ffi-archive-members-tests"
+          rustc --edition=2021 -D warnings -O ci/m3-current-ffi-archive-members.rs \
+            -o "$RUNNER_TEMP/m3-current-ffi-archive-members"
+          echo "PASS: compiled native Rust archive-member inspector with real GNU nm/ar test fixtures"
 
       - name: Record exact-source generated configure substitutions
         shell: bash
@@ -310,6 +316,59 @@ jobs:
               .m3_sixth_gate_closed == false
             ' "$RUNNER_TEMP/m3-current-native-loader-callsite.json" >/dev/null
           echo "PASS: current linked native loader branches tied to source and unstripped libxul ELF; no full dlopen closure"
+
+      - name: Inspect real current compiled Rust archive members and ELF definitions
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          obj="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline"
+          # From an actual prior source-matched successful compiler log:
+          # toolkit/library/rust/libgkrust.a, not wildcard Cargo outputs.
+          rust_archive="$obj/toolkit/library/rust/libgkrust.a"
+          libxul="$obj/dist/bin/libxul.so"
+          test -s "$rust_archive" && test -s "$libxul"
+          "$RUNNER_TEMP/m3-current-ffi-archive-members" \
+            "$GITHUB_SHA" "$rust_archive" "$libxul" \
+            "$RUNNER_TEMP/m3-current-ffi-archive-members.json"
+          jq -e \
+            --arg sha "$GITHUB_SHA" \
+            --arg elf "$(jq -r '.built_libxul_sha256' "$RUNNER_TEMP/m3-native-link-inputs.json")" \
+            '
+            .schema_version == 1 and
+            .status == "bounded_real_compiled_gkrust_archive_member_and_libxul_definitions" and
+            .source_commit == $sha and
+            .rust_staticlib == "libgkrust.a" and
+            .consumer_elf == "libxul.so" and
+            .libxul_unstripped_sha256 == $elf and
+            (.rust_archive_bytes > 64) and
+            (.rust_archive_members > 0) and
+            .named_ffi_symbol_pairs == 2 and
+            ([.symbol_members[].symbol] | sort) == ["GkRust_Init","GkRust_Shutdown"] and
+            all(.symbol_members[];
+              (.archive_member | type) == "string" and
+              (.archive_member | length) > 0 and
+              .archive_definition_count == 1 and .consumer_definition_count == 1) and
+            .compiled_current_rust_archive_member_definitions_observed == true and
+            .compiled_current_elf_named_definitions_observed == true and
+            .complete_member_to_linker_selection_graph_proven == false and
+            .complete_rust_cpp_ffi_graph_proven == false and
+            .dynamic_or_indirect_ffi_closure_proven == false and
+            .additional_source_pruning_authorized == false and
+            .m3_sixth_gate_closed == false
+            ' "$RUNNER_TEMP/m3-current-ffi-archive-members.json" >/dev/null
+          echo "PASS: two gkrust symbols verified in actual current native archive and linked libxul"
+          echo "LIMIT: archive/ELF definitions only; no full FFI closure or source pruning"
+
+      - name: Preserve bounded source-pinned current native FFI archive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-current-native-rust-ffi-archive-evidence
+          path: ${{ runner.temp }}/m3-current-ffi-archive-members.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Preserve bounded current-source native loader callsite evidence
         if: always()
