@@ -89,3 +89,65 @@ complete, and no actual target EndeavourOS/Hyprland workstation acceptance
 was performed. The three selected interfaces and eleven source paths cannot
 justify removal of any additional source or compiled native binary. Product
 M3 remains **83% (5/6 gates)**, overall **61%, delta +0 pp**.
+
+
+## In-flight exact-current compiled gkrust archive/member proof — 2026-11-06 UTC
+
+The preceding 11-path source-object parity establishes where three
+Rust/C++ interfaces are declared, but **does not** identify which actual
+current `libgkrust.a` archive members define them or verify the current
+linked ELF. Previous successful exact-current full-native artifact
+[41762298450](https://github.com/sguzman/vulpra/actions/runs/41762298450)
+contains a SHA-256-linked unstripped `libxul.so` hash and 2,435 compiled
+response-file object references, **but no raw Rust archive-member map**.
+Reusing that small JSON artifact cannot produce missing member evidence.
+
+A new std-only Rust observer
+[`ci/m3-current-ffi-archive-members.rs`](../../ci/m3-current-ffi-archive-members.rs)
+parses actual GNU `ar t` and streaming `nm` output, rejects missing or
+duplicate text definitions, and emits only bounded `GkRust_Init` and
+`GkRust_Shutdown` archive member names plus archive/unstripped ELF
+SHA-256 identities. It explicitly prohibits any full linker/FFI map or
+pruning claims. Real native ELF/archive fixture
+[**CI 42263703373 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42263703373)
+compiled and ran the observer, including 2/2 tests with a real C
+compiler, GNU `ar`/`nm`, and invalid/missing symbol/ELF cases;
+[workflow lint 42263703349 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/42263703349).
+This is **fixture acceptance only**, not actual Vulpra archive proof.
+
+[Commit `83785b2`](https://github.com/sguzman/vulpra/commit/83785b264f232ea7c777abd0a0dd8511ef322ecc)
+adds the observer after the preserved actual native build/packaging,
+graphical Wayland/JS/WebExtension/Nimbus and existing current loader census
+steps. It reads the exact build-generated
+`obj-vulpra-linux-m3-baseline/toolkit/library/rust/libgkrust.a`, whose
+relative path appears in the earlier full-native compiler log, and joins
+its result to the already recorded, genuine linked `libxul.so` SHA-256.
+It uploads a separate bounded report with no full binaries or raw symbols.
+[**Source-matched full-native CI 42264023349**](https://github.com/sguzman/vulpra/actions/runs/42264023349)
+was **in progress at this checkpoint**, with **no real compiled
+current gkrust member report accepted yet**. There is no manual workstation
+action, new omission, user-profile manipulation, release or additional
+full build solely for compiler-existence proof.
+
+A separate [read-only jq evidence
+join](../../ci/m3-current-ffi-native-evidence.jq) now requires the
+native run's exact source SHA/ID, real packaged/runtime pass, original
+unstripped `libxul` hash, and the real FFI archive-member report to
+agree. Its [**synthetic fixture CI 42264329875 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42264329875)
+rejected **30/30** fabricated source/hash/member/FFI/runtime/pruning
+records. Existing [native reconciliation workflow](../../.github/workflows/m3-native-link-evidence-reconcile.yml)
+was extended in [`6c06472`](https://github.com/sguzman/vulpra/commit/6c06472e35719d596ac4a2cfc21a249783729a86)
+to fetch the exact successful native run's separate FFI artifact and
+reject missing or inconsistent evidence; independent lightweight
+[**CI 42264455607 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42264455607)
+and [**workflow lint 42264455613 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42264455613)
+validated the contract. These green checks are **not** the pending
+actual current-native compilation or FFI artifact acceptance.
+
+This is deliberately a **two-symbol archive-definition census**, not
+a complete linker selection/member-to-source graph, not
+`crash_generator_logic_desktop` current native linkage, not all
+conditional or indirect FFI/`dlopen` routes, and not actual
+EndeavourOS/Hyprland hardware acceptance. The final M3 feature/build/
+binary dependency gate remains **OPEN**; **M3 83% (5/6), overall 61%,
+delta +0 pp**. No new source deletion or compiled-package savings.
