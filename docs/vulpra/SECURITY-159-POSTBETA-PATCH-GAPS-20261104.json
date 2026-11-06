@@ -4229,6 +4229,171 @@
         "RefPtr<CustomElementDefinition> customElementDefinition;"
       ],
       "note": "Both Bug 2082030 changed paths match pinned beta, 159 stable, and Vulpra exactly but differ in full-file SHA from selected upstream commit after later edits. Inspected strong RefPtr custom element definition in both XML and HTML new-element paths. No XML/HTML custom-element constructor reentry or sanitizer test performed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117941",
+      "bug": 2082044,
+      "topic": "DOM CSS Object Model inline-style cycle collector skip and untraced JS wrapper lifetime",
+      "patch_commit": "4e3929ab47c84e2acc4387bd4c8c7cda5113d6cb",
+      "classification": "three_code_and_mochitest_paths_identical_beta_stable_vulpra_two_exact_patch_postimages",
+      "source_file_blobs": [
+        {
+          "path": "layout/style/nsDOMCSSAttrDeclaration.cpp",
+          "upstream_fix_commit_result_sha": "28aa1056bbef4280045cb64aa2d30e5e7690bfbf",
+          "pinned_beta_sha": "28aa1056bbef4280045cb64aa2d30e5e7690bfbf",
+          "upstream_stable_159_sha": "28aa1056bbef4280045cb64aa2d30e5e7690bfbf",
+          "vulpra_sha": "28aa1056bbef4280045cb64aa2d30e5e7690bfbf",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/style/test/mochitest.toml",
+          "upstream_fix_commit_result_sha": "127d017770b127dc03a5dc8a9b416e3ce02c9241",
+          "pinned_beta_sha": "8395596aa50897f99fa346a258d2d7f28d968046",
+          "upstream_stable_159_sha": "8395596aa50897f99fa346a258d2d7f28d968046",
+          "vulpra_sha": "8395596aa50897f99fa346a258d2d7f28d968046",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/style/test/test_inline_style_cc.html",
+          "upstream_fix_commit_result_sha": "b48d1c3cc89cb2b4c9340da511ff64ef7ba3e089",
+          "pinned_beta_sha": "b48d1c3cc89cb2b4c9340da511ff64ef7ba3e089",
+          "upstream_stable_159_sha": "b48d1c3cc89cb2b4c9340da511ff64ef7ba3e089",
+          "vulpra_sha": "b48d1c3cc89cb2b4c9340da511ff64ef7ba3e089",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "tmp->HasNothingToTrace(tmp)"
+      ],
+      "note": "Both original code and HTML regression source blobs match selected upstream patch postimages and beta/stable/Vulpra. Mochitest registry changed further from patch commit but is identical in all three compared targets and includes test_inline_style_cc.html. Inspected cycle collector skip guard requiring no JS data to trace before eligible skip. No live CC/reftest or ASAN safety validation."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118014",
+      "bug": 2082051,
+      "topic": "JavaScript Ion JIT generic fun_call realm lifetime and proxy argument allocation",
+      "patch_commit": "c95c2b35c94200715690276dd17c2ff868da7947",
+      "classification": "two_code_and_jit_regression_paths_identical_beta_stable_vulpra_one_exact_patch_postimage",
+      "source_file_blobs": [
+        {
+          "path": "js/src/jit-test/tests/ion/call-generic-fun-call-realm.js",
+          "upstream_fix_commit_result_sha": "328e2bf6c9ac7984d2e0a60233bf4f0b109f074c",
+          "pinned_beta_sha": "328e2bf6c9ac7984d2e0a60233bf4f0b109f074c",
+          "upstream_stable_159_sha": "328e2bf6c9ac7984d2e0a60233bf4f0b109f074c",
+          "vulpra_sha": "328e2bf6c9ac7984d2e0a60233bf4f0b109f074c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/CodeGenerator.cpp",
+          "upstream_fix_commit_result_sha": "c5cb23c93b8d3ef44a575d7dc0e915825fb0902f",
+          "pinned_beta_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "upstream_stable_159_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "vulpra_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "masm.guardObjectHasSameRealm(calleeReg, scratch, vmCall);"
+      ],
+      "note": "Both original commit changed paths are beta/stable/Vulpra byte-identical; the regression JS is exact selected patch postimage. The JIT code differs from postimage due subsequent edits but retains same-realm guard before optimizing fun_call and switches callee realm just before native/JIT invocation. JIT shell regression source exists but was not executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117943",
+      "bug": 2082061,
+      "topic": "ImageDocument and MediaDocument stream OnStartRequest reentrant document lifetime",
+      "patch_commit": "b3d830a931b8b192bf0446490f6131c001b78a16",
+      "classification": "both_exact_upstream_patch_postimage_blobs_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/html/ImageDocument.cpp",
+          "upstream_fix_commit_result_sha": "46adb9af10bda8d215e4cb3c7bf4789d55e30e3e",
+          "pinned_beta_sha": "46adb9af10bda8d215e4cb3c7bf4789d55e30e3e",
+          "upstream_stable_159_sha": "46adb9af10bda8d215e4cb3c7bf4789d55e30e3e",
+          "vulpra_sha": "46adb9af10bda8d215e4cb3c7bf4789d55e30e3e",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/html/MediaDocument.cpp",
+          "upstream_fix_commit_result_sha": "5e29d6863e61ea983c406b0b465accfe6bb9ec51",
+          "pinned_beta_sha": "5e29d6863e61ea983c406b0b465accfe6bb9ec51",
+          "upstream_stable_159_sha": "5e29d6863e61ea983c406b0b465accfe6bb9ec51",
+          "vulpra_sha": "5e29d6863e61ea983c406b0b465accfe6bb9ec51",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<ImageDocument> imgDoc = static_cast<ImageDocument*>(mDocument.get());",
+        "RefPtr<MediaDocument> document = mDocument;"
+      ],
+      "note": "All two code paths byte-identical between the original upstream patch, pinned Firefox beta, stable, and Vulpra. Inspected strong local document refs held across request start callbacks. No live network reentry, stream-lifetime regression or memory sanitizer execution."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117944",
+      "bug": 2082064,
+      "topic": "Layout native anonymous file-input middle-cropping text node lifetime on content notification",
+      "patch_commits": [
+        "00484f32e8fb26b561e470d6bc73b4c396b4ebcf",
+        "11474824a0a743422b73733236048b9404ce3827"
+      ],
+      "classification": "both_code_and_original_web_platform_crashtest_exact_upstream_final_patch_postimages_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "layout/generic/MiddleCroppingBlockFrame.cpp",
+          "upstream_fix_commit_result_sha": "f48bc82c9e99c55c570a0c2c9a6619cbf7e1a642",
+          "pinned_beta_sha": "f48bc82c9e99c55c570a0c2c9a6619cbf7e1a642",
+          "upstream_stable_159_sha": "f48bc82c9e99c55c570a0c2c9a6619cbf7e1a642",
+          "vulpra_sha": "f48bc82c9e99c55c570a0c2c9a6619cbf7e1a642",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/html/rendering/widgets/file-type-label-update-crash.https.html",
+          "upstream_fix_commit_result_sha": "a9322156bd96dc5ce70ca091524d176fed312e62",
+          "pinned_beta_sha": "a9322156bd96dc5ce70ca091524d176fed312e62",
+          "upstream_stable_159_sha": "a9322156bd96dc5ce70ca091524d176fed312e62",
+          "vulpra_sha": "a9322156bd96dc5ce70ca091524d176fed312e62",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "mCropped = aIsCropped;",
+        "RefPtr text = mTextNode;"
+      ],
+      "note": "Layout C++ patch and separately corrected original WPT crashtest are byte-identical at selected post-fix objects and all three checked release source trees. Inspected mCropped assignment before reentrant SetText notification and strong local text-node reference. Original WPT crashtest is present but not executed, especially not with ASAN."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118015",
+      "bug": 2082072,
+      "topic": "DOM window.screen WebIDL SameObject wrapper lifetime during replaceable property changes",
+      "patch_commit": "cf96653694e300ac808e392d39111bb927227075",
+      "classification": "one_exact_upstream_webidl_patch_postimage_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/webidl/Window.webidl",
+          "upstream_fix_commit_result_sha": "36207ca9965b2e5ce7ee74776f84d43a08cbb6d9",
+          "pinned_beta_sha": "36207ca9965b2e5ce7ee74776f84d43a08cbb6d9",
+          "upstream_stable_159_sha": "36207ca9965b2e5ce7ee74776f84d43a08cbb6d9",
+          "vulpra_sha": "36207ca9965b2e5ce7ee74776f84d43a08cbb6d9",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "[Replaceable] readonly attribute Screen screen;"
+      ],
+      "note": "Upstream Bug 2082072 changes exactly one WebIDL file; its post-fix SHA is identical in pinned Firefox 159.0b5, Firefox 159.0, and Vulpra. Inspected removal of SameObject from replaceable window.screen getter attribute. No generated binding code provenance beyond source nor runtime reentry regression was executed."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
