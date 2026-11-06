@@ -31,6 +31,7 @@ on:
       - 'security/**'
       - 'testing/**'
       - 'toolkit/**'
+      - 'xpcom/**'
       - .github/workflows/security-159-hotfix-evidence-reconcile.yml
   workflow_run:
     workflows:
