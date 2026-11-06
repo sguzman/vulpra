@@ -291,198 +291,29 @@ jobs:
           echo "PASS: independent API verification of 17 upstream patched code blobs, original regression fixture and immutable port manifest"
 
       - name: Independently authenticate extra Mozilla fixtures and browser regression driver
-        # A successful build and a self-reported blob hash are not enough:
-        # pin the actual branch files to default-branch reviewed Git objects.
-        # Historical push checks reconcile a pre-extra-fixture run and must
-        # not claim that its browser executed these new regressions.
+        # Pin actual security-branch Git blobs, not just self-reported replay hashes.
+        # Historical push checks use a pre-extra-fixture native run.
         if: github.event_name == 'workflow_run'
         shell: bash
         run: |
           set -euo pipefail
           count=0
-          while IFS=        shell: bash
-        run: |
-          set -euo pipefail
-          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name security-159-source-matched-native-link-evidence \
-            --dir "$RUNNER_TEMP/native-evidence"
-      - name: Reconcile all source, binary, SHA and real runtime evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import os,subprocess,sys
-          root=Path(os.environ["RUNNER_TEMP"])/"native-evidence"
-          names={
-            "config":"m3-native-link-config.json",
-            "link":"m3-native-link-inputs.json",
-            "elf":"m3-native-link-elf-package-graph.json",
-            "localhost":"m3-localhost-acceptance.json",
-            "webextension":"webextension-smoke-*.json",
-            "sidecar":"vulpra-local-m3-native-link-ci.tar.xz.sha256",
-          }
-          args=[]
-          for k,pattern in names.items():
-              matches=list(root.rglob(pattern))
-              if len(matches)!=1:
-                  raise SystemExit("FAIL: expected one "+k+" record; found "+str(len(matches)))
-              args += ["--"+k,str(matches[0])]
-          args += ["--source-sha",os.environ["NATIVE_SOURCE_SHA"],
-                   "--run-id",os.environ["NATIVE_RUN_ID"],
-                   "--output",str(Path(os.environ["RUNNER_TEMP"])/"security-159-native-link-reconciled.json")]
-          subprocess.run([sys.executable,"ci/m3-native-link-evidence-ledger.py",*args],check=True)
-          PY
-          jq -e \
-            --arg sha "$NATIVE_SOURCE_SHA" \
-            --argjson run "$NATIVE_RUN_ID" \
-            '.source_commit==$sha and .workflow_run_id==$run and
-             .status=="passed_full_native_evidence_reconciliation" and
-             .GTK_before_Wayland == true and
-             .Wayland_JS_WebExtension_Nimbus_passed == true and
-             .complete_resolved_linker_symbol_map == false and
-             .lean_full_source_matched_pair_done == false and
-             .compiled_package_savings_bytes == null and
-             .additional_source_removal_authorized == false' \
-            "$RUNNER_TEMP/security-159-native-link-reconciled.json" >/dev/null
-      - name: Independently reconcile current packaged browser TLS certificate rejection
-        shell: bash
-        run: |
-          set -euo pipefail
-          # This runs ONLY after separately checking the completed successful
-          # native Actions workflow and its exact head SHA. Do not reuse a
-          # synthetic fixture or downgrade missing TLS output to a skip.
-          evidence="$RUNNER_TEMP/native-evidence"
-          mapfile -t links < <(find "$evidence" -type f -name m3-native-link-inputs.json -print)
-          mapfile -t local < <(find "$evidence" -type f -name m3-localhost-acceptance.json -print)
-          mapfile -t webext < <(find "$evidence" -type f -name 'webextension-smoke-*.json' -print)
-          test "${#links[@]}" -eq 1
-          test "${#local[@]}" -eq 1
-          test "${#webext[@]}" -eq 1
-          jq -n \
-            --slurpfile link "${links[0]}" \
-            --slurpfile local "${local[0]}" \
-            --slurpfile webextension "${webext[0]}" \
-            --arg source_sha "$NATIVE_SOURCE_SHA" \
-            --argjson run_id "$NATIVE_RUN_ID" \
-            -f ci/m3-current-local-tls-native-evidence.jq \
-            > "$RUNNER_TEMP/security-159-local-tls-reconciled.json"
-          jq -e \
-            --arg sha "$NATIVE_SOURCE_SHA" \
-            --argjson run "$NATIVE_RUN_ID" \
-            '
-              .schema_version == 1 and
-              .status == "bounded_current_native_local_certificate_rejection_crosscheck" and
-              .authenticated_source_sha == $sha and
-              .authenticated_workflow_run_id == $run and
-              .verified_current_native_loopback_self_signed_tls_denial == true and
-              .webdriver_insecure_cert_overrides_enabled == false and
-              .certificate_store_modified == false and
-              .safe_browsing_proven == false and
-              .sandbox_process_denial_proven == false and
-              .no_background_network_egress_proven == false and
-              .all_conditional_ffi_dlopen_proven == false and
-              .target_endeavouros_hyprland_tested == false and
-              .m3_sixth_gate_closed == false and
-              .additional_source_pruning_authorized == false and
-              .marginal_native_savings_bytes == null
-            ' "$RUNNER_TEMP/security-159-local-tls-reconciled.json" >/dev/null
-          echo "PASS: independent source-linked current native package and W3C certificate rejection crosscheck"
-
-      - name: Independently verify original Mozilla CSS crashtest browser evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Known security build before CSS replay was added. No CSS credit.
-          if test "$NATIVE_SOURCE_SHA" = 6e38e78724365b3dd6c02f4d0b0570028a5d2112; then
-            echo "::notice::Historical security build predates original CSS crashtest: not verified"
-            jq -n --arg source "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID"               '{schema_version:1,status:"not_executed_before_css_replay_integration",
-                source_commit:$source,native_run_id:$run,
-                three_real_packaged_replays_verified:false,
-                full_wpt_harness_executed:false,
-                exploit_rejection_proven:false,release_ready:false,
-                m3_sixth_gate_closed:false}'               > "$RUNNER_TEMP/security-159-css-reconciled.json"
-            exit 0
-          fi
-          evidence="$RUNNER_TEMP/native-evidence"
-          css="$(find "$evidence" -type f -name security-159-css-crashtest-replay.json -print -quit)"
-          native="$(find "$evidence" -type f -name m3-native-link-inputs.json -print -quit)"
-          test -n "$css" && test -n "$native"
-          test "$(find "$evidence" -type f -name security-159-css-crashtest-replay.json | wc -l)" -eq 1
-          test "$(find "$evidence" -type f -name m3-native-link-inputs.json | wc -l)" -eq 1
-          jq -n \
-            --slurpfile replay "$css" --slurpfile native "$native" \
-            --arg source "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" \
-            -f ci/security-159-css-evidence.jq \
-            > "$RUNNER_TEMP/security-159-css-reconciled.json"
-          jq -e --arg sha "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
-            .source_commit == $sha and .native_run_id == $run and
-            .three_real_packaged_replays_verified == true and
-            .exploit_rejection_proven == false and .release_ready == false and
-            .m3_sixth_gate_closed == false
-          ' "$RUNNER_TEMP/security-159-css-reconciled.json" >/dev/null
-          echo "PASS: independent source-linked real packaged CSS crashtest; not WPT/ASAN or release acceptance"
-
-      - name: Independently reconcile original SVG, table and multicol browser replays
-        # Historical native builds lack these tests; successful new builds must
-        # supply all three cases, not a synthetic or optional skip.
-        if: github.event_name == 'workflow_run'
-        shell: bash
-        run: |
-          set -euo pipefail
-          evidence="$RUNNER_TEMP/native-evidence"
-          mapfile -t extras < <(find "$evidence" -type f -name security-159-additional-crashtest-replay.json -print)
-          mapfile -t native < <(find "$evidence" -type f -name m3-native-link-inputs.json -print)
-          test "${#extras[@]}" -eq 1
-          test "${#native[@]}" -eq 1
-          jq -n \
-            --slurpfile replay "${extras[0]}" \
-            --slurpfile native "${native[0]}" \
-            --arg source "$NATIVE_SOURCE_SHA" \
-            --argjson run "$NATIVE_RUN_ID" \
-            -f ci/security-159-extra-crashtest-evidence.jq \
-            > "$RUNNER_TEMP/security-159-extra-crashtest-reconciled.json"
-          jq -e --arg sha "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
-            .schema_version == 1 and
-            .status == "bounded_extra_crashtests_source_linked_reconciliation" and
-            .source_commit == $sha and .native_run_id == $run and
-            .real_packaged_fixture_replays == 6 and
-            (.original_mozilla_fixture_blobs | length == 3) and
-            .full_wpt_harness_executed == false and
-            .exploit_rejection_proven == false and
-            .full_advisory_audited == false and
-            .release_ready == false and
-            .m3_sixth_gate_closed == false
-          ' "$RUNNER_TEMP/security-159-extra-crashtest-reconciled.json" >/dev/null
-          echo "PASS: six exact-source SVG/table/multicol browser replays independently verified; not memory safety proof"
-
-      - name: Preserve only bounded reconciled source and runtime attestations
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-159-native-link-reconciled-evidence
-          path: |
-            ${{ runner.temp }}/security-159-native-link-reconciled.json
-            ${{ runner.temp }}/security-159-local-tls-reconciled.json
-            ${{ runner.temp }}/security-159-css-reconciled.json
-            ${{ runner.temp }}/security-159-extra-crashtest-reconciled.json
-          if-no-files-found: error
-          retention-days: 14
-\t' read -r path expected; do
-            test -n "$path" && test -n "$expected"
+          for item in \
+            'ci/security-159-crashtest-smoke.py:802c0f941826fb3d42226b7f09efcdd11abe881d' \
+            'layout/svg/crashtests/2079252.html:a8d78aae061029dcc7cb72e86a18647b2d483625' \
+            'testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html:6d716acb679c1f174e75a4d3d6ddfc85dcba7852' \
+            'testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html:bfb5f0894b80bf39633afcf37be9fdcbb68ab96c'; do
+            path="${item%%:*}"
+            expected="${item##*:}"
             actual="$(gh api "repos/$GITHUB_REPOSITORY/contents/$path?ref=$NATIVE_SOURCE_SHA" --jq .sha)"
             if test "$actual" != "$expected"; then
-              echo "::error::Original regression fixture or driver source mismatch: $path"
+              echo "::error::Reviewed regression driver or original fixture mismatch: $path"
               exit 1
             fi
-            count=$((count+1))
-          done <<'REVIEWED_EXTRA_CRASHTEST_OBJECTS'
-          ci/security-159-crashtest-smoke.py	802c0f941826fb3d42226b7f09efcdd11abe881d
-          layout/svg/crashtests/2079252.html	a8d78aae061029dcc7cb72e86a18647b2d483625
-          testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html	6d716acb679c1f174e75a4d3d6ddfc85dcba7852
-          testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html	bfb5f0894b80bf39633afcf37be9fdcbb68ab96c
-          REVIEWED_EXTRA_CRASHTEST_OBJECTS
+            count=$((count + 1))
+          done
           test "$count" -eq 4
-          echo "PASS: independent GitHub object identity for regression driver and three original Mozilla crash fixtures"
+          echo "PASS: independently authenticated regression driver and 3 Mozilla fixtures"
 
       - name: Retrieve one bounded original run evidence artifact
         shell: bash
