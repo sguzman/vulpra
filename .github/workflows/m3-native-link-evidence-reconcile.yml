@@ -8,6 +8,8 @@ on:
     paths:
       - ci/m3-native-link-evidence-ledger.py
       - ci/m3-current-local-tls-native-evidence.jq
+      - ci/m3-current-ffi-native-evidence.jq
+      - ci/tests/m3-current-ffi-native-evidence-tests.sh
       - ci/tests/m3-current-local-tls-native-evidence-tests.sh
       - .github/workflows/m3-native-link-evidence-reconcile.yml
   workflow_run:
@@ -58,6 +60,7 @@ jobs:
           python3 -m py_compile ci/m3-native-link-evidence-ledger.py
           python3 ci/m3-native-link-evidence-ledger.py --self-test
           bash ci/tests/m3-current-local-tls-native-evidence-tests.sh
+          bash ci/tests/m3-current-ffi-native-evidence-tests.sh
 
   reconcile-real-native-run:
     if: >-
@@ -185,6 +188,45 @@ jobs:
             ' "$RUNNER_TEMP/m3-current-local-tls-reconciled.json" >/dev/null
           echo "PASS: independent source-linked current native package and W3C certificate rejection crosscheck"
 
+      - name: Independently reconcile current compiled Rust archive and linked ELF FFI symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only reached after the exact source-pinned full native workflow's
+          # completed-success identity and native package evidence are checked.
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-current-native-rust-ffi-archive-evidence \
+            --dir "$RUNNER_TEMP/ffi-evidence"
+          mapfile -t native < <(find "$RUNNER_TEMP/native-evidence" \
+            -type f -name m3-native-link-inputs.json -print)
+          mapfile -t ffi < <(find "$RUNNER_TEMP/ffi-evidence" \
+            -type f -name m3-current-ffi-archive-members.json -print)
+          test "${#native[@]}" -eq 1
+          test "${#ffi[@]}" -eq 1
+          jq -n \
+            --slurpfile link "${native[0]}" \
+            --slurpfile ffi "${ffi[0]}" \
+            --arg source "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            -f ci/m3-current-ffi-native-evidence.jq \
+            > "$RUNNER_TEMP/m3-current-ffi-native-reconciled.json"
+          jq -e --arg sha "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            .schema_version == 1 and
+            .status == "source_linked_compiled_gkrust_archive_ffi_definitions_reconciled" and
+            .source_commit == $sha and
+            .native_run_id == $run and
+            .actual_native_runtime_evidence_joined == true and
+            .two_named_rust_archive_and_elf_definitions_verified == true and
+            .named_source_owned_archive_ffi_pairs == 2 and
+            .complete_archive_member_to_linker_selection_graph_proven == false and
+            .complete_cpp_rust_ffi_graph_proven == false and
+            .indirect_runtime_ffi_and_dlopen_closure_proven == false and
+            .target_endeavouros_hyprland_workstation_verified == false and
+            .new_source_pruning_authorized == false and
+            .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/m3-current-ffi-native-reconciled.json" >/dev/null
+          echo "PASS: independent current linked Rust member and ELF SHA evidence; not full FFI or M3 acceptance"
+
       - name: Preserve only bounded reconciled source and runtime attestations
         uses: actions/upload-artifact@v4
         with:
@@ -192,5 +234,6 @@ jobs:
           path: |
             ${{ runner.temp }}/m3-native-link-reconciled.json
             ${{ runner.temp }}/m3-current-local-tls-reconciled.json
+            ${{ runner.temp }}/m3-current-ffi-native-reconciled.json
           if-no-files-found: error
           retention-days: 14
