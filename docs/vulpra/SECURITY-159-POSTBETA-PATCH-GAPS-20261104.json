@@ -3829,6 +3829,171 @@
         "JS::AssertObjectIsNotGray(JS_GetFunctionObject(callback.mCallbackFunction));"
       ],
       "note": "All five affected code and regression source paths are Git-identical across original Firefox 159 beta, stable 159, and Vulpra main. All three test/registration paths match selected upstream postimages; the two C++ sources have later edits and thus differ from their selected commit snapshots. Inspected Vulpra finalization-queue code retains exposing cleanup callback and incumbent global to active JS before host cleanup; CycleCollectedJSContext asserts they are not gray. Original regression fixture is tracked but was not executed; no GC sanitizer/exploit runtime validation."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117909",
+      "bug": 2079155,
+      "topic": "JavaScript FinalizationRegistry registration GC use-after-free on target unwrapping error",
+      "patch_commits": [
+        "376582153b1e96c02788b09c5e4c4083592adf95",
+        "27ce18ba3b2e3a6232ddf15da30a348412946573",
+        "f08b6dad39685e57ed33d0c50d9cbcea00e69f82"
+      ],
+      "classification": "original_fix_code_byte_identical_beta_stable_vulpra_later_upstream_jit_tests_absent",
+      "source_file_blobs": [
+        {
+          "path": "js/src/builtin/FinalizationRegistryObject.cpp",
+          "upstream_fix_commit_result_sha": "2d9dba4159fb42da46180015dcff2b4dc72fd5e2",
+          "pinned_beta_sha": "2d9dba4159fb42da46180015dcff2b4dc72fd5e2",
+          "upstream_stable_159_sha": "2d9dba4159fb42da46180015dcff2b4dc72fd5e2",
+          "vulpra_sha": "2d9dba4159fb42da46180015dcff2b4dc72fd5e2",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "upstream_test_fixture_absence": [
+        "js/src/jit-test/tests/gc/finalizationRegistry-register-error-gc.js",
+        "js/src/jit-test/tests/gc/finalizationRegistry-security-wrapper.js"
+      ],
+      "verified_patch_hunks": [
+        "JS::AutoAssertNoGC nogc(cx);",
+        "MOZ_RELEASE_ASSERT(registry->recordsWithoutToken()->back() == record);"
+      ],
+      "note": "The one changed upstream fix C++ file is exactly identical at its fix postimage, pinned beta 159.0b5, Mozilla stable 159.0, and Vulpra main. Unwrap-before-register and NoGC registration guard inspected in Vulpra. Two later upstream Bug 2079155 JIT regression scripts are explicitly absent in both pinned releases and Vulpra; do not treat them as executed or retained. No JS shell GC exploit/sanitizer regression executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117917",
+      "bug": 2079301,
+      "topic": "Graphics WebRender BufferTexture shared-memory holder lifetime and allocator-thread release",
+      "patch_commit": "cfb7a35115f04fbad7696f8f78875226ad4cdf28",
+      "classification": "beta_stable_vulpra_identical_later_shmem_lifetime_revision_no_exact_original_postimage",
+      "source_file_blobs": [
+        {
+          "path": "gfx/layers/BufferTexture.cpp",
+          "upstream_fix_commit_result_sha": "0ff1518adc60054825680d8f833056b13d8a680e",
+          "pinned_beta_sha": "b9423a90dddfccbab914718d56491bd36a659a70",
+          "upstream_stable_159_sha": "b9423a90dddfccbab914718d56491bd36a659a70",
+          "vulpra_sha": "b9423a90dddfccbab914718d56491bd36a659a70",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "static gfx::UserDataKey sShmemHolderKey = {0};",
+        "OnBorrowDrawTarget(dt);",
+        "mDeallocationTarget(aAllocator->GetThread())"
+      ],
+      "note": "Original upstream Bug 2079301 patch postimage differs from the beta/stable/Vulpra file due to a subsequent revision of shared-memory holder ownership. Final release code inspected: ShmemHolder constructor retains deallocation event target, destructor uses retained target and dispatches IPC deallocation (with closed-IPC checks), DrawTarget user-data owns RefPtr<ShmemHolder>, static per-process user-data key, and BorrowDrawTarget calls OnBorrowDrawTarget. This is source review of intended lifetime protection, not byte-identical original patch or a real thread-dispatch failure test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117929",
+      "bug": 2081549,
+      "topic": "ImageDocument DOMTokenList use-after-free under class mutation",
+      "patch_commit": "784857b04694d24d538847bcc7bc252e3ac6988a",
+      "classification": "beta_stable_vulpra_identical_strong_domtokenlist_ref_guard_present_later_revision",
+      "source_file_blobs": [
+        {
+          "path": "dom/html/ImageDocument.cpp",
+          "upstream_fix_commit_result_sha": "bfebbc75f401bfa9f73c4f7634b8fac14b7118b1",
+          "pinned_beta_sha": "46adb9af10bda8d215e4cb3c7bf4789d55e30e3e",
+          "upstream_stable_159_sha": "46adb9af10bda8d215e4cb3c7bf4789d55e30e3e",
+          "vulpra_sha": "46adb9af10bda8d215e4cb3c7bf4789d55e30e3e",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<nsDOMTokenList> classList = mImageContent->ClassList();",
+        "RefPtr<nsDOMTokenList> classList ="
+      ],
+      "note": "Vulpra beta/stable source identities agree exactly, though they differ from original Bug 2081549 patch postimage due to subsequent edits. Explicit strong ref to the image class token list exists at SetModeClass and CheckFullZoom prior to synchronous event-capable mutation; no DOM mutation exploit regression or sanitizer run."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117930",
+      "bug": 2081953,
+      "topic": "DOM realm principal lifetime when swapping an inner or outer window principal",
+      "patch_commit": "5e5161b4fa63119a0de91b6e89015e88cf84f747",
+      "classification": "three_beta_stable_vulpra_files_identical_two_exact_upstream_fix_postimages",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/nsGlobalWindowInner.cpp",
+          "upstream_fix_commit_result_sha": "095b2f6fd4796bcdf8165f3368bd03198c713d1f",
+          "pinned_beta_sha": "095b2f6fd4796bcdf8165f3368bd03198c713d1f",
+          "upstream_stable_159_sha": "095b2f6fd4796bcdf8165f3368bd03198c713d1f",
+          "vulpra_sha": "095b2f6fd4796bcdf8165f3368bd03198c713d1f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/nsGlobalWindowInner.h",
+          "upstream_fix_commit_result_sha": "e804afe5ba70aa317df1ea3c8439dff8b5c3e9a3",
+          "pinned_beta_sha": "e804afe5ba70aa317df1ea3c8439dff8b5c3e9a3",
+          "upstream_stable_159_sha": "e804afe5ba70aa317df1ea3c8439dff8b5c3e9a3",
+          "vulpra_sha": "e804afe5ba70aa317df1ea3c8439dff8b5c3e9a3",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/base/nsGlobalWindowOuter.cpp",
+          "upstream_fix_commit_result_sha": "ddbc2ca41bb2d5f1bc2d4c3f631e723dfb51f34c",
+          "pinned_beta_sha": "59a1a4671078a3fc3491a5200c30d908fd87cbf1",
+          "upstream_stable_159_sha": "59a1a4671078a3fc3491a5200c30d908fd87cbf1",
+          "vulpra_sha": "59a1a4671078a3fc3491a5200c30d908fd87cbf1",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "HoldOldPrincipal(existing);",
+        "void nsGlobalWindowInner::HoldOldPrincipal(nsIPrincipal* aPrincipal)",
+        "mOldPrincipals.Clear();"
+      ],
+      "note": "All three original Bug 2081953 changed paths match beta/stable/Vulpra. Two are byte-identical with upstream patch postimage; outer window source has later changes but retains HoldOldPrincipal guard on realm-principal swap. Inspected inner holding of old principals through nested event-loop avoidance, and refcounted mOldPrincipals. No nested event-loop realm exploit QA or sanitizer run."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117931",
+      "bug": 2081969,
+      "topic": "DOM coalesced mouse/touch refresh callback BrowserChild lifetime use-after-free",
+      "patch_commit": "1ee3315053803575d7996d96989f309a2d7f1b31",
+      "classification": "all_three_exact_upstream_postimages_identical_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/ipc/CoalescedInputData.h",
+          "upstream_fix_commit_result_sha": "e3482269bac30ef20d22eded559e87c7f6a6f5c8",
+          "pinned_beta_sha": "e3482269bac30ef20d22eded559e87c7f6a6f5c8",
+          "upstream_stable_159_sha": "e3482269bac30ef20d22eded559e87c7f6a6f5c8",
+          "vulpra_sha": "e3482269bac30ef20d22eded559e87c7f6a6f5c8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/ipc/CoalescedMouseData.cpp",
+          "upstream_fix_commit_result_sha": "ac5a2b05026352ad1d6a4cb7c80c6e65e88e7b45",
+          "pinned_beta_sha": "ac5a2b05026352ad1d6a4cb7c80c6e65e88e7b45",
+          "upstream_stable_159_sha": "ac5a2b05026352ad1d6a4cb7c80c6e65e88e7b45",
+          "vulpra_sha": "ac5a2b05026352ad1d6a4cb7c80c6e65e88e7b45",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "dom/ipc/CoalescedTouchData.cpp",
+          "upstream_fix_commit_result_sha": "f130ccc1b21983b0703024159aab92b45a6f59a2",
+          "pinned_beta_sha": "f130ccc1b21983b0703024159aab92b45a6f59a2",
+          "upstream_stable_159_sha": "f130ccc1b21983b0703024159aab92b45a6f59a2",
+          "vulpra_sha": "f130ccc1b21983b0703024159aab92b45a6f59a2",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<BrowserChild> browserChild(mBrowserChild);"
+      ],
+      "note": "Original upstream Bug 2081969 changed three files, all source SHA exact matches among patch postimage, pinned Firefox beta, stable, and Vulpra. Inspected temporary strong BrowserChild refs before mouse/touch event flushing. No actual async refresh/reentrancy race test or sanitizer QA."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
