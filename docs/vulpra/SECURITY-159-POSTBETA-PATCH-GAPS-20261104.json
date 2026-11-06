@@ -6096,11 +6096,95 @@
       "advisory": "MFSA 2026-118",
       "impact": "high",
       "component": "Audio/Video",
-      "verification_status": "unreviewed_public_bugzilla_access_denied_no_upstream_fix_commit_identified",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified",
       "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2056783",
       "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117863",
       "last_checked_date": "2026-11-06",
-      "note": "Public Bugzilla reports Access Denied, and GitHub commit search for Bug 2056783 returns no matching upstream commit. Neither beta fix presence nor missing patch has been established. This remains unaudited in the high-impact Firefox 159 advisory. Do not assign positive security credit."
+      "note": "Uninitialized memory disclosure. Mozilla's public advisory identifies Bug 2056783. Its directly linked public Bugzilla page returned Access Denied, and a GitHub search of mozilla-firefox/firefox for commits explicitly labeled \"Bug 2056783\" returned no matches. This limited search cannot exclude differently labeled security patches. No exact original-beta patch presence, absence, exploit resistance, or runtime regression test has been established; do not assign positive security credit."
+    },
+    {
+      "cve": "CVE-2026-117932",
+      "bug": 2081975,
+      "advisory": "MFSA 2026-118",
+      "impact": "high",
+      "component": "DOM: Core & HTML",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified",
+      "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2081975",
+      "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117932",
+      "last_checked_date": "2026-11-06",
+      "note": "Use-after-free. Mozilla's public advisory identifies Bug 2081975. Its directly linked public Bugzilla page returned Access Denied, and a GitHub search of mozilla-firefox/firefox for commits explicitly labeled \"Bug 2081975\" returned no matches. This limited search cannot exclude differently labeled security patches. No exact original-beta patch presence, absence, exploit resistance, or runtime regression test has been established; do not assign positive security credit."
+    },
+    {
+      "cve": "CVE-2026-117933",
+      "bug": 2081976,
+      "advisory": "MFSA 2026-118",
+      "impact": "high",
+      "component": "CSS Parsing and Computation",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified",
+      "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2081976",
+      "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117933",
+      "last_checked_date": "2026-11-06",
+      "note": "Frame poisoning. Mozilla's public advisory identifies Bug 2081976. Its directly linked public Bugzilla page returned Access Denied, and a GitHub search of mozilla-firefox/firefox for commits explicitly labeled \"Bug 2081976\" returned no matches. This limited search cannot exclude differently labeled security patches. No exact original-beta patch presence, absence, exploit resistance, or runtime regression test has been established; do not assign positive security credit."
+    },
+    {
+      "cve": "CVE-2026-117940",
+      "bug": 2082031,
+      "advisory": "MFSA 2026-118",
+      "impact": "high",
+      "component": "DOM: Core & HTML",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified",
+      "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2082031",
+      "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117940",
+      "last_checked_date": "2026-11-06",
+      "note": "Use-after-free. Mozilla's public advisory identifies Bug 2082031. Its directly linked public Bugzilla page returned Access Denied, and a GitHub search of mozilla-firefox/firefox for commits explicitly labeled \"Bug 2082031\" returned no matches. This limited search cannot exclude differently labeled security patches. No exact original-beta patch presence, absence, exploit resistance, or runtime regression test has been established; do not assign positive security credit."
+    },
+    {
+      "cve": "CVE-2026-117945",
+      "bug": 2082076,
+      "advisory": "MFSA 2026-118",
+      "impact": "high",
+      "component": "XML",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified",
+      "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2082076",
+      "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117945",
+      "last_checked_date": "2026-11-06",
+      "note": "Incorrect boundary conditions. Mozilla's public advisory identifies Bug 2082076. Its directly linked public Bugzilla page returned Access Denied, and a GitHub search of mozilla-firefox/firefox for commits explicitly labeled \"Bug 2082076\" returned no matches. This limited search cannot exclude differently labeled security patches. No exact original-beta patch presence, absence, exploit resistance, or runtime regression test has been established; do not assign positive security credit."
+    },
+    {
+      "cve": "CVE-2026-117947",
+      "bug": 2082100,
+      "advisory": "MFSA 2026-118",
+      "impact": "high",
+      "component": "XML",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified",
+      "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2082100",
+      "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117947",
+      "last_checked_date": "2026-11-06",
+      "note": "Use-after-free. Mozilla's public advisory identifies Bug 2082100. Its directly linked public Bugzilla page returned Access Denied, and a GitHub search of mozilla-firefox/firefox for commits explicitly labeled \"Bug 2082100\" returned no matches. This limited search cannot exclude differently labeled security patches. No exact original-beta patch presence, absence, exploit resistance, or runtime regression test has been established; do not assign positive security credit."
+    },
+    {
+      "cve": "CVE-2026-117953",
+      "bug": 2082199,
+      "advisory": "MFSA 2026-118",
+      "impact": "high",
+      "component": "DOM: Core & HTML",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified",
+      "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2082199",
+      "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-117953",
+      "last_checked_date": "2026-11-06",
+      "note": "Use-after-free. Mozilla's public advisory identifies Bug 2082199. Its directly linked public Bugzilla page returned Access Denied, and a GitHub search of mozilla-firefox/firefox for commits explicitly labeled \"Bug 2082199\" returned no matches. This limited search cannot exclude differently labeled security patches. No exact original-beta patch presence, absence, exploit resistance, or runtime regression test has been established; do not assign positive security credit."
+    },
+    {
+      "cve": "CVE-2026-118017",
+      "bug": 2082200,
+      "advisory": "MFSA 2026-118",
+      "impact": "high",
+      "component": "SVG",
+      "verification_status": "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified",
+      "bugzilla_url": "https://bugzilla.mozilla.org/show_bug.cgi?id=2082200",
+      "advisory_url": "https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#CVE-2026-118017",
+      "last_checked_date": "2026-11-06",
+      "note": "Use-after-free. Mozilla's public advisory identifies Bug 2082200. Its directly linked public Bugzilla page returned Access Denied, and a GitHub search of mozilla-firefox/firefox for commits explicitly labeled \"Bug 2082200\" returned no matches. This limited search cannot exclude differently labeled security patches. No exact original-beta patch presence, absence, exploit resistance, or runtime regression test has been established; do not assign positive security credit."
     }
   ],
   "public_security_advisory_listing_checked": {
