@@ -4394,6 +4394,196 @@
         "[Replaceable] readonly attribute Screen screen;"
       ],
       "note": "Upstream Bug 2082072 changes exactly one WebIDL file; its post-fix SHA is identical in pinned Firefox 159.0b5, Firefox 159.0, and Vulpra. Inspected removal of SameObject from replaceable window.screen getter attribute. No generated binding code provenance beyond source nor runtime reentry regression was executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117946",
+      "bug": 2082092,
+      "topic": "JavaScript RegExp literal syntax parser incorrect bounds for oversized inputs",
+      "patch_commit": "313233d1c3f10a636a31b7ff36d1800813713679",
+      "classification": "exact_fix_source_blob_in_beta_stable_vulpra_no_public_oversized_test_fixture",
+      "source_file_blobs": [
+        {
+          "path": "js/src/irregexp/RegExpAPI.cpp",
+          "upstream_fix_commit_result_sha": "a42e53cf2f9e6cd3f5ddc4a4fefa7df42f6cdfe9",
+          "pinned_beta_sha": "a42e53cf2f9e6cd3f5ddc4a4fefa7df42f6cdfe9",
+          "upstream_stable_159_sha": "a42e53cf2f9e6cd3f5ddc4a4fefa7df42f6cdfe9",
+          "vulpra_sha": "a42e53cf2f9e6cd3f5ddc4a4fefa7df42f6cdfe9",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "if (inputLength > JSString::MAX_LENGTH) {",
+        "result->error = RegExpError::kTooLarge;",
+        "AssertedCast<int>(inputLength)"
+      ],
+      "note": "One original Bug 2082092 code path matches upstream patch commit result, Firefox 159.0b5 beta, 159 stable and Vulpra byte-for-byte. Guard rejects JSString-overlong regex patterns before narrowing length to int. Upstream deliberately omitted an enormous slow-memory test; no multi-GB test, sanitizer or runtime exploit executed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117948",
+      "bug": 2082112,
+      "topic": "SVG switch child removal re-entry lifetime protection via document mutation batching",
+      "patch_commit": "0a4a573472d1d44a72e3c563be3cd1334a1fa476",
+      "classification": "both_exact_code_and_original_wpt_postimages_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/svg/SVGSwitchElement.cpp",
+          "upstream_fix_commit_result_sha": "d273e3c16d2a5c381d69ad9a78a155fbbe660e3f",
+          "pinned_beta_sha": "d273e3c16d2a5c381d69ad9a78a155fbbe660e3f",
+          "upstream_stable_159_sha": "d273e3c16d2a5c381d69ad9a78a155fbbe660e3f",
+          "vulpra_sha": "d273e3c16d2a5c381d69ad9a78a155fbbe660e3f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/svg/struct/scripted/switch_reentrant_removal.html",
+          "upstream_fix_commit_result_sha": "338c30977c58caa53f1d46b025688661c014fe32",
+          "pinned_beta_sha": "338c30977c58caa53f1d46b025688661c014fe32",
+          "upstream_stable_159_sha": "338c30977c58caa53f1d46b025688661c014fe32",
+          "vulpra_sha": "338c30977c58caa53f1d46b025688661c014fe32",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "mozAutoDocUpdate updateBatch(GetComposedDoc(), aNotify);"
+      ],
+      "note": "Both code and original WPT reentrant-removal test are exact upstream patch result SHA and beta/stable/Vulpra source match. Inspected document batch guard in both InsertChildBefore and RemoveChildNode. The original re-entry WPT is source-present but was not run; no sanitizer QA."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117949",
+      "bug": 2082118,
+      "topic": "DOM text selection and edit-action listener owner lifetime use-after-free",
+      "patch_commits": [
+        "9be238d65cf36134ec8186e9e26a884b3d77bbee",
+        "b4183333830b47e1b1c0fbc0bf49a1c30a0479da",
+        "07d0623c12651e2764371f8ec133e279b713f586"
+      ],
+      "classification": "post_revert_reland_code_preserved_beta_stable_vulpra_identical_header_exact_patch_postimage",
+      "source_file_blobs": [
+        {
+          "path": "dom/html/TextControlState.cpp",
+          "upstream_fix_commit_result_sha": "dde1fd9a220c9c2a30097a262ea79f182f94e80b",
+          "pinned_beta_sha": "0486c2d4fb7540bd76387d767811f0df5e9d0a70",
+          "upstream_stable_159_sha": "0486c2d4fb7540bd76387d767811f0df5e9d0a70",
+          "vulpra_sha": "0486c2d4fb7540bd76387d767811f0df5e9d0a70",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "dom/html/TextInputListener.h",
+          "upstream_fix_commit_result_sha": "557a3ffe8279d79b30ae95b91e017a77efcd175c",
+          "pinned_beta_sha": "557a3ffe8279d79b30ae95b91e017a77efcd175c",
+          "upstream_stable_159_sha": "557a3ffe8279d79b30ae95b91e017a77efcd175c",
+          "vulpra_sha": "557a3ffe8279d79b30ae95b91e017a77efcd175c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "RefPtr<TextControlElement> txtCtrlElement = mTxtCtrlElement;",
+        "const RefPtr<TextControlElement> kungFuDeathGrip(mTxtCtrlElement);",
+        "MOZ_CAN_RUN_SCRIPT nsresult"
+      ],
+      "note": "Original upstream landing on Bug 2082118 was reverted once for compilation breakage and then relanded. Vulpra equals beta and 159 stable for both changed files; header matches original patch postimage and TextControlState.cpp has later edits but retains strong TextControlElement refs in OnSelectionChange and OnEditActionHandled (inspected). No real selection/edit script reentry or sanitizer QA."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117950",
+      "bug": 2082127,
+      "topic": "DOM author shadow-root native-anonymous element ID-table boundary conditions",
+      "patch_commits": [
+        "663e04deb72ddb0e494a47783e5ec9a40a4093be",
+        "3a14c8c6a2ce359aeea5a3c1d7c07880e9a766a8"
+      ],
+      "classification": "source_fix_present_beta_stable_vulpra_later_mochitest_absent",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/Element.cpp",
+          "upstream_fix_commit_result_sha": "d9b155f90ded6c58cf4efb1d2c23fbe5bc89a961",
+          "pinned_beta_sha": "b0f08fd6241f36b7a499d33613030f27a63aab96",
+          "upstream_stable_159_sha": "b0f08fd6241f36b7a499d33613030f27a63aab96",
+          "vulpra_sha": "b0f08fd6241f36b7a499d33613030f27a63aab96",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "upstream_test_fixture_absence": [
+        "dom/base/test/test_anonymousContent_id_table.html"
+      ],
+      "verified_patch_hunks": [
+        "nsContentUtils::IsInSameAnonymousTree(this, containingShadow)",
+        "IsInNativeAnonymousSubtree() =="
+      ],
+      "note": "The primary code matches pinned beta, Mozilla stable and Vulpra, with postimage mismatch after further code revisions. Inspected ID-table restriction guarding mixed native-anonymous/author shadow trees, and removal parity. The separate later mochitest file is absent from all three compared trees and was not executed; no runtime site-isolation or tree test claimed."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117951",
+      "bug": 2082130,
+      "topic": "DOM WindowProxy lifetime under inner window clearing",
+      "patch_commit": "9befd8690b26e4cdb3bcb80617fc8a9c55fa36e7",
+      "classification": "source_identical_beta_stable_vulpra_preserved_window_proxy_clear_guard",
+      "source_file_blobs": [
+        {
+          "path": "dom/base/nsGlobalWindowOuter.h",
+          "upstream_fix_commit_result_sha": "477f1fc88096098c441708825f59ad36602b3e0f",
+          "pinned_beta_sha": "ab838e316e31e0221bf962d5a66fcfe44473de38",
+          "upstream_stable_159_sha": "ab838e316e31e0221bf962d5a66fcfe44473de38",
+          "vulpra_sha": "ab838e316e31e0221bf962d5a66fcfe44473de38",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "mBrowsingContext->ClearWindowProxy();"
+      ],
+      "note": "Only changed Bug 2082130 source path is byte-identical across beta/stable/Vulpra, later revisions differ from original patch commit. Inspected MaybeClearInnerWindow matching existing WindowProxy and clearing BrowsingContext proxy on inner-window teardown. No JS WindowProxy destruction/reentry exploit QA."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117954",
+      "bug": 2082450,
+      "topic": "Layout flex/grid content-visibility hidden continuation frames left unreflowed",
+      "patch_commit": "e70bde08449454a4a34805b7172e380233bbd881",
+      "classification": "all_three_code_and_crashtest_files_identical_beta_stable_vulpra_two_exact_patch_postimages",
+      "source_file_blobs": [
+        {
+          "path": "layout/generic/nsFlexContainerFrame.cpp",
+          "upstream_fix_commit_result_sha": "2ff3648ed39176735854e89b5f28efe4a7cca3b9",
+          "pinned_beta_sha": "2ff3648ed39176735854e89b5f28efe4a7cca3b9",
+          "upstream_stable_159_sha": "2ff3648ed39176735854e89b5f28efe4a7cca3b9",
+          "vulpra_sha": "2ff3648ed39176735854e89b5f28efe4a7cca3b9",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "layout/generic/nsGridContainerFrame.cpp",
+          "upstream_fix_commit_result_sha": "1699a429103f3221111aef2b8a3b8c4055f9454d",
+          "pinned_beta_sha": "9de0a663a25c313431e620d5d52a1b1c814278e1",
+          "upstream_stable_159_sha": "9de0a663a25c313431e620d5d52a1b1c814278e1",
+          "vulpra_sha": "9de0a663a25c313431e620d5d52a1b1c814278e1",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-position/crashtests/content-visibility-abspos-continuations-crash.html",
+          "upstream_fix_commit_result_sha": "adb42689f6c864e251423e5a9313bedb7597f248",
+          "pinned_beta_sha": "adb42689f6c864e251423e5a9313bedb7597f248",
+          "upstream_stable_159_sha": "adb42689f6c864e251423e5a9313bedb7597f248",
+          "vulpra_sha": "adb42689f6c864e251423e5a9313bedb7597f248",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "IsHiddenByContentVisibilityOfInFlowParentForLayout() &&",
+        "HidesContentForLayout() && !GetNextContinuation()"
+      ],
+      "note": "Flex frame and original crashtest files have exact upstream postimages; grid frame has later edits but all three source files match 159 beta, 159 stable and Vulpra. Inspected continuation check for hidden content flex/grid reflow. Original multi-column WPT crashtest present, but not run in this audit; no memory-sanitizer evidence."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
