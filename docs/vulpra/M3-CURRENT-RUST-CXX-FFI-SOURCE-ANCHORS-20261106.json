@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "kind": "m3_original_current_compiled_rust_cpp_ffi_source_anchor_parity",
+  "verified_date_utc": "2026-11-06",
+  "original_source_commit": "b1482404dfb8b01342990ee99ea3df0f9756b5f7",
+  "current_compiled_source_commit": "96454f7a1fbe6b505af440c6c2c5fc91e798756d",
+  "current_native_workflow_run_id": 41762298450,
+  "recorded_source_paths": 11,
+  "source_file_blobs": [
+    {
+      "path": "xpcom/build/XPCOMInit.cpp",
+      "original_git_blob_sha": "8d89afd0239b9a47da1dcb86e001aff137355f7d",
+      "compiled_current_git_blob_sha": "8d89afd0239b9a47da1dcb86e001aff137355f7d",
+      "main_git_blob_sha_at_audit": "8d89afd0239b9a47da1dcb86e001aff137355f7d"
+    },
+    {
+      "path": "toolkit/library/rust/shared/lib.rs",
+      "original_git_blob_sha": "078e80a439de35757cf648a52062ff3d3122f8ce",
+      "compiled_current_git_blob_sha": "078e80a439de35757cf648a52062ff3d3122f8ce",
+      "main_git_blob_sha_at_audit": "078e80a439de35757cf648a52062ff3d3122f8ce"
+    },
+    {
+      "path": "toolkit/library/rust/lib.rs",
+      "original_git_blob_sha": "815413a5da15df4f0031572734bc406c2628585f",
+      "compiled_current_git_blob_sha": "815413a5da15df4f0031572734bc406c2628585f",
+      "main_git_blob_sha_at_audit": "815413a5da15df4f0031572734bc406c2628585f"
+    },
+    {
+      "path": "toolkit/library/rust/Cargo.toml",
+      "original_git_blob_sha": "d110b667b08b60af7b539103d5ce3d8cbd71ee5e",
+      "compiled_current_git_blob_sha": "d110b667b08b60af7b539103d5ce3d8cbd71ee5e",
+      "main_git_blob_sha_at_audit": "d110b667b08b60af7b539103d5ce3d8cbd71ee5e"
+    },
+    {
+      "path": "toolkit/library/rust/moz.build",
+      "original_git_blob_sha": "b0c5c51031ce1cc916f9d6668c99c7a677883a83",
+      "compiled_current_git_blob_sha": "b0c5c51031ce1cc916f9d6668c99c7a677883a83",
+      "main_git_blob_sha_at_audit": "b0c5c51031ce1cc916f9d6668c99c7a677883a83"
+    },
+    {
+      "path": "toolkit/library/build/moz.build",
+      "original_git_blob_sha": "72b02071e56d1c93b6bd8a58b6b0ece29837026b",
+      "compiled_current_git_blob_sha": "72b02071e56d1c93b6bd8a58b6b0ece29837026b",
+      "main_git_blob_sha_at_audit": "72b02071e56d1c93b6bd8a58b6b0ece29837026b"
+    },
+    {
+      "path": "toolkit/crashreporter/crash_helper/crashhelper.cpp",
+      "original_git_blob_sha": "e391fe314bbdfc81aebb894d7d5c5c5de8cceaa8",
+      "compiled_current_git_blob_sha": "e391fe314bbdfc81aebb894d7d5c5c5de8cceaa8",
+      "main_git_blob_sha_at_audit": "e391fe314bbdfc81aebb894d7d5c5c5de8cceaa8"
+    },
+    {
+      "path": "toolkit/crashreporter/crash_helper_server/src/lib.rs",
+      "original_git_blob_sha": "6dc2c97db7e69986e66a43ad1fa4cdb8a617c5f1",
+      "compiled_current_git_blob_sha": "6dc2c97db7e69986e66a43ad1fa4cdb8a617c5f1",
+      "main_git_blob_sha_at_audit": "6dc2c97db7e69986e66a43ad1fa4cdb8a617c5f1"
+    },
+    {
+      "path": "toolkit/crashreporter/crash_helper_server/Cargo.toml",
+      "original_git_blob_sha": "b7455f095fd3cec6ca6c5b03135ee8570981f51e",
+      "compiled_current_git_blob_sha": "b7455f095fd3cec6ca6c5b03135ee8570981f51e",
+      "main_git_blob_sha_at_audit": "b7455f095fd3cec6ca6c5b03135ee8570981f51e"
+    },
+    {
+      "path": "toolkit/crashreporter/crash_helper_server/moz.build",
+      "original_git_blob_sha": "266a7207e7f18128c2c3085e3ef0d1779691d597",
+      "compiled_current_git_blob_sha": "266a7207e7f18128c2c3085e3ef0d1779691d597",
+      "main_git_blob_sha_at_audit": "266a7207e7f18128c2c3085e3ef0d1779691d597"
+    },
+    {
+      "path": "toolkit/crashreporter/crash_helper/moz.build",
+      "original_git_blob_sha": "78307c3d5f55f5802a75ca18976643195a6c1c95",
+      "compiled_current_git_blob_sha": "78307c3d5f55f5802a75ca18976643195a6c1c95",
+      "main_git_blob_sha_at_audit": "78307c3d5f55f5802a75ca18976643195a6c1c95"
+    }
+  ],
+  "observed_ffi_links": [
+    {
+      "rust_staticlib": "libgkrust.a",
+      "cpp_consumer": "libxul.so",
+      "source_export": "GkRust_Init",
+      "cpp_source": "xpcom/build/XPCOMInit.cpp"
+    },
+    {
+      "rust_staticlib": "libgkrust.a",
+      "cpp_consumer": "libxul.so",
+      "source_export": "GkRust_Shutdown",
+      "cpp_source": "xpcom/build/XPCOMInit.cpp"
+    },
+    {
+      "rust_staticlib": "libcrash_helper_server.a",
+      "cpp_consumer": "crashhelper",
+      "source_export": "crash_generator_logic_desktop",
+      "cpp_source": "toolkit/crashreporter/crash_helper/crashhelper.cpp"
+    }
+  ],
+  "all_original_and_compiled_current_source_blobs_identical": true,
+  "all_current_main_source_blobs_identical_at_audit": true,
+  "current_normal_native_success_source_authenticated_from_workflow": true,
+  "current_compiled_ffi_archive_members_verified": false,
+  "current_final_elf_ffi_machine_branches_verified": false,
+  "all_rust_cpp_ffi_edges_identified": false,
+  "conditional_dlopen_ffi_closure_proven": false,
+  "all_protected_feature_fallbacks_proven": false,
+  "real_target_endeavouros_hyprland_tested": false,
+  "additional_source_pruning_authorized": false,
+  "m3_sixth_gate_closed": false,
+  "note": "Original and current-normal compiled source file blobs were fetched directly from GitHub at their exact pinned commits. The checked current browser run succeeded, but the structural FFI source path and original native machine-link evidence must not be relabeled as current machine-code FFI proof. CI verifies real Git object identity, authenticates historic paths and runs using GitHub API, and exercises bounded pre-existing Rust source-path witness. This is not a full dependency/feature-closure gate."
+}
