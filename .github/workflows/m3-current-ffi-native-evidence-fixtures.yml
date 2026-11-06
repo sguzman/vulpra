@@ -1,0 +1,34 @@
+name: M3 Current Native Rust FFI Evidence Reconciliation Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-current-ffi-native-evidence.jq
+      - ci/tests/m3-current-ffi-native-evidence-tests.sh
+      - .github/workflows/m3-current-ffi-native-evidence-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fail-closed-native-ffi-evidence:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only bounded FFI evidence join and fixtures
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-current-ffi-native-evidence.jq
+            ci/tests/m3-current-ffi-native-evidence-tests.sh
+      - name: Reject forged Rust archive member, ELF hash and milestone claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/tests/m3-current-ffi-native-evidence-tests.sh
+          bash ci/tests/m3-current-ffi-native-evidence-tests.sh
