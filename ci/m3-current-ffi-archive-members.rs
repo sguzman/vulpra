@@ -225,6 +225,16 @@ fn main() {
         let bad=dir.join("badlibxul.so");
         assert!(Command::new("cc").args(["-shared","-o"]).arg(&bad).arg(&missing).status().unwrap().success());
         assert!(audit(source,&archive,&bad,&report).is_err());
+        // A weak placeholder can appear in both an archive and final ELF.
+        // It must not be counted as the strong Rust #[no_mangle] definition.
+        let weak_src=dir.join("weak.c");let weak_obj=dir.join("weak.o");
+        let weak_archive=dir.join("weak-gkrust.a");let weak_elf=dir.join("weak-libxul.so");
+        fs::write(&weak_src,"__attribute__((weak)) void GkRust_Init(void){} __attribute__((weak)) void GkRust_Shutdown(void){}").unwrap();
+        assert!(Command::new("cc").args(["-fPIC","-c"]).arg(&weak_src).arg("-o").arg(&weak_obj).status().unwrap().success());
+        assert!(Command::new("ar").arg("rcs").arg(&weak_archive).arg(&weak_obj).status().unwrap().success());
+        assert!(Command::new("cc").args(["-shared","-o"]).arg(&weak_elf).arg(&weak_obj).status().unwrap().success());
+        assert!(audit(source,&weak_archive,&weak_elf,&report).is_err());
+        assert!(audit(source,&archive,&weak_elf,&report).is_err());
         fs::remove_dir_all(dir).unwrap();
     }
 }
