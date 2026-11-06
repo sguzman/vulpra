@@ -3520,6 +3520,203 @@
         }
       ],
       "note": "The guarded CSS inline-sheet cache and both upstream cross-origin resource regression fixtures match exact selected fix-result objects in beta, stable, and Vulpra. This is code/test source presence only: actual network isolation, policy enforcement and cross-origin test execution have not been verified."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117906",
+      "bug": 2079062,
+      "topic": "FontFaceSet ready promise and loading event lifetime use-after-free",
+      "patch_commit": "e358158e58ce4b8a3084bdd191c863c8f18f18f0",
+      "classification": "two_beta_stable_vulpra_source_identical_with_later_revision_event_dispatch_changes",
+      "source_file_blobs": [
+        {
+          "path": "layout/style/FontFaceSet.cpp",
+          "upstream_fix_commit_result_sha": "26b5d6827d61099a32131e7b3044d1757443455c",
+          "pinned_beta_sha": "a25930c9f103df7b1ac5de17f735abd3a64c6ab4",
+          "upstream_stable_159_sha": "a25930c9f103df7b1ac5de17f735abd3a64c6ab4",
+          "vulpra_sha": "a25930c9f103df7b1ac5de17f735abd3a64c6ab4",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "layout/style/FontFaceSet.h",
+          "upstream_fix_commit_result_sha": "706fdd9dec4bc8a3a280bf5ee03d2e71493cd37e",
+          "pinned_beta_sha": "4fe3cabe18efdef8b5c89014d68501a2c90b3824",
+          "upstream_stable_159_sha": "4fe3cabe18efdef8b5c89014d68501a2c90b3824",
+          "vulpra_sha": "4fe3cabe18efdef8b5c89014d68501a2c90b3824",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "static RefPtr<FontFaceSetLoadEvent> MakeLoadEvent(",
+        "static RefPtr<FontFaceSetLoadEvent> MaybeMakeLoadEvent(",
+        "void FontFaceSet::MaybeResolve() {"
+      ],
+      "note": "Both changed source paths are exactly identical between Firefox beta, stable and Vulpra; neither is byte-identical to the selected upstream patch commit because subsequent changes moved promise-resolution and loading event dispatch into a different implementation. Final Vulpra source was inspected: strongly referenced load events are created before promise resolution and dispatched after it. Source-level finding only; no synthetic or real loadingdone/loadingerror re-entry exploit or sanitizer test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117907",
+      "bug": 2079068,
+      "topic": "Network resource URL nsIFile lifetime across file resolution",
+      "patch_commit": "ffbdff5f0da651597c456c3633bc703d9627d5d4",
+      "classification": "all_five_changed_source_and_test_paths_equal_beta_stable_vulpra_three_exact_upstream_patch_results",
+      "source_file_blobs": [
+        {
+          "path": "netwerk/base/nsStandardURL.cpp",
+          "upstream_fix_commit_result_sha": "e58d9a3f65f2ef1894942363bb7291214bf96a4f",
+          "pinned_beta_sha": "cd50ad61b6fdac86c062a1cf7ce9925c184c4356",
+          "upstream_stable_159_sha": "cd50ad61b6fdac86c062a1cf7ce9925c184c4356",
+          "vulpra_sha": "cd50ad61b6fdac86c062a1cf7ce9925c184c4356",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "netwerk/base/nsStandardURL.h",
+          "upstream_fix_commit_result_sha": "4d412baec5b0eb108d3b97074cced35ab7dcbd7b",
+          "pinned_beta_sha": "04004794124e30874298e16de7d1e774a9c661a2",
+          "upstream_stable_159_sha": "04004794124e30874298e16de7d1e774a9c661a2",
+          "vulpra_sha": "04004794124e30874298e16de7d1e774a9c661a2",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "netwerk/protocol/res/SubstitutingProtocolHandler.cpp",
+          "upstream_fix_commit_result_sha": "0a89a2eb98c19f1c971bf463d90dc51e11d868d7",
+          "pinned_beta_sha": "0a89a2eb98c19f1c971bf463d90dc51e11d868d7",
+          "upstream_stable_159_sha": "0a89a2eb98c19f1c971bf463d90dc51e11d868d7",
+          "vulpra_sha": "0a89a2eb98c19f1c971bf463d90dc51e11d868d7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "netwerk/protocol/res/SubstitutingURL.h",
+          "upstream_fix_commit_result_sha": "58aae9b2fc4f595f5d0a509f02bfa02a073aeebe",
+          "pinned_beta_sha": "58aae9b2fc4f595f5d0a509f02bfa02a073aeebe",
+          "upstream_stable_159_sha": "58aae9b2fc4f595f5d0a509f02bfa02a073aeebe",
+          "vulpra_sha": "58aae9b2fc4f595f5d0a509f02bfa02a073aeebe",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "netwerk/test/unit/test_URIs.js",
+          "upstream_fix_commit_result_sha": "df64328d7f57da5d4c155478908597801bcb2d41",
+          "pinned_beta_sha": "df64328d7f57da5d4c155478908597801bcb2d41",
+          "upstream_stable_159_sha": "df64328d7f57da5d4c155478908597801bcb2d41",
+          "vulpra_sha": "df64328d7f57da5d4c155478908597801bcb2d41",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "virtual nsresult ResolveFile(nsIFile** aResult);"
+      ],
+      "note": "All five upstream Bug 2079068 paths match between pinned beta, stable and Vulpra; three match the selected upstream postimages exactly. The source and header nsStandardURL implementation differ from the selected patch commit after later revisions; the ResolveFile API retains the owned-return/avoid-shared-file-mutation contract in Vulpra. No file-URL resource-handler runtime regression or exploit test run."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117908",
+      "bug": 2079069,
+      "topic": "ImageLib image wrapper inner image use-after-free while forwarding calls",
+      "patch_commit": "3f0e52fe94558fc7300c8bde57c862ee0c1325ca",
+      "classification": "two_exact_upstream_patch_postimages_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "image/ImageWrapper.cpp",
+          "upstream_fix_commit_result_sha": "a3ad450af012b89bc6f11dd304f734b4bf592c89",
+          "pinned_beta_sha": "a3ad450af012b89bc6f11dd304f734b4bf592c89",
+          "upstream_stable_159_sha": "a3ad450af012b89bc6f11dd304f734b4bf592c89",
+          "vulpra_sha": "a3ad450af012b89bc6f11dd304f734b4bf592c89",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "image/MultipartImage.cpp",
+          "upstream_fix_commit_result_sha": "872e70f38edd457d29eb8665e3056585904bc21c",
+          "pinned_beta_sha": "872e70f38edd457d29eb8665e3056585904bc21c",
+          "upstream_stable_159_sha": "872e70f38edd457d29eb8665e3056585904bc21c",
+          "vulpra_sha": "872e70f38edd457d29eb8665e3056585904bc21c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Both original Bug 2079069 code paths retain byte-for-byte upstream postimage SHA identities in pinned beta, Firefox 159 stable, and Vulpra. RefPtr<Image> inner is held while forwarding multiple wrapper callbacks. No image decode, multipart race or sanitizer runtime test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117910",
+      "bug": 2079156,
+      "topic": "JavaScript iterator helper prototype lookup invalid pointer exposure",
+      "patch_commit": "e1d135f3efc5fc74169d7c722ca2cf70605ddfd9",
+      "classification": "four_upstream_code_and_test_paths_beta_stable_vulpra_identical_three_exact_selected_postimages",
+      "source_file_blobs": [
+        {
+          "path": "js/src/jit-test/tests/iterator/bug2079156-async.js",
+          "upstream_fix_commit_result_sha": "4c3f2aadd76295aaddb6d3a362197e4798066eb7",
+          "pinned_beta_sha": "c24774d707a8276568c762e73904d79207fd8f96",
+          "upstream_stable_159_sha": "c24774d707a8276568c762e73904d79207fd8f96",
+          "vulpra_sha": "c24774d707a8276568c762e73904d79207fd8f96",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/jit-test/tests/iterator/bug2079156.js",
+          "upstream_fix_commit_result_sha": "a2f65d167edd14d1d0ccaaf78ea4e237b5f37daa",
+          "pinned_beta_sha": "a2f65d167edd14d1d0ccaaf78ea4e237b5f37daa",
+          "upstream_stable_159_sha": "a2f65d167edd14d1d0ccaaf78ea4e237b5f37daa",
+          "vulpra_sha": "a2f65d167edd14d1d0ccaaf78ea4e237b5f37daa",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/AsyncIteration.cpp",
+          "upstream_fix_commit_result_sha": "42e13ae703eb04084a8b1a6b5afad36f90cdf2fe",
+          "pinned_beta_sha": "42e13ae703eb04084a8b1a6b5afad36f90cdf2fe",
+          "upstream_stable_159_sha": "42e13ae703eb04084a8b1a6b5afad36f90cdf2fe",
+          "vulpra_sha": "42e13ae703eb04084a8b1a6b5afad36f90cdf2fe",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/GeneratorObject.cpp",
+          "upstream_fix_commit_result_sha": "70d3365a722424285969cd5f6e0c8e357377d034",
+          "pinned_beta_sha": "70d3365a722424285969cd5f6e0c8e357377d034",
+          "upstream_stable_159_sha": "70d3365a722424285969cd5f6e0c8e357377d034",
+          "vulpra_sha": "70d3365a722424285969cd5f6e0c8e357377d034",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "if (!constructor->isSelfHostedBuiltin() &&",
+        "if (!fun->isSelfHostedBuiltin() &&"
+      ],
+      "note": "All four touched Bug 2079156 files are source-identical among beta, stable, and Vulpra. Three exact selected patch postimages; the async regression script has later changes. Both self-hosted iterator helper prototype-lookup guards were inspected in Vulpra source. No JS JIT-test shell execution or sanitizer exploit QA."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117911",
+      "bug": 2079171,
+      "topic": "Audio/Video playback ended media element lifetime use-after-free",
+      "patch_commit": "4c90edeaf366302d069aa0947172eff7b9acd2ed",
+      "classification": "beta_stable_vulpra_identical_source_with_original_playbackended_strong_ref_retained",
+      "source_file_blobs": [
+        {
+          "path": "dom/media/mediaelement/HTMLMediaElement.cpp",
+          "upstream_fix_commit_result_sha": "4d8fca7a7ed6be31742fe4dea6397ea0d25d2c0d",
+          "pinned_beta_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "upstream_stable_159_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "vulpra_sha": "d137ce24a2732db62b4050c5f858c17a067b60c8",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "void HTMLMediaElement::PlaybackEnded() {",
+        "RefPtr<HTMLMediaElement> kungFuDeathGrip(this);"
+      ],
+      "note": "The final beta/stable/Vulpra HTMLMediaElement.cpp source is byte-identical, and PlaybackEnded() retains the upstream Bug 2079171 strong self-reference ahead of potentially reentrant AddRemoveSelfReference(). It differs from the selected patch-result full-file SHA due to subsequent changes. No real ended playback exploit or memory sanitizer test."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
