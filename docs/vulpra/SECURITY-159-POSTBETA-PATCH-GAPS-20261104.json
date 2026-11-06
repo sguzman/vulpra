@@ -4912,6 +4912,145 @@
         "RecreateFramesForContent(mDocument->GetRootElement(), InsertionKind::Async);"
       ],
       "note": "Both upstream Bug 2081977 commits and all 11 distinct changed source/test files checked against selected upstream original postimages, pinned Firefox beta, Firefox stable, and Vulpra: all 11 match across beta/stable/Vulpra, eight exact selected upstream postimages, three final C++ code objects differ due later layout fixes. Inspected pseudo-element reuse when constructing extra repeated frames and explicit page-level full reconstruction instead of unsafe incremental removal of a fragmented table or replicated fixed element; additional ContainsReplicatedFixedPosPlaceholders protection present. Original crashtests and WPT print tests are present in source only, not executed; no ASAN memory-safety proof."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117942",
+      "bug": 2082047,
+      "topic": "SpiderMonkey Ion JIT bailout recovery exception-state and recover-result lifetime on failed bailout and out-of-memory",
+      "patch_commits": [
+        "f942d6e6910e20a66e910d2687353163f2eb234a",
+        "c5a22b75d6d49c79d75b602fb6c4fe2be9518377",
+        "d1a020277b648296fc64ad9fc44bebd0d2276983"
+      ],
+      "classification": "all_thirteen_distinct_original_source_and_jsapi_jit_test_paths_identical_beta_stable_vulpra_ten_exact_selected_patch_results",
+      "source_file_blobs": [
+        {
+          "path": "js/src/jit-test/tests/ion/bug2082047-2.js",
+          "upstream_fix_commit_result_sha": "b85859711fb49f58a77c1e98f4c5b3ff3bdcdf2a",
+          "pinned_beta_sha": "b85859711fb49f58a77c1e98f4c5b3ff3bdcdf2a",
+          "upstream_stable_159_sha": "b85859711fb49f58a77c1e98f4c5b3ff3bdcdf2a",
+          "vulpra_sha": "b85859711fb49f58a77c1e98f4c5b3ff3bdcdf2a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/JSJitFrameIter.h",
+          "upstream_fix_commit_result_sha": "fd51c9034cb0b7a48800a31256f3d73a3cbccadc",
+          "pinned_beta_sha": "fd51c9034cb0b7a48800a31256f3d73a3cbccadc",
+          "upstream_stable_159_sha": "fd51c9034cb0b7a48800a31256f3d73a3cbccadc",
+          "vulpra_sha": "fd51c9034cb0b7a48800a31256f3d73a3cbccadc",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/JitFrames.cpp",
+          "upstream_fix_commit_result_sha": "684b13c6e4e984a9f7b67ee39d82f25bf1042e63",
+          "pinned_beta_sha": "40059758c29600215dd876f0837710ec147f9986",
+          "upstream_stable_159_sha": "40059758c29600215dd876f0837710ec147f9986",
+          "vulpra_sha": "40059758c29600215dd876f0837710ec147f9986",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/jsapi-tests/moz.build",
+          "upstream_fix_commit_result_sha": "ab7e3c9d7128d71fadf2a00fb09abdfbd8edb886",
+          "pinned_beta_sha": "bfadc461891b3e3a9b99c7db5d21a51f5137af84",
+          "upstream_stable_159_sha": "bfadc461891b3e3a9b99c7db5d21a51f5137af84",
+          "vulpra_sha": "bfadc461891b3e3a9b99c7db5d21a51f5137af84",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/jsapi-tests/testJitRInstructionResults.cpp",
+          "upstream_fix_commit_result_sha": "ae027a3e0bfcf5c32b3b7cd2e9ad4fa3892f4c89",
+          "pinned_beta_sha": "ae027a3e0bfcf5c32b3b7cd2e9ad4fa3892f4c89",
+          "upstream_stable_159_sha": "ae027a3e0bfcf5c32b3b7cd2e9ad4fa3892f4c89",
+          "vulpra_sha": "ae027a3e0bfcf5c32b3b7cd2e9ad4fa3892f4c89",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jsapi.cpp",
+          "upstream_fix_commit_result_sha": "04fb2a5e66e4e59fa9840a3a437825dc45e76f6c",
+          "pinned_beta_sha": "04fb2a5e66e4e59fa9840a3a437825dc45e76f6c",
+          "upstream_stable_159_sha": "04fb2a5e66e4e59fa9840a3a437825dc45e76f6c",
+          "vulpra_sha": "04fb2a5e66e4e59fa9840a3a437825dc45e76f6c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/JSContext.cpp",
+          "upstream_fix_commit_result_sha": "707d0901edeed310c6c63f8c5ef51cc3856ae1f5",
+          "pinned_beta_sha": "707d0901edeed310c6c63f8c5ef51cc3856ae1f5",
+          "upstream_stable_159_sha": "707d0901edeed310c6c63f8c5ef51cc3856ae1f5",
+          "vulpra_sha": "707d0901edeed310c6c63f8c5ef51cc3856ae1f5",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/JSContext.h",
+          "upstream_fix_commit_result_sha": "ada76cd543e98f8e8e26914515858784073d9fd7",
+          "pinned_beta_sha": "ada76cd543e98f8e8e26914515858784073d9fd7",
+          "upstream_stable_159_sha": "ada76cd543e98f8e8e26914515858784073d9fd7",
+          "vulpra_sha": "ada76cd543e98f8e8e26914515858784073d9fd7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/ion/bug2082047-1.js",
+          "upstream_fix_commit_result_sha": "13706a3e6aed8a8c7df75050322c89900df0fe69",
+          "pinned_beta_sha": "13706a3e6aed8a8c7df75050322c89900df0fe69",
+          "upstream_stable_159_sha": "13706a3e6aed8a8c7df75050322c89900df0fe69",
+          "vulpra_sha": "13706a3e6aed8a8c7df75050322c89900df0fe69",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/Bailouts.cpp",
+          "upstream_fix_commit_result_sha": "8854f92e1838cba662d47c799f9628e81b3eaa27",
+          "pinned_beta_sha": "8854f92e1838cba662d47c799f9628e81b3eaa27",
+          "upstream_stable_159_sha": "8854f92e1838cba662d47c799f9628e81b3eaa27",
+          "vulpra_sha": "8854f92e1838cba662d47c799f9628e81b3eaa27",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/BaselineBailouts.cpp",
+          "upstream_fix_commit_result_sha": "2592269e79212b33af80744ed6d5f37220d246a1",
+          "pinned_beta_sha": "1b68a661f73e5c9f7d17e13da2b403fc9a6fc116",
+          "upstream_stable_159_sha": "1b68a661f73e5c9f7d17e13da2b403fc9a6fc116",
+          "vulpra_sha": "1b68a661f73e5c9f7d17e13da2b403fc9a6fc116",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/vm/JitActivation.cpp",
+          "upstream_fix_commit_result_sha": "8e004e5253f81d44c26f14b7d1afc21a4883e696",
+          "pinned_beta_sha": "8e004e5253f81d44c26f14b7d1afc21a4883e696",
+          "upstream_stable_159_sha": "8e004e5253f81d44c26f14b7d1afc21a4883e696",
+          "vulpra_sha": "8e004e5253f81d44c26f14b7d1afc21a4883e696",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/ion/bug2082045.js",
+          "upstream_fix_commit_result_sha": "229d0ef01f11fbd6d79859bc3e360447600b6b21",
+          "pinned_beta_sha": "229d0ef01f11fbd6d79859bc3e360447600b6b21",
+          "upstream_stable_159_sha": "229d0ef01f11fbd6d79859bc3e360447600b6b21",
+          "vulpra_sha": "229d0ef01f11fbd6d79859bc3e360447600b6b21",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "mozilla::Maybe<JS::ExceptionStatus> failureStatus_;",
+        "void RInstructionResults::saveFailure(JSContext* cx)",
+        "void RInstructionResults::restoreFailure(JSContext* cx) const",
+        "bailoutData.activation()->removeIonFrameRecovery(currentFramePtr);",
+        "// Set the first frame's formals after all fallible operations"
+      ],
+      "note": "Reviewed all 13 distinct paths across three upstream Bug 2082047/related 2082045 commits and compared original postimage, beta 159.0b5, stable 159, Vulpra main Git objects. All 13 beta/stable/Vulpra identical. JitFrames.cpp, JSAPI test registry, BaselineBailouts.cpp differ from selected patch postimages due subsequent revisions; others exact. Inspected final source: bailout recovery failures persist saved exception status/stack, trace edges; recover result cleanup moved to bailout callers; outermost formals only mutated after fallible bailout steps. Original JS JIT/OOM tests present in source, but not executed; no assertion of actual exploit or ASAN safety."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
