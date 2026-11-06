@@ -3763,6 +3763,72 @@
         "NS_STATE_SVG_TEXT_CORRESPONDENCE_DIRTY"
       ],
       "note": "Upstream first landed the SVG text-correspondence dirty guard in 738acb0 and reverted that landing in 7221716; the later 3-path bug commit d095061 contains the corrective reflow guard and original unicode-bidi crash fixture. The final beta/stable/Vulpra files have exact Git SHA parity, and the SVGObserverUtils.cpp and WPT crash fixture match the later selected fix-result blob exactly. nsIFrame.cpp has later edits but retains the AnyOuterSVGIsCallingReflowSVG guard. No WPT browser regression, sanitizer or exploit run for this CVE."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117904",
+      "bug": 2079059,
+      "topic": "JavaScript GC finalization registry callback active-JS exposure use-after-free",
+      "patch_commits": [
+        "d18ae0a7e1bdf3044c0fcd575208642bfa9e8a70",
+        "e78c56887c1f81181ba242e1a8bc6165a3396001",
+        "28f0865967cb90f111803dab3a1864d5c2731b02",
+        "98a346c77b7c1b1fb87897d9f853d74b9a5e45c8"
+      ],
+      "classification": "five_changed_code_and_test_source_paths_identical_beta_stable_vulpra_finalization_lifetime_guard_retained",
+      "source_file_blobs": [
+        {
+          "path": "js/src/gc/FinalizationObservers.cpp",
+          "upstream_fix_commit_result_sha": "a019903b0012968786781ae09d1655c7b6bc6480",
+          "pinned_beta_sha": "dc07488be161db1d00b6549d080046afcd79897d",
+          "upstream_stable_159_sha": "dc07488be161db1d00b6549d080046afcd79897d",
+          "vulpra_sha": "dc07488be161db1d00b6549d080046afcd79897d",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "xpcom/base/CycleCollectedJSContext.cpp",
+          "upstream_fix_commit_result_sha": "61d4f28fb3198edb6022888067b94a0ad6854808",
+          "pinned_beta_sha": "d14d41bd2d63f6639f1077e2d3ec141f88b6fb9f",
+          "upstream_stable_159_sha": "d14d41bd2d63f6639f1077e2d3ec141f88b6fb9f",
+          "vulpra_sha": "d14d41bd2d63f6639f1077e2d3ec141f88b6fb9f",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "xpcom/tests/crashtests/bug-2079059.html",
+          "upstream_fix_commit_result_sha": "a074493f73275269006d1adbdb55986855f3e6f2",
+          "pinned_beta_sha": "a074493f73275269006d1adbdb55986855f3e6f2",
+          "upstream_stable_159_sha": "a074493f73275269006d1adbdb55986855f3e6f2",
+          "vulpra_sha": "a074493f73275269006d1adbdb55986855f3e6f2",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "xpcom/tests/crashtests/crashtests.list",
+          "upstream_fix_commit_result_sha": "2ea09c32cb0759774b68650aeec64057039183a0",
+          "pinned_beta_sha": "2ea09c32cb0759774b68650aeec64057039183a0",
+          "upstream_stable_159_sha": "2ea09c32cb0759774b68650aeec64057039183a0",
+          "vulpra_sha": "2ea09c32cb0759774b68650aeec64057039183a0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/gc/bug-2081988.js",
+          "upstream_fix_commit_result_sha": "efa2faa1c0e30c607b9dd728b4c7861e488dd4c1",
+          "pinned_beta_sha": "efa2faa1c0e30c607b9dd728b4c7861e488dd4c1",
+          "upstream_stable_159_sha": "efa2faa1c0e30c607b9dd728b4c7861e488dd4c1",
+          "vulpra_sha": "efa2faa1c0e30c607b9dd728b4c7861e488dd4c1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "ExposeObjectToActiveJSDuringCollection(this, doCleanup);",
+        "ExposeObjectToActiveJSDuringCollection(this, incumbentGlobal);",
+        "JS::AssertObjectIsNotGray(JS_GetFunctionObject(callback.mCallbackFunction));"
+      ],
+      "note": "All five affected code and regression source paths are Git-identical across original Firefox 159 beta, stable 159, and Vulpra main. All three test/registration paths match selected upstream postimages; the two C++ sources have later edits and thus differ from their selected commit snapshots. Inspected Vulpra finalization-queue code retains exposing cleanup callback and incumbent global to active JS before host cleanup; CycleCollectedJSContext asserts they are not gray. Original regression fixture is tracked but was not executed; no GC sanitizer/exploit runtime validation."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
