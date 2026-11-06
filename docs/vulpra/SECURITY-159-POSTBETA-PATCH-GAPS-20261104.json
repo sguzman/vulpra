@@ -5161,6 +5161,800 @@
         "self.allowed_in_rule(context.rule_types())"
       ],
       "note": "Audited the entire 10-file union of two upstream Bug 2081985 source+test commits, including Servo CSS rule parser, generated property mask definitions, Gecko binding glue and WPT declaration-context checks. All 10 original Git blobs identical between Firefox 159 pinned beta, stable 159, and Vulpra; seven exact source postimages, three later-release changes in longhands.toml, properties.mako.rs and geckolib/glue.rs. Inspected rule-aware PropertyId acceptance and all-required-rule-type mask containment. The WPT test remains source-present, no actual WPT parser or sanitizer regression run. Newly monitored servo/** root required to ensure CI detects later changes."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118009",
+      "bug": 2076098,
+      "topic": "Graphics: Text FreeType vendored font parser integer overflow and use-after-free update",
+      "patch_commit": "78bbb78774ed71b6f837b3dc3155435271c01159",
+      "classification": "full_freetype_vendor_tree_authenticated_85_current_files_and_two_removed_79_exact_selected_update_postimages_six_subsequent_revisions",
+      "source_file_blobs": [
+        {
+          "path": "modules/freetype2/include/freetype/config/ftmodule.h",
+          "upstream_fix_commit_result_sha": "028e52cc33c675fefafb2d17c7cb83ca208e5580",
+          "pinned_beta_sha": "028e52cc33c675fefafb2d17c7cb83ca208e5580",
+          "upstream_stable_159_sha": "028e52cc33c675fefafb2d17c7cb83ca208e5580",
+          "vulpra_sha": "028e52cc33c675fefafb2d17c7cb83ca208e5580",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/config/ftoption.h",
+          "upstream_fix_commit_result_sha": "6d3d7dfaa574d8387b6eca249b3a13f9f57c0360",
+          "pinned_beta_sha": "6d3d7dfaa574d8387b6eca249b3a13f9f57c0360",
+          "upstream_stable_159_sha": "6d3d7dfaa574d8387b6eca249b3a13f9f57c0360",
+          "vulpra_sha": "6d3d7dfaa574d8387b6eca249b3a13f9f57c0360",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/freetype.h",
+          "upstream_fix_commit_result_sha": "63c0573bc48dd6a7b9f62c79fb5395ffb9e78948",
+          "pinned_beta_sha": "63c0573bc48dd6a7b9f62c79fb5395ffb9e78948",
+          "upstream_stable_159_sha": "63c0573bc48dd6a7b9f62c79fb5395ffb9e78948",
+          "vulpra_sha": "63c0573bc48dd6a7b9f62c79fb5395ffb9e78948",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/ftimage.h",
+          "upstream_fix_commit_result_sha": "61de54e48cbbe83ef47462314483b6e96bbfdd7f",
+          "pinned_beta_sha": "61de54e48cbbe83ef47462314483b6e96bbfdd7f",
+          "upstream_stable_159_sha": "61de54e48cbbe83ef47462314483b6e96bbfdd7f",
+          "vulpra_sha": "61de54e48cbbe83ef47462314483b6e96bbfdd7f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/ftmoderr.h",
+          "upstream_fix_commit_result_sha": "9010c9fc489a49d378dcbffc80b0bb0ec5e19980",
+          "pinned_beta_sha": "9010c9fc489a49d378dcbffc80b0bb0ec5e19980",
+          "upstream_stable_159_sha": "9010c9fc489a49d378dcbffc80b0bb0ec5e19980",
+          "vulpra_sha": "9010c9fc489a49d378dcbffc80b0bb0ec5e19980",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/fttypes.h",
+          "upstream_fix_commit_result_sha": "2f3ca05955a030fe20c9be6c7dd2b3d008635927",
+          "pinned_beta_sha": "2f3ca05955a030fe20c9be6c7dd2b3d008635927",
+          "upstream_stable_159_sha": "2f3ca05955a030fe20c9be6c7dd2b3d008635927",
+          "vulpra_sha": "2f3ca05955a030fe20c9be6c7dd2b3d008635927",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/ftcalc.h",
+          "upstream_fix_commit_result_sha": "129366f38949b07877e86d847c1520ed5da2d692",
+          "pinned_beta_sha": "129366f38949b07877e86d847c1520ed5da2d692",
+          "upstream_stable_159_sha": "129366f38949b07877e86d847c1520ed5da2d692",
+          "vulpra_sha": "129366f38949b07877e86d847c1520ed5da2d692",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/ftdebug.h",
+          "upstream_fix_commit_result_sha": "1baf5f385a8499a9cb304531567d68f09cf83e5f",
+          "pinned_beta_sha": "1baf5f385a8499a9cb304531567d68f09cf83e5f",
+          "upstream_stable_159_sha": "1baf5f385a8499a9cb304531567d68f09cf83e5f",
+          "vulpra_sha": "1baf5f385a8499a9cb304531567d68f09cf83e5f",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/ftmmtypes.h",
+          "upstream_fix_commit_result_sha": "854798ad3c0e87a391d3f626f0d4cbf73f7f3a0b",
+          "pinned_beta_sha": "854798ad3c0e87a391d3f626f0d4cbf73f7f3a0b",
+          "upstream_stable_159_sha": "854798ad3c0e87a391d3f626f0d4cbf73f7f3a0b",
+          "vulpra_sha": "854798ad3c0e87a391d3f626f0d4cbf73f7f3a0b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/ftobjs.h",
+          "upstream_fix_commit_result_sha": "f97262ffa95148629a076582db00dfaf6184a48a",
+          "pinned_beta_sha": "f97262ffa95148629a076582db00dfaf6184a48a",
+          "upstream_stable_159_sha": "f97262ffa95148629a076582db00dfaf6184a48a",
+          "vulpra_sha": "f97262ffa95148629a076582db00dfaf6184a48a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/ftserv.h",
+          "upstream_fix_commit_result_sha": "3b326627074d6eb214ccc9162742f2406601cdba",
+          "pinned_beta_sha": "3b326627074d6eb214ccc9162742f2406601cdba",
+          "upstream_stable_159_sha": "3b326627074d6eb214ccc9162742f2406601cdba",
+          "vulpra_sha": "3b326627074d6eb214ccc9162742f2406601cdba",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/fttrace.h",
+          "upstream_fix_commit_result_sha": "22291ef7cfe5ead9ca7701524284b9711a0b1808",
+          "pinned_beta_sha": "22291ef7cfe5ead9ca7701524284b9711a0b1808",
+          "upstream_stable_159_sha": "22291ef7cfe5ead9ca7701524284b9711a0b1808",
+          "vulpra_sha": "22291ef7cfe5ead9ca7701524284b9711a0b1808",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/services/svfntfmt.h",
+          "upstream_fix_commit_result_sha": "91a6f007aa52cdec84644201d8f0cba1c2d8076d",
+          "pinned_beta_sha": "91a6f007aa52cdec84644201d8f0cba1c2d8076d",
+          "upstream_stable_159_sha": "91a6f007aa52cdec84644201d8f0cba1c2d8076d",
+          "vulpra_sha": "91a6f007aa52cdec84644201d8f0cba1c2d8076d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/services/svttcmap.h",
+          "upstream_fix_commit_result_sha": "d7ad8066b5ee83a3a12ab36b7f243996cfc87a32",
+          "pinned_beta_sha": "d7ad8066b5ee83a3a12ab36b7f243996cfc87a32",
+          "upstream_stable_159_sha": "d7ad8066b5ee83a3a12ab36b7f243996cfc87a32",
+          "vulpra_sha": "d7ad8066b5ee83a3a12ab36b7f243996cfc87a32",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/services/svvarc.h",
+          "upstream_fix_commit_result_sha": "753340904d6674db40fc6e3ce7c3743d2c0eab7b",
+          "pinned_beta_sha": "753340904d6674db40fc6e3ce7c3743d2c0eab7b",
+          "upstream_stable_159_sha": "753340904d6674db40fc6e3ce7c3743d2c0eab7b",
+          "vulpra_sha": "753340904d6674db40fc6e3ce7c3743d2c0eab7b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/internal/tttypes.h",
+          "upstream_fix_commit_result_sha": "ad45da39b994ac3365c831b3e3475c2dca9647ec",
+          "pinned_beta_sha": "ad45da39b994ac3365c831b3e3475c2dca9647ec",
+          "upstream_stable_159_sha": "ad45da39b994ac3365c831b3e3475c2dca9647ec",
+          "vulpra_sha": "ad45da39b994ac3365c831b3e3475c2dca9647ec",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/include/freetype/tttags.h",
+          "upstream_fix_commit_result_sha": "7d431cea490bb24c23efd53af8253d314f280b26",
+          "pinned_beta_sha": "7d431cea490bb24c23efd53af8253d314f280b26",
+          "upstream_stable_159_sha": "7d431cea490bb24c23efd53af8253d314f280b26",
+          "vulpra_sha": "7d431cea490bb24c23efd53af8253d314f280b26",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/modules.cfg",
+          "upstream_fix_commit_result_sha": "b9b4718f187364e6657105320e220222d5bc0a2c",
+          "pinned_beta_sha": "b9b4718f187364e6657105320e220222d5bc0a2c",
+          "upstream_stable_159_sha": "b9b4718f187364e6657105320e220222d5bc0a2c",
+          "vulpra_sha": "b9b4718f187364e6657105320e220222d5bc0a2c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/moz.build",
+          "upstream_fix_commit_result_sha": "4e1752373c6548b1b2127d52c9cbdf09edebae54",
+          "pinned_beta_sha": "4e1752373c6548b1b2127d52c9cbdf09edebae54",
+          "upstream_stable_159_sha": "4e1752373c6548b1b2127d52c9cbdf09edebae54",
+          "vulpra_sha": "4e1752373c6548b1b2127d52c9cbdf09edebae54",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/moz.yaml",
+          "upstream_fix_commit_result_sha": "9edd49aff2d4c5e97d6010237e07a5d81d48ca3d",
+          "pinned_beta_sha": "9d6221dfa68d87f5afa8391dbbc709636396189c",
+          "upstream_stable_159_sha": "9d6221dfa68d87f5afa8391dbbc709636396189c",
+          "vulpra_sha": "9d6221dfa68d87f5afa8391dbbc709636396189c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "modules/freetype2/src/autofit/afgsub.c",
+          "upstream_fix_commit_result_sha": "4a9b9ef69faa21c29bb3290a3a3d129551e5de2a",
+          "pinned_beta_sha": "4a9b9ef69faa21c29bb3290a3a3d129551e5de2a",
+          "upstream_stable_159_sha": "4a9b9ef69faa21c29bb3290a3a3d129551e5de2a",
+          "vulpra_sha": "4a9b9ef69faa21c29bb3290a3a3d129551e5de2a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/autofit/aflatin.c",
+          "upstream_fix_commit_result_sha": "3c97f91dd933c99a08ae770455ffbe85659a23f7",
+          "pinned_beta_sha": "3c97f91dd933c99a08ae770455ffbe85659a23f7",
+          "upstream_stable_159_sha": "3c97f91dd933c99a08ae770455ffbe85659a23f7",
+          "vulpra_sha": "3c97f91dd933c99a08ae770455ffbe85659a23f7",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/autofit/afranges.c",
+          "upstream_fix_commit_result_sha": "c9f5e0a8aab073f592462185a0e0c67bdc391922",
+          "pinned_beta_sha": "c9f5e0a8aab073f592462185a0e0c67bdc391922",
+          "upstream_stable_159_sha": "c9f5e0a8aab073f592462185a0e0c67bdc391922",
+          "vulpra_sha": "c9f5e0a8aab073f592462185a0e0c67bdc391922",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/autofit/hb-script-list.h",
+          "upstream_fix_commit_result_sha": "1caa16aabe7f991579fc72ad178837fac3a525fe",
+          "pinned_beta_sha": "1caa16aabe7f991579fc72ad178837fac3a525fe",
+          "upstream_stable_159_sha": "1caa16aabe7f991579fc72ad178837fac3a525fe",
+          "vulpra_sha": "1caa16aabe7f991579fc72ad178837fac3a525fe",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/base/ftbbox.c",
+          "upstream_fix_commit_result_sha": "09ab8ce4de577c339d9db3971d5c58e0e413023c",
+          "pinned_beta_sha": "09ab8ce4de577c339d9db3971d5c58e0e413023c",
+          "upstream_stable_159_sha": "09ab8ce4de577c339d9db3971d5c58e0e413023c",
+          "vulpra_sha": "09ab8ce4de577c339d9db3971d5c58e0e413023c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/base/ftbitmap.c",
+          "upstream_fix_commit_result_sha": "1606cbfa09053b9a63b29e06da8aaef062ecd20b",
+          "pinned_beta_sha": "1606cbfa09053b9a63b29e06da8aaef062ecd20b",
+          "upstream_stable_159_sha": "1606cbfa09053b9a63b29e06da8aaef062ecd20b",
+          "vulpra_sha": "1606cbfa09053b9a63b29e06da8aaef062ecd20b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/base/ftcalc.c",
+          "upstream_fix_commit_result_sha": "c78d3b6da4b8f350bacbd356c27800d1e0845b76",
+          "pinned_beta_sha": "c78d3b6da4b8f350bacbd356c27800d1e0845b76",
+          "upstream_stable_159_sha": "c78d3b6da4b8f350bacbd356c27800d1e0845b76",
+          "vulpra_sha": "c78d3b6da4b8f350bacbd356c27800d1e0845b76",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/base/ftobjs.c",
+          "upstream_fix_commit_result_sha": "edc4c2c45aff00cb805effd43ffea308a3b7f568",
+          "pinned_beta_sha": "edc4c2c45aff00cb805effd43ffea308a3b7f568",
+          "upstream_stable_159_sha": "edc4c2c45aff00cb805effd43ffea308a3b7f568",
+          "vulpra_sha": "edc4c2c45aff00cb805effd43ffea308a3b7f568",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/base/ftoutln.c",
+          "upstream_fix_commit_result_sha": "b37b53312fcd3d6f24dd22958ee82b77d0ac4b52",
+          "pinned_beta_sha": "b37b53312fcd3d6f24dd22958ee82b77d0ac4b52",
+          "upstream_stable_159_sha": "b37b53312fcd3d6f24dd22958ee82b77d0ac4b52",
+          "vulpra_sha": "b37b53312fcd3d6f24dd22958ee82b77d0ac4b52",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/base/ftstroke.c",
+          "upstream_fix_commit_result_sha": "cc93265b0ba210ca1435a3e2cbc647b2c6f82869",
+          "pinned_beta_sha": "cc93265b0ba210ca1435a3e2cbc647b2c6f82869",
+          "upstream_stable_159_sha": "cc93265b0ba210ca1435a3e2cbc647b2c6f82869",
+          "vulpra_sha": "cc93265b0ba210ca1435a3e2cbc647b2c6f82869",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/cff/cffdrivr.c",
+          "upstream_fix_commit_result_sha": "935548ea647f55404d868fb7219238b624cb72dc",
+          "pinned_beta_sha": "935548ea647f55404d868fb7219238b624cb72dc",
+          "upstream_stable_159_sha": "935548ea647f55404d868fb7219238b624cb72dc",
+          "vulpra_sha": "935548ea647f55404d868fb7219238b624cb72dc",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/cff/cffgload.c",
+          "upstream_fix_commit_result_sha": "331c681b8ae2e4cd7ca28cfabe1a7756a7195c7a",
+          "pinned_beta_sha": "331c681b8ae2e4cd7ca28cfabe1a7756a7195c7a",
+          "upstream_stable_159_sha": "331c681b8ae2e4cd7ca28cfabe1a7756a7195c7a",
+          "vulpra_sha": "331c681b8ae2e4cd7ca28cfabe1a7756a7195c7a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/cff/cffload.c",
+          "upstream_fix_commit_result_sha": "cfd5317ff52a1522d3895ff27243cee1f669b2e1",
+          "pinned_beta_sha": "cfd5317ff52a1522d3895ff27243cee1f669b2e1",
+          "upstream_stable_159_sha": "cfd5317ff52a1522d3895ff27243cee1f669b2e1",
+          "vulpra_sha": "cfd5317ff52a1522d3895ff27243cee1f669b2e1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/cff/cffobjs.c",
+          "upstream_fix_commit_result_sha": "8efdd109f95cae0bb825400a70661348f61fd5aa",
+          "pinned_beta_sha": "8efdd109f95cae0bb825400a70661348f61fd5aa",
+          "upstream_stable_159_sha": "8efdd109f95cae0bb825400a70661348f61fd5aa",
+          "vulpra_sha": "8efdd109f95cae0bb825400a70661348f61fd5aa",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/cid/cidload.c",
+          "upstream_fix_commit_result_sha": "b9ab1b9e05d514e58f8d682be96163d449e538cf",
+          "pinned_beta_sha": "b9ab1b9e05d514e58f8d682be96163d449e538cf",
+          "upstream_stable_159_sha": "b9ab1b9e05d514e58f8d682be96163d449e538cf",
+          "vulpra_sha": "b9ab1b9e05d514e58f8d682be96163d449e538cf",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/gzip/README.freetype",
+          "upstream_fix_commit_result_sha": "5d8b83d5dd783a68bb7382220009f5d3db96ff84",
+          "pinned_beta_sha": "5d8b83d5dd783a68bb7382220009f5d3db96ff84",
+          "upstream_stable_159_sha": "5d8b83d5dd783a68bb7382220009f5d3db96ff84",
+          "vulpra_sha": "5d8b83d5dd783a68bb7382220009f5d3db96ff84",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/gzip/crc32.c",
+          "upstream_fix_commit_result_sha": "6624c0ec5d0ab00ce209a0397eaedf213b4db6a1",
+          "pinned_beta_sha": "6624c0ec5d0ab00ce209a0397eaedf213b4db6a1",
+          "upstream_stable_159_sha": "6624c0ec5d0ab00ce209a0397eaedf213b4db6a1",
+          "vulpra_sha": "6624c0ec5d0ab00ce209a0397eaedf213b4db6a1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/gzip/zlib.h",
+          "upstream_fix_commit_result_sha": "fda054163ea593959cdfb074959cb3b89029920e",
+          "pinned_beta_sha": "fda054163ea593959cdfb074959cb3b89029920e",
+          "upstream_stable_159_sha": "fda054163ea593959cdfb074959cb3b89029920e",
+          "vulpra_sha": "fda054163ea593959cdfb074959cb3b89029920e",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/hvf.c",
+          "upstream_fix_commit_result_sha": "a0e0a58ce10a4d44e51cc67ad7b26ce77318bc64",
+          "pinned_beta_sha": "a0e0a58ce10a4d44e51cc67ad7b26ce77318bc64",
+          "upstream_stable_159_sha": "a0e0a58ce10a4d44e51cc67ad7b26ce77318bc64",
+          "vulpra_sha": "a0e0a58ce10a4d44e51cc67ad7b26ce77318bc64",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/hvfdrv.c",
+          "upstream_fix_commit_result_sha": "b59cb55c93f6cc8c39b9960344cd3ad1e30b1db1",
+          "pinned_beta_sha": "b59cb55c93f6cc8c39b9960344cd3ad1e30b1db1",
+          "upstream_stable_159_sha": "b59cb55c93f6cc8c39b9960344cd3ad1e30b1db1",
+          "vulpra_sha": "b59cb55c93f6cc8c39b9960344cd3ad1e30b1db1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/hvfdrv.h",
+          "upstream_fix_commit_result_sha": "c27d7fcaa19753456ea0b18e639341a05be5b47e",
+          "pinned_beta_sha": "c27d7fcaa19753456ea0b18e639341a05be5b47e",
+          "upstream_stable_159_sha": "c27d7fcaa19753456ea0b18e639341a05be5b47e",
+          "vulpra_sha": "c27d7fcaa19753456ea0b18e639341a05be5b47e",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/hvferror.h",
+          "upstream_fix_commit_result_sha": "6d474d292cf5762489897927c7afb562eca720e8",
+          "pinned_beta_sha": "6d474d292cf5762489897927c7afb562eca720e8",
+          "upstream_stable_159_sha": "6d474d292cf5762489897927c7afb562eca720e8",
+          "vulpra_sha": "6d474d292cf5762489897927c7afb562eca720e8",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/hvfload.c",
+          "upstream_fix_commit_result_sha": "a02d363c1da6fa8f4c2cf054cffa0ca914697f6a",
+          "pinned_beta_sha": "a02d363c1da6fa8f4c2cf054cffa0ca914697f6a",
+          "upstream_stable_159_sha": "a02d363c1da6fa8f4c2cf054cffa0ca914697f6a",
+          "vulpra_sha": "a02d363c1da6fa8f4c2cf054cffa0ca914697f6a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/hvfload.h",
+          "upstream_fix_commit_result_sha": "0207a55e5ff05ce90bf96661eabb0309683def84",
+          "pinned_beta_sha": "0207a55e5ff05ce90bf96661eabb0309683def84",
+          "upstream_stable_159_sha": "0207a55e5ff05ce90bf96661eabb0309683def84",
+          "vulpra_sha": "0207a55e5ff05ce90bf96661eabb0309683def84",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/hvfobjs.c",
+          "upstream_fix_commit_result_sha": "96536b8ef15b9989a4a22433f2c9310fbb64aca1",
+          "pinned_beta_sha": "96536b8ef15b9989a4a22433f2c9310fbb64aca1",
+          "upstream_stable_159_sha": "96536b8ef15b9989a4a22433f2c9310fbb64aca1",
+          "vulpra_sha": "96536b8ef15b9989a4a22433f2c9310fbb64aca1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/hvfobjs.h",
+          "upstream_fix_commit_result_sha": "ae9c90595e8122f2b9e152a8eaa987be506ff5b9",
+          "pinned_beta_sha": "ae9c90595e8122f2b9e152a8eaa987be506ff5b9",
+          "upstream_stable_159_sha": "ae9c90595e8122f2b9e152a8eaa987be506ff5b9",
+          "vulpra_sha": "ae9c90595e8122f2b9e152a8eaa987be506ff5b9",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/module.mk",
+          "upstream_fix_commit_result_sha": "b404119e881ca27b28d72d46f67d87511018e43e",
+          "pinned_beta_sha": "b404119e881ca27b28d72d46f67d87511018e43e",
+          "upstream_stable_159_sha": "b404119e881ca27b28d72d46f67d87511018e43e",
+          "vulpra_sha": "b404119e881ca27b28d72d46f67d87511018e43e",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/hvf/rules.mk",
+          "upstream_fix_commit_result_sha": "7083ecefb0b0a548bedfc58c416d41366d699f04",
+          "pinned_beta_sha": "7083ecefb0b0a548bedfc58c416d41366d699f04",
+          "upstream_stable_159_sha": "7083ecefb0b0a548bedfc58c416d41366d699f04",
+          "vulpra_sha": "7083ecefb0b0a548bedfc58c416d41366d699f04",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/otvalid/otvmath.c",
+          "upstream_fix_commit_result_sha": "ccc4b89d296f40d205e1c6c41213bd569e75048d",
+          "pinned_beta_sha": "ccc4b89d296f40d205e1c6c41213bd569e75048d",
+          "upstream_stable_159_sha": "ccc4b89d296f40d205e1c6c41213bd569e75048d",
+          "vulpra_sha": "ccc4b89d296f40d205e1c6c41213bd569e75048d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/pcf/pcfdrivr.c",
+          "upstream_fix_commit_result_sha": "11977c51edbe10b3759d2bfaaa348433a327121c",
+          "pinned_beta_sha": "11977c51edbe10b3759d2bfaaa348433a327121c",
+          "upstream_stable_159_sha": "11977c51edbe10b3759d2bfaaa348433a327121c",
+          "vulpra_sha": "11977c51edbe10b3759d2bfaaa348433a327121c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/pcf/pcfread.c",
+          "upstream_fix_commit_result_sha": "49d5171630d349e7444a420bb037e258b0649dba",
+          "pinned_beta_sha": "49d5171630d349e7444a420bb037e258b0649dba",
+          "upstream_stable_159_sha": "49d5171630d349e7444a420bb037e258b0649dba",
+          "vulpra_sha": "49d5171630d349e7444a420bb037e258b0649dba",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/pfr/pfrobjs.c",
+          "upstream_fix_commit_result_sha": "bf538e20e54c533bff8e7673e32143a07e7772b0",
+          "pinned_beta_sha": "bf538e20e54c533bff8e7673e32143a07e7772b0",
+          "upstream_stable_159_sha": "bf538e20e54c533bff8e7673e32143a07e7772b0",
+          "vulpra_sha": "bf538e20e54c533bff8e7673e32143a07e7772b0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/psaux/psintrp.c",
+          "upstream_fix_commit_result_sha": "4db0a544aedade6748888738c38a6bb4ed3f167c",
+          "pinned_beta_sha": "4db0a544aedade6748888738c38a6bb4ed3f167c",
+          "upstream_stable_159_sha": "4db0a544aedade6748888738c38a6bb4ed3f167c",
+          "vulpra_sha": "4db0a544aedade6748888738c38a6bb4ed3f167c",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/psaux/psstack.c",
+          "upstream_fix_commit_result_sha": "1360ba30dab7ef9827d62030e457a06fdea91cb9",
+          "pinned_beta_sha": "1360ba30dab7ef9827d62030e457a06fdea91cb9",
+          "upstream_stable_159_sha": "1360ba30dab7ef9827d62030e457a06fdea91cb9",
+          "vulpra_sha": "1360ba30dab7ef9827d62030e457a06fdea91cb9",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/raster/ftraster.c",
+          "upstream_fix_commit_result_sha": "e0121f6ee1acd0591dc292f3fcba364cec5d0028",
+          "pinned_beta_sha": "e0121f6ee1acd0591dc292f3fcba364cec5d0028",
+          "upstream_stable_159_sha": "e0121f6ee1acd0591dc292f3fcba364cec5d0028",
+          "vulpra_sha": "e0121f6ee1acd0591dc292f3fcba364cec5d0028",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sdf/ftsdf.c",
+          "upstream_fix_commit_result_sha": "d9d43fcc41c1d487660d3d707d469a954bea5aeb",
+          "pinned_beta_sha": "d9d43fcc41c1d487660d3d707d469a954bea5aeb",
+          "upstream_stable_159_sha": "d9d43fcc41c1d487660d3d707d469a954bea5aeb",
+          "vulpra_sha": "d9d43fcc41c1d487660d3d707d469a954bea5aeb",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/sfobjs.c",
+          "upstream_fix_commit_result_sha": "b894331935a80e538345fcc9c7f36e49f6ef1a05",
+          "pinned_beta_sha": "b894331935a80e538345fcc9c7f36e49f6ef1a05",
+          "upstream_stable_159_sha": "b894331935a80e538345fcc9c7f36e49f6ef1a05",
+          "vulpra_sha": "b894331935a80e538345fcc9c7f36e49f6ef1a05",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/sfwoff.c",
+          "upstream_fix_commit_result_sha": "02125e3cba5d86d85107c8817a02c5d16dc62fbb",
+          "pinned_beta_sha": "02125e3cba5d86d85107c8817a02c5d16dc62fbb",
+          "upstream_stable_159_sha": "02125e3cba5d86d85107c8817a02c5d16dc62fbb",
+          "vulpra_sha": "02125e3cba5d86d85107c8817a02c5d16dc62fbb",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttbdf.c",
+          "upstream_fix_commit_result_sha": "e4ece461369177ff45a9bfcead110170a7141863",
+          "pinned_beta_sha": "e4ece461369177ff45a9bfcead110170a7141863",
+          "upstream_stable_159_sha": "e4ece461369177ff45a9bfcead110170a7141863",
+          "vulpra_sha": "e4ece461369177ff45a9bfcead110170a7141863",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttcmap.c",
+          "upstream_fix_commit_result_sha": "8915e3decb07b76128729fd6d11422fd674eb826",
+          "pinned_beta_sha": "6fae7041b8ef6da32fdc8d28e996d3f84d59c1ab",
+          "upstream_stable_159_sha": "6fae7041b8ef6da32fdc8d28e996d3f84d59c1ab",
+          "vulpra_sha": "6fae7041b8ef6da32fdc8d28e996d3f84d59c1ab",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttcmap.h",
+          "upstream_fix_commit_result_sha": "4b8cbb3197a1cc338d597cabab9f5252cd9b6e30",
+          "pinned_beta_sha": "4b8cbb3197a1cc338d597cabab9f5252cd9b6e30",
+          "upstream_stable_159_sha": "4b8cbb3197a1cc338d597cabab9f5252cd9b6e30",
+          "vulpra_sha": "4b8cbb3197a1cc338d597cabab9f5252cd9b6e30",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttcmapc.h",
+          "upstream_fix_commit_result_sha": "a704690dae6fce800e7ab176da2048d9afbe3286",
+          "pinned_beta_sha": "a704690dae6fce800e7ab176da2048d9afbe3286",
+          "upstream_stable_159_sha": "a704690dae6fce800e7ab176da2048d9afbe3286",
+          "vulpra_sha": "a704690dae6fce800e7ab176da2048d9afbe3286",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttcolr.c",
+          "upstream_fix_commit_result_sha": "7078afd1c7ee8c05de2e02453a81952963a2d375",
+          "pinned_beta_sha": "2272ec3739a236873cc3fe3a3cd89dc6fe9547b9",
+          "upstream_stable_159_sha": "2272ec3739a236873cc3fe3a3cd89dc6fe9547b9",
+          "vulpra_sha": "2272ec3739a236873cc3fe3a3cd89dc6fe9547b9",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttload.c",
+          "upstream_fix_commit_result_sha": "74d319e01f17690dd06f67fdf2cd0e94361a004a",
+          "pinned_beta_sha": "74d319e01f17690dd06f67fdf2cd0e94361a004a",
+          "upstream_stable_159_sha": "74d319e01f17690dd06f67fdf2cd0e94361a004a",
+          "vulpra_sha": "74d319e01f17690dd06f67fdf2cd0e94361a004a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttmtx.c",
+          "upstream_fix_commit_result_sha": "e52df3f583e07825c796ca74901acb9a0c2acfe0",
+          "pinned_beta_sha": "e52df3f583e07825c796ca74901acb9a0c2acfe0",
+          "upstream_stable_159_sha": "e52df3f583e07825c796ca74901acb9a0c2acfe0",
+          "vulpra_sha": "e52df3f583e07825c796ca74901acb9a0c2acfe0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttpost.c",
+          "upstream_fix_commit_result_sha": "0e0bd0fd366d5da967af5a9896187553bf3d3cc1",
+          "pinned_beta_sha": "0e0bd0fd366d5da967af5a9896187553bf3d3cc1",
+          "upstream_stable_159_sha": "0e0bd0fd366d5da967af5a9896187553bf3d3cc1",
+          "vulpra_sha": "0e0bd0fd366d5da967af5a9896187553bf3d3cc1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/sfnt/ttsbit.c",
+          "upstream_fix_commit_result_sha": "d479b6a0b78ea0eb11676457db51c592a5b83aed",
+          "pinned_beta_sha": "d479b6a0b78ea0eb11676457db51c592a5b83aed",
+          "upstream_stable_159_sha": "d479b6a0b78ea0eb11676457db51c592a5b83aed",
+          "vulpra_sha": "d479b6a0b78ea0eb11676457db51c592a5b83aed",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/smooth/ftgrays.c",
+          "upstream_fix_commit_result_sha": "69805f08a270e1c30a3d1616ccffb300b5e5fd52",
+          "pinned_beta_sha": "69805f08a270e1c30a3d1616ccffb300b5e5fd52",
+          "upstream_stable_159_sha": "69805f08a270e1c30a3d1616ccffb300b5e5fd52",
+          "vulpra_sha": "69805f08a270e1c30a3d1616ccffb300b5e5fd52",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/smooth/ftsmooth.c",
+          "upstream_fix_commit_result_sha": "f5a3de65d801aa5be5b3de2f6835481c2462e691",
+          "pinned_beta_sha": "f5a3de65d801aa5be5b3de2f6835481c2462e691",
+          "upstream_stable_159_sha": "f5a3de65d801aa5be5b3de2f6835481c2462e691",
+          "vulpra_sha": "f5a3de65d801aa5be5b3de2f6835481c2462e691",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/rules.mk",
+          "upstream_fix_commit_result_sha": "c8b5611b6ef2f0a6c1bd6ff10a4de97607e14dbc",
+          "pinned_beta_sha": "c8b5611b6ef2f0a6c1bd6ff10a4de97607e14dbc",
+          "upstream_stable_159_sha": "c8b5611b6ef2f0a6c1bd6ff10a4de97607e14dbc",
+          "vulpra_sha": "c8b5611b6ef2f0a6c1bd6ff10a4de97607e14dbc",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/truetype.c",
+          "upstream_fix_commit_result_sha": "631f004cb3da3b1d35da9e719789060c752645e4",
+          "pinned_beta_sha": "631f004cb3da3b1d35da9e719789060c752645e4",
+          "upstream_stable_159_sha": "631f004cb3da3b1d35da9e719789060c752645e4",
+          "vulpra_sha": "631f004cb3da3b1d35da9e719789060c752645e4",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttdriver.c",
+          "upstream_fix_commit_result_sha": "b9530b518bcd2bc7007a0b37e1a2c37a5d7ce484",
+          "pinned_beta_sha": "b9530b518bcd2bc7007a0b37e1a2c37a5d7ce484",
+          "upstream_stable_159_sha": "b9530b518bcd2bc7007a0b37e1a2c37a5d7ce484",
+          "vulpra_sha": "b9530b518bcd2bc7007a0b37e1a2c37a5d7ce484",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttgload.c",
+          "upstream_fix_commit_result_sha": "f665361646dda40ec264e711a463758ab8cbd228",
+          "pinned_beta_sha": "f665361646dda40ec264e711a463758ab8cbd228",
+          "upstream_stable_159_sha": "f665361646dda40ec264e711a463758ab8cbd228",
+          "vulpra_sha": "f665361646dda40ec264e711a463758ab8cbd228",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttgxvar.c",
+          "upstream_fix_commit_result_sha": "d3f8c30fa06ccb88effa20ea2ffc534d182908c3",
+          "pinned_beta_sha": "d3f8c30fa06ccb88effa20ea2ffc534d182908c3",
+          "upstream_stable_159_sha": "d3f8c30fa06ccb88effa20ea2ffc534d182908c3",
+          "vulpra_sha": "d3f8c30fa06ccb88effa20ea2ffc534d182908c3",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttgxvar.h",
+          "upstream_fix_commit_result_sha": "c8446e134b2882ae6706f3ca71fc43cd4413f547",
+          "pinned_beta_sha": "c8446e134b2882ae6706f3ca71fc43cd4413f547",
+          "upstream_stable_159_sha": "c8446e134b2882ae6706f3ca71fc43cd4413f547",
+          "vulpra_sha": "c8446e134b2882ae6706f3ca71fc43cd4413f547",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttinterp.c",
+          "upstream_fix_commit_result_sha": "75bd8e0ee8c45e300d34bdab12176a599bd9f3e9",
+          "pinned_beta_sha": "cc99b2ebd42ef5c98ffb068dc58cf9790e9cfe4d",
+          "upstream_stable_159_sha": "cc99b2ebd42ef5c98ffb068dc58cf9790e9cfe4d",
+          "vulpra_sha": "cc99b2ebd42ef5c98ffb068dc58cf9790e9cfe4d",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttinterp.h",
+          "upstream_fix_commit_result_sha": "5b71bb82d8053e69c0c2e095a4727d80e00eb1f0",
+          "pinned_beta_sha": "5b71bb82d8053e69c0c2e095a4727d80e00eb1f0",
+          "upstream_stable_159_sha": "5b71bb82d8053e69c0c2e095a4727d80e00eb1f0",
+          "vulpra_sha": "5b71bb82d8053e69c0c2e095a4727d80e00eb1f0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttobjs.c",
+          "upstream_fix_commit_result_sha": "8c76e23dbf812363b8a5e5d7bfbbe3d0bb212546",
+          "pinned_beta_sha": "8c76e23dbf812363b8a5e5d7bfbbe3d0bb212546",
+          "upstream_stable_159_sha": "8c76e23dbf812363b8a5e5d7bfbbe3d0bb212546",
+          "vulpra_sha": "8c76e23dbf812363b8a5e5d7bfbbe3d0bb212546",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttobjs.h",
+          "upstream_fix_commit_result_sha": "01e581e1c1a1412debbaa5b5380e5398008d2e3b",
+          "pinned_beta_sha": "01e581e1c1a1412debbaa5b5380e5398008d2e3b",
+          "upstream_stable_159_sha": "01e581e1c1a1412debbaa5b5380e5398008d2e3b",
+          "vulpra_sha": "01e581e1c1a1412debbaa5b5380e5398008d2e3b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttpload.c",
+          "upstream_fix_commit_result_sha": "ec85f48ce2c2ebe0765094dc8d24ec20bedf0d18",
+          "pinned_beta_sha": "ec85f48ce2c2ebe0765094dc8d24ec20bedf0d18",
+          "upstream_stable_159_sha": "ec85f48ce2c2ebe0765094dc8d24ec20bedf0d18",
+          "vulpra_sha": "ec85f48ce2c2ebe0765094dc8d24ec20bedf0d18",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttvarc.c",
+          "upstream_fix_commit_result_sha": "a91c708290f244e73e23daae924edd4885d2154c",
+          "pinned_beta_sha": "80d527b66ad03d545f301802f730ca6fe92f6b17",
+          "upstream_stable_159_sha": "80d527b66ad03d545f301802f730ca6fe92f6b17",
+          "vulpra_sha": "80d527b66ad03d545f301802f730ca6fe92f6b17",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "modules/freetype2/src/truetype/ttvarc.h",
+          "upstream_fix_commit_result_sha": "1ac742a396208bdbabf269c30c6a35a25857e922",
+          "pinned_beta_sha": "1ac742a396208bdbabf269c30c6a35a25857e922",
+          "upstream_stable_159_sha": "1ac742a396208bdbabf269c30c6a35a25857e922",
+          "vulpra_sha": "1ac742a396208bdbabf269c30c6a35a25857e922",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/type1/t1load.c",
+          "upstream_fix_commit_result_sha": "2ed327ba2e75b0ddd4e62597c4de0249ea17b6fe",
+          "pinned_beta_sha": "2ed327ba2e75b0ddd4e62597c4de0249ea17b6fe",
+          "upstream_stable_159_sha": "2ed327ba2e75b0ddd4e62597c4de0249ea17b6fe",
+          "vulpra_sha": "2ed327ba2e75b0ddd4e62597c4de0249ea17b6fe",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "modules/freetype2/src/type1/t1parse.c",
+          "upstream_fix_commit_result_sha": "151aeac3ced7ed785cbb976ce1c243d49c4b67cd",
+          "pinned_beta_sha": "73bfb0cdecce6870f1192c344eea918544f05ab3",
+          "upstream_stable_159_sha": "73bfb0cdecce6870f1192c344eea918544f05ab3",
+          "vulpra_sha": "73bfb0cdecce6870f1192c344eea918544f05ab3",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "modules/freetype2/src/winfonts/winfnt.c",
+          "upstream_fix_commit_result_sha": "99f31f61f7b63389c8d4e9c61d5cbf4ea5fa56fa",
+          "pinned_beta_sha": "99f31f61f7b63389c8d4e9c61d5cbf4ea5fa56fa",
+          "upstream_stable_159_sha": "99f31f61f7b63389c8d4e9c61d5cbf4ea5fa56fa",
+          "vulpra_sha": "99f31f61f7b63389c8d4e9c61d5cbf4ea5fa56fa",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "upstream_fix_freetype_tree_sha": "3f2ef9e0b6f213e02ef44e973062ad43f92ccfe5",
+      "pinned_beta_freetype_tree_sha": "2e22f899bbf1bacd82db822552d72994aad30dd6",
+      "upstream_stable_159_freetype_tree_sha": "2e22f899bbf1bacd82db822552d72994aad30dd6",
+      "vulpra_main_freetype_tree_sha": "2e22f899bbf1bacd82db822552d72994aad30dd6",
+      "upstream_deleted_paths_verified_absent_in_pinned_and_postfix": [
+        "modules/freetype2/patches/0002-Bug-2032043-cherry-pick-upstream-1803559c.patch",
+        "modules/freetype2/patches/0003-Bug-2038537-truetype-interpreter-fixes.patch"
+      ],
+      "upstream_changed_paths_revised_again_in_mozilla_release": [
+        "modules/freetype2/moz.yaml",
+        "modules/freetype2/src/sfnt/ttcmap.c",
+        "modules/freetype2/src/sfnt/ttcolr.c",
+        "modules/freetype2/src/truetype/ttinterp.c",
+        "modules/freetype2/src/truetype/ttvarc.c",
+        "modules/freetype2/src/type1/t1parse.c"
+      ],
+      "upstream_vendor_commit_revision": "d1f916a65eb13d5cd44b711cfd24cf8d5949b2d2",
+      "pinned_beta_vendor_revision": "d5d4bef0c6d5363931d346a6b2380317a32b8601",
+      "note": "Public Mozilla MFSA 2026-118 ties CVE-2026-118009 to Bug 2076098, whose upstream commit updates vendored FreeType to revision d1f916a. Verified complete Git tree identity of entire modules/freetype2 subtree at pinned Firefox 159.0b5, stable Firefox 159.0 and Vulpra main (same SHA); compared all 87 changed paths from the Bug fix commit against that final tree. 85 files remain: 79 retain exact original update result objects and six are revised by later Mozilla/vendor updates; two retired patch files remain absent in both trees. Final moz.yaml revision d5d4bef0 is newer than source snapshot revision d1f916a, and both release trees match Vulpra. This is full-tree vendored source alignment, not a separately isolated integer-overflow exploit patch demonstration; no FreeType font fuzzer, ASAN or malicious-font runtime execution, so memory safety not certified."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
