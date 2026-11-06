@@ -6,11 +6,13 @@ on:
     paths:
       - ci/m3-current-ffi-native-evidence.jq
       - ci/tests/m3-current-ffi-native-evidence-tests.sh
+      - ci/tests/m3-current-ffi-real-link-compatibility.sh
       - .github/workflows/m3-current-ffi-native-evidence-fixtures.yml
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   fail-closed-native-ffi-evidence:
@@ -26,9 +28,18 @@ jobs:
           sparse-checkout: |
             ci/m3-current-ffi-native-evidence.jq
             ci/tests/m3-current-ffi-native-evidence-tests.sh
+            ci/tests/m3-current-ffi-real-link-compatibility.sh
       - name: Reject forged Rust archive member, ELF hash and milestone claims
         shell: bash
         run: |
           set -euo pipefail
           bash -n ci/tests/m3-current-ffi-native-evidence-tests.sh
           bash ci/tests/m3-current-ffi-native-evidence-tests.sh
+      - name: Verify contract against authentic earlier native build evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash -n ci/tests/m3-current-ffi-real-link-compatibility.sh
+          bash ci/tests/m3-current-ffi-real-link-compatibility.sh
