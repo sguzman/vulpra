@@ -43,3 +43,38 @@ No source deletion, newly measured native savings, complete conditional `dlopen`
 [**Lightweight contract run 41842786384 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/41842786384) executed the exact checked-in jq verifier and shell fixtures from `main`, reporting **18 protected feature records; four current normal-browser runtime witnesses, nine historical or diagnostic witnesses, three strictly bounded negative/fallback witnesses, and 28/28 deliberate forged claims rejected**. [Full workflow lint 41842786096 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/41842786096). The acceptance fixture checks that all **14** current unverified runtime cases and **15** unverified negative/fallback cases remain explicitly open; an editable next-check description cannot itself turn a missing proof into a pass.
 
 **Scope:** this is genuine executed CI of the *acceptance contract*, not another browser build, a new runtime test, independent verification of every historical GitHub run, or workstation QA. The broad M3 sixth gate remains open, with current source compile and protected normal-build smoke evidence handled by prior successful native CI. No removals or measured marginal native savings; **overall 61%, M3 83% (5/6), Δ+0 pp**.
+
+## Independently authenticated workflow identities — 2026-11-06 UTC
+
+The original 18-feature worklist CI authenticated **internal** evidence
+labels but did not query GitHub for the reported workflow runs. The
+read-only [run-provenance verifier](../../ci/m3-protected-feature-run-provenance.sh)
+now checks each recorded source/workflow run against the GitHub Actions API.
+It pins ten **distinct** real run identities to their full exact source
+commit, workflow title, workflow-file path, repository, main branch,
+original push event, completed/success status and first run attempt.
+The crosscheck explicitly links all referenced current/configuration,
+historical and fallback run IDs from the 18-feature worklist to those
+ten expected sources: no unknown witness can silently enter the ledger.
+
+[**Live-source provenance workflow 42254404008 PASS**](https://github.com/sguzman/vulpra/actions/runs/42254404008)
+authenticated **10/10** live GitHub run identities against original
+source SHAs, with **14/14** forged run metadata, substituted witness and
+false M3-gate fixtures rejected. The existing matrix test simultaneously
+rejected **28/28** forged feature/FFI/workstation claims. [Workflow
+lint 42254302266 PASS](https://github.com/sguzman/vulpra/actions/runs/42254302266).
+The predecessor CI [42254302340](https://github.com/sguzman/vulpra/actions/runs/42254302340)
+failed after the fixture PASS because an exit trap referenced a function-local
+temporary variable after its scope ended; [commit
+`e3315a0`](https://github.com/sguzman/vulpra/commit/e3315a0738204f4f9c4be60bc6fa52f5517b2718)
+fixed both cleanup traps, and the final complete CI passed.
+
+**Boundary:** GitHub's successful run metadata does not independently prove
+the complete native artifact's content, source-to-ELF symbol resolution,
+all 18 protected feature paths, negative error paths, target
+EndeavourOS/Hyprland workstation acceptance or source-pruning safety.
+The matrix remains **4 current bounded runtime witnesses, 9 historical
+diagnostics, 3 narrow fallback witnesses** and the sixth M3 dependency
+closure gate remains open. No new native build was requested, source deleted,
+compiled package saving credited, or product milestone increased.
+**M3 83% (5/6), overall 61%, delta +0 percentage points.**
