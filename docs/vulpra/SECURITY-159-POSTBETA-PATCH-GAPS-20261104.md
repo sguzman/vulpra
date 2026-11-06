@@ -247,3 +247,79 @@ Selected original Mozilla Firefox 159 high-impact patch-result commits were comp
 **Actual runtime regression upgrade in progress:** The isolated security branch [`8bfc833`](https://github.com/sguzman/vulpra/commit/8bfc833c47226533a55047c5575b2a6f382249f2) extends the original CSS crashtest harness with exact Mozilla SVG 2079252, table 2079036 and multicol 2079255 HTML fixtures, two browser replays per new case, original fixture byte-identity and observable trigger state; [lightweight contract CI 42224279917](https://github.com/sguzman/vulpra/actions/runs/42224279917) **PASS**, rejecting 26/26 forged DOM/liveness claims. Main has a separate [source/package-linked independent verifier `52294e1`](https://github.com/sguzman/vulpra/commit/52294e1cbbbe9cb9532c13421716d6fa8d05bb7c), synthetic tests **28/28** negative cases rejected in [CI 42225017296](https://github.com/sguzman/vulpra/actions/runs/42225017296) **SUCCESS**. **The actual new full native build and browser replay [42224511431](https://github.com/sguzman/vulpra/actions/runs/42224511431) is still running at checkpoint**; no new real-browser regression, memory-safety, target-workstation or release acceptance is claimed before the native run and its independent reconciliation succeed.
 
 M3 remains 5/6=83%, overall 61%, no source deletions, no security branch merge or release. This work concerns verified source and ongoing test infrastructure, not an authorized production browser.
+
+## November 6 later checkpoint: native replay accepted, 100/108 high-impact source scoped
+
+This section **supersedes the earlier in-progress native-build status above**; the
+historical entries remain unchanged for audit provenance.
+
+- The isolated security source `8bfc833c47226533a55047c5575b2a6f382249f2`
+  completed a **full normal native Vulpra browser build and packaged runtime**
+  in [workflow 42224511431](https://github.com/sguzman/vulpra/actions/runs/42224511431).
+  Wayland, JavaScript navigation, WebExtensions, Nimbus, and local self-signed
+  TLS rejection passed. Mozilla's original CSS crash fixture ran three times;
+  SVG, table, and multicol fixtures ran twice each.
+  [Independent workflow 42231630654](https://github.com/sguzman/vulpra/actions/runs/42231630654)
+  **passed** after independently checking exact source, regression driver,
+  original fixture Git objects, native ELF/package SHA joins, and all nine
+  reported real-browser replays. This is bounded regression/liveness evidence,
+  **not** exploit resistance, ASAN/UBSAN, full advisory clearance or release.
+- Subsequent original Mozilla source crosswalks cover media playback,
+  FinalizationRegistry GC, SVG/XSLT, parser lifetime, DOM window principals,
+  radio groups, cache compressed bytes and failed alt-data readers, Ion bailout
+  exceptions, Servo CSS declaration context, and paginated layout replication.
+  Every claim distinguishes exact selected patch postimage from a later
+  source-equivalent release revision. Original test fixtures found absent in
+  the release tags are expressly **not** counted as runtime-tested.
+- **FreeType Graphics: Text / CVE-2026-118009:** Mozilla Bug 2076098 changed
+  **87** paths in the vendored `modules/freetype2` tree. Complete nontruncated
+  authenticated Git subtree objects proved identical pinned
+  `FIREFOX_159_0b5_RELEASE`, official `FIREFOX_159_0_RELEASE` and Vulpra
+  subtree SHA `2e22f899bbf1bacd82db822552d72994aad30dd6`.
+  Of those 87 paths, **85** retain files (79 exact selected upstream update
+  postimages, six subsequently revised in official Mozilla source), and two
+  retired patch files are absent in both compared histories. The official
+  beta vendor manifest records a later FreeType revision
+  `d5d4bef0c6d5363931d346a6b2380317a32b8601` than the first selected
+  Bug 2076098 landing `d1f916a65eb13d5cd44b711cfd24cf8d5949b2d2`.
+  This is **complete affected-vendor-tree source alignment**, not an
+  isolated proof of the overflow fix or a malicious-font runtime test.
+  [Crosswalk commit](https://github.com/sguzman/vulpra/commit/06d6505d16a088a4f95990377c72872677577930).
+- The [security source guard CI 42249960612](https://github.com/sguzman/vulpra/actions/runs/42249960612)
+  **SUCCESS** verified **99 source-positive CVEs, 463/463 tracked code/test
+  object assertions, 17/17 monitored source roots**, and rejected all eight
+  forged negative advisory/source claims. Corresponding workflow lint
+  [42249631664](https://github.com/sguzman/vulpra/actions/runs/42249631664)
+  passed. `servo/**` and `modules/**` are now included in automatic
+  source-integrity push triggers.
+
+**Remaining unreviewed/unknown MFSA 2026-118 high-impact vulnerabilities:**
+
+| CVE | Mozilla bug | Component | Source verification blocker |
+| --- | --- | --- | --- |
+| CVE-2026-117863 | 2056783 | Audio/Video uninitialized memory | Public security bug access restricted; no bug-numbered public patch |
+| CVE-2026-117932 | 2081975 | DOM Core & HTML use-after-free | No matching original public bug-numbered upstream patch found |
+| CVE-2026-117933 | 2081976 | CSS frame poisoning | No matching original public bug-numbered upstream patch found |
+| CVE-2026-117940 | 2082031 | DOM Core & HTML use-after-free | No matching original public bug-numbered upstream patch found |
+| CVE-2026-117945 | 2082076 | XML boundary conditions | No matching original public bug-numbered upstream patch found |
+| CVE-2026-117947 | 2082100 | XML use-after-free | No matching original public bug-numbered upstream patch found |
+| CVE-2026-117953 | 2082199 | DOM Core & HTML use-after-free | No matching original public bug-numbered upstream patch found |
+| CVE-2026-118017 | 2082200 | SVG use-after-free | No matching original public bug-numbered upstream patch found |
+
+None of these eight is established **patched** or **unpatched** by the absence
+of a public bug-numbered commit. Do not substitute broad stable-tag
+similarity, a guessed patch location, or browser smoke results for a
+CVE-specific provenance and exploit/reentry assessment.
+
+**Source audit 100/108:** 99 source-positive original pinned beta records,
+one beta-missing `CVE-2026-117860` patched and tested **only** in the
+isolated maintenance branch; **eight unreviewed/unknown**. The separate
+Firefox 159.0.1 `CVE-2026-120572` is also branch-only. Source-audit ratio
+must never be interpreted as 92.6% exploitation resistance, a security
+certificate or the product roadmap percentage. No merge, new source deletion,
+public distribution or target Hyprland acceptance is approved by this
+checkpoint.
+
+**Product progress is unchanged: overall 61% (Δ +0 pp); M3 5/6 = 83%.**
+The sixth feature/build/binary/conditional FFI ownership and target-workstation
+dependency gate remains open.
