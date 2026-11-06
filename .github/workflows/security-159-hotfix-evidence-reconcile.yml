@@ -29,6 +29,7 @@ on:
       - 'netwerk/**'
       - 'parser/**'
       - 'security/**'
+      - 'servo/**'
       - 'testing/**'
       - 'toolkit/**'
       - 'xpcom/**'
