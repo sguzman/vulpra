@@ -1,0 +1,96 @@
+name: M3 Original Current Rust CXX FFI Source Anchor Crosswalk
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-current-rust-cxx-ffi-source-crosswalk.sh
+      - ci/m3-static-rust-cpp-ffi-source-witness.rs
+      - docs/vulpra/M3-CURRENT-RUST-CXX-FFI-SOURCE-ANCHORS-20261106.json
+      - xpcom/build/XPCOMInit.cpp
+      - toolkit/library/rust/shared/lib.rs
+      - toolkit/library/rust/lib.rs
+      - toolkit/library/rust/Cargo.toml
+      - toolkit/library/rust/moz.build
+      - toolkit/library/build/moz.build
+      - toolkit/crashreporter/crash_helper/crashhelper.cpp
+      - toolkit/crashreporter/crash_helper_server/src/lib.rs
+      - toolkit/crashreporter/crash_helper_server/Cargo.toml
+      - toolkit/crashreporter/crash_helper_server/moz.build
+      - toolkit/crashreporter/crash_helper/moz.build
+      - .github/workflows/m3-original-current-rust-cxx-ffi-source-crosswalk.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify-exact-original-current-ffi-source:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout only the eleven original and current source FFI owners
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            ci/m3-current-rust-cxx-ffi-source-crosswalk.sh
+            ci/m3-static-rust-cpp-ffi-source-witness.rs
+            docs/vulpra/M3-CURRENT-RUST-CXX-FFI-SOURCE-ANCHORS-20261106.json
+            xpcom/build/XPCOMInit.cpp
+            toolkit/library/rust/shared/lib.rs
+            toolkit/library/rust/lib.rs
+            toolkit/library/rust/Cargo.toml
+            toolkit/library/rust/moz.build
+            toolkit/library/build/moz.build
+            toolkit/crashreporter/crash_helper/crashhelper.cpp
+            toolkit/crashreporter/crash_helper_server/src/lib.rs
+            toolkit/crashreporter/crash_helper_server/Cargo.toml
+            toolkit/crashreporter/crash_helper_server/moz.build
+            toolkit/crashreporter/crash_helper/moz.build
+      - name: Reject forged source, FFI ownership and milestone claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/m3-current-rust-cxx-ffi-source-crosswalk.sh
+          bash ci/m3-current-rust-cxx-ffi-source-crosswalk.sh --self-test
+      - name: Independently verify Git objects at original, compiled-current and main source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash ci/m3-current-rust-cxx-ffi-source-crosswalk.sh --check-live
+      - name: Exercise the existing Rust CXX FFI source structure observer
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v rustc
+          rustc --edition=2021 --test ci/m3-static-rust-cpp-ffi-source-witness.rs \
+            -o "$RUNNER_TEMP/m3-ffi-source-witness-tests"
+          "$RUNNER_TEMP/m3-ffi-source-witness-tests"
+          rustc --edition=2021 ci/m3-static-rust-cpp-ffi-source-witness.rs \
+            -o "$RUNNER_TEMP/m3-ffi-source-witness"
+          "$RUNNER_TEMP/m3-ffi-source-witness" . "$RUNNER_TEMP/m3-ffi-source-report.json"
+          jq -e '
+            .schema_version == 1 and
+            .status == "pinned_original_two_rust_staticlib_cpp_source_ffi_seams_verified" and
+            .source_commit == "b1482404dfb8b01342990ee99ea3df0f9756b5f7" and
+            .native_staticlib_roots == 2 and
+            .native_consumer_targets == 2 and
+            .cpp_callsite_functions == 3 and
+            .gkrust_init_cpp_calls == 2 and
+            .gkrust_shutdown_cpp_calls == 1 and
+            .crash_generator_logic_desktop_cpp_calls == 1 and
+            (.ffi_edges | length) == 3 and
+            .actual_compiled_ffi_symbols_or_relocations_verified == false and
+            .all_static_rust_cpp_ffi_edges_identified == false and
+            .conditional_dlopen_closure_proven == false and
+            .source_removal_authorized == false and
+            .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/m3-ffi-source-report.json" >/dev/null
+          echo "PASS: original/current-identical Rust/CXX declarations and three finite FFI source routes"
+          echo "LIMIT: no fresh browser build, compiled-current archive/member census or M3 gate closure"
