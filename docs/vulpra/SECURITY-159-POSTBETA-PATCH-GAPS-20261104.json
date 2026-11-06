@@ -3058,9 +3058,223 @@
         }
       ],
       "note": "One exact selected upstream source Git blob in beta/stable/Vulpra. This confirms presence of touched source, not browser exploit rejection."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117889",
+      "bug": 2078727,
+      "topic": "JavaScript RegExpStatics lazy-execution boundary conditions",
+      "patch_commit": "59579da43a4eec2990f55df48356290c175bc66a",
+      "classification": "exact_upstream_fix_result_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "js/src/vm/RegExpStatics.cpp",
+          "upstream_fix_commit_result_sha": "be91275187753c3ce8da2bb88c22d460a41d3033",
+          "pinned_beta_sha": "be91275187753c3ce8da2bb88c22d460a41d3033",
+          "upstream_stable_159_sha": "be91275187753c3ce8da2bb88c22d460a41d3033",
+          "vulpra_sha": "be91275187753c3ce8da2bb88c22d460a41d3033",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Single code path exactly matches upstream fix postimage and both Mozilla release tags and Vulpra. No actual malicious RegExp probe."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117890",
+      "bug": 2078749,
+      "topic": "JIT nested bound-function generic call trampoline stack limit",
+      "patch_commit": "e1be8aac1f0ea47d9945ede8f75c7782880f9181",
+      "classification": "two_beta_stable_vulpra_exact_file_identities_one_original_regression_script_exact_upstream_postimage_and_stack_guard_present",
+      "source_file_blobs": [
+        {
+          "path": "js/src/jit-test/tests/ion/bug2078749.js",
+          "upstream_fix_commit_result_sha": "01985a52c43db439b118c61e8dc6084190033e5d",
+          "pinned_beta_sha": "01985a52c43db439b118c61e8dc6084190033e5d",
+          "upstream_stable_159_sha": "01985a52c43db439b118c61e8dc6084190033e5d",
+          "vulpra_sha": "01985a52c43db439b118c61e8dc6084190033e5d",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/CodeGenerator.cpp",
+          "upstream_fix_commit_result_sha": "effb4f0be48ef6ef009216aef49e9091cb96d6b2",
+          "pinned_beta_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "upstream_stable_159_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "vulpra_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "Check the stack limit before",
+        "addressOfJitStackLimit()",
+        "branchStackPtrRhs(Assembler::AboveOrEqual"
+      ],
+      "note": "The code and original regression file match exactly between beta/stable/Vulpra; test exactly matches selected upstream landing, CodeGenerator.cpp differs due additional changes but retains the stack-limit check before recursing into bound-call trampoline. No JS shell JIT regression run."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117891",
+      "bug": 2078837,
+      "topic": "JIT native exit frame callee GC lifetime use-after-free",
+      "patch_commit": "60da826357fb884de63a9fe72414508e9bc430f0",
+      "classification": "seven_changed_paths_beta_stable_vulpra_sha_identical_four_exact_selected_fix_postimages_and_callee_trace_guard",
+      "source_file_blobs": [
+        {
+          "path": "js/src/builtin/TestingFunctions.cpp",
+          "upstream_fix_commit_result_sha": "d69dddd6f1f423f7a773ebf40402f5c00bd72b02",
+          "pinned_beta_sha": "d69dddd6f1f423f7a773ebf40402f5c00bd72b02",
+          "upstream_stable_159_sha": "d69dddd6f1f423f7a773ebf40402f5c00bd72b02",
+          "vulpra_sha": "d69dddd6f1f423f7a773ebf40402f5c00bd72b02",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit-test/tests/ion/bug2078837.js",
+          "upstream_fix_commit_result_sha": "531d58660afce5d045dd5bb76f509bf0a1f8da52",
+          "pinned_beta_sha": "531d58660afce5d045dd5bb76f509bf0a1f8da52",
+          "upstream_stable_159_sha": "531d58660afce5d045dd5bb76f509bf0a1f8da52",
+          "vulpra_sha": "531d58660afce5d045dd5bb76f509bf0a1f8da52",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/BaselineCacheIRCompiler.cpp",
+          "upstream_fix_commit_result_sha": "bd11ae2028d5ca8b1ad94f97e84e8ae3e5ea8b25",
+          "pinned_beta_sha": "bd11ae2028d5ca8b1ad94f97e84e8ae3e5ea8b25",
+          "upstream_stable_159_sha": "bd11ae2028d5ca8b1ad94f97e84e8ae3e5ea8b25",
+          "vulpra_sha": "bd11ae2028d5ca8b1ad94f97e84e8ae3e5ea8b25",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/CodeGenerator.cpp",
+          "upstream_fix_commit_result_sha": "26d71433062ee4b2899e7504ed028866df7a034b",
+          "pinned_beta_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "upstream_stable_159_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "vulpra_sha": "ed329aea64d33c90fe38e6088c051921de67fd74",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/jit/IonCacheIRCompiler.cpp",
+          "upstream_fix_commit_result_sha": "2e70eb2b5bf173133a73c3f1695e7b1f72db878a",
+          "pinned_beta_sha": "2e70eb2b5bf173133a73c3f1695e7b1f72db878a",
+          "upstream_stable_159_sha": "2e70eb2b5bf173133a73c3f1695e7b1f72db878a",
+          "vulpra_sha": "2e70eb2b5bf173133a73c3f1695e7b1f72db878a",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/jit/JitFrames.cpp",
+          "upstream_fix_commit_result_sha": "fe84b525d90267af98462fa1564c05d052d4ebe9",
+          "pinned_beta_sha": "40059758c29600215dd876f0837710ec147f9986",
+          "upstream_stable_159_sha": "40059758c29600215dd876f0837710ec147f9986",
+          "vulpra_sha": "40059758c29600215dd876f0837710ec147f9986",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "js/src/jit/JitFrames.h",
+          "upstream_fix_commit_result_sha": "1373380d563f92a4410a72731851be82d6a95078",
+          "pinned_beta_sha": "1373380d563f92a4410a72731851be82d6a95078",
+          "upstream_stable_159_sha": "1373380d563f92a4410a72731851be82d6a95078",
+          "vulpra_sha": "1373380d563f92a4410a72731851be82d6a95078",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "js/src/vm/PortableBaselineInterpret.cpp",
+          "upstream_fix_commit_result_sha": "ec80deec911be8b1de2ed0cbd8da7b1e2440c6f4",
+          "pinned_beta_sha": "ec80deec911be8b1de2ed0cbd8da7b1e2440c6f4",
+          "upstream_stable_159_sha": "ec80deec911be8b1de2ed0cbd8da7b1e2440c6f4",
+          "vulpra_sha": "ec80deec911be8b1de2ed0cbd8da7b1e2440c6f4",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "TraceRoot(trc, native->savedCallee(),",
+        "TraceRoot(trc, oolnative->savedCallee(),"
+      ],
+      "note": "Eight (not seven) unique touched paths: 8/8 source SHA parity beta/stable/Vulpra; 6/8 selected upstream result exact (CodeGenerator.cpp and JitFrames.cpp differ), original JS regression fixture present but not executed. Verified saved-callee trace at NativeExitFrameLayout and IonOOLNativeExitFrameLayout in Vulpra. This is scoped source not proof of GC safety."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117892",
+      "bug": 2078902,
+      "topic": "WebRTC ICE candidate STUN callback lifecycle privilege escalation",
+      "patch_commit": "a3f830d92ac85091e6947e2ffd33594e65d9f260",
+      "classification": "exact_upstream_fix_result_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/media/webrtc/transport/third_party/nICEr/src/ice/ice_candidate_pair.cpp",
+          "upstream_fix_commit_result_sha": "755e87d6cc3b58f5362391e01b4abfbaf33a8857",
+          "pinned_beta_sha": "755e87d6cc3b58f5362391e01b4abfbaf33a8857",
+          "upstream_stable_159_sha": "755e87d6cc3b58f5362391e01b4abfbaf33a8857",
+          "vulpra_sha": "755e87d6cc3b58f5362391e01b4abfbaf33a8857",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Exact single ICE candidate-pair source fix blob among pinned beta, stable, Vulpra. Callback no longer clears the timer prematurely in upstream patch; no live WebRTC/STUN exploit test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117902",
+      "bug": 2079057,
+      "topic": "User font set lifetime use-after-free during font set destruction",
+      "patch_commit": "1e643a857bfb2b1f976b68a37db919d96681f9ed",
+      "classification": "both_changed_file_blobs_same_beta_stable_vulpra_one_exact_patch_result_and_destroy_guard",
+      "source_file_blobs": [
+        {
+          "path": "gfx/thebes/gfxPlatformFontList.h",
+          "upstream_fix_commit_result_sha": "4719c99e05d8b71dc8ccc95f57f3918b8f4fef17",
+          "pinned_beta_sha": "4719c99e05d8b71dc8ccc95f57f3918b8f4fef17",
+          "upstream_stable_159_sha": "4719c99e05d8b71dc8ccc95f57f3918b8f4fef17",
+          "vulpra_sha": "4719c99e05d8b71dc8ccc95f57f3918b8f4fef17",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "gfx/thebes/gfxUserFontSet.h",
+          "upstream_fix_commit_result_sha": "d5f329bcff9be1b07440f34cb1d81226fbc586b3",
+          "pinned_beta_sha": "76b4bc8374cd5a0ff5e155f9efce6625f2e5c27c",
+          "upstream_stable_159_sha": "76b4bc8374cd5a0ff5e155f9efce6625f2e5c27c",
+          "vulpra_sha": "76b4bc8374cd5a0ff5e155f9efce6625f2e5c27c",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        }
+      ],
+      "verified_patch_hunks": [
+        "if (!aUserFontSet->mDestroying) {",
+        "aUserFontSet->mDestroying = true;"
+      ],
+      "note": "Both code files SHA-identical among beta/stable/Vulpra, one original patch-result exact. Vulpra AddUserFontSet/RemoveUserFontSet contains mDestroying condition and sets it before removal. No crafted font runtime test."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-117903",
+      "bug": 2079058,
+      "topic": "Media ChannelMediaResource principal update lifetime use-after-free",
+      "patch_commit": "689d11b2db81731a53db1c2b362b648785cdcb51",
+      "classification": "exact_upstream_fix_result_in_beta_stable_vulpra",
+      "source_file_blobs": [
+        {
+          "path": "dom/media/ChannelMediaResource.cpp",
+          "upstream_fix_commit_result_sha": "a816597eadfe8b204993933735339544efe444c0",
+          "pinned_beta_sha": "a816597eadfe8b204993933735339544efe444c0",
+          "upstream_stable_159_sha": "a816597eadfe8b204993933735339544efe444c0",
+          "vulpra_sha": "a816597eadfe8b204993933735339544efe444c0",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "note": "Single source fix postimage exact in beta/stable/Vulpra. No media playback regression or exploit test."
     }
   ],
-  "additional_source_audit_head": "74238c0273d81a007a9b805d015cd00605da18ed",
+  "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
   "advisory_coverage": {
     "provenance": "Mozilla's publicly posted advisories, reviewed 2026-11-04 America/Mexico_City; this is a manually pinned CVE enumeration and not a live advisory feed.",
     "mfsa_2026_118_high": {
