@@ -3119,7 +3119,7 @@
       "bug": 2078837,
       "topic": "JIT native exit frame callee GC lifetime use-after-free",
       "patch_commit": "60da826357fb884de63a9fe72414508e9bc430f0",
-      "classification": "seven_changed_paths_beta_stable_vulpra_sha_identical_four_exact_selected_fix_postimages_and_callee_trace_guard",
+      "classification": "eight_changed_paths_beta_stable_vulpra_sha_identical_six_exact_selected_fix_postimages_and_callee_trace_guard",
       "source_file_blobs": [
         {
           "path": "js/src/builtin/TestingFunctions.cpp",
