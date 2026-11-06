@@ -201,3 +201,49 @@ if (( removed != 1 )); then
   exit 1
 fi
 echo "PASS: obsolete OTS local patch remains absent from Vulpra HEAD"
+
+
+# Restricted public-source blockers are NOT audited fixes. Keep the exact
+# Mozilla advisory CVE→Bug crosswalk attached to every remaining unknown,
+# and fail closed if an unknown is silently dropped or misrepresented.
+# This is a pinned bookkeeping invariant, NOT a live Bugzilla access check.
+jq -e '
+  {
+    "CVE-2026-117863": 2056783,
+    "CVE-2026-117932": 2081975,
+    "CVE-2026-117933": 2081976,
+    "CVE-2026-117940": 2082031,
+    "CVE-2026-117945": 2082076,
+    "CVE-2026-117947": 2082100,
+    "CVE-2026-117953": 2082199,
+    "CVE-2026-118017": 2082200
+  } as $advisory_bugs |
+  ([.verified_present_in_beta[].cve,
+    (.findings[] | select(.cve == "CVE-2026-117860") | .cve)]
+   | unique) as $audited |
+  ([.advisory_coverage.mfsa_2026_118_high.expected_cve_ids[]
+    | select(. as $cve | $audited | index($cve) == null)]
+    | sort) as $remaining |
+  (.public_source_access_blockers) as $blockers |
+  ($remaining == ($advisory_bugs | keys))
+  and (($blockers | length) == ($advisory_bugs | length))
+  and ([$blockers[].cve] | sort) == $remaining
+  and ([ $blockers[].cve ] | unique | length) == ($blockers | length)
+  and all($blockers[];
+    (.bug == $advisory_bugs[.cve])
+    and (.advisory == "MFSA 2026-118")
+    and (.impact == "high")
+    and (.verification_status ==
+      "unreviewed_public_bugzilla_access_denied_no_bug_labeled_upstream_fix_commit_identified")
+    and (.bugzilla_url ==
+      ("https://bugzilla.mozilla.org/show_bug.cgi?id=" + (.bug | tostring)))
+    and (.advisory_url ==
+      ("https://www.mozilla.org/en-US/security/advisories/mfsa2026-118/#" + .cve))
+    and (.last_checked_date == "2026-11-06")
+    and (.note | type == "string" and length > 60)
+  )
+' "$manifest" >/dev/null || {
+  echo "Restricted source blocker register disagrees with Mozilla advisory or remaining unknowns" >&2
+  exit 1
+}
+echo "PASS: eight Mozilla advisory-mapped access blockers remain unaudited, not missing/present fixes"
