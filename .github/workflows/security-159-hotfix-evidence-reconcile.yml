@@ -89,7 +89,7 @@ jobs:
           test "$count" -gt 0
           echo "PASS: all $count audited source roots trigger source-integrity CI"
 
-      - name: Reject eight forged source, advisory and obsolete-patch claims
+      - name: Reject eleven forged source, advisory, restricted-bug and obsolete-patch claims
         shell: bash
         run: |
           set -euo pipefail
@@ -104,13 +104,16 @@ jobs:
           jq '(.advisory_coverage.mfsa_2026_118_high.expected_cve_ids) |= .[:-1]' "$original" > "$tmp/missing-high-cve.json"
           jq '(.advisory_coverage.mfsa_2026_123_high.expected_cve_ids) = []' "$original" > "$tmp/missing-followup-fix.json"
           jq '(.verified_present_in_beta[] | select(.cve == "CVE-2026-117886") | .removed_source_path_verification[0].absent_in_vulpra_main) = false' "$original" > "$tmp/forged-ots-patch-absence.json"
+          jq '(.public_source_access_blockers[0].bug) = 1' "$original" > "$tmp/forged-restricted-bug.json"
+          jq 'del(.public_source_access_blockers[1])' "$original" > "$tmp/omitted-restricted-bug.json"
+          jq '(.public_source_access_blockers[2].verification_status) = "verified_present_in_pinned_beta"' "$original" > "$tmp/forged-restricted-credit.json"
           for bad in "$tmp"/*.json; do
             if bash ci/security-159-check-source-crosswalk.sh "$bad" >/dev/null 2>&1; then
               echo "::error::Verifier accepted fabricated source evidence: $bad"
               exit 1
             fi
           done
-          echo "PASS: 8/8 forged source and advisory coverage fixtures rejected"
+          echo "PASS: 11/11 forged source, advisory and restricted blocker fixtures rejected"
 
       - name: Emit bounded, fail-closed release-advisory coverage worklist
         shell: bash
