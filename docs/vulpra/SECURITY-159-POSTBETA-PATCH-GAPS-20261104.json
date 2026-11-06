@@ -5051,6 +5051,116 @@
         "// Set the first frame's formals after all fallible operations"
       ],
       "note": "Reviewed all 13 distinct paths across three upstream Bug 2082047/related 2082045 commits and compared original postimage, beta 159.0b5, stable 159, Vulpra main Git objects. All 13 beta/stable/Vulpra identical. JitFrames.cpp, JSAPI test registry, BaselineBailouts.cpp differ from selected patch postimages due subsequent revisions; others exact. Inspected final source: bailout recovery failures persist saved exception status/stack, trace edges; recover result cleanup moved to bailout callers; outermost formals only mutated after fallible bailout steps. Original JS JIT/OOM tests present in source, but not executed; no assertion of actual exploit or ASAN safety."
+    },
+    {
+      "advisory": "MFSA 2026-118",
+      "cve": "CVE-2026-118011",
+      "bug": 2081985,
+      "topic": "CSS @scope and @position-try declaration permission enforcement and generated Servo property rule-type masks",
+      "patch_commits": [
+        "de5fdc7c270a17307221c9cf725839861973ccc6",
+        "9f77011aa34b4c326073e4152f3dfe0062a5c442"
+      ],
+      "classification": "ten_union_source_and_wpt_paths_beta_stable_vulpra_identical_seven_exact_original_postimages",
+      "source_file_blobs": [
+        {
+          "path": "servo/components/style/properties/data.py",
+          "upstream_fix_commit_result_sha": "d3240df95a4b827abd2e3ba840abede706eb8ccd",
+          "pinned_beta_sha": "d3240df95a4b827abd2e3ba840abede706eb8ccd",
+          "upstream_stable_159_sha": "d3240df95a4b827abd2e3ba840abede706eb8ccd",
+          "vulpra_sha": "d3240df95a4b827abd2e3ba840abede706eb8ccd",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "servo/components/style/properties/longhands.toml",
+          "upstream_fix_commit_result_sha": "652629551baeb9853bc4a8650790d3a4ba01f8e2",
+          "pinned_beta_sha": "c48c4566a91f968a9bc9ccda941359ffb78b086e",
+          "upstream_stable_159_sha": "c48c4566a91f968a9bc9ccda941359ffb78b086e",
+          "vulpra_sha": "c48c4566a91f968a9bc9ccda941359ffb78b086e",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "servo/components/style/properties/shorthands.toml",
+          "upstream_fix_commit_result_sha": "9a171ce4efe5f3896a522b961351a6967db47d67",
+          "pinned_beta_sha": "9a171ce4efe5f3896a522b961351a6967db47d67",
+          "upstream_stable_159_sha": "9a171ce4efe5f3896a522b961351a6967db47d67",
+          "vulpra_sha": "9a171ce4efe5f3896a522b961351a6967db47d67",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "testing/web-platform/tests/css/css-cascade/declaration-context.html",
+          "upstream_fix_commit_result_sha": "d79b5881645e5388e3e53fd6bf7e27d639d19f96",
+          "pinned_beta_sha": "d79b5881645e5388e3e53fd6bf7e27d639d19f96",
+          "upstream_stable_159_sha": "d79b5881645e5388e3e53fd6bf7e27d639d19f96",
+          "vulpra_sha": "d79b5881645e5388e3e53fd6bf7e27d639d19f96",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "servo/components/style/parser.rs",
+          "upstream_fix_commit_result_sha": "dbc926110606a58e0aa596271b51282a8ac229ee",
+          "pinned_beta_sha": "dbc926110606a58e0aa596271b51282a8ac229ee",
+          "upstream_stable_159_sha": "dbc926110606a58e0aa596271b51282a8ac229ee",
+          "vulpra_sha": "dbc926110606a58e0aa596271b51282a8ac229ee",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "servo/components/style/properties/mod.rs",
+          "upstream_fix_commit_result_sha": "6e88e7ba63f94fd6d14321f854e1dd13aa9b6dd1",
+          "pinned_beta_sha": "6e88e7ba63f94fd6d14321f854e1dd13aa9b6dd1",
+          "upstream_stable_159_sha": "6e88e7ba63f94fd6d14321f854e1dd13aa9b6dd1",
+          "vulpra_sha": "6e88e7ba63f94fd6d14321f854e1dd13aa9b6dd1",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "servo/components/style/properties/properties.mako.rs",
+          "upstream_fix_commit_result_sha": "3f9bdd104628cd369a5e83a1c624c0f9675584f4",
+          "pinned_beta_sha": "959e7f3d961412797b352528b248e54e9615ea94",
+          "upstream_stable_159_sha": "959e7f3d961412797b352528b248e54e9615ea94",
+          "vulpra_sha": "959e7f3d961412797b352528b248e54e9615ea94",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "servo/components/style/stylesheets/mod.rs",
+          "upstream_fix_commit_result_sha": "eceb49f69bdef4ffddb89ddb3a222975d22fcc4b",
+          "pinned_beta_sha": "eceb49f69bdef4ffddb89ddb3a222975d22fcc4b",
+          "upstream_stable_159_sha": "eceb49f69bdef4ffddb89ddb3a222975d22fcc4b",
+          "vulpra_sha": "eceb49f69bdef4ffddb89ddb3a222975d22fcc4b",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        },
+        {
+          "path": "servo/ports/geckolib/glue.rs",
+          "upstream_fix_commit_result_sha": "32c180ebdee5776a20465e5e8136e25dfc2c7bae",
+          "pinned_beta_sha": "b4babfc04a2c8761a0163bce8ec832d553b5c4e0",
+          "upstream_stable_159_sha": "b4babfc04a2c8761a0163bce8ec832d553b5c4e0",
+          "vulpra_sha": "b4babfc04a2c8761a0163bce8ec832d553b5c4e0",
+          "fix_result_blob_matches_beta": false,
+          "fix_result_blob_matches_vulpra": false
+        },
+        {
+          "path": "testing/web-platform/meta/css/css-cascade/declaration-context.html.ini",
+          "upstream_fix_commit_result_sha": "f9c5f88c6679d47d01cb8b255da27480ecfa4ab5",
+          "pinned_beta_sha": "f9c5f88c6679d47d01cb8b255da27480ecfa4ab5",
+          "upstream_stable_159_sha": "f9c5f88c6679d47d01cb8b255da27480ecfa4ab5",
+          "vulpra_sha": "f9c5f88c6679d47d01cb8b255da27480ecfa4ab5",
+          "fix_result_blob_matches_beta": true,
+          "fix_result_blob_matches_vulpra": true
+        }
+      ],
+      "verified_patch_hunks": [
+        "pub fn allowed_in_rule(&self, rule_types: CssRuleTypes) -> bool",
+        "let allowed_types = rule_types.intersection(CssRuleTypes::DECLARATION_ALLOWED_TYPES);",
+        "MAP[self.0 as usize].contains_all(allowed_types)",
+        "self.allowed_in_rule(context.rule_types())"
+      ],
+      "note": "Audited the entire 10-file union of two upstream Bug 2081985 source+test commits, including Servo CSS rule parser, generated property mask definitions, Gecko binding glue and WPT declaration-context checks. All 10 original Git blobs identical between Firefox 159 pinned beta, stable 159, and Vulpra; seven exact source postimages, three later-release changes in longhands.toml, properties.mako.rs and geckolib/glue.rs. Inspected rule-aware PropertyId acceptance and all-required-rule-type mask containment. The WPT test remains source-present, no actual WPT parser or sanitizer regression run. Newly monitored servo/** root required to ensure CI detects later changes."
     }
   ],
   "additional_source_audit_head": "238f1c61d40c218554a183c7547086a50337b495",
