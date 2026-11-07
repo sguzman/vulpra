@@ -185,3 +185,62 @@ the later strengthened rules. The newer tests cover compiler-produced
 negative fixtures only. No newer real native Rust archive/ELF census had
 completed at this checkpoint, no package source or installed desktop was
 modified, and M3 stays **5/6 (83%)**, overall **61%**, Δ0 pp.
+
+
+## Current compiled Rust archive audit failure and guarded retry — 2026-11-07 UTC
+
+The full native CI [42264023349](https://github.com/sguzman/vulpra/actions/runs/42264023349)
+for exact source `83785b264f232ea7c777abd0a0dd8511ef322ecc` **finished FAILURE**,
+but the failure is isolated to the new *compiled gkrust archive-member
+inspector*. The actual native `./mach build`, `./mach package`, package
+hash/ELF/link-input reconciliation, Weston graphical 10-second render, local
+WebDriver JS/HTTP/DOM, WebExtension install/messaging/storage/uninstall,
+self-signed HTTPS rejection, Nimbus initialization, isolated profile
+protection and **73 direct/47 distinct native loader callsite** census
+all passed in the same job, according to its CI log. This is an independently
+successful bounded browser build/runtime, **not an overall green workflow**.
+
+The Rust FFI step emitted only
+`FAIL: Missing compiled native input: No such file or directory (os error 2)`
+and uploaded **no** FFI archive-member report. Its previous guard
+`test -s "$rust_archive" && test -s "$libxul"` was incorrect under
+`bash -e`: a false left side of an AND-list does not necessarily
+terminate the shell when followed by more commands. The reported error
+does **not** identify which native input path was missing, so assigning
+the failure to a specific archive location or absence of the linked
+library would exceed the evidence. The full-run failure correctly
+triggered [independent reconciliation
+42275954907](https://github.com/sguzman/vulpra/actions/runs/42275954907)
+to **reject** the native workflow; its negative fixtures passed and its
+success-only comparison was skipped.
+
+The inspector now distinguishes missing archive versus missing consumer
+ELF paths in error output
+([source correction `011b55c`](https://github.com/sguzman/vulpra/commit/011b55ce50513070c6626e30d689199032bb4003)).
+The new [strict source-local archive finder](../../ci/m3-locate-gkrust-archive.sh)
+requires a nonempty unstripped `dist/bin/libxul.so`, prefers the
+known normal-build `toolkit/library/rust/libgkrust.a` output when it is
+a real regular file, otherwise accepts **exactly one** non-symlink
+`libgkrust.a` in the built object directory, and rejects no match,
+multiple matches, escaped symlinks and missing libxul. It never searches
+the user's machine or selects a source tree outside the native CI objdir.
+
+The finder, including real C compiler and GNU `ar` fixture tests, passed
+[**42397419625 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42397419625)
+with corresponding
+[workflow lint 42397419634 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/42397419634).
+[Correction `fc362d0`](https://github.com/sguzman/vulpra/commit/fc362d0c8de7529554af6dc00f84e485714f73d8)
+replaces the unreliable Bash AND-list with separately enforced
+nonempty-file and non-symlink assertions; the exact selected compiled
+archive and ELF then enter the previously reviewed Rust FFI observer.
+It also prevents the initial bug from being counted as a successful audit.
+
+A single corrected, source-matched full normal browser
+[**CI 42397502966**](https://github.com/sguzman/vulpra/actions/runs/42397502966)
+was started at `fc362d0` and was **in progress at this checkpoint**.
+Its corrected real archive/ELF member evidence and independent subsequent
+success-only reconciliation are **not yet accepted**; the old failed run
+does not prove them. No direct action is required on the user's currently
+unavailable EndeavourOS desktop. The existing downloaded browser/profile,
+security branch, source files and user hardware remain untouched.
+**M3 5/6 (83%), overall 61%, Δ0pp.**
