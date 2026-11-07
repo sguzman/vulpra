@@ -324,11 +324,19 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           obj="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline"
-          # From an actual prior source-matched successful compiler log:
-          # toolkit/library/rust/libgkrust.a, not wildcard Cargo outputs.
-          rust_archive="$obj/toolkit/library/rust/libgkrust.a"
+          # Do not trust one assumed archive path. This helper selects the
+          # expected normal-build owner when present or exactly one real
+          # in-objdir candidate; absent/ambiguous inputs fail closed.
+          rust_archive="$(bash ci/m3-locate-gkrust-archive.sh "$obj")"
           libxul="$obj/dist/bin/libxul.so"
-          test -s "$rust_archive" && test -s "$libxul"
+          # Individual checks: bash -e does NOT reliably abort an AND-list
+          # when its first 'test -s' fails.
+          test -s "$rust_archive"
+          test -s "$libxul"
+          test ! -L "$rust_archive"
+          test ! -L "$libxul"
+          echo "AUDIT: source-matched gkrust archive bytes $(stat -c %s "$rust_archive")"
+          echo "AUDIT: source-matched unstripped libxul bytes $(stat -c %s "$libxul")"
           "$RUNNER_TEMP/m3-current-ffi-archive-members" \
             "$GITHUB_SHA" "$rust_archive" "$libxul" \
             "$RUNNER_TEMP/m3-current-ffi-archive-members.json"
