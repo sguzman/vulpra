@@ -1,0 +1,39 @@
+name: M3 Real Rust Archive Location Guard Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-locate-gkrust-archive.sh
+      - ci/tests/m3-locate-gkrust-archive-tests.sh
+      - .github/workflows/m3-real-rust-archive-location-guard-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-native-location-guards:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only Rust staticlib path audit and fixtures
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-locate-gkrust-archive.sh
+            ci/tests/m3-locate-gkrust-archive-tests.sh
+      - name: Reject missing, duplicate, escaped or ambiguous native inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v realpath
+          command -v cc
+          command -v ar
+          bash -n ci/m3-locate-gkrust-archive.sh
+          bash -n ci/tests/m3-locate-gkrust-archive-tests.sh
+          bash ci/tests/m3-locate-gkrust-archive-tests.sh
+          echo "LIMIT: compiled-native test fixtures, not a completed source-pinned Firefox FFI archive link"
