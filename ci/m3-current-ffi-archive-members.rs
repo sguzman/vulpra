@@ -13,7 +13,11 @@ const MAX_NM_LINES: usize = 15_000_000;
 const MAX_MEMBERS: usize = 1_000_000;
 
 fn check_file(path: &Path, archive: bool) -> Result<u64, String> {
-    let m = fs::metadata(path).map_err(|e| format!("Missing compiled native input: {e}"))?;
+    // Include the failing role and path: a missing staticlib must not be
+    // mistaken for a missing linked libxul (or for an FFI symbol failure).
+    let role = if archive { "libgkrust.a" } else { "unstripped libxul.so" };
+    let m = fs::metadata(path)
+        .map_err(|e| format!("Missing compiled {role} at {}: {e}", path.display()))?;
     if !m.is_file() || !(64..=MAX_BYTES).contains(&m.len()) {
         return Err("Native archive/ELF size or file type invalid".into());
     }
