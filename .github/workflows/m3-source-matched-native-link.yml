@@ -111,6 +111,12 @@ jobs:
           rustc --edition=2021 -D warnings -O ci/m3-current-gkrust-direct-branches.rs \
             -o "$RUNNER_TEMP/m3-current-gkrust-direct-branches"
           echo "PASS: compiled real C++ machine-call FFI fixture and negative branch tests"
+          rustc --edition=2021 -D warnings --test ci/m3-current-crashhelper-direct-branch.rs \
+            -o "$RUNNER_TEMP/m3-current-crashhelper-direct-branch-tests"
+          "$RUNNER_TEMP/m3-current-crashhelper-direct-branch-tests"
+          rustc --edition=2021 -D warnings -O ci/m3-current-crashhelper-direct-branch.rs \
+            -o "$RUNNER_TEMP/m3-current-crashhelper-direct-branch"
+          echo "PASS: linked Rust staticlib to crashhelper C++ machine-branch fixtures"
 
       - name: Record exact-source generated configure substitutions
         shell: bash
@@ -375,6 +381,39 @@ jobs:
           echo "PASS: two gkrust symbols verified in actual current native archive and linked libxul"
           echo "LIMIT: archive/ELF definitions only; no full FFI closure or source pruning"
 
+      - name: Verify actual current native crashhelper CXX main direct branch to Rust FFI
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          crashhelper="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline/dist/bin/crashhelper"
+          test -s "$crashhelper"
+          test ! -L "$crashhelper"
+          "$RUNNER_TEMP/m3-current-crashhelper-direct-branch" \
+            "$GITHUB_SHA" "$crashhelper" \
+            "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            --arg binary "$(sha256sum "$crashhelper" | cut -d' ' -f1)" '
+              .schema_version == 1 and
+              .status == "one_current_linked_crashhelper_main_direct_branch_to_named_ffi_definition" and
+              .source_commit == $sha and
+              .consumer_elf == "crashhelper" and
+              .unstripped_crashhelper_sha256 == $binary and
+              (.unstripped_crashhelper_bytes > 64) and
+              .main_strong_text_definitions == 1 and
+              .crash_generator_logic_desktop_text_definitions == 1 and
+              .main_to_crash_generator_logic_desktop_direct_branches == 1 and
+              .compiled_direct_branch_to_named_ffi_export_verified == true and
+              .real_rust_archive_member_proven == false and
+              .all_cpp_rust_ffi_edges_enumerated == false and
+              .conditional_or_indirect_ffi_closure_proven == false and
+              .source_pruning_authorized == false and
+              .m3_sixth_gate_closed == false
+            ' "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json" >/dev/null
+          echo "PASS: real current linked crashhelper main issues one direct branch to named crash-helper FFI export"
+          echo "LIMIT: no claimed Rust archive member provenance, complete FFI closure or source pruning"
+
       - name: Verify three actual current native C++ XPCOM direct branches to gkrust FFI
         shell: bash
         timeout-minutes: 35
@@ -411,6 +450,15 @@ jobs:
             ' "$RUNNER_TEMP/m3-current-gkrust-direct-branches.json" >/dev/null
           echo "PASS: three source-matched current XPCOM compiled machine branches to real gkrust exports"
           echo "LIMIT: no full FFI map, additional source pruning or release authority"
+
+      - name: Preserve bounded current linked crashhelper CXX to FFI branch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-current-native-crashhelper-direct-branch-evidence
+          path: ${{ runner.temp }}/m3-current-crashhelper-direct-branch.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Preserve source-linked current native direct-branch evidence only
         if: always()
