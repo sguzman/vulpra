@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "status": "current_source_compiled_gkrust_two_named_archive_member_and_elf_definitions_independently_reconciled",
+  "verified_date_utc": "2026-11-08",
+  "source_commit": "fc362d0c8de7529554af6dc00f84e485714f73d8",
+  "native_workflow": {
+    "run_id": 42397502966,
+    "workflow": ".github/workflows/m3-source-matched-native-link.yml",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "reconciliation_workflow": {
+    "run_id": 42401728599,
+    "workflow": ".github/workflows/m3-native-link-evidence-reconcile.yml",
+    "status": "completed",
+    "conclusion": "success",
+    "compiled_ffi_reconciliation_job": "reconcile-real-native-run"
+  },
+  "observed_real_native_gkrust_archive": {
+    "basename": "libgkrust.a",
+    "sha256": "38e1f778edf3b8e036b0c2a4302e294c71c4f9efb3821116434ee059aa5f1407",
+    "bytes": 1463257954,
+    "archive_member_count": 313,
+    "discovery": "unique-fallback-under-source-matched-objdir"
+  },
+  "observed_real_unstripped_consumer_elf": {
+    "basename": "libxul.so",
+    "sha256": "5fc7db85c0469a60c362f81229de1c24ad5a32cfc4b3c5e76119409d68fa3a84",
+    "bytes": 2590378712
+  },
+  "observed_named_ffi_definitions": [
+    {
+      "symbol": "GkRust_Init",
+      "strong_archive_member": "gkrust-970258c2b320f725.gkrust.4baad39560e1113c-cgu.0.rcgu.o",
+      "archive_definitions": 1,
+      "linked_elf_definitions": 1
+    },
+    {
+      "symbol": "GkRust_Shutdown",
+      "strong_archive_member": "gkrust-970258c2b320f725.gkrust.4baad39560e1113c-cgu.0.rcgu.o",
+      "archive_definitions": 1,
+      "linked_elf_definitions": 1
+    }
+  ],
+  "both_exports_owned_by_same_compiled_archive_member": true,
+  "archive_and_elf_sha256_bound_to_successful_compiled_native_runtime": true,
+  "strong_archive_symbol_test_contract_included_in_compiled_source": true,
+  "existing_real_native_package_wayland_js_webextension_nimbus_tls_runtime_verified": true,
+  "compiled_current_crashhelper_archive_to_consumer_verified": false,
+  "all_gkrust_archive_member_to_linker_selection_edges_verified": false,
+  "cpp_to_rust_machine_callsite_proof_for_current_native_elf_verified": false,
+  "indirect_ffi_and_dlopen_graph_complete": false,
+  "protected_feature_activation_and_error_fallback_complete": false,
+  "target_endeavouros_hyprland_verified": false,
+  "additional_source_removal_authorized": false,
+  "m3_sixth_gate_closed": false,
+  "release_ready": false,
+  "notes": "Read from the actual 13584709670 native archive-member evidence ZIP and separate 13585657649 independent reconciliation ZIP, both downloaded from completed successful GitHub Actions runs. Two exact C ABI definitions from one observed gkrust archive member match actual unstripped libxul. No full archive-member selection, complete runtime FFI or feature dependency closure can be inferred. No new package savings were measured."
+}
