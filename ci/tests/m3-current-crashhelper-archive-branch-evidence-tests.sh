@@ -131,7 +131,7 @@ while IFS= read -r mutation; do
   rejected=$((rejected+1))
 done <<'ARCHIVE'
 .source_commit = ("0"*40)
-.rust_archive_sha256 = ("0"*64)
+.rust_archive_sha256 = "not-a-valid-sha256"
 .unstripped_crashhelper_sha256 = ("0"*64)
 .unstripped_crashhelper_bytes = 10
 .export_name = "fake_export"
