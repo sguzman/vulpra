@@ -4,12 +4,14 @@ set -euo pipefail
 source_sha=0123456789abcdef0123456789abcdef01234567
 run=42492978832
 crash_hash=abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+package_sha=1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
 tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT
-jq -n --arg source "$source_sha" --argjson run "$run" '{
+jq -n --arg source "$source_sha" --argjson run "$run" --arg pkg "$package_sha" '{
   schema_version:1,source_commit:$source,workflow_run_id:$run,
   native_build_required:true,runtime_passed_after_link_audit:true,
   linker_full_map_recorded:false,source_removal_authorized:false,
+  package:{package_sha256:$pkg},
   packaging_transform_replay:{deterministic_reproduction_verified:true}
 }' > "$tmp/link.json"
 jq -n --arg source "$source_sha" --arg hash "$crash_hash" '{
@@ -26,16 +28,29 @@ jq -n --arg source "$source_sha" --arg hash "$crash_hash" '{
   conditional_or_indirect_ffi_closure_proven:false,
   source_pruning_authorized:false,m3_sixth_gate_closed:false
 }' > "$tmp/crash.json"
+jq -n --arg source "$source_sha" --arg archive "$package_sha" --arg hash "$crash_hash" '{
+  schema_version:1,source_commit:$source,archive_sha256:$archive,
+  direct_needed_edges:268,source_removal_authorized:false,
+  dlopen_and_indirect_runtime_dependencies_complete:false,
+  elf_members:([range(0;27) | {
+    name:("fixture"+(.|tostring)),
+    path:("vulpra/fixture"+(.|tostring)),
+    sha256:$hash,logical_bytes:100
+  }] + [{
+    name:"crashhelper",path:"vulpra/crashhelper",
+    sha256:$hash,logical_bytes:200000
+  }])
+}' > "$tmp/package.json"
 verify() {
-  jq -n --slurpfile link "$1" --slurpfile crash "$2" \
+  jq -n --slurpfile link "$1" --slurpfile crash "$2" --slurpfile package "$3" \
     --arg source "$source_sha" --argjson run "$run" \
     -f ci/m3-current-crashhelper-machine-branch-evidence.jq >/dev/null
 }
-verify "$tmp/link.json" "$tmp/crash.json"
+verify "$tmp/link.json" "$tmp/crash.json" "$tmp/package.json"
 bad=0
 while IFS= read -r mutation; do
   jq "$mutation" "$tmp/crash.json" > "$tmp/forged.json"
-  if verify "$tmp/link.json" "$tmp/forged.json" 2>/dev/null; then
+  if verify "$tmp/link.json" "$tmp/forged.json" "$tmp/package.json" 2>/dev/null; then
     echo "FAIL: accepted fabricated crashhelper attestation: $mutation" >&2
     exit 1
   fi
@@ -60,7 +75,7 @@ done <<'CRASH'
 CRASH
 while IFS= read -r mutation; do
   jq "$mutation" "$tmp/link.json" > "$tmp/forged.json"
-  if verify "$tmp/forged.json" "$tmp/crash.json" 2>/dev/null; then
+  if verify "$tmp/forged.json" "$tmp/crash.json" "$tmp/package.json" 2>/dev/null; then
     echo "FAIL: accepted fabricated native runtime identity: $mutation" >&2
     exit 1
   fi
@@ -74,10 +89,30 @@ done <<'NATIVE'
 .source_removal_authorized = true
 .packaging_transform_replay.deterministic_reproduction_verified = false
 NATIVE
-test "$bad" -eq 23
-test "$(jq -n --slurpfile link "$tmp/link.json" --slurpfile crash "$tmp/crash.json" \
+while IFS= read -r mutation; do
+  jq "$mutation" "$tmp/package.json" > "$tmp/forged.json"
+  if verify "$tmp/link.json" "$tmp/crash.json" "$tmp/forged.json" 2>/dev/null; then
+    echo "FAIL: accepted fabricated packaged crashhelper ELF evidence: $mutation" >&2
+    exit 1
+  fi
+  bad=$((bad+1))
+done <<'PACKAGE'
+.source_commit = ("0"*40)
+.archive_sha256 = ("0"*64)
+.direct_needed_edges = 0
+.elf_members = .elf_members[:-1]
+.elf_members += [.elf_members[-1]]
+.elf_members[-1].sha256 = "invalid"
+.elf_members[-1].logical_bytes = 0
+.elf_members[-1].path = "elsewhere/false"
+.elf_members[-1].name = "not-crashhelper"
+.source_removal_authorized = true
+.dlopen_and_indirect_runtime_dependencies_complete = true
+PACKAGE
+test "$bad" -eq 34
+test "$(jq -n --slurpfile link "$tmp/link.json" --slurpfile crash "$tmp/crash.json" --slurpfile package "$tmp/package.json" \
   --arg source "$source_sha" --argjson run "$run" \
   -f ci/m3-current-crashhelper-machine-branch-evidence.jq |
   jq -r '.authenticated_native_build_and_runtime_joined')" = true
-echo "PASS: 23/23 synthetic forged current crashhelper source/runtime/ABI claims rejected"
+echo "PASS: 34/34 forged current crashhelper source/runtime/ABI/packaged ELF claims rejected"
 echo "LIMIT: no real Vulpra native crashhelper examined by this fixture"
