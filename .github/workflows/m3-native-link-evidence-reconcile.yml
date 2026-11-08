@@ -11,7 +11,9 @@ on:
       - ci/m3-current-ffi-native-evidence.jq
       - ci/m3-current-gkrust-machine-branches-evidence.jq
       - ci/m3-current-crashhelper-machine-branch-evidence.jq
+      - ci/m3-current-crashhelper-archive-branch-evidence.jq
       - ci/tests/m3-current-crashhelper-machine-branch-evidence-tests.sh
+      - ci/tests/m3-current-crashhelper-archive-branch-evidence-tests.sh
       - ci/tests/m3-current-gkrust-machine-branches-evidence-tests.sh
       - ci/tests/m3-current-ffi-native-evidence-tests.sh
       - ci/tests/m3-current-local-tls-native-evidence-tests.sh
@@ -67,6 +69,7 @@ jobs:
           bash ci/tests/m3-current-ffi-native-evidence-tests.sh
           bash ci/tests/m3-current-gkrust-machine-branches-evidence-tests.sh
           bash ci/tests/m3-current-crashhelper-machine-branch-evidence-tests.sh
+          bash ci/tests/m3-current-crashhelper-archive-branch-evidence-tests.sh
 
   reconcile-real-native-run:
     if: >-
