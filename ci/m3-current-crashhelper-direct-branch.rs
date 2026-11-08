@@ -35,6 +35,7 @@ fn inspect_symbols(path: &Path) -> Result<(), String> {
         .spawn().map_err(|e| format!("GNU nm unavailable: {e}"))?;
     let output = child.stdout.take().ok_or("GNU nm stdout missing")?;
     let mut main_count = 0;
+    let mut main_kinds: Vec<String> = Vec::new();
     let mut export_count = 0;
     for (n, line) in BufReader::new(output).lines().enumerate() {
         if n >= MAX_NM_LINES {
@@ -45,14 +46,20 @@ fn inspect_symbols(path: &Path) -> Result<(), String> {
         let mut fields = line.split_whitespace();
         let Some(name) = fields.next() else { continue };
         let Some(kind) = fields.next() else { continue };
-        if name == "main" && kind == "T" { main_count += 1; }
+        if name == "main" {
+            if main_kinds.len() < 8 { main_kinds.push(kind.to_owned()); }
+            // Mozilla's linked native binary can internalize its C++ main
+            // into local .text ('t'). That is a real nonweak text function,
+            // not a missing entry point; still reject weak W/w or data.
+            if matches!(kind, "T" | "t") { main_count += 1; }
+        }
         if name == EXPORT && matches!(kind, "T" | "t") { export_count += 1; }
     }
     if !child.wait().map_err(|e| e.to_string())?.success() {
         return Err("GNU nm failed on actual crashhelper ELF".into());
     }
     if main_count != 1 || export_count != 1 {
-        return Err(format!("Expected one strong main and one named ABI text definition: main={main_count}, export={export_count}"));
+        return Err(format!("Expected one nonweak text main (T/t) and one named ABI text definition: main={main_count}, observed_main_kinds={main_kinds:?}, export={export_count}"));
     }
     Ok(())
 }
@@ -190,6 +197,16 @@ mod tests {
         let report = fs::read_to_string(&output).unwrap();
         assert!(report.contains("\"main_to_crash_generator_logic_desktop_direct_branches\":1"));
         assert!(report.contains("\"real_rust_archive_member_proven\":false"));
+        // Reproduce the native GNU-symbol visibility case: local nonweak
+        // 't main' must be accepted, weak 'W main' must never be accepted.
+        let local_main = root.join("local-main-crashhelper");
+        assert!(Command::new("objcopy").arg("--localize-symbol=main")
+            .arg(&elf).arg(&local_main).status().unwrap().success());
+        audit(source, &local_main, &root.join("local-main.json")).unwrap();
+        let weak_main = root.join("weak-main-crashhelper");
+        assert!(Command::new("objcopy").arg("--weaken-symbol=main")
+            .arg(&elf).arg(&weak_main).status().unwrap().success());
+        assert!(audit(source, &weak_main, &root.join("weak-main.json")).is_err());
         let wrong_source = root.join("no-call.cpp");
         let wrong_elf = root.join("no-call-crashhelper");
         fs::write(&wrong_source,
