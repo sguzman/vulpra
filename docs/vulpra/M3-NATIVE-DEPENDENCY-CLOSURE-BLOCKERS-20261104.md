@@ -347,3 +347,16 @@ No new full Firefox build was launched, and the already running [source-pinned c
 [One deliberately scoped updated native workflow `e4eef5d`](https://github.com/sguzman/vulpra/commit/e4eef5d9c064fcedf703fa0faaa80fdc994c5e25) launched [full normal native run **42502043415**](https://github.com/sguzman/vulpra/actions/runs/42502043415), source `e4eef5d9c064fcedf703fa0faaa80fdc994c5e25`. It now emits the **actual `main` symbol binding** (only that name, not an unbounded symbol dump) before the corrected direct machine-branch observer and, if it passes, runs the independently compiled and fixture-tested `libcrash_helper_server.a` Rust member-owner audit on **the same unstripped actual `crashhelper` ELF**, retaining both SHA digests in a separate bounded artifact. The source/runtime/ELF/ABI reconciler [`93426b9`](https://github.com/sguzman/vulpra/commit/93426b92f38e8be76996ea48b35114d2ce32d251) independently joins the new Rust archive report to the direct machine-branch report and normal package; [workflow lint **42502134862 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42502134862) and [lightweight evidence fixtures **42502134695 SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/42502134695). The previous [31/31 forged cross-report mutation suite](https://github.com/sguzman/vulpra/actions/runs/42500190328) remains accepted.
 
 **At this checkpoint the new full source-pinned run 42502043415 is still in progress**, with no accepted machine-branch/archive-owner artifact or reconciled result. An additional native run is justified by the **observed** executable-symbol false-negative and previously unmeasured Rust archive-member source. No additional Firefox pruning, marginal package-byte savings, indirect FFI completeness, local workstation QA, security maintenance-branch merge or release can be credited. **Overall 61% (Δ+0pp); M3 5/6=83%, sixth gate OPEN.**
+
+## Exact crashhelper source parity across failed and corrective normal-native revisions — 2026-11-08 UTC
+
+Read-only GitHub API blob checks at the **failed compiled-source SHA** `20f9caa74c099eba87d1808a907b1d7242c8cd9d` and the **corrective native-source SHA** `e4eef5d9c064fcedf703fa0faaa80fdc994c5e25` find the same Git blob object for all four directly relevant files:
+
+| Source file | Identical Git blob SHA at both revisions |
+| --- | --- |
+| `toolkit/crashreporter/crash_helper/crashhelper.cpp` | `e391fe314bbdfc81aebb894d7d5c5c5de8cceaa8` |
+| `toolkit/crashreporter/crash_helper/moz.build` | `78307c3d5f55f5802a75ca18976643195a6c1c95` |
+| `toolkit/crashreporter/crash_helper_server/src/lib.rs` | `6dc2c97db7e69986e66a43ad1fa4cdb8a617c5f1` |
+| `toolkit/crashreporter/crash_helper_server/moz.build` | `266a7207e7f18128c2c3085e3ef0d1779691d597` |
+
+**Narrow deduction:** no edit to these four source files explains the preceding `main=0, export=1` audit output. This does **not** identify the precise actual linked `main` symbol binding, prove the compiler produced a local `t main`, or authenticate any new compiled branch. The new source-pinned native run [42502043415](https://github.com/sguzman/vulpra/actions/runs/42502043415) was **still compiling** at this checkpoint, and its bounded `nm` binding diagnostic is the next decisive result. No redundant native build or source pruning. **M3 5/6 (83%), overall 61%, Δ+0pp.**
