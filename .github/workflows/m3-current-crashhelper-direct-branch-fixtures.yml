@@ -7,6 +7,7 @@ on:
     paths:
       - ci/m3-current-crashhelper-direct-branch.rs
       - ci/m3-current-crashhelper-archive-ffi.rs
+      - ci/m3-locate-crashhelper-archive.sh
       - .github/workflows/m3-current-crashhelper-direct-branch-fixtures.yml
   workflow_dispatch:
 
@@ -27,6 +28,7 @@ jobs:
           sparse-checkout: |
             ci/m3-current-crashhelper-direct-branch.rs
             ci/m3-current-crashhelper-archive-ffi.rs
+            ci/m3-locate-crashhelper-archive.sh
       - name: Compile real Rust staticlib and CXX executable; reject fake direct branches
         shell: bash
         run: |
@@ -73,3 +75,55 @@ jobs:
           test ! -e "$RUNNER_TEMP/forged-crashhelper-archive.json"
           echo 'PASS: compiled Rust archive member and linked C++ strong definition fixtures'
           echo 'LIMIT: archive member selection graph, current Firefox native link and release not proven'
+      - name: Fail closed on absent, ambiguous and symlinked crash helper Rust archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(mktemp -d)"
+          trap 'rm -rf -- "$root"' EXIT
+          obj="$root/objdir"
+          helper="$obj/dist/bin/crashhelper"
+          direct="$obj/toolkit/crashreporter/crash_helper_server/libcrash_helper_server.a"
+          locator="ci/m3-locate-crashhelper-archive.sh"
+          mkdir -p "$(dirname "$helper")" "$(dirname "$direct")"
+          printf 'fixture executable\n' > "$helper"
+          if bash "$locator" "$obj"; then
+            echo 'FAIL: missing archive was accepted' >&2
+            exit 1
+          fi
+          printf 'fixture staticlib\n' > "$direct"
+          result="$(bash "$locator" "$obj")"
+          test "$result" = "$(realpath "$direct")"
+          rm -f -- "$direct"
+          fallback="$obj/toolkit/crashreporter/fallback/libcrash_helper_server.a"
+          mkdir -p "$(dirname "$fallback")"
+          printf 'fallback staticlib\n' > "$fallback"
+          result="$(bash "$locator" "$obj")"
+          test "$result" = "$(realpath "$fallback")"
+          second="$obj/toolkit/crashreporter/another/libcrash_helper_server.a"
+          mkdir -p "$(dirname "$second")"
+          printf 'second staticlib\n' > "$second"
+          if bash "$locator" "$obj"; then
+            echo 'FAIL: ambiguous archives were accepted' >&2
+            exit 1
+          fi
+          rm -f -- "$second"
+          ln -s "$fallback" "$direct"
+          if bash "$locator" "$obj"; then
+            echo 'FAIL: symlinked expected archive was accepted' >&2
+            exit 1
+          fi
+          rm -f -- "$direct"
+          rm -f -- "$helper"
+          if bash "$locator" "$obj"; then
+            echo 'FAIL: missing linked crashhelper was accepted' >&2
+            exit 1
+          fi
+          printf 'fixture executable\n' > "$helper"
+          rm -f -- "$fallback"
+          if bash "$locator" "$obj"; then
+            echo 'FAIL: no candidate archive was accepted' >&2
+            exit 1
+          fi
+          echo 'PASS: six native crashhelper archive path presence/ambiguity/symlink checks'
+          echo 'LIMIT: synthetic paths only; actual Mozilla-built Rust archive not yet examined'
