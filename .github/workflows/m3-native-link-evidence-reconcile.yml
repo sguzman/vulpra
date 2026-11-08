@@ -9,6 +9,8 @@ on:
       - ci/m3-native-link-evidence-ledger.py
       - ci/m3-current-local-tls-native-evidence.jq
       - ci/m3-current-ffi-native-evidence.jq
+      - ci/m3-current-gkrust-machine-branches-evidence.jq
+      - ci/tests/m3-current-gkrust-machine-branches-evidence-tests.sh
       - ci/tests/m3-current-ffi-native-evidence-tests.sh
       - ci/tests/m3-current-local-tls-native-evidence-tests.sh
       - .github/workflows/m3-native-link-evidence-reconcile.yml
@@ -61,6 +63,7 @@ jobs:
           python3 ci/m3-native-link-evidence-ledger.py --self-test
           bash ci/tests/m3-current-local-tls-native-evidence-tests.sh
           bash ci/tests/m3-current-ffi-native-evidence-tests.sh
+          bash ci/tests/m3-current-gkrust-machine-branches-evidence-tests.sh
 
   reconcile-real-native-run:
     if: >-
@@ -227,6 +230,49 @@ jobs:
           ' "$RUNNER_TEMP/m3-current-ffi-native-reconciled.json" >/dev/null
           echo "PASS: independent current linked Rust member and ELF SHA evidence; not full FFI or M3 acceptance"
 
+      - name: Independently reconcile real current C++ XPCOM direct branches to Rust FFI exports
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The native CI run already passed the source/package/runtime and
+          # compiled Rust archive audit; this separate action rechecks the
+          # precise unstripped libxul identity across all three reports.
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-current-native-gkrust-direct-branch-evidence \
+            --dir "$RUNNER_TEMP/direct-evidence"
+          mapfile -t linked < <(find "$RUNNER_TEMP/native-evidence" \
+            -type f -name m3-native-link-inputs.json -print)
+          mapfile -t rustffi < <(find "$RUNNER_TEMP/ffi-evidence" \
+            -type f -name m3-current-ffi-archive-members.json -print)
+          mapfile -t branches < <(find "$RUNNER_TEMP/direct-evidence" \
+            -type f -name m3-current-gkrust-direct-branches.json -print)
+          test "${#linked[@]}" -eq 1
+          test "${#rustffi[@]}" -eq 1
+          test "${#branches[@]}" -eq 1
+          jq -n \
+            --slurpfile link "${linked[0]}" \
+            --slurpfile ffi "${rustffi[0]}" \
+            --slurpfile direct "${branches[0]}" \
+            --arg source "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            -f ci/m3-current-gkrust-machine-branches-evidence.jq \
+            > "$RUNNER_TEMP/m3-current-gkrust-machine-branches-reconciled.json"
+          jq -e --arg sha "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            .schema_version == 1 and
+            .status == "actual_current_compiled_three_cpp_gkrust_machine_branches_joined_to_source_owned_archive_exports" and
+            .native_source_commit == $sha and .native_run_id == $run and
+            .actual_native_build_and_runtime_joined == true and
+            .verified_rust_ffi_archive_symbols == 2 and
+            .verified_actual_current_cpp_direct_branch_callers == 3 and
+            .complete_compiled_linker_selection_map_proven == false and
+            .all_cpp_rust_ffi_edges_enumerated == false and
+            .indirect_ffi_and_dlopen_closure_proven == false and
+            .target_endeavouros_hyprland_verified == false and
+            .new_source_pruning_authorized == false and .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/m3-current-gkrust-machine-branches-reconciled.json" >/dev/null
+          echo "PASS: independent three current C++ direct machine branches join the compiled Rust staticlib and exact libxul ELF"
+          echo "LIMIT: not complete Rust/C++ FFI or indirect loader closure"
+
       - name: Preserve only bounded reconciled source and runtime attestations
         uses: actions/upload-artifact@v4
         with:
@@ -235,5 +281,6 @@ jobs:
             ${{ runner.temp }}/m3-native-link-reconciled.json
             ${{ runner.temp }}/m3-current-local-tls-reconciled.json
             ${{ runner.temp }}/m3-current-ffi-native-reconciled.json
+            ${{ runner.temp }}/m3-current-gkrust-machine-branches-reconciled.json
           if-no-files-found: error
           retention-days: 14
