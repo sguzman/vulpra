@@ -50,11 +50,11 @@ else
     exit 1
   }
   mapfile -t candidates < "$tmp"
-  if [ "\${#candidates[@]}" -ne 1 ]; then
-    echo "FAIL: expected exactly one current crash helper Rust staticlib, found \${#candidates[@]}" >&2
+  if [ "${#candidates[@]}" -ne 1 ]; then
+    echo "FAIL: expected exactly one current crash helper Rust staticlib, found ${#candidates[@]}" >&2
     exit 1
   fi
-  archive="\${candidates[0]}"
+  archive="${candidates[0]}"
   mode=unique-fallback
 fi
 
