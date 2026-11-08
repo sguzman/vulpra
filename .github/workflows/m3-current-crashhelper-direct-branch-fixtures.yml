@@ -100,6 +100,20 @@ jobs:
           printf 'fallback staticlib\n' > "$fallback"
           result="$(bash "$locator" "$obj")"
           test "$result" = "$(realpath "$fallback")"
+          # Real Rust Cargo staticlib is not guaranteed to live beside its
+          # moz.build; the previous source-matched native run saw zero
+          # matching files in the crashreporter subtree.
+          cargo="$obj/cargo-target/release/libcrash_helper_server.a"
+          mkdir -p "$(dirname "$cargo")"
+          mv -- "$fallback" "$cargo"
+          result="$(bash "$locator" "$obj")"
+          test "$result" = "$(realpath "$cargo")"
+          printf 'fallback staticlib\n' > "$fallback"
+          if bash "$locator" "$obj"; then
+            echo 'FAIL: ambiguity across Cargo and crashreporter directories accepted' >&2
+            exit 1
+          fi
+          rm -f -- "$cargo"
           second="$obj/toolkit/crashreporter/another/libcrash_helper_server.a"
           mkdir -p "$(dirname "$second")"
           printf 'second staticlib\n' > "$second"
@@ -121,9 +135,17 @@ jobs:
           fi
           printf 'fixture executable\n' > "$helper"
           rm -f -- "$fallback"
+          mkdir -p "$root/outside" "$obj/alternate"
+          printf 'outside staticlib\n' > "$root/outside/libcrash_helper_server.a"
+          ln -s "$root/outside/libcrash_helper_server.a" "$obj/alternate/libcrash_helper_server.a"
+          if bash "$locator" "$obj"; then
+            echo 'FAIL: symlink to an outside archive was accepted' >&2
+            exit 1
+          fi
+          rm -f -- "$obj/alternate/libcrash_helper_server.a"
           if bash "$locator" "$obj"; then
             echo 'FAIL: no candidate archive was accepted' >&2
             exit 1
           fi
-          echo 'PASS: six native crashhelper archive path presence/ambiguity/symlink checks'
+          echo 'PASS: nine native crashhelper archive locator presence/scope/ambiguity/symlink checks'
           echo 'LIMIT: synthetic paths only; actual Mozilla-built Rust archive not yet examined'
