@@ -120,6 +120,12 @@ fn audit(source: &str, archive: &Path, elf: &Path, output: &Path) -> Result<(), 
     if source.len() != 40 || !source.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("Exact source SHA must be 40 ASCII hex characters".into());
     }
+    if archive.file_name().is_none_or(|x| x != "libcrash_helper_server.a") {
+        return Err("Rust staticlib basename must be libcrash_helper_server.a".into());
+    }
+    if elf.file_name().is_none_or(|x| x != "crashhelper") {
+        return Err("Linked C++ executable basename must be crashhelper".into());
+    }
     let archive_bytes = bounded_file(archive, true)?;
     let elf_bytes = bounded_file(elf, false)?;
     let members = archive_members(archive)?;
@@ -206,17 +212,38 @@ mod tests {
         let json=fs::read_to_string(&report).unwrap();
         assert!(json.contains("\"real_rust_archive_member_definition_observed\":true"));
         assert!(json.contains("\"archive_member_selected_by_final_linker_proven\":false"));
-        let no_link=dir.join("unused");
+        let no_link_dir=dir.join("unlinked");
+        fs::create_dir_all(&no_link_dir).unwrap();
+        let no_link=no_link_dir.join("crashhelper");
         fs::write(&cpp,"int main(){return 0;}\n").unwrap();
         assert!(Command::new("c++").arg(&cpp).arg("-o").arg(&no_link).status().unwrap().success());
         assert!(audit(src,&archive,&no_link,&dir.join("bad.json")).is_err());
         let weak=dir.join("weak.c");
         let weak_obj=dir.join("weak.o");
-        let weak_ar=dir.join("weak.a");
+        let weak_dir=dir.join("weak-archive");
+        fs::create_dir_all(&weak_dir).unwrap();
+        let weak_ar=weak_dir.join("libcrash_helper_server.a");
         fs::write(&weak,"__attribute__((weak)) int crash_generator_logic_desktop(void){return 11;}\n").unwrap();
         assert!(Command::new("cc").arg("-c").arg(&weak).arg("-o").arg(&weak_obj).status().unwrap().success());
         assert!(Command::new("ar").arg("rcs").arg(&weak_ar).arg(&weak_obj).status().unwrap().success());
         assert!(audit(src,&weak_ar,&exe,&dir.join("weak.json")).is_err());
+        let dup_dir=dir.join("duplicate-archive");
+        fs::create_dir_all(&dup_dir).unwrap();
+        let dup_ar=dup_dir.join("libcrash_helper_server.a");
+        let obj1=dup_dir.join("a.o");
+        let obj2=dup_dir.join("b.o");
+        let c1=dup_dir.join("a.c");
+        let c2=dup_dir.join("b.c");
+        fs::write(&c1,"int crash_generator_logic_desktop(void){return 1;}\n").unwrap();
+        fs::write(&c2,"int crash_generator_logic_desktop(void){return 2;}\n").unwrap();
+        for (src,obj) in [(&c1,&obj1),(&c2,&obj2)] {
+            assert!(Command::new("cc").arg("-c").arg(src).arg("-o").arg(obj).status().unwrap().success());
+        }
+        assert!(Command::new("ar").arg("rcs").arg(&dup_ar).arg(&obj1).arg(&obj2).status().unwrap().success());
+        assert!(audit(src,&dup_ar,&exe,&dir.join("duplicate.json")).is_err());
+        let alternate=dir.join("other-name.a");
+        fs::copy(&archive,&alternate).unwrap();
+        assert!(audit(src,&alternate,&exe,&dir.join("wrong-name.json")).is_err());
         assert!(audit(src,Path::new("/does-not-exist/libcrash_helper_server.a"),&exe,&dir.join("missing.json")).is_err());
         fs::remove_dir_all(dir).unwrap();
     }
