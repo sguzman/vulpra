@@ -105,6 +105,12 @@ jobs:
           rustc --edition=2021 -D warnings -O ci/m3-current-ffi-archive-members.rs \
             -o "$RUNNER_TEMP/m3-current-ffi-archive-members"
           echo "PASS: compiled native Rust archive-member inspector with real GNU nm/ar test fixtures"
+          rustc --edition=2021 -D warnings --test ci/m3-current-gkrust-direct-branches.rs \
+            -o "$RUNNER_TEMP/m3-current-gkrust-direct-branch-tests"
+          "$RUNNER_TEMP/m3-current-gkrust-direct-branch-tests"
+          rustc --edition=2021 -D warnings -O ci/m3-current-gkrust-direct-branches.rs \
+            -o "$RUNNER_TEMP/m3-current-gkrust-direct-branches"
+          echo "PASS: compiled real C++ machine-call FFI fixture and negative branch tests"
 
       - name: Record exact-source generated configure substitutions
         shell: bash
@@ -368,6 +374,52 @@ jobs:
             ' "$RUNNER_TEMP/m3-current-ffi-archive-members.json" >/dev/null
           echo "PASS: two gkrust symbols verified in actual current native archive and linked libxul"
           echo "LIMIT: archive/ELF definitions only; no full FFI closure or source pruning"
+
+      - name: Verify three actual current native C++ XPCOM direct branches to gkrust FFI
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          libxul="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline/dist/bin/libxul.so"
+          test -s "$libxul"
+          test ! -L "$libxul"
+          test -s "$RUNNER_TEMP/m3-current-ffi-archive-members.json"
+          "$RUNNER_TEMP/m3-current-gkrust-direct-branches" \
+            "$GITHUB_SHA" "$libxul" \
+            "$RUNNER_TEMP/m3-current-gkrust-direct-branches.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            --arg elf "$(jq -r '.built_libxul_sha256' "$RUNNER_TEMP/m3-native-link-inputs.json")" \
+            --arg rust_elf "$(jq -r '.libxul_unstripped_sha256' "$RUNNER_TEMP/m3-current-ffi-archive-members.json")" '
+              .schema_version == 1 and
+              .status == "three_current_compiled_cpp_direct_branches_to_named_gkrust_abi_exports" and
+              .source_commit == $sha and
+              .linked_consumer == "libxul.so" and
+              .unstripped_consumer_sha256 == $elf and
+              .unstripped_consumer_sha256 == $rust_elf and
+              (.unstripped_consumer_bytes > 10000000) and
+              .caller_functions_verified == 3 and
+              .ns_init_xpcom_to_gkrust_init_branches == 1 and
+              .ns_init_minimal_xpcom_to_gkrust_init_branches == 1 and
+              .mozilla_shutdown_xpcom_to_gkrust_shutdown_branches == 1 and
+              .current_machine_code_direct_branch_targets_verified == true and
+              .all_cpp_rust_ffi_callers_enumerated == false and
+              .all_rust_archive_members_to_linker_edges_verified == false and
+              .conditional_or_indirect_ffi_closure_proven == false and
+              .source_pruning_authorized == false and
+              .m3_sixth_gate_closed == false
+            ' "$RUNNER_TEMP/m3-current-gkrust-direct-branches.json" >/dev/null
+          echo "PASS: three source-matched current XPCOM compiled machine branches to real gkrust exports"
+          echo "LIMIT: no full FFI map, additional source pruning or release authority"
+
+      - name: Preserve source-linked current native direct-branch evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-current-native-gkrust-direct-branch-evidence
+          path: ${{ runner.temp }}/m3-current-gkrust-direct-branches.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Preserve bounded source-pinned current native FFI archive evidence
         if: always()
