@@ -1,0 +1,51 @@
+# Cheap native C++/Rust ELF fixtures only: no Firefox browser build.
+name: M3 Current Crashhelper Direct Rust FFI Branch Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-current-crashhelper-direct-branch.rs
+      - .github/workflows/m3-current-crashhelper-direct-branch-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compiled-current-crashhelper-machine-branch-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout bounded linked crashhelper verifier only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-current-crashhelper-direct-branch.rs
+      - name: Compile real Rust staticlib and CXX executable; reject fake direct branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v rustc
+          command -v c++
+          command -v nm
+          command -v objdump
+          rustc --edition=2021 -D warnings --test \
+            ci/m3-current-crashhelper-direct-branch.rs \
+            -o "$RUNNER_TEMP/crashhelper-branch-tests"
+          "$RUNNER_TEMP/crashhelper-branch-tests" --nocapture
+          rustc --edition=2021 -D warnings -O \
+            ci/m3-current-crashhelper-direct-branch.rs \
+            -o "$RUNNER_TEMP/crashhelper-branch-verifier"
+          if "$RUNNER_TEMP/crashhelper-branch-verifier" \
+            "$GITHUB_SHA" /nonexistent/unstripped/crashhelper \
+            "$RUNNER_TEMP/forged-crashhelper-report.json"; then
+            echo 'FAIL: missing real crashhelper cannot be accepted' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/forged-crashhelper-report.json"
+          echo 'PASS: linked Rust staticlib and real C++ crashhelper call fixtures; negatives rejected'
+          echo 'LIMIT: fixture compiler evidence only, not source-matched current Vulpra crashhelper'
