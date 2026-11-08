@@ -173,6 +173,94 @@ jobs:
           set -euo pipefail
           ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-native-link-build.log"
 
+      # Preserve the actual Rust/C++ archive ABI evidence immediately after
+      # the full native build, before packaging can change/remove intermediate
+      # Cargo or moz.build staticlib outputs. The same unstripped crashhelper
+      # ELF is rehashed after package/runtime smoke below.
+      - name: Verify actual current native crashhelper CXX main direct branch to Rust FFI
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          crashhelper="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline/dist/bin/crashhelper"
+          test -s "$crashhelper"
+          test ! -L "$crashhelper"
+          # Diagnose exact main binding if the real linked ELF uses local (t) text.
+          # Do not print raw global symbols or run the crash helper process.
+          nm --defined-only --format=posix "$crashhelper" | \
+            awk '$1 == "main" { print "AUDIT: compiled crashhelper main nm binding " $2 }'
+          "$RUNNER_TEMP/m3-current-crashhelper-direct-branch" \
+            "$GITHUB_SHA" "$crashhelper" \
+            "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            --arg binary "$(sha256sum "$crashhelper" | cut -d' ' -f1)" '
+              .schema_version == 1 and
+              .status == "one_current_linked_crashhelper_main_direct_branch_to_named_ffi_definition" and
+              .source_commit == $sha and
+              .consumer_elf == "crashhelper" and
+              .unstripped_crashhelper_sha256 == $binary and
+              (.unstripped_crashhelper_bytes > 64) and
+              .main_strong_text_definitions == 1 and
+              .crash_generator_logic_desktop_text_definitions == 1 and
+              .main_to_crash_generator_logic_desktop_direct_branches == 1 and
+              .compiled_direct_branch_to_named_ffi_export_verified == true and
+              .real_rust_archive_member_proven == false and
+              .all_cpp_rust_ffi_edges_enumerated == false and
+              .conditional_or_indirect_ffi_closure_proven == false and
+              .source_pruning_authorized == false and
+              .m3_sixth_gate_closed == false
+            ' "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json" >/dev/null
+          echo "PASS: real current linked crashhelper main issues one direct branch to named crash-helper FFI export"
+          echo "LIMIT: no claimed Rust archive member provenance, complete FFI closure or source pruning"
+
+      - name: Verify actual source-matched crashhelper Rust staticlib export archive owner
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          obj="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline"
+          crashhelper="$obj/dist/bin/crashhelper"
+          archive="$(bash ci/m3-locate-crashhelper-archive.sh "$obj")"
+          test -s "$crashhelper"
+          test ! -L "$crashhelper"
+          test -s "$archive"
+          test ! -L "$archive"
+          test -s "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json"
+          "$RUNNER_TEMP/m3-current-crashhelper-archive-ffi" \
+            "$GITHUB_SHA" "$archive" "$crashhelper" \
+            "$RUNNER_TEMP/m3-current-crashhelper-archive-ffi.json"
+          jq -e --arg source "$GITHUB_SHA" \
+            --arg archive "$(sha256sum "$archive" | cut -d' ' -f1)" \
+            --arg elf "$(jq -r '.unstripped_crashhelper_sha256' "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json")" \
+            --argjson size "$(jq -r '.unstripped_crashhelper_bytes' "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json")" '
+              .schema_version == 1 and
+              .status == "bounded_current_crashhelper_rust_staticlib_export_and_linked_elf_definition" and
+              .source_commit == $source and
+              .rust_staticlib == "libcrash_helper_server.a" and
+              .consumer_elf == "crashhelper" and
+              .rust_archive_sha256 == $archive and
+              .unstripped_crashhelper_sha256 == $elf and
+              .unstripped_crashhelper_bytes == $size and
+              (.rust_archive_bytes > 64 and .rust_archive_bytes < 17179869184) and
+              (.rust_archive_members > 0 and .rust_archive_members <= 1000000) and
+              .export_name == "crash_generator_logic_desktop" and
+              .export_strong_archive_definition_count == 1 and
+              .export_linked_elf_text_definition_count == 1 and
+              (.export_archive_member | type == "string" and test("^[A-Za-z0-9._+@$-]{1,255}$")) and
+              .real_rust_archive_member_definition_observed == true and
+              .real_linked_elf_definition_observed == true and
+              .archive_member_selected_by_final_linker_proven == false and
+              .all_rust_archive_member_selection_edges_proven == false and
+              .complete_cpp_rust_ffi_graph_proven == false and
+              .conditional_or_indirect_ffi_closure_proven == false and
+              .source_pruning_authorized == false and .m3_sixth_gate_closed == false
+            ' "$RUNNER_TEMP/m3-current-crashhelper-archive-ffi.json" >/dev/null
+          echo "PASS: named Rust crashhelper archive owner and linked consumer ELF accepted from one actual native build"
+          echo "LIMIT: full linker archive selection and conditional FFI closure are not proven"
+
+
       - name: Package and independently verify native browser
         shell: bash
         run: |
@@ -293,6 +381,42 @@ jobs:
           print("PASS: normal browser packaged runtime acceptance")
           PY
 
+      - name: Revalidate exact compiled crashhelper ELF after packaging and runtime smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          obj="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline"
+          elf="$obj/dist/bin/crashhelper"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -s "$elf"
+          test ! -L "$elf"
+          test -s "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json"
+          test -s "$RUNNER_TEMP/m3-current-crashhelper-archive-ffi.json"
+          actual="$(sha256sum "$elf" | cut -d' ' -f1)"
+          jq -e --arg src "$GITHUB_SHA" --arg sha "$actual" \
+            --argjson bytes "$(stat -c '%s' "$elf")" '
+            .source_commit == $src and
+            .unstripped_crashhelper_sha256 == $sha and
+            .unstripped_crashhelper_bytes == $bytes and
+            .main_to_crash_generator_logic_desktop_direct_branches == 1 and
+            .source_pruning_authorized == false and
+            .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json" >/dev/null
+          jq -e --arg src "$GITHUB_SHA" --arg sha "$actual" \
+            --argjson bytes "$(stat -c '%s' "$elf")" '
+            .source_commit == $src and
+            .unstripped_crashhelper_sha256 == $sha and
+            .unstripped_crashhelper_bytes == $bytes and
+            .real_rust_archive_member_definition_observed == true and
+            .real_linked_elf_definition_observed == true and
+            .archive_member_selected_by_final_linker_proven == false and
+            .complete_cpp_rust_ffi_graph_proven == false and
+            .source_pruning_authorized == false and
+            .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/m3-current-crashhelper-archive-ffi.json" >/dev/null
+          echo "PASS: original source-linked crashhelper ELF hash unchanged after packaging and real browser runtime"
+          echo "LIMIT: archive-member selection and full FFI/feature closure remain unproven"
+
       - name: Audit current-source linked native loader callsites
         shell: bash
         timeout-minutes: 40
@@ -386,89 +510,6 @@ jobs:
             ' "$RUNNER_TEMP/m3-current-ffi-archive-members.json" >/dev/null
           echo "PASS: two gkrust symbols verified in actual current native archive and linked libxul"
           echo "LIMIT: archive/ELF definitions only; no full FFI closure or source pruning"
-
-      - name: Verify actual current native crashhelper CXX main direct branch to Rust FFI
-        shell: bash
-        timeout-minutes: 15
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          crashhelper="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline/dist/bin/crashhelper"
-          test -s "$crashhelper"
-          test ! -L "$crashhelper"
-          # Diagnose exact main binding if the real linked ELF uses local (t) text.
-          # Do not print raw global symbols or run the crash helper process.
-          nm --defined-only --format=posix "$crashhelper" | \
-            awk '$1 == "main" { print "AUDIT: compiled crashhelper main nm binding " $2 }'
-          "$RUNNER_TEMP/m3-current-crashhelper-direct-branch" \
-            "$GITHUB_SHA" "$crashhelper" \
-            "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json"
-          jq -e --arg sha "$GITHUB_SHA" \
-            --arg binary "$(sha256sum "$crashhelper" | cut -d' ' -f1)" '
-              .schema_version == 1 and
-              .status == "one_current_linked_crashhelper_main_direct_branch_to_named_ffi_definition" and
-              .source_commit == $sha and
-              .consumer_elf == "crashhelper" and
-              .unstripped_crashhelper_sha256 == $binary and
-              (.unstripped_crashhelper_bytes > 64) and
-              .main_strong_text_definitions == 1 and
-              .crash_generator_logic_desktop_text_definitions == 1 and
-              .main_to_crash_generator_logic_desktop_direct_branches == 1 and
-              .compiled_direct_branch_to_named_ffi_export_verified == true and
-              .real_rust_archive_member_proven == false and
-              .all_cpp_rust_ffi_edges_enumerated == false and
-              .conditional_or_indirect_ffi_closure_proven == false and
-              .source_pruning_authorized == false and
-              .m3_sixth_gate_closed == false
-            ' "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json" >/dev/null
-          echo "PASS: real current linked crashhelper main issues one direct branch to named crash-helper FFI export"
-          echo "LIMIT: no claimed Rust archive member provenance, complete FFI closure or source pruning"
-
-      - name: Verify actual source-matched crashhelper Rust staticlib export archive owner
-        shell: bash
-        timeout-minutes: 20
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          obj="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline"
-          crashhelper="$obj/dist/bin/crashhelper"
-          archive="$(bash ci/m3-locate-crashhelper-archive.sh "$obj")"
-          test -s "$crashhelper"
-          test ! -L "$crashhelper"
-          test -s "$archive"
-          test ! -L "$archive"
-          test -s "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json"
-          "$RUNNER_TEMP/m3-current-crashhelper-archive-ffi" \
-            "$GITHUB_SHA" "$archive" "$crashhelper" \
-            "$RUNNER_TEMP/m3-current-crashhelper-archive-ffi.json"
-          jq -e --arg source "$GITHUB_SHA" \
-            --arg archive "$(sha256sum "$archive" | cut -d' ' -f1)" \
-            --arg elf "$(jq -r '.unstripped_crashhelper_sha256' "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json")" \
-            --argjson size "$(jq -r '.unstripped_crashhelper_bytes' "$RUNNER_TEMP/m3-current-crashhelper-direct-branch.json")" '
-              .schema_version == 1 and
-              .status == "bounded_current_crashhelper_rust_staticlib_export_and_linked_elf_definition" and
-              .source_commit == $source and
-              .rust_staticlib == "libcrash_helper_server.a" and
-              .consumer_elf == "crashhelper" and
-              .rust_archive_sha256 == $archive and
-              .unstripped_crashhelper_sha256 == $elf and
-              .unstripped_crashhelper_bytes == $size and
-              (.rust_archive_bytes > 64 and .rust_archive_bytes < 17179869184) and
-              (.rust_archive_members > 0 and .rust_archive_members <= 1000000) and
-              .export_name == "crash_generator_logic_desktop" and
-              .export_strong_archive_definition_count == 1 and
-              .export_linked_elf_text_definition_count == 1 and
-              (.export_archive_member | type == "string" and test("^[A-Za-z0-9._+@$-]{1,255}$")) and
-              .real_rust_archive_member_definition_observed == true and
-              .real_linked_elf_definition_observed == true and
-              .archive_member_selected_by_final_linker_proven == false and
-              .all_rust_archive_member_selection_edges_proven == false and
-              .complete_cpp_rust_ffi_graph_proven == false and
-              .conditional_or_indirect_ffi_closure_proven == false and
-              .source_pruning_authorized == false and .m3_sixth_gate_closed == false
-            ' "$RUNNER_TEMP/m3-current-crashhelper-archive-ffi.json" >/dev/null
-          echo "PASS: named Rust crashhelper archive owner and linked consumer ELF accepted from one actual native build"
-          echo "LIMIT: full linker archive selection and conditional FFI closure are not proven"
 
       - name: Verify three actual current native C++ XPCOM direct branches to gkrust FFI
         shell: bash
