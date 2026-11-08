@@ -10,6 +10,8 @@ on:
       - ci/m3-current-local-tls-native-evidence.jq
       - ci/m3-current-ffi-native-evidence.jq
       - ci/m3-current-gkrust-machine-branches-evidence.jq
+      - ci/m3-current-crashhelper-machine-branch-evidence.jq
+      - ci/tests/m3-current-crashhelper-machine-branch-evidence-tests.sh
       - ci/tests/m3-current-gkrust-machine-branches-evidence-tests.sh
       - ci/tests/m3-current-ffi-native-evidence-tests.sh
       - ci/tests/m3-current-local-tls-native-evidence-tests.sh
@@ -64,6 +66,7 @@ jobs:
           bash ci/tests/m3-current-local-tls-native-evidence-tests.sh
           bash ci/tests/m3-current-ffi-native-evidence-tests.sh
           bash ci/tests/m3-current-gkrust-machine-branches-evidence-tests.sh
+          bash ci/tests/m3-current-crashhelper-machine-branch-evidence-tests.sh
 
   reconcile-real-native-run:
     if: >-
@@ -273,6 +276,56 @@ jobs:
           echo "PASS: independent three current C++ direct machine branches join the compiled Rust staticlib and exact libxul ELF"
           echo "LIMIT: not complete Rust/C++ FFI or indirect loader closure"
 
+      - name: Independently reconcile current linked crashhelper main to named Rust ABI call
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The preceding native run is already checked against original
+          # GitHub Actions success metadata, source SHA and runtime records.
+          # Older native runs did not produce this new separate artifact;
+          # don't rewrite their historical acceptance as a crashhelper pass.
+          introduced=20f9caa74c099eba87d1808a907b1d7242c8cd9d
+          status="$(gh api "repos/$GITHUB_REPOSITORY/compare/$introduced...$NATIVE_SOURCE_SHA" --jq '.status')"
+          if test "$status" = behind; then
+            echo "Historical compiled native run predates current crashhelper machine branch audit"
+            exit 0
+          fi
+          if test "$status" != identical && test "$status" != ahead; then
+            echo "::error::Cannot establish current native source descent for crashhelper FFI verifier: $status"
+            exit 1
+          fi
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-current-native-crashhelper-direct-branch-evidence \
+            --dir "$RUNNER_TEMP/crashhelper-evidence"
+          mapfile -t native < <(find "$RUNNER_TEMP/native-evidence" \
+            -type f -name m3-native-link-inputs.json -print)
+          mapfile -t crash < <(find "$RUNNER_TEMP/crashhelper-evidence" \
+            -type f -name m3-current-crashhelper-direct-branch.json -print)
+          test "${#native[@]}" -eq 1
+          test "${#crash[@]}" -eq 1
+          jq -n \
+            --slurpfile link "${native[0]}" \
+            --slurpfile crash "${crash[0]}" \
+            --arg source "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            -f ci/m3-current-crashhelper-machine-branch-evidence.jq \
+            > "$RUNNER_TEMP/m3-current-crashhelper-machine-branch-reconciled.json"
+          jq -e --arg sha "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            .schema_version == 1 and
+            .status == "source_matched_current_linked_crashhelper_direct_ffi_machine_branch_reconciled" and
+            .native_source_commit == $sha and .native_run_id == $run and
+            .authenticated_native_build_and_runtime_joined == true and
+            .verified_exact_crashhelper_main_direct_branch_count == 1 and
+            .independent_crashhelper_elf_hash_witnessed_elsewhere == false and
+            .rust_archive_member_source_proven == false and
+            .complete_cpp_rust_ffi_graph_proven == false and
+            .conditional_or_indirect_ffi_closure_proven == false and
+            .target_endeavouros_hyprland_verified == false and
+            .source_pruning_authorized == false and .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/m3-current-crashhelper-machine-branch-reconciled.json" >/dev/null
+          echo "PASS: one current linked crashhelper direct ABI branch joined to authenticated native runtime"
+          echo "LIMIT: no independently archived crashhelper binary or Rust archive provenance"
+
       - name: Preserve only bounded reconciled source and runtime attestations
         uses: actions/upload-artifact@v4
         with:
@@ -282,5 +335,6 @@ jobs:
             ${{ runner.temp }}/m3-current-local-tls-reconciled.json
             ${{ runner.temp }}/m3-current-ffi-native-reconciled.json
             ${{ runner.temp }}/m3-current-gkrust-machine-branches-reconciled.json
+            ${{ runner.temp }}/m3-current-crashhelper-machine-branch-reconciled.json
           if-no-files-found: error
           retention-days: 14
