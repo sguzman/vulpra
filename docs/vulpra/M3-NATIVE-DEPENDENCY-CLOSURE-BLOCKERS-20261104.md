@@ -244,3 +244,17 @@ does not prove them. No direct action is required on the user's currently
 unavailable EndeavourOS desktop. The existing downloaded browser/profile,
 security branch, source files and user hardware remain untouched.
 **M3 5/6 (83%), overall 61%, Δ0pp.**
+
+## Successful current compiled Rust FFI artifact — accepted 2026-11-08 UTC
+
+The corrected [source-matched full-native workflow 42397502966](https://github.com/sguzman/vulpra/actions/runs/42397502966) **SUCCEEDED** at exact source `fc362d0c8de7529554af6dc00f84e485714f73d8`, including a real complete normal native build, package, 28 packaged ELFs/268 direct DT_NEEDED edges, 2,435 recorded `libxul` object inputs, private Weston/Wayland rendering, WebDriver JS navigation, WebExtension lifecycle, Nimbus initialization and explicit self-signed TLS rejection. A real current-linked native-loader census also passed with **73 direct branches / 47 distinct caller/API/kind records**. The Rust FFI inspector ran after those checks and independently resolved the actual compiled archive at a **unique fallback** location inside the object directory (not the previous assumed direct output path).
+
+The bounded [real compiled FFI report, artifact 13584709670](https://github.com/sguzman/vulpra/actions/runs/42397502966/artifacts/13584709670) contains:
+
+- `libgkrust.a`: **1,463,257,954 bytes**, **313 archive members**, SHA-256 `38e1f778edf3b8e036b0c2a4302e294c71c4f9efb3821116434ee059aa5f1407`.
+- Unstripped `libxul.so`: **2,590,378,712 bytes**, SHA-256 `5fc7db85c0469a60c362f81229de1c24ad5a32cfc4b3c5e76119409d68fa3a84`.
+- The strong Rust archive definitions of **`GkRust_Init`** and **`GkRust_Shutdown`** are each unique, both in the **same observed compiled member**, `gkrust-970258c2b320f725.gkrust.4baad39560e1113c-cgu.0.rcgu.o`, and each has one corresponding native text definition in the actual unstripped `libxul.so`.
+
+The separately completed [independent reconciliation CI 42401728599 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/42401728599) downloaded the full-native evidence and the separate FFI artifact, authenticated exact source/run identity, linked ELF SHA and real runtime acceptance, and required the bounded FFI/closure flags. Its [reconciled artifact 13585657649](https://github.com/sguzman/vulpra/actions/runs/42401728599/artifacts/13585657649) confirms the same **313 member count, two symbol pairs, SHA-256s and explicit incomplete map**. Both ZIP artifacts were independently downloaded and inspected for this checkpoint. The exact machine-readable accepted record is [M3-REAL-CURRENT-GKRUST-ARCHIVE-ELF-FFI-20261108.json](M3-REAL-CURRENT-GKRUST-ARCHIVE-ELF-FFI-20261108.json).
+
+**Accepted new evidence:** real compiled-current Rust staticlib *member ownership of two named C ABI exports* and corresponding real unstripped ELF definitions, tied to a successful current normal browser build and independent reconciliation. **Not established:** all 313 archive member selections and relocations; actual machine-call branches in current C++ callers; current crashhelper Rust export archive-to-ELF proof; other Rust FFI, indirect/conditional loader calls and dynamic dependency routes; 18-feature activation/error fallback completion; or target EndeavourOS/Hyprland parity. No further pruning, native byte-savings credit, security-branch merge or release. The sixth M3 dependency gate remains **open**, M3 **83% (5/6)** and overall **61%, delta +0 pp**. The prior run failure and its correction above remain accurate historical entries; only the corrected run is accepted.
