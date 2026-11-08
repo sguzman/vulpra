@@ -337,6 +337,66 @@ jobs:
           echo "PASS: current linked crashhelper direct ABI branch joined to authenticated native runtime and packaged ELF inventory"
           echo "LIMIT: no independently archived crashhelper binary or Rust archive provenance"
 
+      - name: Independently join current crashhelper Rust staticlib owner to same linked CXX ABI branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This native observer first exists in the compiled source below.
+          # Historical successful builds cannot be retroactively credited.
+          introduced=e4eef5d9c064fcedf703fa0faaa80fdc994c5e25
+          status="$(gh api "repos/$GITHUB_REPOSITORY/compare/$introduced...$NATIVE_SOURCE_SHA" --jq '.status')"
+          if test "$status" = behind; then
+            echo "Historical normal native run predates crashhelper Rust archive-owner witness"
+            exit 0
+          fi
+          if test "$status" != identical && test "$status" != ahead; then
+            echo "::error::Cannot establish archive-owner verifier source descent: $status"
+            exit 1
+          fi
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-current-native-crashhelper-rust-archive-evidence \
+            --dir "$RUNNER_TEMP/crashhelper-rust-archive-evidence"
+          mapfile -t native < <(find "$RUNNER_TEMP/native-evidence" \
+            -type f -name m3-native-link-inputs.json -print)
+          mapfile -t package < <(find "$RUNNER_TEMP/native-evidence" \
+            -type f -name m3-native-link-elf-package-graph.json -print)
+          mapfile -t crash < <(find "$RUNNER_TEMP/crashhelper-evidence" \
+            -type f -name m3-current-crashhelper-direct-branch.json -print)
+          mapfile -t archive < <(find "$RUNNER_TEMP/crashhelper-rust-archive-evidence" \
+            -type f -name m3-current-crashhelper-archive-ffi.json -print)
+          test "${#native[@]}" -eq 1
+          test "${#package[@]}" -eq 1
+          test "${#crash[@]}" -eq 1
+          test "${#archive[@]}" -eq 1
+          jq -n --slurpfile link "${native[0]}" \
+            --slurpfile package "${package[0]}" \
+            --slurpfile direct "${crash[0]}" \
+            --slurpfile archive "${archive[0]}" \
+            --arg source "$NATIVE_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" \
+            -f ci/m3-current-crashhelper-archive-branch-evidence.jq \
+            > "$RUNNER_TEMP/m3-current-crashhelper-archive-branch-reconciled.json"
+          jq -e --arg source "$NATIVE_SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            .schema_version == 1 and
+            .status == "one_current_rust_crashhelper_archive_owner_and_cpp_direct_branch_source_linked" and
+            .native_source_commit == $source and .native_run_id == $run and
+            .authenticated_build_runtime_and_package_joined == true and
+            .one_named_rust_archive_export_and_linked_elf_definition == true and
+            .one_named_cpp_main_direct_branch == true and
+            .source_owned_rust_archive_member_compiled == true and
+            (.rust_staticlib_sha256 | test("^[0-9a-f]{64}$")) and
+            (.compiled_unstripped_crashhelper_sha256 | test("^[0-9a-f]{64}$")) and
+            (.rust_staticlib_member_count > 0) and
+            .archive_member_selected_by_final_linker_proven == false and
+            .all_cpp_rust_ffi_edges_enumerated == false and
+            .conditional_ffi_or_dlopen_closure_proven == false and
+            .complete_protected_feature_activation_proven == false and
+            .target_endeavouros_hyprland_accepted == false and
+            .source_removal_authorized == false and .m3_sixth_gate_closed == false
+          ' "$RUNNER_TEMP/m3-current-crashhelper-archive-branch-reconciled.json" >/dev/null
+          echo "PASS: authenticated normal native run, Rust crashhelper archive strong export and same-linked-ELF CXX main direct branch"
+          echo "LIMIT: no complete archive linker-selection/FFI closure or sixth-gate acceptance"
+
       - name: Preserve only bounded reconciled source and runtime attestations
         uses: actions/upload-artifact@v4
         with:
@@ -347,5 +407,6 @@ jobs:
             ${{ runner.temp }}/m3-current-ffi-native-reconciled.json
             ${{ runner.temp }}/m3-current-gkrust-machine-branches-reconciled.json
             ${{ runner.temp }}/m3-current-crashhelper-machine-branch-reconciled.json
+            ${{ runner.temp }}/m3-current-crashhelper-archive-branch-reconciled.json
           if-no-files-found: error
           retention-days: 14
