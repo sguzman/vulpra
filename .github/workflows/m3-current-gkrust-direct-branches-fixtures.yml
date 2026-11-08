@@ -1,0 +1,51 @@
+name: M3 Current Gkrust CXX Direct Machine Branch Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-current-gkrust-direct-branches.rs
+      - .github/workflows/m3-current-gkrust-direct-branches-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compiled-real-machine-branch-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout only bounded current CXX to Rust branch parser
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-current-gkrust-direct-branches.rs
+      - name: Test real CXX compiler ELF and machine direct branch acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v c++
+          command -v nm
+          command -v c++filt
+          command -v objdump
+          command -v rustc
+          rustc --edition=2021 -D warnings --test \
+            ci/m3-current-gkrust-direct-branches.rs \
+            -o "$RUNNER_TEMP/m3-current-gkrust-direct-branch-tests"
+          "$RUNNER_TEMP/m3-current-gkrust-direct-branch-tests" --nocapture
+          rustc --edition=2021 -D warnings -O \
+            ci/m3-current-gkrust-direct-branches.rs \
+            -o "$RUNNER_TEMP/m3-current-gkrust-direct-branches"
+          if "$RUNNER_TEMP/m3-current-gkrust-direct-branches" \
+            0123456789abcdef0123456789abcdef01234567 \
+            /missing/libxul.so "$RUNNER_TEMP/forged.json"; then
+            echo 'FAIL: missing current native ELF must not pass' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/forged.json"
+          echo 'PASS: three real C++ machine branches to named gkrust FFI fixture targets and negative branches'
+          echo 'LIMIT: only native fixtures; no claim of current compiled Firefox binary acceptance'
