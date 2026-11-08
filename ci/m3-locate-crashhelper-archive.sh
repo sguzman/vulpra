@@ -38,24 +38,24 @@ if [ -f "$expected" ] && [ -s "$expected" ]; then
   archive="$expected"
   mode=expected
 else
-  scope="$obj/toolkit/crashreporter"
-  if [ ! -d "$scope" ] || [ -L "$scope" ]; then
-    echo "FAIL: no built native crash reporter archive search scope" >&2
-    exit 1
-  fi
+  # The full native build (42502043415) compiled this Rust target but its
+  # archive was NOT in the crashreporter subtree at the later package/runtime
+  # audit. Cargo's real output root may differ from the moz.build directory.
+  # Look only under this exact native objdir, never HOME, the source tree,
+  # stale sibling objdirs, the filesystem root, or symlinked directories.
   tmp="$(mktemp)"
   trap 'rm -f -- "$tmp"' EXIT
-  find -P "$scope" -type f -name libcrash_helper_server.a -print > "$tmp" || {
-    echo "FAIL: failed to list native crash helper archive candidates" >&2
+  find -P "$obj" -type f -name libcrash_helper_server.a -print > "$tmp" || {
+    echo "FAIL: failed to enumerate bounded native object-tree Rust archives" >&2
     exit 1
   }
   mapfile -t candidates < "$tmp"
   if [ "${#candidates[@]}" -ne 1 ]; then
-    echo "FAIL: expected exactly one current crash helper Rust staticlib, found ${#candidates[@]}" >&2
+    echo "FAIL: expected exactly one actual crash helper Rust staticlib anywhere in source-matched objdir; found ${#candidates[@]}" >&2
     exit 1
   fi
   archive="${candidates[0]}"
-  mode=unique-fallback
+  mode=unique-objdir-fallback
 fi
 
 if [ ! -f "$archive" ] || [ ! -s "$archive" ] || [ -L "$archive" ]; then
@@ -65,8 +65,8 @@ fi
 
 canonical="$(realpath -e -- "$archive")"
 case "$canonical" in
-  "$obj"/toolkit/crashreporter/*) ;;
-  *) echo "FAIL: crash helper archive escaped the expected object tree" >&2; exit 1 ;;
+  "$obj"/*) ;;
+  *) echo "FAIL: crash helper archive escaped the source-matched object tree" >&2; exit 1 ;;
 esac
 
 echo "PASS: selected exactly one normal-build crash helper Rust staticlib via $mode" >&2
