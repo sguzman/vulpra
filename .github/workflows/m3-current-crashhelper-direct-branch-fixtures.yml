@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - ci/m3-current-crashhelper-direct-branch.rs
+      - ci/m3-current-crashhelper-archive-ffi.rs
       - .github/workflows/m3-current-crashhelper-direct-branch-fixtures.yml
   workflow_dispatch:
 
@@ -25,6 +26,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-current-crashhelper-direct-branch.rs
+            ci/m3-current-crashhelper-archive-ffi.rs
       - name: Compile real Rust staticlib and CXX executable; reject fake direct branches
         shell: bash
         run: |
@@ -49,3 +51,25 @@ jobs:
           test ! -e "$RUNNER_TEMP/forged-crashhelper-report.json"
           echo 'PASS: linked Rust staticlib and real C++ crashhelper call fixtures; negatives rejected'
           echo 'LIMIT: fixture compiler evidence only, not source-matched current Vulpra crashhelper'
+      - name: Verify actual Rust archive export owner and linked crashhelper ELF definitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v ar
+          command -v sha256sum
+          rustc --edition=2021 -D warnings --test \
+            ci/m3-current-crashhelper-archive-ffi.rs \
+            -o "$RUNNER_TEMP/crashhelper-archive-tests"
+          "$RUNNER_TEMP/crashhelper-archive-tests" --nocapture
+          rustc --edition=2021 -D warnings -O \
+            ci/m3-current-crashhelper-archive-ffi.rs \
+            -o "$RUNNER_TEMP/crashhelper-archive-verifier"
+          if "$RUNNER_TEMP/crashhelper-archive-verifier" \
+            "$GITHUB_SHA" /nonexistent/libcrash_helper_server.a \
+            /nonexistent/crashhelper "$RUNNER_TEMP/forged-crashhelper-archive.json"; then
+            echo 'FAIL: missing real Rust staticlib and executable accepted' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/forged-crashhelper-archive.json"
+          echo 'PASS: compiled Rust archive member and linked C++ strong definition fixtures'
+          echo 'LIMIT: archive member selection graph, current Firefox native link and release not proven'
