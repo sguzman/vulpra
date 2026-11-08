@@ -301,11 +301,15 @@ jobs:
             -type f -name m3-native-link-inputs.json -print)
           mapfile -t crash < <(find "$RUNNER_TEMP/crashhelper-evidence" \
             -type f -name m3-current-crashhelper-direct-branch.json -print)
+          mapfile -t package < <(find "$RUNNER_TEMP/native-evidence" \
+            -type f -name m3-native-link-elf-package-graph.json -print)
           test "${#native[@]}" -eq 1
           test "${#crash[@]}" -eq 1
+          test "${#package[@]}" -eq 1
           jq -n \
             --slurpfile link "${native[0]}" \
             --slurpfile crash "${crash[0]}" \
+            --slurpfile package "${package[0]}" \
             --arg source "$NATIVE_SOURCE_SHA" \
             --argjson run "$NATIVE_RUN_ID" \
             -f ci/m3-current-crashhelper-machine-branch-evidence.jq \
@@ -316,14 +320,18 @@ jobs:
             .native_source_commit == $sha and .native_run_id == $run and
             .authenticated_native_build_and_runtime_joined == true and
             .verified_exact_crashhelper_main_direct_branch_count == 1 and
-            .independent_crashhelper_elf_hash_witnessed_elsewhere == false and
+            .exact_packaged_crashhelper_present == true and
+            (.packaged_crashhelper_sha256 | test("^[0-9a-f]{64}$")) and
+            (.packaged_crashhelper_bytes > 64) and
+            .byte_equal_unstripped_to_packaged_crashhelper_verified == false and
+            .independent_unstripped_crashhelper_elf_hash_witnessed_elsewhere == false and
             .rust_archive_member_source_proven == false and
             .complete_cpp_rust_ffi_graph_proven == false and
             .conditional_or_indirect_ffi_closure_proven == false and
             .target_endeavouros_hyprland_verified == false and
             .source_pruning_authorized == false and .m3_sixth_gate_closed == false
           ' "$RUNNER_TEMP/m3-current-crashhelper-machine-branch-reconciled.json" >/dev/null
-          echo "PASS: one current linked crashhelper direct ABI branch joined to authenticated native runtime"
+          echo "PASS: current linked crashhelper direct ABI branch joined to authenticated native runtime and packaged ELF inventory"
           echo "LIMIT: no independently archived crashhelper binary or Rust archive provenance"
 
       - name: Preserve only bounded reconciled source and runtime attestations
