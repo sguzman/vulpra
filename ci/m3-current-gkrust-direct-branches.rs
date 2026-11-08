@@ -91,6 +91,19 @@ fn discover_callers(path: &Path) -> Result<BTreeMap<usize,String>,String> {
     Ok(result)
 }
 
+// Accept only a literal x86 branch destination with an exact symbol label.
+// Never treat an indirect call's objdump comment as proof of its destination.
+fn is_direct_named_branch(op: &str, target: &str) -> bool {
+    let mut words = op.split('#').next().unwrap_or("").split_whitespace();
+    if !matches!(words.next(), Some("call"|"callq"|"jmp"|"jmpq")) { return false; }
+    let Some(destination) = words.next() else { return false; };
+    let address = destination.strip_prefix("0x").unwrap_or(destination);
+    if address.is_empty() || !address.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return false;
+    }
+    words.next() == Some(format!("<{target}>").as_str()) && words.next().is_none()
+}
+
 fn count_direct_branches(path: &Path, raw: &str, target: &str) -> Result<usize,String> {
     let mut p=Command::new("objdump")
         .arg("-d").arg("--no-show-raw-insn").arg(format!("--disassemble={raw}"))
@@ -109,13 +122,7 @@ fn count_direct_branches(path: &Path, raw: &str, target: &str) -> Result<usize,S
             continue;
         }
         instruction_lines+=1;
-        let op=op.trim_start();
-        let mn=op.split_whitespace().next().unwrap_or("");
-        if !matches!(mn,"call"|"callq"|"jmp"|"jmpq") { continue; }
-        if let Some(symbol)=op.rsplit_once('<')
-            .and_then(|(_,s)|s.strip_suffix('>')) {
-            if symbol==target { count+=1; }
-        }
+        if is_direct_named_branch(op.trim_start(),target) { count+=1; }
     }
     if !p.wait().map_err(|e|e.to_string())?.success() {
         return Err("objdump could not inspect actual compiled caller".into());
@@ -184,6 +191,18 @@ fn main() {
 #[cfg(test)] mod tests {
     use super::*;
     use std::time::{SystemTime,UNIX_EPOCH};
+    #[test] fn reject_indirect_branches_and_false_symbol_annotations() {
+        assert!(is_direct_named_branch("call  10f9 <GkRust_Init>", "GkRust_Init"));
+        assert!(is_direct_named_branch("callq 0x10f9 <GkRust_Init>", "GkRust_Init"));
+        assert!(is_direct_named_branch("jmp 10f9 <GkRust_Init>", "GkRust_Init"));
+        assert!(!is_direct_named_branch("call *0x1234(%rip) # 10f9 <GkRust_Init>", "GkRust_Init"));
+        assert!(!is_direct_named_branch("call *%rax # <GkRust_Init>", "GkRust_Init"));
+        assert!(!is_direct_named_branch("call *10f9 <GkRust_Init>", "GkRust_Init"));
+        assert!(!is_direct_named_branch("call 10f9 <GkRust_Init+0x1>", "GkRust_Init"));
+        assert!(!is_direct_named_branch("call 10f9 <GkRust_Shutdown>", "GkRust_Init"));
+        assert!(!is_direct_named_branch("jne 10f9 <GkRust_Init>", "GkRust_Init"));
+        assert!(!is_direct_named_branch("call 10f9 <GkRust_Init> trailing", "GkRust_Init"));
+    }
     #[test] fn classify_exact_cpp_callers() {
         assert_eq!(classify("NS_InitXPCOM(nsIServiceManager**)"),Some(0));
         assert_eq!(classify("NS_InitMinimalXPCOM()"),Some(1));
