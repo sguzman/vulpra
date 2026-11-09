@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   validate-wayland-vp9-provider-evidence:
@@ -34,3 +35,58 @@ jobs:
           bash -n ci/tests/m3-wayland-vp9-provider-outcome-audit-tests.sh
           bash ci/tests/m3-wayland-vp9-provider-outcome-audit-tests.sh
           echo "LIMIT: synthetic evidence classifier only; no VA-API hardware decode or GPU fallback"
+
+      - name: Download and independently classify actual source-bound browser replay
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          run_id=42665579538
+          repo="$GITHUB_REPOSITORY"
+          status="$(gh run view "$run_id" --repo "$repo" --json status,conclusion,headSha)"
+          jq -e --arg sha f8d16a0cb63686e750d97267d79043fd2b194a5d '
+            .headSha==$sha and .status=="completed" and .conclusion=="success"
+          ' <<< "$status" >/dev/null
+          dir="$RUNNER_TEMP/m3-real-graphical-vp9"
+          mkdir -p "$dir"
+          gh run download "$run_id" --repo "$repo" \
+            --name m3-source-pinned-wayland-vp9-provider-media-evidence --dir "$dir"
+          test "$(find "$dir" -type f -name m3-packaged-wayland-vp9-providers.json | wc -l)" -eq 1
+          report="$(find "$dir" -type f -name m3-packaged-wayland-vp9-providers.json -print -quit)"
+          test -s "$report" && test ! -L "$report"
+          jq -e \
+            --arg expected_compiled_source a17ac58d694bf77c4da352ed7ab9b37233fbc01e \
+            --arg expected_harness_source f8d16a0cb63686e750d97267d79043fd2b194a5d \
+            --arg expected_package_sha256 f92fe8c29843e7521ffe1ddd7cbbed8836ff9491228b182628973e8484ed1a41 \
+            -f ci/m3-wayland-vp9-provider-outcome-audit.jq "$report" \
+            > "$RUNNER_TEMP/m3-wayland-vp9-provider-outcome-classified.json"
+          jq -e '
+            .normal_wayland_vp9_video_verified==true and
+            .normal_canvas_video_readback_measured==true and
+            .normal_webgl2_context_available_measured==true and
+            .gbm_denial_requests_before_media_navigation==1 and
+            .gbm_denial_requests_after_media_navigation==1 and
+            .gbm_denial_requests_added_after_navigation==0 and
+            .gbm_provider_denial_observed==true and
+            .gbm_wayland_video_decoded_with_provider_denial==true and
+            .vaapi_denial_requests_before_media_navigation==0 and
+            .vaapi_denial_requests_after_media_navigation==0 and
+            .vaapi_provider_denial_observed==false and
+            .vaapi_wayland_video_decoded_with_provider_denial==true and
+            .actual_GPU_hardware_fallback_proven==false and
+            .VA_API_hardware_decoding_fallback_proven==false and
+            .m3_sixth_gate_closed==false and .release_ready==false
+          ' "$RUNNER_TEMP/m3-wayland-vp9-provider-outcome-classified.json" >/dev/null
+          echo "PASS: real VP9+canvas+WebGL2 on source-bound non-headless Wayland; GBM=1 and VAAPI=0"
+          echo "LIMIT: GBM request before media navigation; no VA-API request or GPU fallback established"
+
+      - name: Preserve independent graphical media reconciliation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-independent-wayland-vp9-provider-outcome
+          path: ${{ runner.temp }}/m3-wayland-vp9-provider-outcome-classified.json
+          if-no-files-found: warn
+          retention-days: 14
+
