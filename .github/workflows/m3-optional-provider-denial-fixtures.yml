@@ -1,0 +1,116 @@
+# Validate narrow, opt-in Linux loader-denial interposition against actual
+# synthetic C ELF providers before any costly packaged browser trial.
+name: M3 Optional Native Provider Denial Fixtures
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-deny-optional-native-providers.c
+      - ci/tests/m3-native-provider-denial-fixture.c
+      - .github/workflows/m3-optional-provider-denial-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actual-dlopen-denial-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout only the native denial interposer and test fixture
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-deny-optional-native-providers.c
+            ci/tests/m3-native-provider-denial-fixture.c
+      - name: Compile C ABI loader shim and known native ELF fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror \
+            ci/m3-deny-optional-native-providers.c \
+            -o "$RUNNER_TEMP/m3-deny-native-providers.so" -ldl
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            ci/tests/m3-native-provider-denial-fixture.c \
+            -o "$RUNNER_TEMP/m3-native-provider-denial-fixture" -ldl
+          mkdir "$RUNNER_TEMP/fake-providers"
+          printf 'int vulpra_ci_provider_fixture(void) { return 1; }\n' \
+            > "$RUNNER_TEMP/fake-provider.c"
+          for name in libgbm.so.1 libdrm.so.2 libva.so.2 \
+            libva-drm.so.2 libavcodec.so.62 libavcodec-ffmpeg.so.58; do
+            cc -std=c11 -fPIC -shared -Wall -Wextra -Werror \
+              "$RUNNER_TEMP/fake-provider.c" \
+              -o "$RUNNER_TEMP/fake-providers/$name"
+          done
+          test -s "$RUNNER_TEMP/m3-deny-native-providers.so"
+          echo "PASS: isolated C loader shim and six real fake ELF providers compiled"
+      - name: Reject six real optional loads and preserve normal loader requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          shim="$RUNNER_TEMP/m3-deny-native-providers.so"
+          fixture="$RUNNER_TEMP/m3-native-provider-denial-fixture"
+          logfile="$RUNNER_TEMP/m3-denied-optional-providers.log"
+          touch "$logfile"
+          chmod 0600 "$logfile"
+          export LD_LIBRARY_PATH="$RUNNER_TEMP/fake-providers"
+          export LD_PRELOAD="$shim"
+          export VULPRA_M3_DENY_FIXTURE_EXE=m3-native-provider-denial-fixture
+          export VULPRA_M3_DENY_LOG="$logfile"
+          count=0
+          for entry in \
+            gbm:libgbm.so.1 gbm:libdrm.so.2 \
+            vaapi:libva.so.2 vaapi:libva-drm.so.2 \
+            ffmpeg:libavcodec.so.62 ffmpeg:libavcodec-ffmpeg.so.58; do
+            group="${entry%%:*}"; name="${entry#*:}"
+            export VULPRA_M3_DENY_GROUP="$group"
+            "$fixture" "$name" denied
+            count=$((count + 1))
+          done
+          test "$count" -eq 6
+          test "$(grep -c '^DENIED dlopen ' "$logfile")" -eq 6
+          export VULPRA_M3_DENY_GROUP=gbm
+          "$fixture" libavcodec.so.62 allowed
+          "$fixture" libc.so.6 allowed
+          export VULPRA_M3_DENY_GROUP=not-supported
+          "$fixture" libgbm.so.1 allowed
+          export VULPRA_M3_DENY_GROUP=gbm
+          export VULPRA_M3_DENY_FIXTURE_EXE=nonmatching-fixture-name
+          "$fixture" libgbm.so.1 allowed
+          test "$(grep -c '^DENIED dlopen ' "$logfile")" -eq 6
+          grep -Fq 'DENIED dlopen libgbm.so.1 ' "$logfile"
+          grep -Fq 'DENIED dlopen libdrm.so.2 ' "$logfile"
+          grep -Fq 'DENIED dlopen libva.so.2 ' "$logfile"
+          grep -Fq 'DENIED dlopen libva-drm.so.2 ' "$logfile"
+          grep -Fq 'DENIED dlopen libavcodec.so.62 ' "$logfile"
+          grep -Fq 'DENIED dlopen libavcodec-ffmpeg.so.58 ' "$logfile"
+          jq -n --arg sha "$GITHUB_SHA" '{
+            schema_version:1,
+            status:"six_real_dlopen_provider_denials_in_isolated_fake_elf_fixtures",
+            source_commit:$sha,
+            test_executable_is_real_browser:false,
+            real_dynamic_loader_interposition_verified:true,
+            forced_missing_optional_library_requests:6,
+            allowed_unrelated_provider_requests:4,
+            only_explicit_allowlisted_exe_scoped:true,
+            system_libraries_modified:false,
+            browser_profile_used:false,
+            actual_packaged_vulpra_provider_denials_exercised:false,
+            actual_browser_fallback_proven:false,
+            target_endeavouros_hyprland_qa:false,
+            m3_sixth_gate_closed:false,
+            source_pruning_authorized:false,
+            release_ready:false
+          }' > "$RUNNER_TEMP/m3-optional-loader-denial-fixtures.json"
+          echo "PASS: 6/6 actual dlopen denials; 4/4 cross-group/system/nonbrowser loads unaffected"
+          echo "LIMIT: only fixture program; no packaged Vulpra/Wayland/media fallback asserted"
+      - name: Preserve bounded fake-provider control proof only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-optional-provider-denial-fixtures
+          path: ${{ runner.temp }}/m3-optional-loader-denial-fixtures.json
+          if-no-files-found: error
+          retention-days: 14
