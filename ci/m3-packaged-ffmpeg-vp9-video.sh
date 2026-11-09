@@ -16,10 +16,33 @@ make_clip() {
   test "$(stat -c %s "$1")" -gt 3000
   test "$(stat -c %s "$1")" -lt 800000
 }
+make_watch_page() {
+  cat > "$1" <<'HTML'
+<!doctype html><meta charset="utf-8"><title>Local VP9/WebM video</title>
+<video id="v" muted autoplay playsinline preload="auto" src="/vp9.webm"></video>
+<script>
+document.getElementById("v").play().catch(e=>{
+document.documentElement.dataset.playRejected=e.name;
+});
+</script>
+HTML
+}
+# Check the actual page generated for the runtime and ensure its video
+# points to the generated WebM fixture, not a nonexistent MP4.
+check_watch_page() {
+  local dir="$1" src
+  test -s "$dir/watch.html" && test -s "$dir/vp9.webm"
+  src="$(sed -n 's/.*<video id="v"[^>]*src="\([^"]*\)".*/\1/p' "$dir/watch.html")"
+  test "$src" = /vp9.webm
+  test -s "$dir/${src#/}"
+}
 if test "$#" -eq 1 && test "$1" = "--self-test"; then
   tmp="$(mktemp -d)"; trap 'rm -rf -- "$tmp"' EXIT
-  make_clip "$tmp/test.webm"
-  echo "PASS: generated real bounded four-second local VP9/WebM clip"
+  mkdir -p "$tmp/www"
+  make_clip "$tmp/www/vp9.webm"
+  make_watch_page "$tmp/www/watch.html"
+  check_watch_page "$tmp/www"
+  echo "PASS: real bounded VP9/WebM fixture and matching playable HTML source"
   exit 0
 fi
 if test "$#" -ne 4; then
@@ -29,6 +52,10 @@ fi
 repo="$1"; shim="$2"; gecko="$3"; output="$4"
 test "$repo" = "$GITHUB_WORKSPACE"
 test "$(git -C "$repo" rev-parse HEAD)" = "$GITHUB_SHA"
+# A replay may run a newer test harness against a previously compiled,
+# source-pinned package. Keep both identities distinct in its evidence.
+compiled_source="${VULPRA_M3_COMPILED_SOURCE_SHA:-$GITHUB_SHA}"
+[[ "$compiled_source" =~ ^[0-9a-f]{40}$ ]]
 test "$output" = "$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-video.json"
 test ! -e "$output"
 test -s "$shim" && test ! -L "$shim"
@@ -73,15 +100,8 @@ for name in vulpra firefox; do
 done
 test -n "$binary"
 make_clip "$tmp/www/vp9.webm"
-cat > "$tmp/www/watch.html" <<'HTML'
-<!doctype html><meta charset="utf-8"><title>Local VP9/WebM video</title>
-<video id="v" muted autoplay playsinline preload="auto" src="/vp9.mp4"></video>
-<script>
-document.getElementById("v").play().catch(e=>{
-document.documentElement.dataset.playRejected=e.name;
-});
-</script>
-HTML
+make_watch_page "$tmp/www/watch.html"
+check_watch_page "$tmp/www"
 new_port() {
   python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()'
 }
@@ -199,9 +219,10 @@ run_mode() {
 }
 run_mode baseline
 run_mode denied
-jq -s --arg source "$GITHUB_SHA" --arg archive "$archive_sha" '{
+jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive "$archive_sha" '{
   schema_version:1,status:"real_packaged_VP9_WebDriver_video_decode_with_FFmpeg_denial",
-  source_commit:$source,normal_packaged_archive_sha256:$archive,
+  source_commit:$source,test_harness_commit:$harness,
+  normal_packaged_archive_sha256:$archive,
   fixture_VP9_codec_validated:true,
   real_browser_decoded_frames_and_time_measured:true,
   baseline_VP9_playback_passed:([.[]|select(.mode=="baseline")|.vp9_decoded_frames_and_time_verified][0]//false),
