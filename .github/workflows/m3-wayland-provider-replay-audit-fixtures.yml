@@ -64,7 +64,8 @@ jobs:
             .gbm_denied_library_requests==1 and
             .vaapi_denied_library_requests==0 and
             .ffmpeg_denied_library_requests==14 and
-            .rendered_Wayland_frame_after_observed_gbm_denial==true and
+            .same_session_Wayland_frame_and_gbm_denial_observed==true and
+            .provider_denial_temporally_precedes_frame_proven==false and
             .vaapi_missing_provider_path_tested==false and
             .actual_GPU_or_DMA_BUF_graphics_fallback_proven==false and
             .hardware_VAAPI_video_decode_or_fallback_proven==false and
