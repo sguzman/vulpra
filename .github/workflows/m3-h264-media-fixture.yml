@@ -1,0 +1,48 @@
+# Preflight the generated local H.264/AVC probe without expensive Firefox build.
+# Checks the actual fixture codec and that the packaged WebDriver runner refuses
+# invalid/absent native browser inputs. No npm/pip or user workstation.
+name: M3 H264 Media Fixture Preflight
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-packaged-ffmpeg-h264-video.sh
+      - .github/workflows/m3-h264-media-fixture.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-local-h264-media:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout bounded FFmpeg H264 media workload harness only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-packaged-ffmpeg-h264-video.sh
+      - name: Verify generated H264 AVC clip with real FFmpeg and ffprobe
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get \
+            -o Acquire::Retries=3 install -y --no-install-recommends ffmpeg jq
+          bash -n ci/m3-packaged-ffmpeg-h264-video.sh
+          bash ci/m3-packaged-ffmpeg-h264-video.sh --self-test
+          if bash ci/m3-packaged-ffmpeg-h264-video.sh \
+            > /dev/null 2>&1; then
+            echo "FAIL: missing real browser/package arguments accepted" >&2
+            exit 1
+          fi
+          if bash ci/m3-packaged-ffmpeg-h264-video.sh \
+            invalid invalid invalid invalid > /dev/null 2>&1; then
+            echo "FAIL: forged browser checkout and archive accepted" >&2
+            exit 1
+          fi
+          echo "PASS: live generated H264 codec fixture and fail-closed packaged WebDriver harness input checks"
+          echo "LIMIT: no packaged browser executed; media decoding/fallback remains pending"
