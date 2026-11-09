@@ -1,0 +1,36 @@
+# Fail-closed source/package/Wayland video evidence checks, no browser build.
+name: M3 Wayland VP9 Provider Outcome Evidence Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-wayland-vp9-provider-outcome-audit.jq
+      - ci/tests/m3-wayland-vp9-provider-outcome-audit-tests.sh
+      - .github/workflows/m3-wayland-vp9-provider-outcome-audit-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-wayland-vp9-provider-evidence:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only Wayland media evidence checker and synthetic cases
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-wayland-vp9-provider-outcome-audit.jq
+            ci/tests/m3-wayland-vp9-provider-outcome-audit-tests.sh
+      - name: Reject 27 forged native-media, denied-provider, and safety claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq
+          bash -n ci/tests/m3-wayland-vp9-provider-outcome-audit-tests.sh
+          bash ci/tests/m3-wayland-vp9-provider-outcome-audit-tests.sh
+          echo "LIMIT: synthetic evidence classifier only; no VA-API hardware decode or GPU fallback"
