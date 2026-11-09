@@ -29,6 +29,24 @@ static bool browser_process(void) {
   return fixture && !strcmp(name, fixture);
 }
 
+// An absence of blocked calls is not meaningful unless the real browser
+// process actually loaded this shim. Emit a narrow attachment witness.
+__attribute__((constructor)) static void note_real_process_attachment(void) {
+  if (!browser_process()) return;
+  const char *log = getenv("VULPRA_M3_DENY_LOG");
+  if (!log || log[0] != '/' || strlen(log) >= PATH_MAX) return;
+  int fd = open(log, O_APPEND | O_WRONLY | O_CLOEXEC | O_NOFOLLOW);
+  if (fd < 0) return;
+  char line[128];
+  int n = snprintf(line, sizeof(line), "ATTACHED browser-process %ld\n",
+                   (long)getpid());
+  if (n > 0 && n < (int)sizeof(line)) {
+    ssize_t written = write(fd, line, (size_t)n);
+    (void)written; // Attachment is subsequently required by the CI report.
+  }
+  (void)close(fd);
+}
+
 static bool group_matches(const char *group, const char *name) {
   if (!group || !name || !*name) return false;
   const char *base = strrchr(name, '/');
