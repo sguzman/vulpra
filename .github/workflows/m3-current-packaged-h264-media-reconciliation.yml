@@ -1,0 +1,168 @@
+# Read-only, fail-closed audit of one successful native build's actual
+# packaged H.264 WebDriver playback baseline and FFmpeg-denied failure.
+# No browser build or source pruning. Does not claim software decoder fallback.
+name: M3 Current Packaged H264 Media Evidence Reconciliation
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-h264-video-outcome-audit.jq
+      - ci/tests/m3-h264-video-outcome-audit-tests.sh
+      - .github/workflows/m3-current-packaged-h264-media-reconciliation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  validate-real-h264-playback-and-denied-media-error:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: "091499590cabe2426df96b5b735af64ebdd4ba23"
+      NATIVE_RUN_ID: "42553489035"
+      NATIVE_RECONCILIATION_RUN_ID: "42557375833"
+    steps:
+      - name: Checkout original bounded H264 evidence validator only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-h264-video-outcome-audit.jq
+            ci/tests/m3-h264-video-outcome-audit-tests.sh
+
+      - name: Authenticate successful native run and independent normal-native reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NATIVE_RUN_ID" > "$RUNNER_TEMP/native-run.json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg sha "$SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            .id==$run and .head_sha==$sha and .head_repository.full_name==$repo and
+            .head_branch=="main" and .event=="push" and
+            .name=="M3 Source Matched Native Link Inputs and Runtime" and
+            .path==".github/workflows/m3-source-matched-native-link.yml" and
+            .run_attempt==1 and .status=="completed" and .conclusion=="success"
+          ' "$RUNNER_TEMP/native-run.json" > /dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NATIVE_RECONCILIATION_RUN_ID" > "$RUNNER_TEMP/recon-run.json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --argjson run "$NATIVE_RECONCILIATION_RUN_ID" '
+            .id==$run and .head_repository.full_name==$repo and
+            .name=="M3 Source Matched Native Evidence Reconciliation" and
+            .path==".github/workflows/m3-native-link-evidence-reconcile.yml" and
+            .event=="workflow_run" and
+            .status=="completed" and .conclusion=="success"
+          ' "$RUNNER_TEMP/recon-run.json" >/dev/null
+          echo "PASS: actual source-matched full build and independent native evidence reconciliation authenticated"
+
+      - name: Download exact original native package and H264 WebDriver playback evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-source-matched-native-link-evidence --dir "$RUNNER_TEMP/native"
+          gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-packaged-h264-video-ffmpeg-denial-evidence --dir "$RUNNER_TEMP/h264"
+          gh run download "$NATIVE_RECONCILIATION_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name m3-native-link-reconciled-evidence --dir "$RUNNER_TEMP/reconciled"
+          mapfile -t native < <(find "$RUNNER_TEMP/native" -type f -name m3-native-link-inputs.json -print)
+          mapfile -t media < <(find "$RUNNER_TEMP/h264" -type f -name m3-packaged-ffmpeg-h264-video.json -print)
+          mapfile -t recon < <(find "$RUNNER_TEMP/reconciled" -type f -name m3-native-link-reconciled.json -print)
+          test "${#native[@]}" -eq 1
+          test "${#media[@]}" -eq 1
+          test "${#recon[@]}" -eq 1
+          printf '%s\n' "${native[0]}" "${media[0]}" "${recon[0]}" > "$RUNNER_TEMP/h264-inputs"
+          echo "PASS: exact real normal-package, H264 video DOM, and independent native reconciliation artifacts retrieved"
+
+      - name: Authenticate package identity then reject forged H264 video evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t p < "$RUNNER_TEMP/h264-inputs"
+          test "${#p[@]}" -eq 3
+          package="$(jq -er '.package.package_sha256' "${p[0]}")"
+          jq -e --arg sha "$SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" '
+            .schema_version==1 and
+            .source_commit==$sha and .workflow_run_id==$run and
+            .native_build_required==true and .runtime_passed_after_link_audit==true and
+            .source_removal_authorized==false
+          ' "${p[0]}" >/dev/null
+          jq -e --arg sha "$SOURCE_SHA" --argjson run "$NATIVE_RUN_ID" --arg package "$package" '
+            .schema_version==1 and .status=="passed_full_native_evidence_reconciliation" and
+            .source_commit==$sha and .workflow_run_id==$run and
+            .package_sha256==$package and .Wayland_JS_WebExtension_Nimbus_passed==true and
+            .native_elf_member_count==28 and .native_direct_needed_edges==268 and
+            .host_transitive_and_dlopen_dependencies_closed==false and
+            .additional_source_removal_authorized==false
+          ' "${p[2]}" >/dev/null
+          bash ci/tests/m3-h264-video-outcome-audit-tests.sh
+          jq -e --arg expected_source_commit "$SOURCE_SHA" --arg expected_package_sha256 "$package" \
+            -f ci/m3-h264-video-outcome-audit.jq "${p[1]}" \
+            > "$RUNNER_TEMP/m3-current-packaged-h264-media-reconciled.json"
+          for mutation in \
+            '.modes[0].observed_video_state.frames=0' \
+            '.modes[1].ffmpeg_denials_before_video_navigation=0' \
+            '.modes[1].new_denials_during_video_navigation=14' \
+            '.denied_H264_playback_passed=true' \
+            '.normal_packaged_archive_sha256=("0"*64)' \
+            '.m3_sixth_gate_closed=true'; do
+            jq "$mutation" "${p[1]}" > "$RUNNER_TEMP/forged-h264.json"
+            if jq -e --arg expected_source_commit "$SOURCE_SHA" --arg expected_package_sha256 "$package" \
+              -f ci/m3-h264-video-outcome-audit.jq "$RUNNER_TEMP/forged-h264.json" \
+              > /dev/null 2>&1; then
+              echo "FAIL: forged real native H264 outcome accepted: $mutation" >&2
+              exit 1
+            fi
+          done
+          echo "PASS: original H264 report tied to native package, 20 synthetic and 6 real-report mutations rejected"
+
+      - name: Assert measured decoded baseline and actual H264 unsupported-source failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t p < "$RUNNER_TEMP/h264-inputs"
+          jq -e '
+            .schema_version==1 and
+            .actual_normal_H264_frames_and_time_verified==true and
+            .observed_denied_ffmpeg_loads_in_session==14 and
+            .ffmpeg_loads_denied_before_media_navigation==14 and
+            .ffmpeg_additional_denials_observed_after_media_navigation==0 and
+            .zero_new_denials_means_media_specific_library_attempt_not_established==true and
+            .ffmpeg_requests_causally_proven_to_originate_in_H264_decoder==false and
+            .H264_decoding_with_FFmpeg_denied_measured==false and
+            .H264_media_error_with_FFmpeg_denied_measured==true and
+            .alternative_software_codec_fallback_proven==false and
+            .hardware_video_or_Wayland_DMABuf_fallback_proven==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false and
+            .release_ready==false
+          ' "$RUNNER_TEMP/m3-current-packaged-h264-media-reconciled.json" >/dev/null
+          jq -e '
+            ([.modes[] | select(.mode=="baseline")][0]) as $b |
+            ([.modes[] | select(.mode=="denied")][0]) as $d |
+            $b.h264_decoded_frames_and_time_verified==true and
+            $b.observed_video_state.frames==9 and
+            $b.observed_video_state.time==0.642 and
+            $b.observed_video_state.width==192 and
+            $b.observed_video_state.height==108 and
+            $b.observed_video_state.error==null and
+            $d.h264_decoded_frames_and_time_verified==false and
+            $d.observed_video_state.frames==0 and
+            $d.observed_video_state.time==0 and
+            $d.observed_video_state.error==4 and
+            $d.observed_video_state.playRejected=="NotSupportedError" and
+            $d.ffmpeg_denials_before_video_navigation==14 and
+            $d.ffmpeg_denials_after_video_navigation==14 and
+            $d.new_denials_during_video_navigation==0 and
+            $d.webdriver_browser_responsive==true
+          ' "${p[1]}" >/dev/null
+          echo "PASS: real baseline decoded 9 H264 frames at 0.642s; denied video decoded 0, MediaError 4, browser stayed responsive"
+          echo "LIMIT: all 14 denied loads preceded media navigation; no claimed media-caused library load or H264 fallback"
+
+      - name: Archive narrow verified real H264 media outcome only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-source-matched-real-h264-denied-media-outcome
+          path: ${{ runner.temp }}/m3-current-packaged-h264-media-reconciled.json
+          if-no-files-found: error
+          retention-days: 14
