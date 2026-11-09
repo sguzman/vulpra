@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
-      GH_TOKEN: ${ github.token }}
+      GH_TOKEN: ${{ github.token }}
       NATIVE_RUN_ID: "42507965586"
       NATIVE_SOURCE_SHA: "bd2499aeadce0368faa8b717b0e8a17e9c9dc317"
       RECONCILIATION_RUN_ID: "42513861084"
@@ -138,6 +138,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-current-conditional-loader-source-linked-triage
-          path: ${ runner.temp }}/m3-current-conditional-loader-triage.json
+          path: ${{ runner.temp }}/m3-current-conditional-loader-triage.json
           if-no-files-found: error
           retention-days: 14
