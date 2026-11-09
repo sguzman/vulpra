@@ -7,6 +7,8 @@ on:
     branches: [main]
     paths:
       - ci/m3-packaged-ffmpeg-h264-video.sh
+      - ci/m3-h264-video-outcome-audit.jq
+      - ci/tests/m3-h264-video-outcome-audit-tests.sh
       - .github/workflows/m3-h264-media-fixture.yml
   workflow_dispatch:
 
@@ -25,6 +27,15 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-packaged-ffmpeg-h264-video.sh
+            ci/m3-h264-video-outcome-audit.jq
+            ci/tests/m3-h264-video-outcome-audit-tests.sh
+      - name: Reject forged decoded frames media errors and startup-only denial coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/tests/m3-h264-video-outcome-audit-tests.sh
+          bash ci/tests/m3-h264-video-outcome-audit-tests.sh
+
       - name: Verify generated H264 AVC clip with real FFmpeg and ffprobe
         shell: bash
         run: |
