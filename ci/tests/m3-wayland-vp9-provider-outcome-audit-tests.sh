@@ -109,7 +109,7 @@ done <<'FORGERIES'
 .test_harness_commit=("0"*40)
 .verified_normal_packaged_archive_sha256=("0"*64)
 .private_Weston_pixman_compositor_available=false
-.actual_GPU_or_DMAbuf_provider_execution_proven=true
+.actual_GPU_or_DMABuf_provider_execution_proven=true
 .hardware_video_decoder_identified=true
 .complete_indirect_loader_graph_proven=true
 .target_endeavouros_hyprland_verified=true
