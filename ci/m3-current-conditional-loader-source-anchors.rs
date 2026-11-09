@@ -12,6 +12,7 @@ struct Rule {
     next: &'static str,
     names: &'static [&'static str],
     exact_calls: usize,
+    expected_false_returns: usize,
     call: &'static str,
     tokens: &'static [&'static str],
 }
@@ -24,6 +25,7 @@ const RULES: [Rule; 3] = [
         next: "bool FFmpegRuntimeLinker::PreferSystemFFmpegForVulkan()",
         names: &["libavcodec.so.62", "libavcodec.so.60", "libavcodec-ffmpeg.so.58"],
         exact_calls: 1,
+        expected_false_returns: 1,
         call: "PR_LoadLibraryWithFlags(",
         tokens: &[
             "if (sLinkStatus != LinkStatus_INIT)",
@@ -44,6 +46,7 @@ const RULES: [Rule; 3] = [
         next: "bool VALibWrapper::AreVAAPIFuncsAvailable()",
         names: &["libva-drm.so.2", "libva.so.2"],
         exact_calls: 2,
+        expected_false_returns: 3,
         call: "PR_LoadLibraryWithFlags(",
         tokens: &[
             "if (!gfx::gfxVars::CanUseHardwareVideoDecoding() || !XRE_IsRDDProcess())",
@@ -64,6 +67,7 @@ const RULES: [Rule; 3] = [
         next: "DMABufDevice* DMABufDeviceLock::EnsureDMABufDevice()",
         names: &["libgbm.so.1", "libdrm.so.2"],
         exact_calls: 2,
+        expected_false_returns: 2,
         call: "dlopen(",
         tokens: &[
             "static bool sTriedToLoad = false;",
@@ -90,6 +94,9 @@ fn bounded_func<'a>(source: &'a str, rule: &Rule) -> Result<&'a str, String> {
     let body = &rest[..end];
     if body.matches(rule.call).count() != rule.exact_calls {
         return Err(format!("{}: loader call count changed", rule.id));
+    }
+    if body.matches("return false;").count() != rule.expected_false_returns {
+        return Err(format!("{}: conditional failure-exit count changed", rule.id));
     }
     for token in rule.tokens {
         if !body.contains(token) {
