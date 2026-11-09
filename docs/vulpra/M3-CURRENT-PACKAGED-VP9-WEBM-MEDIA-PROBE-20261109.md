@@ -27,3 +27,25 @@ The [new full source-matched native workflow commit `a17ac58`](https://github.co
 The updated native workflow also attempts to retain its actual source-pinned packaged archive, `.sha256` sidecar, and bounded source/package report in a separate **`m3-test-only-native-package-not-for-release`** Actions artifact with **seven-day retention** and `include-hidden-files=true`. This is for future sandboxed CI trials, not a user-installable release; its availability is contingent on the actual upload step succeeding. Once verified, future test workflows may download this exact source-identified packaged executable for isolated runtime tests instead of starting a complete new Firefox Rust/C++ build. Any new runtime environment must verify its own platform dependencies, source/package identities and original normal-browser acceptance.
 
 **M3 remains 5/6 gates (83%); overall progress 61% (Δ+0 pp).** Actual VP9 playback outcome, missing GBM/VA-API feature paths, full conditional/indirect dependency closure, EndeavourOS/Hyprland desktop QA, source pruning, security hotfix merge and release remain **unproven/unapproved**.
+
+## Verified corrected replay of retained native package (2026-11-09 UTC)
+
+**The original full-native run [#42559566915](https://github.com/sguzman/vulpra/actions/runs/42559566915) finished FAILURE, but not from a browser compilation or H.264 regression.** Full native compilation, source-linked FFI checks, packaging, private Wayland/JavaScript/WebExtension/Nimbus smoke, optional-provider checks and real H.264 playback all passed. The **new VP9 test step** failed: it generated `vp9.webm` but its `<video>` HTML requested the nonexistent `/vp9.mp4`. The retained report (artifact **13651021378**) therefore recorded baseline **zero frames, zero seconds, media error 4**, and denied **zero frames, zero seconds, media error 4**. Neither failure was a trustworthy VP9 decoder result; the source/path mismatch invalidated the media experiment.
+
+[Fix `901bd6d`](https://github.com/sguzman/vulpra/commit/901bd6d13444d959f61efcd1a772d5c12096c147) creates the actual page and generated VP9 fixture together and checks the exact WebM path in both the lightweight self-test and the real runtime. The [corrected preflight #42660052697 passed](https://github.com/sguzman/vulpra/actions/runs/42660052697); its scope is still **fixture/classifier**, not actual browser playback. The fix also records the **compiled browser source SHA separately from the test harness SHA**, allowing truthful replay of a previously built package.
+
+**Real [source-pinned package replay #42660459080 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/42660459080)** reused the retained **test-only**, non-release package from original native source `a17ac58d694bf77c4da352ed7ab9b37233fbc01e` without compiling Firefox again. The workflow independently checked the original run ID **42559566915**, source identity and runtime-success ledger, saved SHA-256 sidecar and actual archive SHA-256 `f92fe8c29843e7521ffe1ddd7cbbed8836ff9491228b182628973e8484ed1a41`. The corrected test harness source was `1da98867b8f074bc116782d9c730508c06582f5c`. The replay artifact **13695320052** contains the raw WebDriver comparison and independently classified report.
+
+| Actual packaged-browser measurement | Normal FFmpeg | FFmpeg deliberately denied |
+| --- | ---: | ---: |
+| Decoded VP9 frames | **6** | **10** |
+| Advanced video time | **0.402 s** | **0.684 s** |
+| Video dimensions | 192 × 108 | 192 × 108 |
+| HTML media error or rejected play | None | None |
+| Responsive WebDriver/browser | Yes | Yes |
+| FFmpeg blocked loads **before** video page | 0 | **14** |
+| FFmpeg blocked loads **after** video page | 0 | **14** |
+
+**Supported conclusion:** The actual compiled Vulpra package plays VP9/WebM successfully under the bounded FFmpeg-denial condition. The browser was responsive and both temporary profiles were preserved. Since the 14 blocked requests were already present before media navigation and there were **zero additional blocked requests afterward**, this evidence does **not** prove the VP9 page itself requested FFmpeg libraries or identify the working VP9 decoder. It also does not contradict the earlier actual H.264 failure under FFmpeg denial, establish a substitute H.264 software decoder, prove hardware VA-API/GBM/DMABuf/Wayland fallback, grant source pruning, or complete the indirect/conditional native dependency/FFI map.
+
+**Roadmap credit:** M3 remains **5/6 (83%)** and overall Vulpra **61%**, **Δ +0 percentage points**. This closes the pending *VP9 comparison experiment*, not the sixth M3 gate, target workstation acceptance, security hotfix merge or release.
