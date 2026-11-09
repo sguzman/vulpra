@@ -17,7 +17,11 @@ def decoded($row): ($row.observed_video_state.found==true and
   $row.observed_video_state.playRejected==null);
 
 . as $report |
-require($report.schema_version==1 and
+require(($expected_source_commit|sha40) and
+        ($expected_package_sha256|sha64) and
+        $report.source_commit==$expected_source_commit and
+        $report.normal_packaged_archive_sha256==$expected_package_sha256 and
+        $report.schema_version==1 and
         $report.status=="real_packaged_H264_WebDriver_video_decode_with_FFmpeg_denial" and
         ($report.source_commit|sha40) and
         ($report.normal_packaged_archive_sha256|sha64) and
