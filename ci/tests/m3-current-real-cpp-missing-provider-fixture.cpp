@@ -12,11 +12,23 @@
 enum class Mode {
   VaGuardNoHw, VaGuardNoRdd, VaMissingDrm, VaMissingVa,
   VaMissingSymbol, VaPresent,
-  GbmMissingGbm, GbmMissingDrm, GbmMissingSymbol, GbmPresent
+  GbmMissingGbm, GbmMissingDrm, GbmMissingSymbol, GbmMissingOptionalModifier, GbmPresent
 };
 static Mode mode;
 static int pr_loads=0, dlopen_calls=0, unload_calls=0, link_calls=0;
 static int sym_calls=0;
+static const char* missing_gbm_symbol="gbm_create_device";
+// Exactly the 18 nonnull fields in real GbmLib::IsLoaded(), whose original
+// method is included below verbatim from source-verified DMABufDevice.cpp.
+static const char* const required_gbm_symbols[]={
+  "gbm_create_device", "gbm_device_destroy", "gbm_bo_create",
+  "gbm_bo_create_with_modifiers", "gbm_bo_get_modifier",
+  "gbm_bo_get_stride", "gbm_bo_get_fd", "gbm_bo_destroy",
+  "gbm_bo_map", "gbm_bo_unmap", "gbm_bo_get_plane_count",
+  "gbm_bo_get_handle_for_plane", "gbm_bo_get_stride_for_plane",
+  "gbm_bo_get_offset", "gbm_device_is_format_supported",
+  "drmPrimeHandleToFD", "gbm_surface_create", "gbm_surface_destroy"
+};
 static bool enable_hw=true, is_rdd=true;
 static int pointer_a=1, pointer_b=2;
 static void* const handle_a=&pointer_a;
@@ -80,7 +92,9 @@ static void* mocked_dlopen(const char* name, int flags) {
 static void* mocked_dlsym(void*, const char* symbol) {
   ++sym_calls;
   if (mode==Mode::GbmMissingSymbol &&
-      std::strcmp(symbol,"gbm_create_device")==0) { return nullptr; }
+      std::strcmp(symbol,missing_gbm_symbol)==0) { return nullptr; }
+  if (mode==Mode::GbmMissingOptionalModifier &&
+      std::strcmp(symbol,"gbm_bo_create_with_modifiers2")==0) { return nullptr; }
   return handle_a;
 }
 #define RTLD_LAZY 1
@@ -153,9 +167,20 @@ static Mode decode(const char* s) {
     {"va-no-drm",Mode::VaMissingDrm}, {"va-no-va",Mode::VaMissingVa},
     {"va-no-symbol",Mode::VaMissingSymbol}, {"va-present",Mode::VaPresent},
     {"gbm-no-gbm",Mode::GbmMissingGbm}, {"gbm-no-drm",Mode::GbmMissingDrm},
-    {"gbm-no-symbol",Mode::GbmMissingSymbol}, {"gbm-present",Mode::GbmPresent}
+    {"gbm-no-symbol",Mode::GbmMissingSymbol}, {"gbm-present",Mode::GbmPresent},
+    {"gbm-no-optional-modifier2",Mode::GbmMissingOptionalModifier}
   };
   for (const auto& e : names) if (std::strcmp(s,e.name)==0) return e.value;
+  const char* const prefix="gbm-no-required-";
+  if (std::strncmp(s,prefix,std::strlen(prefix))==0) {
+    const char* symbol=s+std::strlen(prefix);
+    for (const char* required : required_gbm_symbols) {
+      if (std::strcmp(required,symbol)==0) {
+        missing_gbm_symbol=required;
+        return Mode::GbmMissingSymbol;
+      }
+    }
+  }
   std::fprintf(stderr, "FAIL: unrecognized mock-provider scenario %s\n",s);
   std::exit(2);
 }
@@ -166,7 +191,7 @@ int main(int argc, char** argv) {
   enable_hw=mode!=Mode::VaGuardNoHw;
   is_rdd=mode!=Mode::VaGuardNoRdd;
   bool observed=false, expected=false;
-  int expected_loads=0, expected_pr_loads=0, expected_unloads=0, expected_link=0;
+  int expected_pr_loads=0, expected_unloads=0, expected_link=0;
   int expected_dlopen=0;
   bool gbm=std::strncmp(scenario,"gbm-",4)==0;
   if (!gbm) {
@@ -186,7 +211,7 @@ int main(int argc, char** argv) {
       return fail(scenario,"VA unexpectedly loaded");
   } else {
     observed=GbmLib::Load();
-    expected=(mode==Mode::GbmPresent);
+    expected=(mode==Mode::GbmPresent || mode==Mode::GbmMissingOptionalModifier);
     expected_dlopen=mode==Mode::GbmMissingGbm?1:2;
     const int before=dlopen_calls;
     const bool repeated=GbmLib::Load();
@@ -207,6 +232,5 @@ int main(int argc, char** argv) {
     "\"packaged_browser_feature_fallback_verified\":false}\n",
     scenario, observed?"true":"false",expected?"true":"false",
     pr_loads,dlopen_calls,unload_calls,link_calls);
-  (void)expected_loads;
-  return 0;
+   return 0;
 }
