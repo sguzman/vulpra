@@ -1,0 +1,179 @@
+# Isolated, source-body-extracted C++ runtime branch tests. Browser binary
+# is not executed; all provider calls are mocks in a private Actions runner.
+name: M3 Real CXX Source Loader Missing-Provider Fixtures
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-extract-current-provider-functions.rs
+      - ci/tests/m3-current-real-cpp-missing-provider-fixture.cpp
+      - .github/workflows/m3-real-cpp-provider-failure-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  compile-extracted-source-loader-runtime-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${ github.token }}
+      COMPILED_SOURCE_SHA: bd2499aeadce0368faa8b717b0e8a17e9c9dc317
+      NATIVE_RUN_ID: "42507965586"
+      RECONCILIATION_RUN_ID: "42513861084"
+    steps:
+      - name: Checkout only source-verifier tool, fixture, and two compiled-source owners
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-extract-current-provider-functions.rs
+            ci/tests/m3-current-real-cpp-missing-provider-fixture.cpp
+            dom/media/platforms/ffmpeg/VALibWrapper.cpp
+            widget/gtk/DMABufDevice.cpp
+
+      - name: Verify actual successful normal-native source run and independent reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$NATIVE_RUN_ID" > "$RUNNER_TEMP/native-run.json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg sha "$COMPILED_SOURCE_SHA" \
+            --argjson run "$NATIVE_RUN_ID" '
+              .id == $run and .head_sha == $sha and
+              .head_repository.full_name == $repo and
+              .head_branch == "main" and .event == "push" and
+              .name == "M3 Source Matched Native Link Inputs and Runtime" and
+              .path == ".github/workflows/m3-source-matched-native-link.yml" and
+              .run_attempt == 1 and .status == "completed" and .conclusion == "success"
+            ' "$RUNNER_TEMP/native-run.json" >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RECONCILIATION_RUN_ID" \
+            > "$RUNNER_TEMP/reconciled-run.json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --argjson run "$RECONCILIATION_RUN_ID" '
+            .id == $run and .head_repository.full_name == $repo and
+            .name == "M3 Source Matched Native Evidence Reconciliation" and
+            .event == "workflow_run" and .status == "completed" and
+            .conclusion == "success"
+          ' "$RUNNER_TEMP/reconciled-run.json" >/dev/null
+          for entry in \
+            "dom/media/platforms/ffmpeg/VALibWrapper.cpp:76935cfb49270b0281362d186b65ddbe971f8f97" \
+            "widget/gtk/DMABufDevice.cpp:4fd08d1453edac94bc96deb9a5ed0efcb27dad91"; do
+            file="${entry%%:*}"
+            blob="${entry##*:}"
+            test "$(git rev-parse "HEAD:$file")" = "$blob"
+            test "$(git hash-object -- "$file")" = "$blob"
+            gh api "repos/$GITHUB_REPOSITORY/contents/$file?ref=$COMPILED_SOURCE_SHA" \
+              > "$RUNNER_TEMP/source-api.json"
+            jq -e --arg path "$file" --arg blob "$blob" '
+              .type == "file" and .path == $path and .sha == $blob
+            ' "$RUNNER_TEMP/source-api.json" >/dev/null
+          done
+          echo "PASS: two Git object/working-source/API SHA identities match successful compiled native revision"
+
+      - name: Compile Rust verifier, extract genuine source CXX functions, and reject forged source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2021 -D warnings --test \
+            ci/m3-extract-current-provider-functions.rs \
+            -o "$RUNNER_TEMP/provider-source-extractor-tests"
+          "$RUNNER_TEMP/provider-source-extractor-tests" --nocapture
+          rustc --edition=2021 -D warnings -O \
+            ci/m3-extract-current-provider-functions.rs \
+            -o "$RUNNER_TEMP/provider-source-extractor"
+          mkdir "$RUNNER_TEMP/real-provider-functions"
+          "$RUNNER_TEMP/provider-source-extractor" --extract \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/real-provider-functions" "$COMPILED_SOURCE_SHA"
+          test "$(find "$RUNNER_TEMP/real-provider-functions" -maxdepth 1 -type f | wc -l)" -eq 3
+          if "$RUNNER_TEMP/provider-source-extractor" --extract \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/real-provider-functions" "$COMPILED_SOURCE_SHA" \
+            > /dev/null 2>&1; then
+            echo "FAIL: accepted overwriting real extracted source" >&2; exit 1
+          fi
+          mkdir "$RUNNER_TEMP/forged-source-test"
+          if "$RUNNER_TEMP/provider-source-extractor" --extract \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/forged-source-test" \
+            0000000000000000000000000000000000000000 > /dev/null 2>&1; then
+            echo "FAIL: accepted forged native source SHA" >&2; exit 1
+          fi
+
+      - name: Compile actual CXX function bodies with isolated mocked providers
+        shell: bash
+        run: |
+          set -euo pipefail
+          c++ -std=c++17 -O0 -g0 -Wall -Wextra -Werror \
+            -I "$RUNNER_TEMP/real-provider-functions" \
+            ci/tests/m3-current-real-cpp-missing-provider-fixture.cpp \
+            -o "$RUNNER_TEMP/provider-missing-fixture"
+          : > "$RUNNER_TEMP/provider-results.jsonl"
+          for scenario in \
+            va-no-hw va-no-rdd va-no-drm va-no-va va-no-symbol va-present \
+            gbm-no-gbm gbm-no-drm gbm-no-symbol gbm-present; do
+            "$RUNNER_TEMP/provider-missing-fixture" "$scenario" \
+              >> "$RUNNER_TEMP/provider-results.jsonl"
+          done
+          if "$RUNNER_TEMP/provider-missing-fixture" fake-scenario \
+            > /dev/null 2>&1; then
+            echo "FAIL: unsupported runtime failure mode accepted" >&2; exit 1
+          fi
+          jq -s --arg source "$COMPILED_SOURCE_SHA" \
+            --argjson native "$NATIVE_RUN_ID" \
+            --argjson reconciliation "$RECONCILIATION_RUN_ID" '
+              if length != 10 or
+                ([.[].scenario] | unique | length) != 10 or
+                ([.[] | select(.observed_load == true)] | length) != 2 or
+                ([.[] | select(.observed_load == false)] | length) != 8 or
+                (all(.[]; .source_extracted_cpp_function_executed == true and
+                  .provider_library_resolution_mocked == true and
+                  .observed_load == .expected_load and
+                  .packaged_browser_feature_fallback_verified == false)) | not
+              then error("Real CXX source function mock-provider runtime scenario mismatch")
+              else {
+                schema_version:1,
+                status:"compiled_verbatim_source_cpp_loader_methods_exercised_with_mocked_missing_providers",
+                native_source_commit:$source,
+                source_native_run_id:$native,
+                independent_native_reconciliation_run_id:$reconciliation,
+                exact_compiled_source_git_blobs_checked:2,
+                verbatim_cpp_source_functions_extracted:3,
+                real_original_cpp_function_bodies_compiled_and_executed:true,
+                mocked_provider_scenarios:10,
+                mocked_failure_and_guard_scenarios:8,
+                mocked_present_provider_scenarios:2,
+                source_extracted_loader_missing_provider_branches_exercised:true,
+                provider_library_resolution_mocked:true,
+                original_packaged_browser_executed_in_this_fixture:false,
+                original_packaged_browser_missing_provider_runtime_tested:false,
+                system_library_presence_or_ABI_verified:false,
+                Wayland_rendering_or_software_video_fallback_proven:false,
+                indirect_dlopen_dlsym_ffi_graph_complete:false,
+                target_endeavouros_hyprland_tested:false,
+                source_pruning_authorized:false,
+                m3_sixth_gate_closed:false,
+                release_ready:false,
+                scenarios:.
+              } end
+            ' "$RUNNER_TEMP/provider-results.jsonl" \
+            > "$RUNNER_TEMP/m3-real-cpp-missing-provider-fixtures.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="compiled_verbatim_source_cpp_loader_methods_exercised_with_mocked_missing_providers" and
+            .verbatim_cpp_source_functions_extracted==3 and
+            .mocked_provider_scenarios==10 and
+            .source_extracted_loader_missing_provider_branches_exercised==true and
+            .original_packaged_browser_executed_in_this_fixture==false and
+            .Wayland_rendering_or_software_video_fallback_proven==false and
+            .m3_sixth_gate_closed==false and .source_pruning_authorized==false
+          ' "$RUNNER_TEMP/m3-real-cpp-missing-provider-fixtures.json" >/dev/null
+          echo "PASS: original compiled-source C++ VA-API and GBM methods executed in 10 isolated mock-provider scenarios"
+          echo "LIMIT: source-body runtime only; no browser binary, host library ABI, live video or Wayland fallback validated"
+
+      - name: Preserve bounded mocked provider failure evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-real-source-cxx-loader-mock-provider-fixtures
+          path: ${ runner.temp }}/m3-real-cpp-missing-provider-fixtures.json
+          if-no-files-found: error
+          retention-days: 14
