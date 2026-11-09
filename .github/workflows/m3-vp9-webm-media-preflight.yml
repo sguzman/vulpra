@@ -1,0 +1,50 @@
+# No browser build. Validate the exact local VP9/WebM fixture and future
+# packaged WebDriver smoke input gating before adding an expensive native step.
+name: M3 VP9 WebM Media Fixture Preflight
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-packaged-ffmpeg-vp9-video.sh
+      - .github/workflows/m3-vp9-webm-media-preflight.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-vp9-webm-local-media:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact VP9 local playback and FFmpeg denial test script only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-packaged-ffmpeg-vp9-video.sh
+      - name: Encode actual bounded WebM VP9 media and reject invalid browser inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 \
+            install -y --no-install-recommends ffmpeg jq
+          bash -n ci/m3-packaged-ffmpeg-vp9-video.sh
+          ffmpeg -hide_banner -encoders 2>/dev/null | grep -Eq '^ V.* libvpx-vp9 '
+          bash ci/m3-packaged-ffmpeg-vp9-video.sh --self-test
+          python3 - <<'PY'
+          import mimetypes
+          assert mimetypes.guess_type("vp9.webm")[0] == "video/webm"
+          print("PASS: Python local HTTP server serves WebM with video/webm MIME")
+          PY
+          if bash ci/m3-packaged-ffmpeg-vp9-video.sh > /dev/null 2>&1; then
+            echo "FAIL: accepted missing actual browser inputs" >&2
+            exit 1
+          fi
+          if bash ci/m3-packaged-ffmpeg-vp9-video.sh \
+            fake fake fake fake > /dev/null 2>&1; then
+            echo "FAIL: accepted forged actual native packaged archive" >&2
+            exit 1
+          fi
+          echo "PASS: local VP9/WebM codec, MIME and fail-closed browser inputs independently validated"
+          echo "LIMIT: no real browser decoded frames measured by this lightweight preflight"
