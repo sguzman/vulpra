@@ -32,3 +32,27 @@ The [adversarial classifier test](../../ci/tests/m3-h264-video-outcome-audit-tes
 Meanwhile [full native **42553489035**](https://github.com/sguzman/vulpra/actions/runs/42553489035) is **still in normal C++/Rust compilation at the latest checkpoint**. That run is pinned to earlier commit `091499590cabe2426df96b5b735af64ebdd4ba23`; the later independent evidence-classifier additions were **not executed in that already-running job**. Its real media artifact will require separate examination and source/package authentication after completion.
 
 **Overall 61% (Δ+0 pp), M3 5/6 (83%).**
+
+## Accepted real packaged H.264 result and independent crosscheck — 2026-11-09 UTC
+
+**Full native [#42553489035 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/42553489035)** for original source `091499590cabe2426df96b5b735af64ebdd4ba23`. The full native C++/Rust compile, normal packaged archive, private Weston/Wayland and WebDriver browser checks, crashhelper Rust ABI, current Rust staticlib/ELF FFI checks, and new H.264 media WebDriver step all passed. The packaged native archive was **87,153,592 compressed bytes**, SHA-256 `522e1230386ef752f5baf9e260717e6f2aa5840b53a762aaf2b5cacf07500900` (not directly comparable as a lean-source savings delta). The separately authenticated [native reconciliation #42557375833 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/42557375833) joined the exact package source/hash and existing full-native/FFI coverage, retaining full indirect/dynamic dependency closure as false.
+
+**Original real packaged-media artifact [#13646969759](https://github.com/sguzman/vulpra/actions/runs/42553489035/artifacts/13646969759)** was downloaded and its actual browser DOM states independently parsed:
+
+| Real packaged WebDriver measurement | Available FFmpeg libraries | FFmpeg `dlopen`/ `dlmopen` denied |
+| --- | ---: | ---: |
+| H.264 `getVideoPlaybackQuality().totalVideoFrames` | **9 decoded frames** | **0 frames** |
+| Media `currentTime` | **0.642 seconds** | **0 seconds** |
+| Media video dimensions | **192 × 108** | **0 × 0** |
+| `HTMLMediaElement.error.code` | null | **4** (source not supported) |
+| `video.play()` rejected | no | **`NotSupportedError`** |
+| Browser/WebDriver responsive | **yes** | **yes** |
+| Isolated profile sentinel preserved | yes | yes |
+
+The actual denied session recorded **14 intercepted FFmpeg library-load attempts before navigating to the video page**, and **0 additional attempts during/after video-page navigation**. The denied browser survived and handled the unsupported media source without crashing, but **did not decode the H.264 clip**. The 14 attempts happened before navigation, so they cannot be attributed to the new page by this instrumentation alone. The observed behavior is consistent with FFmpeg codec unavailability in this configuration; it is **not** evidence of a successful alternate software-decoder fallback, nor a tracing proof of exactly which codec path initiated each denied load.
+
+The original H.264 media result has an additional **read-only independently successful [audit #42558025681](https://github.com/sguzman/vulpra/actions/runs/42558025681)**, [actionlint success #42558025671](https://github.com/sguzman/vulpra/actions/runs/42558025671), and independently downloaded [reconciled artifact #13648381719](https://github.com/sguzman/vulpra/actions/runs/42558025681/artifacts/13648381719). The audit authenticates both successful GitHub native and separate native-reconciler runs, downloads **the original named H.264, normal-package and native-reconciliation artifacts**, pins the source/package SHAs across all three, recomputes video frames/time/error from actual DOM evidence and validates **20/20 synthetic + 6/6 original-real-report malicious alterations rejected**. Its report correctly records `ffmpeg_additional_denials_observed_after_media_navigation=0`, `H264_decoding_with_FFmpeg_denied_measured=false`, `H264_media_error_with_FFmpeg_denied_measured=true` and the unproven decoder/graph/release flags as false. The independent audit does **not** itself rerun playback; its claim is identity-checked verification of an earlier real playback run.
+
+**Next functional work:** preserve FFmpeg as a *required runtime component* for H.264 on this tested Ubuntu native configuration; don't prune or omit it based on generic browser-survival screenshots. To establish other safe decode paths, test a separate independently decodable baseline format (for example an appropriately verified WebM/VP9 workload) both with and without FFmpeg, then explicitly trigger VA-API and Wayland/GBM GPU/DMABuf paths under their own denial probes. A genuinely valid fallback claim needs **successful media decoded frames under the relevant provider denial**, not merely browser availability. A private Weston/pixman frame is insufficient for GPU/DMABuf acceptance.
+
+**Scope remains bounded:** normal playback success and denied H.264 failure on the tested GitHub Ubuntu runner; not a universal statement about all available host codecs, all browser features or the user's EndeavourOS/Hyprland desktop. **M3 gate six stays open (5/6, 83%). Overall 61% (Δ+0 pp).** No further source pruning, normal-browsing release, security hotfix merge or target workstation changes authorized.
