@@ -119,11 +119,11 @@ mod tests {
     #[test]
     fn balanced_and_duplicate_function_guards() {
         let t=check_example();
-        let s="stuff\nbool Box::Load() { if (true) { return false; } return true; }\n";
-        let body=source_function(s,&t).unwrap();
+        let s=format!("stuff\\nbool Box::Load() {{ if (true) {{ return false; }} /* {} */ return true; }}\\n", "p".repeat(180));
+        let body=source_function(&s,&t).unwrap();
         assert!(body.contains("return false;"));
-        assert!(!body.contains("stuff\n"));
-        assert!(source_function(&(s.to_owned()+s),&t).is_err());
+        assert!(!body.contains("stuff\\n"));
+        assert!(source_function(&(s.to_owned()+&s),&t).is_err());
         assert!(source_function("bool Box::Load() { return false;", &t).is_err());
         assert!(source_function("bool Box::Load() { return true; }", &t).is_err());
     }
