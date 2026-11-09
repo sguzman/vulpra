@@ -1,0 +1,36 @@
+# Lightweight fail-closed source/package/Wayland frame classifier fixture; no browser build.
+name: M3 Wayland Provider Replay Evidence Fixtures
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-wayland-provider-replay-audit.jq
+      - ci/tests/m3-wayland-provider-replay-audit-tests.sh
+      - .github/workflows/m3-wayland-provider-replay-audit-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-graphical-evidence-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact graphical audit classifier and test inputs
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-wayland-provider-replay-audit.jq
+            ci/tests/m3-wayland-provider-replay-audit-tests.sh
+      - name: Validate real-frame no-hit distinction and 22 forged safety states
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq
+          bash -n ci/tests/m3-wayland-provider-replay-audit-tests.sh
+          bash ci/tests/m3-wayland-provider-replay-audit-tests.sh
+          echo "LIMIT: fixture classifier only, never a compiled-browser Wayland or GPU acceptance"
