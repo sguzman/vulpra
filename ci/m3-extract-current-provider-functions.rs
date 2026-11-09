@@ -1,5 +1,6 @@
 // Extract the exact bounded C++ function bodies of accepted source-linked
-// VA-API and GBM loader owners, for isolated *mock-provider* execution.
+// VA-API and GBM loader owners plus an original inline GBM fallback wrapper,
+// for isolated *mock-provider* execution.
 // Not a browser binary, not a test of system library presence or actual
 // WebDriver fallback. Require fixed source Git blobs and only exact functions.
 use std::{fs, path::{Path, PathBuf}, process::Command};
@@ -14,7 +15,7 @@ struct Target {
     anchors: &'static [&'static str],
 }
 
-const TARGETS: [Target; 3] = [
+const TARGETS: [Target; 4] = [
     Target {
         path: "dom/media/platforms/ffmpeg/VALibWrapper.cpp",
         expected_blob: "76935cfb49270b0281362d186b65ddbe971f8f97",
@@ -35,6 +36,15 @@ const TARGETS: [Target; 3] = [
         signature: "bool GbmLib::Load() {",
         output: "real-gbm-load.inc",
         anchors: &["GBMLIB_NAME", "DRMLIB_NAME", "dlopen(", "dlsym(", "return false;"],
+    },
+    Target {
+        path: "widget/gtk/DMABufDevice.h",
+        expected_blob: "6ec965c96846bc09050b1567ef042228d59cdd1c",
+        signature: "static struct gbm_bo* CreateWithModifiers2(struct gbm_device* gbm,",
+        output: "real-gbm-inline-create-with-modifiers2.inc",
+        anchors: &["if (!gbm)", "if (!sCreateWithModifiers2)",
+                    "return sCreateWithModifiers(gbm, width, height, format, modifiers, count);",
+                    "return sCreateWithModifiers2(gbm, width, height, format, modifiers, count,"],
     },
 ];
 
@@ -97,7 +107,7 @@ fn extract(root: &Path, out: &Path, source: &str) -> Result<(), String> {
         if output.exists() { return Err(format!("Refuse overwrite {}", output.display())); }
         fs::write(output, body).map_err(|e| e.to_string())?;
     }
-    println!("PASS: extracted exactly 3 unchanged source-owned C++ loader function bodies from two compiled Git blobs");
+    println!("PASS: extracted exactly 4 unchanged source-owned C++ methods, including the inline GBM fallback, from three exact compiled Git blobs");
     Ok(())
 }
 
