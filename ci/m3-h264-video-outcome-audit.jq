@@ -81,7 +81,7 @@ require($b.h264_decoded_frames_and_time_verified==true and
   ffmpeg_requests_causally_proven_to_originate_in_H264_decoder:false,
   H264_decoding_with_FFmpeg_denied_measured:decoded($d),
   H264_media_error_with_FFmpeg_denied_measured:$d.media_error_observed,
-  failure_without_media_error_possible:(!decoded($d) and !$d.media_error_observed),
+  failure_without_media_error_possible:((decoded($d)|not) and ($d.media_error_observed|not)),
   entire_requested_library_argument_and_indirect_graph_proven:false,
   alternative_software_codec_fallback_proven:false,
   hardware_video_or_Wayland_DMABuf_fallback_proven:false,
