@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      GH_TOKEN: ${ github.token }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout exact source-owner, original C++ mock and runner only
         uses: actions/checkout@v4
@@ -60,6 +60,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-current-real-ffmpeg-runtime-linker-mock-fixtures
-          path: ${ runner.temp }}/m3-original-ffmpeg-runtime-linker-mocks.json
+          path: ${{ runner.temp }}/m3-original-ffmpeg-runtime-linker-mocks.json
           if-no-files-found: error
           retention-days: 14
