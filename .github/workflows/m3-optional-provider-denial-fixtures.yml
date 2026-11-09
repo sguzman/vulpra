@@ -7,6 +7,7 @@ on:
     paths:
       - ci/m3-deny-optional-native-providers.c
       - ci/tests/m3-native-provider-denial-fixture.c
+      - ci/m3-smoke-packaged-optional-provider-denial.sh
       - .github/workflows/m3-optional-provider-denial-fixtures.yml
   workflow_dispatch:
 
@@ -26,6 +27,17 @@ jobs:
           sparse-checkout: |
             ci/m3-deny-optional-native-providers.c
             ci/tests/m3-native-provider-denial-fixture.c
+            ci/m3-smoke-packaged-optional-provider-denial.sh
+      - name: Validate isolated packaged-browser driver shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/m3-smoke-packaged-optional-provider-denial.sh
+          if bash ci/m3-smoke-packaged-optional-provider-denial.sh               > /dev/null 2>&1; then
+            echo "FAIL: accepted missing packaged-runtime inputs" >&2
+            exit 1
+          fi
+          echo "PASS: strict packaged-runtime denial harness syntax and invalid-input guard"
       - name: Compile C ABI loader shim and known native ELF fixtures
         shell: bash
         run: |
