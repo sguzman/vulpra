@@ -58,7 +58,12 @@ static bool deny(const char *name, const char *api) {
         int n = snprintf(line, sizeof(line), "DENIED %s %s %ld\n",
                          api, name, (long)getpid());
         if (n > 0 && n < (int)sizeof(line)) {
-          (void)write(fd, line, (size_t)n);
+          ssize_t written = write(fd, line, (size_t)n);
+          if (written != (ssize_t)n) {
+            (void)close(fd);
+            --reentry;
+            return false; // No silent denial when evidence logging failed.
+          }
         }
         (void)close(fd);
       }
