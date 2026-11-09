@@ -1,0 +1,65 @@
+# Small exact-native-source C++ FFmpeg candidate and error-state fixture.
+# No complete Firefox build or host library changes.
+name: M3 Current FFmpeg Native Source Candidate Fixtures
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/tests/m3-real-ffmpeg-linker-candidates-fixture.cpp
+      - ci/tests/m3-current-ffmpeg-linker-fixtures.sh
+      - .github/workflows/m3-current-ffmpeg-source-loader-fixtures.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  source-matched-real-ffmpeg-init:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${ github.token }}
+    steps:
+      - name: Checkout exact source-owner, original C++ mock and runner only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/media/platforms/ffmpeg/FFmpegRuntimeLinker.cpp
+            ci/tests/m3-real-ffmpeg-linker-candidates-fixture.cpp
+            ci/tests/m3-current-ffmpeg-linker-fixtures.sh
+
+      - name: Verify original successful native source and execute exact C++ linker
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/tests/m3-current-ffmpeg-linker-fixtures.sh
+          bash ci/tests/m3-current-ffmpeg-linker-fixtures.sh
+          jq -e '
+            .schema_version==1 and
+            .status=="real_source_FFmpeg_Init_and_linux_candidates_executed_with_mocked_loaders" and
+            .original_source_candidate_array_extracted_verbatim==true and
+            .original_source_cpp_Init_method_extracted_verbatim==true and
+            .actual_original_source_cpp_method_compiled_and_executed==true and
+            .original_linux_candidate_count==14 and
+            .simulated_provider_scenarios==5 and
+            .original_failed_candidates_exhausted==true and
+            .original_first_and_last_usable_candidate_traversal_tested==true and
+            .original_candidate_priority_and_memoization_tested==true and
+            .actual_packaged_browser_h264_playback_tested==false and
+            .actual_system_FFmpeg_ABI_loaded==false and
+            .real_video_decode_or_software_fallback_proven==false and
+            .complete_indirect_dynamic_dependency_closure_proven==false and
+            .m3_sixth_gate_closed==false and
+            .source_pruning_authorized==false and .release_ready==false
+          ' "$RUNNER_TEMP/m3-original-ffmpeg-runtime-linker-mocks.json" >/dev/null
+
+      - name: Preserve only scoped current C++ FFmpeg candidate/control-flow evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-current-real-ffmpeg-runtime-linker-mock-fixtures
+          path: ${ runner.temp }}/m3-original-ffmpeg-runtime-linker-mocks.json
+          if-no-files-found: error
+          retention-days: 14
