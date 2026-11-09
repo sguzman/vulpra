@@ -381,6 +381,51 @@ jobs:
           print("PASS: normal browser packaged runtime acceptance")
           PY
 
+      - name: Probe actual packaged Vulpra with isolated optional GBM VA-API and FFmpeg denial
+        shell: bash
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/m3-smoke-packaged-optional-provider-denial.sh
+          cc -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror \
+            ci/m3-deny-optional-native-providers.c \
+            -o "$RUNNER_TEMP/m3-deny-native-providers.so" -ldl
+          bash ci/m3-smoke-packaged-optional-provider-denial.sh \
+            "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/m3-deny-native-providers.so" \
+            "$RUNNER_TEMP/m3-packaged-provider-denial-runtime.json"
+          jq -e --arg sha "$GITHUB_SHA" \
+            --arg archive "$(jq -r '.package.package_sha256' "$RUNNER_TEMP/m3-native-link-inputs.json")" '
+              .schema_version == 1 and
+              .status == "real_packaged_native_browser_optional_provider_denial_probe" and
+              .native_source_commit == $sha and
+              .verified_packaged_archive_sha256 == $archive and
+              .actual_normal_packaged_browser_relaunched == true and
+              .every_scenario_attached_and_screenshot_passed == true and
+              ([.runtime_modes[].provider_group] | sort) == ["ffmpeg","gbm","vaapi"] and
+              .original_private_home_and_profiles_untouched == true and
+              .system_libraries_modified == false and
+              .used_compiled_LD_PRELOAD_interposer == true and
+              .all_requested_library_arguments_and_indirect_edges_proven == false and
+              .hardware_video_or_Wayland_gpu_fallback_complete == false and
+              .target_endeavouros_hyprland_verified == false and
+              .source_pruning_authorized == false and
+              .m3_sixth_gate_closed == false and
+              .release_ready == false
+            ' "$RUNNER_TEMP/m3-packaged-provider-denial-runtime.json" >/dev/null
+          echo "PASS: normal packaged Vulpra survived bounded three-mode optional-provider denial smoke"
+          echo "LIMIT: denial paths only proven for observed attempted loads; screenshot alone is not media/Wayland feature fallback proof"
+
+      - name: Preserve bounded packaged browser optional-provider runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-current-packaged-optional-provider-denial-evidence
+          path: ${{ runner.temp }}/m3-packaged-provider-denial-runtime.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Revalidate exact compiled crashhelper ELF after packaging and runtime smoke
         shell: bash
         run: |
