@@ -57,7 +57,7 @@ jobs:
       - name: Authenticate exact earlier native package and preserved runtime acceptance
         shell: bash
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
@@ -70,10 +70,10 @@ jobs:
             -type f -name vulpra-local-m3-native-link-ci.tar.xz -print)
           mapfile -t reports < <(find "$RUNNER_TEMP/wayland-replay-package" \
             -type f -name m3-native-link-inputs.json -print)
-          test "\${#packages[@]}" -eq 1
-          test "\${#reports[@]}" -eq 1
-          pkg="\${packages[0]}"
-          report="\${reports[0]}"
+          test "${#packages[@]}" -eq 1
+          test "${#reports[@]}" -eq 1
+          pkg="${packages[0]}"
+          report="${reports[0]}"
           test -s "$pkg.sha256"
           (cd "$(dirname "$pkg")" && sha256sum -c "$(basename "$pkg").sha256")
           test "$(sha256sum "$pkg" | cut -d' ' -f1)" = "$PINNED_NATIVE_PACKAGE_SHA"
@@ -130,6 +130,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-pinned-graphical-wayland-provider-denial-evidence
-          path: \${{ runner.temp }}/m3-packaged-wayland-provider-denial-runtime.json
+          path: ${{ runner.temp }}/m3-packaged-wayland-provider-denial-runtime.json
           if-no-files-found: warn
           retention-days: 14
