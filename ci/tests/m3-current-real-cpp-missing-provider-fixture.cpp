@@ -17,6 +17,7 @@ enum class Mode {
 static Mode mode;
 static int pr_loads=0, dlopen_calls=0, unload_calls=0, link_calls=0;
 static int sym_calls=0;
+static int forced_missing_symbol_lookups=0;
 static const char* missing_gbm_symbol="gbm_create_device";
 // Exactly the 18 nonnull fields in real GbmLib::IsLoaded(), whose original
 // method is included below verbatim from source-verified DMABufDevice.cpp.
@@ -92,9 +93,15 @@ static void* mocked_dlopen(const char* name, int flags) {
 static void* mocked_dlsym(void*, const char* symbol) {
   ++sym_calls;
   if (mode==Mode::GbmMissingSymbol &&
-      std::strcmp(symbol,missing_gbm_symbol)==0) { return nullptr; }
+      std::strcmp(symbol,missing_gbm_symbol)==0) {
+    ++forced_missing_symbol_lookups;
+    return nullptr;
+  }
   if (mode==Mode::GbmMissingOptionalModifier &&
-      std::strcmp(symbol,"gbm_bo_create_with_modifiers2")==0) { return nullptr; }
+      std::strcmp(symbol,"gbm_bo_create_with_modifiers2")==0) {
+    ++forced_missing_symbol_lookups;
+    return nullptr;
+  }
   return handle_a;
 }
 #define RTLD_LAZY 1
@@ -217,6 +224,9 @@ int main(int argc, char** argv) {
     const bool repeated=GbmLib::Load();
     if (repeated!=observed || dlopen_calls!=before)
       return fail(scenario,"one-shot GBM state/cache guard not preserved");
+    if ((mode==Mode::GbmMissingSymbol || mode==Mode::GbmMissingOptionalModifier) &&
+        forced_missing_symbol_lookups!=1)
+      return fail(scenario,"requested dlsym symbol was not actually queried by original loader");
   }
   if (observed!=expected) return fail(scenario,"unexpected load boolean");
   if (pr_loads!=expected_pr_loads || dlopen_calls!=expected_dlopen ||
