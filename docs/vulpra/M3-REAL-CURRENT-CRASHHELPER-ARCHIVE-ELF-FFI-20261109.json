@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "status": "real_current_crashhelper_rust_archive_member_and_direct_cxx_abi_branch_independently_reconciled",
+  "verified_date_utc": "2026-11-09",
+  "native_source_commit": "bd2499aeadce0368faa8b717b0e8a17e9c9dc317",
+  "native_workflow": {
+    "run_id": 42507965586,
+    "path": ".github/workflows/m3-source-matched-native-link.yml",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "independent_reconciliation_workflow": {
+    "run_id": 42513861084,
+    "path": ".github/workflows/m3-native-link-evidence-reconcile.yml",
+    "status": "completed",
+    "conclusion": "success",
+    "reconcile_real_native_run_job": "success"
+  },
+  "primary_real_native_artifact_ids": {
+    "rust_archive_member": 13630038197,
+    "linked_crashhelper_machine_branch": 13630636083,
+    "normal_native_package_and_runtime": 13630038207
+  },
+  "independent_reconciled_artifact_id": 13630537067,
+  "observed_actual_rust_staticlib": {
+    "basename": "libcrash_helper_server.a",
+    "sha256": "c4b3c21ff1b652e3fdab6f240cd0d090cb88740cc4b9432d47a7fcf87a00948c",
+    "bytes": 28565678,
+    "archive_member_count": 310,
+    "export_name": "crash_generator_logic_desktop",
+    "strong_export_definition_count": 1,
+    "export_owner_archive_member": "crash_helper_server-8eb0a2b46a0cd640.crash_helper_server.f2ea425dcdde4baf-cgu.0.rcgu.o"
+  },
+  "observed_actual_unstripped_consumer": {
+    "basename": "crashhelper",
+    "sha256": "17566310435f5d3d1e062167c76942f27e4ab11f889c0f3ddc3de5e93ad37640",
+    "bytes": 18923624,
+    "main_symbol_binding": "t",
+    "strong_ffi_export_text_definition_count": 1,
+    "main_direct_branch_count_to_named_rust_export": 1
+  },
+  "observed_shipped_crashhelper": {
+    "basename": "crashhelper",
+    "sha256": "2d7b0dfec6e1e73d3dbc43882434e35962a44ebfaccec40d6269897d1aa63c0f",
+    "bytes": 1657824,
+    "raw_byte_identity_with_unstripped_build": false
+  },
+  "authenticated_normal_package": {
+    "sha256": "965171f3e6cb90004a24683b38df99e27bb93e3514dbd382dd48e96b3290668b",
+    "compressed_bytes": 87158888,
+    "native_elf_count": 28,
+    "native_direct_needed_edges": 268
+  },
+  "checks": {
+    "full_source_pinned_native_build_success": true,
+    "full_normal_package_and_wayland_javascript_webextensions_nimbus_tls_runtime_success": true,
+    "source_matched_compiled_rust_archive_export_owned_by_single_real_member": true,
+    "same_unstripped_consumer_elf_verified_in_rust_and_cpp_reports": true,
+    "exact_one_compiled_cpp_main_to_named_rust_ffi_direct_branch": true,
+    "same_unstripped_consumer_elf_hash_unchanged_after_packaging_and_runtime": true,
+    "independent_source_build_package_runtime_archive_and_cpp_branch_reconciliation_success": true
+  },
+  "not_proven": {
+    "every_archive_member_selected_by_final_linker": false,
+    "complete_cpp_rust_ffi_and_indirect_call_graph": false,
+    "complete_dlopen_and_conditional_feature_fallback_graph": false,
+    "all_protected_feature_activation_and_error_routes": false,
+    "target_endeavouros_hyprland_workstation_qa": false,
+    "per_feature_native_byte_savings": false
+  },
+  "source_pruning_authorized": false,
+  "m3_sixth_gate_closed": false,
+  "normal_browsing_release_approved": false,
+  "progress": {
+    "overall_percent": 61,
+    "m3_gates_passed": 5,
+    "m3_gates_total": 6,
+    "m3_percent": 83,
+    "delta_percentage_points": 0
+  },
+  "notes": "Both actual source-matched native reports and the independent reconciliation ZIP were downloaded and inspected. The Rust export's compiled archive-member owner, the unstripped linked ELF definition, and the exact C++ main direct branch were observed, not merely fixture-tested. The reconciler required a successful full normal native workflow. Packager transformations make shipped and unstripped crashhelper SHA-256 values different; the raw unstripped binary hash was rechecked after package/runtime. No complete linker selection, indirect FFI graph, workstation QA, pruning or release is established."
+}
