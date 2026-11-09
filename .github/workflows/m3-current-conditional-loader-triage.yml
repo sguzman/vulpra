@@ -7,6 +7,10 @@ on:
     paths:
       - ci/m3-current-conditional-loader-triage.jq
       - ci/tests/m3-current-conditional-loader-triage-tests.sh
+      - ci/m3-current-conditional-loader-source-anchors.rs
+      - dom/media/platforms/ffmpeg/FFmpegRuntimeLinker.cpp
+      - dom/media/platforms/ffmpeg/VALibWrapper.cpp
+      - widget/gtk/DMABufDevice.cpp
       - .github/workflows/m3-current-conditional-loader-triage.yml
   workflow_dispatch:
 
@@ -32,6 +36,10 @@ jobs:
           sparse-checkout: |
             ci/m3-current-conditional-loader-triage.jq
             ci/tests/m3-current-conditional-loader-triage-tests.sh
+            ci/m3-current-conditional-loader-source-anchors.rs
+            dom/media/platforms/ffmpeg/FFmpegRuntimeLinker.cpp
+            dom/media/platforms/ffmpeg/VALibWrapper.cpp
+            widget/gtk/DMABufDevice.cpp
 
       - name: Authenticate successful full-native and independent reconciliation run origins
         shell: bash
@@ -134,10 +142,65 @@ jobs:
           echo "PASS: 12 current conditional-loader caller witnesses / 19 direct branches"
           echo "LIMIT: not library arguments, indirect calls, fallbacks, platform QA or pruning"
 
+      - name: Compile/test Rust source anchor examiner and verify three actual compiled-source Git blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2021 -D warnings --test \
+            ci/m3-current-conditional-loader-source-anchors.rs \
+            -o "$RUNNER_TEMP/m3-loader-source-anchor-tests"
+          "$RUNNER_TEMP/m3-loader-source-anchor-tests" --nocapture
+          rustc --edition=2021 -D warnings -O \
+            ci/m3-current-conditional-loader-source-anchors.rs \
+            -o "$RUNNER_TEMP/m3-loader-source-anchor-check"
+          for path in \
+            dom/media/platforms/ffmpeg/FFmpegRuntimeLinker.cpp \
+            dom/media/platforms/ffmpeg/VALibWrapper.cpp \
+            widget/gtk/DMABufDevice.cpp; do
+            blob="$(git rev-parse "HEAD:$path")"
+            gh api "repos/$GITHUB_REPOSITORY/contents/$path?ref=$NATIVE_SOURCE_SHA" \
+              > "$RUNNER_TEMP/native-source-object.json"
+            jq -e --arg path "$path" --arg blob "$blob" '
+              .path == $path and .sha == $blob and
+              .type == "file"
+            ' "$RUNNER_TEMP/native-source-object.json" >/dev/null
+          done
+          "$RUNNER_TEMP/m3-loader-source-anchor-check" \
+            --audit "$GITHUB_WORKSPACE" "$NATIVE_SOURCE_SHA" \
+            "$RUNNER_TEMP/m3-current-conditional-loader-source-anchors.json"
+          jq -e --slurpfile triage "$RUNNER_TEMP/m3-current-conditional-loader-triage.json" \
+            --arg sha "$NATIVE_SOURCE_SHA" '
+            .schema_version == 1 and
+            .status == "three_current_source_owned_conditional_loader_name_and_failure_guards" and
+            .native_source_commit == $sha and
+            .source_rows_count == 3 and
+            .source_literal_library_candidates_checked == 7 and
+            ([.source_rows[].id] | sort) == ["ffmpeg_runtime_init","gbm_widget","vaapi_loader"] and
+            all(.source_rows[];
+              (.exact_compiled_source_git_blob|test("^[0-9a-f]{40}$")) and
+              .source_guard_and_failure_anchors_observed == true and
+              .runtime_requested_library_name_verified == false and
+              .missing_library_fallback_exercised == false) and
+            all(.source_rows[].id; . as $id |
+              any($triage[0].scoped_witnesses[]; .id == $id and .observed_direct_branches > 0)) and
+            .compiled_native_branch_reconciliation_performed_by_this_observer == false and
+            .library_names_at_actual_machine_call_arguments_verified == false and
+            .all_indirect_loader_and_symbol_edges_known == false and
+            .source_guards_exercised_at_runtime == false and
+            .safe_feature_fallback_proven == false and
+            .target_endeavouros_hyprland_tested == false and
+            .source_pruning_authorized == false and
+            .m3_sixth_gate_closed == false and .release_ready == false
+          ' "$RUNNER_TEMP/m3-current-conditional-loader-source-anchors.json" >/dev/null
+          echo "PASS: exact current FFmpeg/VA-API/GBM source blobs, named library literals and guarded loader callsites"
+          echo "LIMIT: no proof of runtime requested arguments, actual missing-provider fallback or indirect FFI closure"
+
       - name: Preserve bounded conditional native loader gap evidence only
         uses: actions/upload-artifact@v4
         with:
           name: m3-current-conditional-loader-source-linked-triage
-          path: ${{ runner.temp }}/m3-current-conditional-loader-triage.json
+          path: |
+            ${{ runner.temp }}/m3-current-conditional-loader-triage.json
+            ${{ runner.temp }}/m3-current-conditional-loader-source-anchors.json
           if-no-files-found: error
           retention-days: 14
