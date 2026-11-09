@@ -11,6 +11,10 @@ fi
 repo="$1"; shim="$2"; output="$3"
 test "$repo" = "$GITHUB_WORKSPACE"
 test "$(git -C "$repo" rev-parse HEAD)" = "$GITHUB_SHA"
+# A source-pinned already-compiled package may be replayed with a newer
+# verification harness. Preserve the original ELF source identity separately.
+compiled_source="${VULPRA_M3_COMPILED_SOURCE_SHA:-$GITHUB_SHA}"
+[[ "$compiled_source" =~ ^[0-9a-f]{40}$ ]]
 test -s "$shim" && test ! -L "$shim"
 test "$output" = "$RUNNER_TEMP/m3-packaged-wayland-provider-denial-runtime.json"
 test ! -e "$output"
@@ -80,10 +84,11 @@ for group in gbm vaapi ffmpeg; do
   echo "AUDIT: graphical Vulpra group=$group attached=$attached denied=$denied real_Wayland_frame=$passed"
   if test "$passed" != true || test "$attached" -eq 0; then break; fi
 done
-jq -s --arg source "$GITHUB_SHA" --arg archive "$archive" '{
+jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive "$archive" '{
   schema_version:1,
   status:"actual_packaged_graphical_Weston_Wayland_optional_provider_denial_probe",
   native_source_commit:$source,
+  test_harness_commit:$harness,
   verified_normal_packaged_archive_sha256:$archive,
   actual_graphical_packaged_Vulpra_executed:true,
   private_Weston_pixman_renderer_used:true,
