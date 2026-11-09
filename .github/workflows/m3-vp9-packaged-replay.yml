@@ -1,0 +1,140 @@
+# Reuse a source-pinned test-only browser package; never compile Firefox or release.
+name: M3 VP9 Packaged Media Replay (No Rebuild)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-packaged-ffmpeg-vp9-video.sh
+      - ci/m3-vp9-webm-outcome-audit.jq
+      - .github/workflows/m3-vp9-packaged-replay.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: vulpra-m3-vp9-package-replay
+  cancel-in-progress: false
+
+jobs:
+  replay-pinned-browser-media:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PINNED_NATIVE_RUN_ID: "42559566915"
+      PINNED_NATIVE_SOURCE_SHA: "a17ac58d694bf77c4da352ed7ab9b37233fbc01e"
+      PINNED_NATIVE_PACKAGE_SHA: "f92fe8c29843e7521ffe1ddd7cbbed8836ff9491228b182628973e8484ed1a41"
+      PINNED_TEST_PACKAGE_ARTIFACT: "m3-test-only-native-package-not-for-release"
+      VULPRA_M3_COMPILED_SOURCE_SHA: "a17ac58d694bf77c4da352ed7ab9b37233fbc01e"
+    steps:
+      - name: Checkout only corrected media harness and denial interposer
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-packaged-ffmpeg-vp9-video.sh
+            ci/m3-vp9-webm-outcome-audit.jq
+            ci/m3-deny-optional-native-providers.c
+            ci/tests/m3-vp9-webm-outcome-audit-tests.sh
+
+      - name: Install packaged browser runtime and VP9 test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends ffmpeg jq curl git libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+          bash -n ci/m3-packaged-ffmpeg-vp9-video.sh
+          bash ci/m3-packaged-ffmpeg-vp9-video.sh --self-test
+          bash ci/tests/m3-vp9-webm-outcome-audit-tests.sh
+
+      - name: Download and authenticate previous test-only native package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/vp9-replay-package"
+          gh run download "$PINNED_NATIVE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$PINNED_TEST_PACKAGE_ARTIFACT" \
+            --dir "$RUNNER_TEMP/vp9-replay-package"
+          mapfile -t packages < <(find "$RUNNER_TEMP/vp9-replay-package" \
+            -type f -name vulpra-local-m3-native-link-ci.tar.xz -print)
+          mapfile -t reports < <(find "$RUNNER_TEMP/vp9-replay-package" \
+            -type f -name m3-native-link-inputs.json -print)
+          test "${#packages[@]}" -eq 1
+          test "${#reports[@]}" -eq 1
+          package="${packages[0]}"
+          report="${reports[0]}"
+          sidecar="$package.sha256"
+          test -s "$sidecar"
+          (cd "$(dirname "$package")" && sha256sum -c "$(basename "$sidecar")")
+          test "$(sha256sum "$package" | cut -d' ' -f1)" = "$PINNED_NATIVE_PACKAGE_SHA"
+          jq -e --arg src "$PINNED_NATIVE_SOURCE_SHA" \
+            --arg sha "$PINNED_NATIVE_PACKAGE_SHA" \
+            --argjson run "$PINNED_NATIVE_RUN_ID" '
+            .source_commit==$src and
+            .package.package_sha256==$sha and
+            .workflow_run_id==$run and
+            .runtime_passed_after_link_audit==true and
+            .packaging_transform_replay.deterministic_reproduction_verified==true
+          ' "$report" >/dev/null
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp "$package" "$sidecar" "$dest/"
+          (cd "$dest" && sha256sum -c vulpra-local-m3-native-link-ci.tar.xz.sha256)
+          echo "PASS: source-pinned real native browser authenticated; no rebuild"
+
+      - name: Measure corrected VP9 decoded frames with FFmpeg available and denied
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror \
+            ci/m3-deny-optional-native-providers.c \
+            -o "$RUNNER_TEMP/m3-deny-native-providers.so" -ldl
+          bash ci/m3-packaged-ffmpeg-vp9-video.sh \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/m3-deny-native-providers.so" \
+            "$RUNNER_TEMP/geckodriver" \
+            "$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-video.json"
+          jq -e --arg compiled "$PINNED_NATIVE_SOURCE_SHA" \
+            --arg harness "$GITHUB_SHA" \
+            --arg archive "$PINNED_NATIVE_PACKAGE_SHA" '
+            .source_commit==$compiled and
+            .test_harness_commit==$harness and
+            .normal_packaged_archive_sha256==$archive and
+            .baseline_VP9_playback_passed==true and
+            .exact_source_private_webdriver_modes_safe==true and
+            .real_denied_FFmpeg_attempt_observed==true and
+            .specific_VP9_decoder_implementation_identified==false and
+            .alternative_H264_software_decoder_fallback_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false and .release_ready==false
+          ' "$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-video.json" >/dev/null
+          jq -e --arg expected_source_commit "$PINNED_NATIVE_SOURCE_SHA" \
+            --arg expected_package_sha256 "$PINNED_NATIVE_PACKAGE_SHA" \
+            -f ci/m3-vp9-webm-outcome-audit.jq \
+            "$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-video.json" \
+            > "$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-reconciled.json"
+          echo "PASS: actual source-pinned native browser VP9 playback evidence accepted"
+          echo "LIMIT: decoder identity, H264 replacement, VAAPI and M3 closure not proven"
+
+      - name: Preserve actual VP9 report even when media acceptance fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-source-pinned-vp9-packaged-replay-evidence
+          path: |
+            ${{ runner.temp }}/m3-packaged-ffmpeg-vp9-video.json
+            ${{ runner.temp }}/m3-packaged-ffmpeg-vp9-reconciled.json
+          if-no-files-found: warn
+          retention-days: 14
