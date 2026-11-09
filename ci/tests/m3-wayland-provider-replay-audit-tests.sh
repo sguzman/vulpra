@@ -63,6 +63,8 @@ jq -e '.real_private_Wayland_buffer_commits_verified==true and
   .gbm_missing_provider_path_tested==false and
   .vaapi_missing_provider_path_tested==false and
   .ffmpeg_missing_provider_path_tested==true and
+  .same_session_Wayland_frame_and_gbm_denial_observed==false and
+  .provider_denial_temporally_precedes_frame_proven==false and
   .actual_GPU_or_DMA_BUF_graphics_fallback_proven==false and
   .m3_sixth_gate_closed==false' "$work/valid-out.json" >/dev/null
 # An all-no-hit run may render Wayland, but proves no missing-provider branch.
