@@ -66,14 +66,15 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --name "$PINNED_TEST_PACKAGE_ARTIFACT" \
             --dir "$RUNNER_TEMP/wayland-replay-package"
-          mapfile -t packages < <(find "$RUNNER_TEMP/wayland-replay-package" \
-            -type f -name vulpra-local-m3-native-link-ci.tar.xz -print)
-          mapfile -t reports < <(find "$RUNNER_TEMP/wayland-replay-package" \
-            -type f -name m3-native-link-inputs.json -print)
-          test "${#packages[@]}" -eq 1
-          test "${#reports[@]}" -eq 1
-          pkg="${packages[0]}"
-          report="${reports[0]}"
+          test "$(find "$RUNNER_TEMP/wayland-replay-package" \
+            -type f -name vulpra-local-m3-native-link-ci.tar.xz | wc -l)" -eq 1
+          test "$(find "$RUNNER_TEMP/wayland-replay-package" \
+            -type f -name m3-native-link-inputs.json | wc -l)" -eq 1
+          pkg="$(find "$RUNNER_TEMP/wayland-replay-package" \
+            -type f -name vulpra-local-m3-native-link-ci.tar.xz -print -quit)"
+          report="$(find "$RUNNER_TEMP/wayland-replay-package" \
+            -type f -name m3-native-link-inputs.json -print -quit)"
+          test -s "$pkg" && test -s "$report"
           test -s "$pkg.sha256"
           (cd "$(dirname "$pkg")" && sha256sum -c "$(basename "$pkg").sha256")
           test "$(sha256sum "$pkg" | cut -d' ' -f1)" = "$PINNED_NATIVE_PACKAGE_SHA"
