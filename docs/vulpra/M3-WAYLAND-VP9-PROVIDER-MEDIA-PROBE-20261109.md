@@ -27,3 +27,29 @@ The [adversarial fixture suite](../../ci/tests/m3-wayland-vp9-provider-outcome-a
 For meaningful graphics evidence, separately establish what native provider loads occurred, whether actual VP9 and canvas worked in each mode, whether a real rendering device and compatible VA-API backend were present, and whether hardware software fallback actually ran. A successful Pixman frame with **VA-API 0** loads is **not** VA-API missing-provider coverage. Even positive matching denies do not prove which media code requested them or the hardware decoder identity without further source/runtime evidence.
 
 Target EndeavourOS/Hyprland acceptance, complete conditional/indirect and Rust/C++ FFI closure, security integration and release are still outstanding. **M3 5/6 (83%); overall 61%, Δ +0 pp.** No milestone gate is credited for a pending CI run.
+
+## Actual completed native browser result — 2026-11-09 UTC
+
+**The previously in-progress real browser run [42665579538 completed SUCCESS](https://github.com/sguzman/vulpra/actions/runs/42665579538)**. Every step completed: authenticating the retained native package, preparing private Weston, starting Vulpra via Geckodriver, checking VP9 decode/video pixel readback/WebGL2, and uploading the bounded runtime report. The original report was downloaded from artifact **13696587813**, parsed, and checked against its compiled source `a17ac58d694bf77c4da352ed7ab9b37233fbc01e`, harness `f8d16a0cb63686e750d97267d79043fd2b194a5d` and real test-only package SHA-256 `f92fe8c29843e7521ffe1ddd7cbbed8836ff9491228b182628973e8484ed1a41`. No browser rebuild or workstation installation occurred.
+
+| Actual non-headless graphical mode | Baseline | GBM/DRM denied | VA-API denied |
+| --- | ---: | ---: | ---: |
+| VP9/WebM decoded frames | **8** | **10** | **10** |
+| Advancing video `currentTime` | **0.524 s** | **0.522 s** | **0.562 s** |
+| Video intrinsic dimensions | 192×108 | 192×108 | 192×108 |
+| HTML media errors / rejected `play()` | None | None | None |
+| Video frame → 2D canvas pixel readback | **Pass** | **Pass** | **Pass** |
+| WebGL2 context creation | **Available** | **Available** | **Available** |
+| W3C WebDriver browser screenshot | Pass | Pass | Pass |
+| Browser/WebDriver alive, original temporary profile unchanged | Pass | Pass | Pass |
+| Denied matched native provider loads **before** media-page navigation | 0 | **1** | **0** |
+| Denied matched native provider loads **after** media-page navigation | 0 | **1** | **0** |
+| **Additional** matching loads during/after navigation | 0 | **0** | **0** |
+
+**Supported:** A real graphical Wayland Vulpra session with a matching GBM/DRM library request denied nevertheless decoded VP9 frames, advanced playback, read decoded video into a 2D canvas, created a WebGL2 context, produced an actual browser screenshot, and remained responsive with private-profile integrity. The observed **one** GBM/DRM denied request occurred **before page navigation**. Accordingly it is a *same-browser-session observed native load denial and later media playback*; it is not evidence the media page itself attempted GBM, nor identification of the specific `libgbm` versus `libdrm` SONAME.
+
+**Unsupported:** Under `VULPRA_M3_DENY_GROUP=vaapi`, the browser was instrumented but **zero** selected VA-API library requests were observed; the successful playback was not a VA-API denial fallback exercise. A created WebGL2 context is **not** proof of accelerated GPU execution or actual WebGL shader/texture rendering. 2D canvas readback does not identify the VP9 decoder. Pixman Weston is a software compositor; no native GPU/DMABuf allocation or VA-API device/backend was demonstrated. The run also lacks a full graphical same-surface Wayland attach+commit trace in this specific WebDriver experiment; that stronger graphical surface witness comes from the **separate** earlier [Weston graphical startup run 42662005847](https://github.com/sguzman/vulpra/actions/runs/42662005847).
+
+**Independent source/package/denial/media reconciliation:** a new read-only audit action at [`ci/m3-wayland-vp9-provider-outcome-audit.jq`](../../ci/m3-wayland-vp9-provider-outcome-audit.jq) was wired to download the actual successful run artifact after independently checking its run ID, completion status and `headSha`. It requires the exact observed counts above, source/package hashes, decoded-frame and media/canvas consistency, original profile safety, and explicitly false GPU/VA-API/FFI/pruning/release claims. The historical [fixture CI 42666160423 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/42666160423) independently rejected 27/27 forged metadata cases. The new actual-run reconciliation must be checked for its **own** success before counting independent acceptance.
+
+**Progress unchanged:** M3 **5/6 gates (83%)**, overall **61%, Δ+0 pp**; the outstanding sixth gate requires more than this single workload, notably target EndeavourOS/Hyprland graphics and complete feature/loader/FFI closure. There is no release approval or safe source-pruning authorization.
