@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
-      GH_TOKEN: ${ github.token }}
+      GH_TOKEN: ${{ github.token }}
       SOURCE_SHA: d7bf1cb73b384df047871d6b8c608312eb6cb5b4
       NATIVE_RUN_ID: "42546880350"
       NATIVE_RECONCILIATION_RUN_ID: "42551783346"
@@ -135,6 +135,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-current-real-packaged-provider-denial-reconciled
-          path: ${ runner.temp }}/m3-current-real-packaged-provider-denial-reconciled.json
+          path: ${{ runner.temp }}/m3-current-real-packaged-provider-denial-reconciled.json
           if-no-files-found: error
           retention-days: 14
