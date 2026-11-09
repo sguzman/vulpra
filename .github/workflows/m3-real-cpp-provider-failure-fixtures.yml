@@ -108,12 +108,31 @@ jobs:
             ci/tests/m3-current-real-cpp-missing-provider-fixture.cpp \
             -o "$RUNNER_TEMP/provider-missing-fixture"
           : > "$RUNNER_TEMP/provider-results.jsonl"
+          # Original ten run modes, then 17 additional required dlsym
+          # providers and one explicitly optional GBM modifier2 export.
+          # Each scenario starts a fresh process: no one-time loader state leak.
           for scenario in \
             va-no-hw va-no-rdd va-no-drm va-no-va va-no-symbol va-present \
-            gbm-no-gbm gbm-no-drm gbm-no-symbol gbm-present; do
+            gbm-no-gbm gbm-no-drm gbm-no-symbol gbm-present \
+            gbm-no-optional-modifier2; do
             "$RUNNER_TEMP/provider-missing-fixture" "$scenario" \
               >> "$RUNNER_TEMP/provider-results.jsonl"
           done
+          for required in \
+            gbm_device_destroy gbm_bo_create gbm_bo_create_with_modifiers \
+            gbm_bo_get_modifier gbm_bo_get_stride gbm_bo_get_fd \
+            gbm_bo_destroy gbm_bo_map gbm_bo_unmap gbm_bo_get_plane_count \
+            gbm_bo_get_handle_for_plane gbm_bo_get_stride_for_plane \
+            gbm_bo_get_offset gbm_device_is_format_supported drmPrimeHandleToFD \
+            gbm_surface_create gbm_surface_destroy; do
+            "$RUNNER_TEMP/provider-missing-fixture" "gbm-no-required-$required" \
+              >> "$RUNNER_TEMP/provider-results.jsonl"
+          done
+          # The original gbm-no-symbol scenario covers gbm_create_device.
+          if "$RUNNER_TEMP/provider-missing-fixture" gbm-no-required-fake_sym \
+            > /dev/null 2>&1; then
+            echo "FAIL: non-existent required GBM ABI symbol accepted" >&2; exit 1
+          fi
           if "$RUNNER_TEMP/provider-missing-fixture" fake-scenario \
             > /dev/null 2>&1; then
             echo "FAIL: unsupported runtime failure mode accepted" >&2; exit 1
@@ -121,10 +140,10 @@ jobs:
           jq -s --arg source "$COMPILED_SOURCE_SHA" \
             --argjson native "$NATIVE_RUN_ID" \
             --argjson reconciliation "$RECONCILIATION_RUN_ID" '
-              if length != 10 or
-                ([.[].scenario] | unique | length) != 10 or
-                ([.[] | select(.observed_load == true)] | length) != 2 or
-                ([.[] | select(.observed_load == false)] | length) != 8 or
+              if length != 28 or
+                ([.[].scenario] | unique | length) != 28 or
+                ([.[] | select(.observed_load == true)] | length) != 3 or
+                ([.[] | select(.observed_load == false)] | length) != 25 or
                 (all(.[]; .source_extracted_cpp_function_executed == true and
                   .provider_library_resolution_mocked == true and
                   .observed_load == .expected_load and
@@ -139,9 +158,11 @@ jobs:
                 exact_compiled_source_git_blobs_checked:2,
                 verbatim_cpp_source_functions_extracted:3,
                 real_original_cpp_function_bodies_compiled_and_executed:true,
-                mocked_provider_scenarios:10,
-                mocked_failure_and_guard_scenarios:8,
-                mocked_present_provider_scenarios:2,
+                mocked_provider_scenarios:28,
+                mocked_failure_and_guard_scenarios:25,
+                mocked_present_provider_scenarios:3,
+                all_18_required_gbm_dlsym_missing_one_at_a_time:true,
+                missing_optional_gbm_bo_create_with_modifiers2_tolerated:true,
                 source_extracted_loader_missing_provider_branches_exercised:true,
                 provider_library_resolution_mocked:true,
                 original_packaged_browser_executed_in_this_fixture:false,
@@ -161,13 +182,15 @@ jobs:
             .schema_version==1 and
             .status=="compiled_verbatim_source_cpp_loader_methods_exercised_with_mocked_missing_providers" and
             .verbatim_cpp_source_functions_extracted==3 and
-            .mocked_provider_scenarios==10 and
+            .mocked_provider_scenarios==28 and
+            .all_18_required_gbm_dlsym_missing_one_at_a_time==true and
+            .missing_optional_gbm_bo_create_with_modifiers2_tolerated==true and
             .source_extracted_loader_missing_provider_branches_exercised==true and
             .original_packaged_browser_executed_in_this_fixture==false and
             .Wayland_rendering_or_software_video_fallback_proven==false and
             .m3_sixth_gate_closed==false and .source_pruning_authorized==false
           ' "$RUNNER_TEMP/m3-real-cpp-missing-provider-fixtures.json" >/dev/null
-          echo "PASS: original compiled-source C++ VA-API and GBM methods executed in 10 isolated mock-provider scenarios"
+          echo "PASS: original compiled-source C++ VA-API and GBM methods executed in 28 isolated mock-provider scenarios"
           echo "LIMIT: source-body runtime only; no browser binary, host library ABI, live video or Wayland fallback validated"
 
       - name: Preserve bounded mocked provider failure evidence only
