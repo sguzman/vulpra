@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - ci/m3-packaged-ffmpeg-vp9-video.sh
+      - ci/m3-vp9-webm-outcome-audit.jq
+      - ci/tests/m3-vp9-webm-outcome-audit-tests.sh
       - .github/workflows/m3-vp9-webm-media-preflight.yml
   workflow_dispatch:
 permissions:
@@ -22,6 +24,15 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/m3-packaged-ffmpeg-vp9-video.sh
+            ci/m3-vp9-webm-outcome-audit.jq
+            ci/tests/m3-vp9-webm-outcome-audit-tests.sh
+      - name: Reject twenty falsified VP9 playback loader and integrity reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/tests/m3-vp9-webm-outcome-audit-tests.sh
+          bash ci/tests/m3-vp9-webm-outcome-audit-tests.sh
+
       - name: Encode actual bounded WebM VP9 media and reject invalid browser inputs
         shell: bash
         run: |
