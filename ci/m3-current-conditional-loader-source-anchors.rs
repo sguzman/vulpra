@@ -98,6 +98,12 @@ fn bounded_func<'a>(source: &'a str, rule: &Rule) -> Result<&'a str, String> {
     if body.matches("return false;").count() != rule.expected_false_returns {
         return Err(format!("{}: conditional failure-exit count changed", rule.id));
     }
+    // The GBM loader has *two* return sLoaded paths: a repeated load
+    // short-circuit and the final availability decision. Losing either one
+    // must fail the semantic negative fixture even if the other remains.
+    if rule.id == "gbm_widget" && body.matches("return sLoaded;").count() != 2 {
+        return Err("GBM duplicate state-return path count changed".into());
+    }
     for token in rule.tokens {
         if !body.contains(token) {
             return Err(format!("{}: source guard/library/failure anchor missing: {token}", rule.id));
