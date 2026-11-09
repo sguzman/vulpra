@@ -1,0 +1,52 @@
+# Hardware-neutral syntax and fail-closed inventory tests only. Never
+# accesses owner's workstation, hardware GPU/VAAPI, installs or builds Firefox.
+name: M3 Target Wayland GPU Readiness Self-Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/m3-arch-wayland-gpu-readiness.sh
+      - .github/workflows/m3-arch-wayland-gpu-readiness.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  passive-target-readiness-contract:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout only read-only hardware inventory
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-arch-wayland-gpu-readiness.sh
+      - name: Verify no privilege, installs or hardware inference
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/m3-arch-wayland-gpu-readiness.sh
+          bash ci/m3-arch-wayland-gpu-readiness.sh --self-test
+          bash ci/m3-arch-wayland-gpu-readiness.sh --inspect |
+            jq -e '
+              .schema_version==1 and
+              .real_GPU_or_video_decoder_initialized==false and
+              .actual_render_node_opened==false and
+              .VAAPI_native_provider_loaded_or_denied==false and
+              .DMA_BUF_buffer_allocated_and_compositor_imported==false and
+              .accelerated_WebGL2_draw_presented==false and
+              .compiled_Vulpra_executed==false and
+              .m3_sixth_gate_closed==false and
+              .source_pruning_authorized==false and
+              .release_ready==false
+            ' >/dev/null
+          if bash ci/m3-arch-wayland-gpu-readiness.sh --unexpected >/dev/null 2>&1; then
+            echo "FAIL: accepted unapproved active probe mode" >&2
+            exit 1
+          fi
+          echo "PASS: read-only inventory tool is safe to offer for opt-in target QA"
+          echo "LIMIT: Ubuntu software runner is not owner's NVIDIA/Hyprland hardware"
