@@ -5,6 +5,11 @@
 set -euo pipefail
 filter=ci/m3-h264-video-outcome-audit.jq
 test -s "$filter"
+audit() {
+  jq -e --arg expected_source_commit "$(printf 'a%.0s' {1..40})" \
+    --arg expected_package_sha256 "$(printf 'b%.0s' {1..64})" \
+    -f "$filter" "$1"
+}
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 jq -n '{
@@ -60,7 +65,7 @@ jq -n '{
     }
   ]
 }' > "$work/original.json"
-jq -e -f "$filter" "$work/original.json" > "$work/first.json"
+audit "$work/original.json" > "$work/first.json"
 jq -e '
   .actual_normal_H264_frames_and_time_verified == true and
   .observed_denied_ffmpeg_loads_in_session==14 and
@@ -81,7 +86,7 @@ jq '.modes[1].ffmpeg_denials_after_video_navigation=16 |
     .modes[1].new_denials_during_video_navigation=2 |
     .denied_FFmpeg_loader_attempts=16 |
     .denial_attempts_after_video_navigation=2' "$work/original.json" > "$work/post-nav.json"
-jq -e -f "$filter" "$work/post-nav.json" > "$work/second.json"
+audit "$work/post-nav.json" > "$work/second.json"
 jq -e '
   .ffmpeg_additional_denials_observed_after_media_navigation==2 and
   .additional_ffmpeg_denials_observed_after_media_navigation==true and
@@ -101,7 +106,7 @@ jq '.modes[1].observed_video_state={
      .modes[1].media_error_observed=false |
      .denied_H264_playback_passed=true |
      .denied_H264_media_error_observed=false' "$work/post-nav.json" > "$work/playable.json"
-jq -e -f "$filter" "$work/playable.json" > "$work/third.json"
+audit "$work/playable.json" > "$work/third.json"
 jq -e '
   .H264_decoding_with_FFmpeg_denied_measured==true and
   .additional_ffmpeg_denials_observed_after_media_navigation==true and
@@ -113,7 +118,7 @@ count=0
 reject() {
   local alteration="$1"
   jq "$alteration" "$work/original.json" > "$work/forged.json"
-  if jq -e -f "$filter" "$work/forged.json" > "$work/accepted-bad.json" 2>/dev/null; then
+  if audit "$work/forged.json" > "$work/accepted-bad.json" 2>/dev/null; then
     echo "FAIL: forged H264 evidence accepted: $alteration" >&2
     exit 1
   fi
