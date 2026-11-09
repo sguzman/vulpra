@@ -41,6 +41,7 @@ std::vector<std::string> attempted;
 int codecs_initialized=0;
 int encoders_initialized=0;
 size_t successful_candidate=static_cast<size_t>(-1);
+size_t initially_forced_link_candidates=0;
 int mock_library=1;
 using PRLibrary=void;
 struct PRLibSpec { int type; struct {const char* pathname;} value; };
@@ -50,7 +51,7 @@ static PRLibrary* mocked_load(PRLibSpec spec, int flags) {
   assert(flags==(PR_LD_NOW|PR_LD_LOCAL));
   attempted.emplace_back(spec.value.pathname);
   if (attempted.size()-1==successful_candidate ||
-      (FFmpegLibWrapper::link_policy && attempted.size()<=2))
+      (attempted.size()<=initially_forced_link_candidates))
     return &mock_library;
   return nullptr;
 }
@@ -145,6 +146,8 @@ int main(int argc,char** argv) {
     want_link_calls=2;
   } else return fail(scenario,"unrecognized fixture case");
   FFmpegLibWrapper::link_policy=(active==Scenario::MissingAll)?nullptr:policy;
+  initially_forced_link_candidates=(active==Scenario::BadThenSuccess ||
+     active==Scenario::InvalidPriority)?2:0;
   // Expected Linux candidate count = 14 entries in original source array.
   if (std::size(sLibs)!=14) return fail(scenario,"native Linux FFmpeg candidate count changed");
   bool actual=FFmpegRuntimeLinker::Init();
