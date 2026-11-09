@@ -218,34 +218,34 @@ jobs:
             exit 1
           fi
           jq -s --arg sha "$COMPILED_SOURCE_SHA" '
-            if length != 5 or
-               ([.[].mode] | unique | length) != 5 or
-               (all(.[]; .original_source_inline_wrapper_executed == true and
+            if (
+               length == 5 and
+               ([.[].mode] | unique | length) == 5 and
+               all(.[]; .original_source_inline_wrapper_executed == true and
                  .provider_symbols_mocked == true and
                  .actual_gbm_library_used == false and
                  .actual_dmabuf_buffer_created == false and
-                 .packaged_browser_gpu_fallback_verified == false)) | not or
-               (any(.[]; .mode == "null-device" and
+                 .packaged_browser_gpu_fallback_verified == false) and
+               any(.[]; .mode == "null-device" and
                  .old_modifiers_api_calls == 0 and .new_modifiers2_api_calls == 0 and
-                 .null_result == true)) | not or
-               (any(.[]; .mode == "older-api-fallback" and
+                 .null_result == true) and
+               any(.[]; .mode == "older-api-fallback" and
                  .old_modifiers_api_calls == 1 and .new_modifiers2_api_calls == 0 and
                  .missing_optional_api_old_fallback_executed == true and
-                 .null_result == false)) | not or
-               (any(.[]; .mode == "newer-api-preferred" and
+                 .null_result == false) and
+               any(.[]; .mode == "newer-api-preferred" and
                  .old_modifiers_api_calls == 0 and .new_modifiers2_api_calls == 1 and
                  .missing_optional_api_old_fallback_executed == false and
-                 .null_result == false)) | not or
-               (any(.[]; .mode == "older-api-failure" and
+                 .null_result == false) and
+               any(.[]; .mode == "older-api-failure" and
                  .old_modifiers_api_calls == 1 and .new_modifiers2_api_calls == 0 and
                  .missing_optional_api_old_fallback_executed == true and
-                 .null_result == true)) | not or
-               (any(.[]; .mode == "newer-api-failure" and
+                 .null_result == true) and
+               any(.[]; .mode == "newer-api-failure" and
                  .old_modifiers_api_calls == 0 and .new_modifiers2_api_calls == 1 and
                  .missing_optional_api_old_fallback_executed == false and
-                 .null_result == true)) | not
-            then error("Verbatim inline GBM fallback or distinct failure path was not proven")
-            else {
+                 .null_result == true)
+            ) then {
               schema_version:1,
               status:"exact_source_inline_gbm_optional_modifiers_fallback_executed_with_mocked_abis",
               authentic_original_native_source_commit:$sha,
@@ -264,7 +264,7 @@ jobs:
               m3_sixth_gate_closed:false,
               release_ready:false,
               cases:.
-            } end
+            } else error("Verbatim inline GBM fallback or distinct failure path was not proven") end
           ' "$RUNNER_TEMP/gbm-inline-fallback-modes.jsonl" \
             > "$RUNNER_TEMP/m3-gbm-inline-modifier-fallback.json"
           jq -e '
