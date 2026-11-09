@@ -8,6 +8,7 @@ on:
       - ci/m3-deny-optional-native-providers.c
       - ci/tests/m3-native-provider-denial-fixture.c
       - ci/m3-smoke-packaged-optional-provider-denial.sh
+      - ci/m3-smoke-packaged-wayland-provider-denial.sh
       - .github/workflows/m3-optional-provider-denial-fixtures.yml
   workflow_dispatch:
 
@@ -28,16 +29,22 @@ jobs:
             ci/m3-deny-optional-native-providers.c
             ci/tests/m3-native-provider-denial-fixture.c
             ci/m3-smoke-packaged-optional-provider-denial.sh
+            ci/m3-smoke-packaged-wayland-provider-denial.sh
       - name: Validate isolated packaged-browser driver shell syntax
         shell: bash
         run: |
           set -euo pipefail
           bash -n ci/m3-smoke-packaged-optional-provider-denial.sh
+          bash -n ci/m3-smoke-packaged-wayland-provider-denial.sh
           if bash ci/m3-smoke-packaged-optional-provider-denial.sh               > /dev/null 2>&1; then
             echo "FAIL: accepted missing packaged-runtime inputs" >&2
             exit 1
           fi
-          echo "PASS: strict packaged-runtime denial harness syntax and invalid-input guard"
+          if bash ci/m3-smoke-packaged-wayland-provider-denial.sh > /dev/null 2>&1; then
+            echo "FAIL: accepted missing graphical packaged runtime inputs" >&2
+            exit 1
+          fi
+          echo "PASS: both headless and true graphical Wayland denial harnesses have valid syntax and reject missing inputs"
       - name: Compile C ABI loader shim and known native ELF fixtures
         shell: bash
         run: |
