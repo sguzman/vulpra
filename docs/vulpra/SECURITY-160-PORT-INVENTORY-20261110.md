@@ -106,3 +106,32 @@ A second review checked all **21 other modified code/configuration paths** again
 These are **source migration work items, not license to delete resources**. Their old Vulpra versions are not automatically valid in Firefox 160. Even after resolving all nine, complete 160 source registration, the changed/new file tree, protected features and actual native browser build/runtime remain mandatory.
 
 **Source-stage coverage: 17/26 modified code/configuration files; 9/26 still unresolved, 0 native Firefox 160 browser acceptance.** This count measures only selected source-overlay analysis; it is **not** a new project percentage or a security readiness claim. Overall project/M3 checkpoint remains **61% / 83%**.
+
+
+## Third port pass: 21 verified source-stage files (2026-11-10)
+
+After the 17-source-file pass, four further upstream-changed files were migrated as small, exact, targeted patches against authentic Firefox 160 sources, **never** by copying complete older source files onto new ones:
+
+| Newly staged file | Verified Vulpra 159 delta and Firefox 160 preservation |
+| --- | --- |
+| `toolkit/components/moz.build` | Exact original Vulpra beta delta is a split `DIRS += ["messaging-system", "normandy"]` with comments explaining the experimental no-Normandy helper-jar pathway. Applied to Firefox 160 while explicitly retaining the newly added `widgets` component registration. |
+| `browser/components/asrouter/modules/ASRouter.sys.mjs` | Exactly two original Vulpra 159 promo-call guards (`SidebarChatBotPromo` and `SmartWindowNewTabPromo`) were isolated and shown to reproduce Mozilla 159 beta byte-for-byte when removed. Firefox 160 retains both original call sites; only the guards were reintroduced. |
+| `python/mozbuild/mozbuild/frontend/emitter.py` | Exactly one original Vulpra modification to skip test-manifest processing when `ENABLE_TESTS` is false was isolated. Reinserted into Firefox 160's changed emitter at its unique function entry, retaining all newer source logic. A Python compile check additionally passed. |
+| `taskcluster/kinds/toolchain/android.yml` | Two identical old Vulpra substitutions remove references to absent Android Gradle-plugin source files; both replacements were validated by byte-for-byte restoration of the original Mozilla 159 beta file. Firefox 160 still has both source blocks. The adaptation **retains Firefox 160's newly added Robolectric toolchain job**, rather than overwriting the entire file. |
+
+Every source preimage and generated postimage was checked by **exact SHA-1 Git blob identity**, not expected-string presence alone. The full isolated stage preserves original Vulpra and Mozilla checkouts and refuses source-tree output paths before creating anything.
+
+- [18-file isolated overlay CI **42910079463 PASS**](https://github.com/sguzman/vulpra/actions/runs/42910079463)
+- [19-file isolated overlay CI **42910267959 PASS**](https://github.com/sguzman/vulpra/actions/runs/42910267959)
+- [20-file isolated overlay + Python syntax CI **42910531243 PASS**](https://github.com/sguzman/vulpra/actions/runs/42910531243)
+- [21-file isolated overlay CI **42910773551 PASS**](https://github.com/sguzman/vulpra/actions/runs/42910773551)
+
+### Remaining five code/config migration tasks
+
+1. `browser/extensions/newtab/lib/ActivityStream.sys.mjs` — integrate modern Firefox 160 lifecycle/state and Vulpra's optional New Tab ads/promo gates.
+2. `browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs` — preserve new 160 Discovery Stream behavior while reworking opt-in filters.
+3. `browser/extensions/newtab/lib/TopSitesFeed.sys.mjs` — preserve 160 Top Sites handling while reworking sponsored-site opt-in source.
+4. `browser/extensions/newtab/webext-glue/moz.build` — old Vulpra explicit library allowlist must be reconciled against 160's new preview-string resource stanza; verify resource availability. Do not overwrite the new `newtabPreview.ftl` packaging.
+5. `toolkit/components/normandy/jar.mn` — **confirmed source incompatibility**: old Vulpra's optional no-Normandy manifest references `toolkit/components/normandy/lib/ClientEnvironment.sys.mjs`; this path does **not exist** in the authenticated Firefox 160 release, though `NormandyApi.sys.mjs`, `NormandyUtils.sys.mjs`, and `schemas/LegacyHeartbeat.schema.json` do. Requires new component/resource graph analysis rather than reusing the old manifest.
+
+The above are port obligations, not proof of failing runtime behavior. **21/26** modified browser/code/config files have isolated, exact-source migration overlays. Five remain, and the **entire Firefox 160 browser tree has not been assembled, configured, compiled, packaged, or runtime-tested**. No source-pruning, security-current, release, or M3 closure claimed. Overall **61% (Δ+0 pp)**, M3 **83% (5/6)**.
