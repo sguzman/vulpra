@@ -466,6 +466,24 @@ if grep -Fq 'normandy-content' "$dest/toolkit/components/normandy/jar.mn"; then
   fail 'removed upstream Normandy content package was reintroduced'
 fi
 
-echo 'PASS: twenty-six exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# Two Vulpra-added browser/toolkit sources are absent from upstream 160,
+# confirmed via the FULL 160 commit Git tree (not the sparse working tree).
+# Preserve their exact known Git objects as independent opt-in files only.
+# Project CI, packaging, import scripts, and old sourcestamp are not engine
+# overlays and must NEVER be copied into the 160 source by this workflow.
+for record in \
+  'browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx 717e107fa4af5dbffbb0b98083fe84bc5f0c6705' \
+  'toolkit/components/nimbus/NimbusBootstrap.sys.mjs df7e5b95aa96d930550d794753c1acef942c70da'; do
+  read -r path sha <<< "$record"
+  test -n "$path" && test -n "$sha" || fail 'bad added-source record'
+  test -z "$(git -C "$upstream" ls-tree -r --name-only HEAD -- "$path")" ||
+    fail "Vulpra added source would overwrite official Firefox 160 file: $path"
+  hash_is "$repo/$path" "$sha"
+  mkdir -p -- "$dest/$(dirname -- "$path")"
+  cp -- "$repo/$path" "$dest/$path"
+  hash_is "$dest/$path" "$sha"
+done
+
+echo 'PASS: twenty-eight exact-source Firefox 160 overlay files staged: 26 adapted existing + 2 Vulpra-added'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
