@@ -306,6 +306,82 @@ hash_is "$dest/taskcluster/kinds/toolchain/android.yml" 2b2f399363ffdb14c5c96e5f
 grep -Fq 'linux64-android-robolectric-jars:' "$dest/taskcluster/kinds/toolchain/android.yml" ||
   fail 'Firefox 160 Robolectric build job missing from adapted source'
 
-echo 'PASS: twenty-one exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# New Tab: exact Vulpra 159 beta delta is an optional AdsFeed factory
+# suppression in FEEDS_CONFIG. Keep all Firefox 160 feed lifecycle changes.
+hash_is "$repo/browser/extensions/newtab/lib/ActivityStream.sys.mjs" e0b0eef5a3f4a9814888b60f5617d105db739454
+hash_is "$upstream/browser/extensions/newtab/lib/ActivityStream.sys.mjs" 6fd9e6c62769bc435577280d468eba1f387ff0f8
+mkdir -p -- "$dest/browser/extensions/newtab/lib"
+awk '
+  {
+    print
+    if ($0 == "for (const config of FEEDS_DATA) {") {
+      print "  // Preserve all other New Tab feeds; this opt-in Linux variant does not"
+      print "  // register or instantiate the independently packaged sponsored AdsFeed."
+      print "  if (AppConstants.VULPRA_NO_NEWTAB_ADSFEED && config.name === \"adsfeed\") {"
+      print "    continue;"
+      print "  }"
+      count++
+    }
+  }
+  END { if (count != 1) exit 1 }
+' "$upstream/browser/extensions/newtab/lib/ActivityStream.sys.mjs" > "$dest/browser/extensions/newtab/lib/ActivityStream.sys.mjs"
+hash_is "$dest/browser/extensions/newtab/lib/ActivityStream.sys.mjs" 96c542d338f72c22f448a799e6b1b2a569c8c6f3
+
+# Discovery Stream: original Vulpra beta delta was one lazy AppConstants getter
+# and two AdsFeed-enabled checks. Never replace 160 story/personalization logic.
+hash_is "$repo/browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs" aa6239b92899d0ee3a0a57a6023d89109eb8829f
+hash_is "$upstream/browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs" 802fd3265b77c55597a7e0d9f5f8cc35a3a21130
+awk '
+  {
+    if ($0 == "  AdsClient: \"resource://newtab/lib/AdsClient.sys.mjs\",") {
+      print "  AppConstants: \"resource://gre/modules/AppConstants.sys.mjs\","
+      count_import++
+    }
+    if ($0 == "    const adsFeedEnabled =") {
+      print "    // No AdsFeed factory exists in the opt-in package even if Nimbus/remote"
+      print "    // prefs enable this upstream pref. Use the retained direct-fetch/AdsClient"
+      print "    // path instead of reading a nonexistent state.Ads payload."
+      print
+      print "      !lazy.AppConstants.VULPRA_NO_NEWTAB_ADSFEED &&"
+      count_cached++
+    } else if ($0 == "    const adsFeedEnabled = state.Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];") {
+      print "    const adsFeedEnabled ="
+      print "      !lazy.AppConstants.VULPRA_NO_NEWTAB_ADSFEED &&"
+      print "      state.Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];"
+      count_delete++
+    } else {
+      print
+    }
+  }
+  END { if (count_import != 1 || count_cached != 1 || count_delete != 1) exit 1 }
+' "$upstream/browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs" > "$dest/browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs"
+hash_is "$dest/browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs" 2f4046cdf9d02cef0260da14acd4fd7c859cf854
+
+# TopSites: original Vulpra beta delta was one lazy AppConstants getter and
+# one optional AdsFeed check. Preserve new 160 Top Sites application logic.
+hash_is "$repo/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs" 25ece297c5c5e3a4495d1d89c1103c3c52c8ec13
+hash_is "$upstream/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs" 3510f65e71cd4f250f5fc6b591e0096ee5276015
+awk '
+  {
+    if ($0 == "  AdsClient: \"resource://newtab/lib/AdsClient.sys.mjs\",") {
+      print "  AppConstants: \"resource://gre/modules/AppConstants.sys.mjs\","
+      count_import++
+    }
+    if ($0 == "    const adsFeedEnabled = state.Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];") {
+      print "    // Even when a remote pref enables AdsFeed, the opt-in build never"
+      print "    // registers its factory. Fall back to existing direct/AdsClient tiles."
+      print "    const adsFeedEnabled ="
+      print "      !lazy.AppConstants.VULPRA_NO_NEWTAB_ADSFEED &&"
+      print "      state.Prefs.values[PREF_UNIFIED_ADS_ADSFEED_ENABLED];"
+      count_ads++
+    } else {
+      print
+    }
+  }
+  END { if (count_import != 1 || count_ads != 1) exit 1 }
+' "$upstream/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs" > "$dest/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs"
+hash_is "$dest/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs" c68ac1440fe93656a563210ecb9d55d79760a573
+
+echo 'PASS: twenty-four exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
