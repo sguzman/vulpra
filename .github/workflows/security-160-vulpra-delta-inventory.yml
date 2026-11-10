@@ -1,0 +1,72 @@
+name: Firefox 160 Upgrade — Complete Vulpra 159 Delta Inventory
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - ci/security-160-vulpra-delta-inventory.sh
+      - .github/workflows/security-160-vulpra-delta-inventory.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare-two-complete-source-git-trees:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout only Vulpra inventory helper; keep source sparse
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-vulpra-delta-inventory.sh
+      - name: Fetch official Mozilla beta commit/tree metadata, without blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-vulpra-delta-inventory.sh
+          git fetch --no-tags --filter=blob:none --depth=1 \
+            https://github.com/mozilla-firefox/firefox.git \
+            refs/tags/FIREFOX_159_0b5_RELEASE
+          base="$(git rev-parse FETCH_HEAD)"
+          test "$base" = 34ac0671eb25f31f8c56ace36e1c413dd471eb8d
+          git cat-file -e "$base^{tree}"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          echo 'PASS: authenticated upstream Firefox 159.0b5 tree and exact Vulpra source commit'
+      - name: Enumerate complete Vulpra modifications without contents checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/vulpra-beta-delta"
+          bash ci/security-160-vulpra-delta-inventory.sh --inventory \
+            34ac0671eb25f31f8c56ace36e1c413dd471eb8d "$output"
+          jq -e --arg sha "$GITHUB_SHA" '
+            .source_commit == $sha and
+            .counts.total > 0 and
+            (.counts.added + .counts.deleted + .counts.modified + .counts.type_changed) == .counts.total and
+            .tree_diff_was_complete == true and
+            .complete_rebase_plan == false and .firefox_160_upgrade_performed == false and
+            .security_current == false
+          ' "$output/vulpra-full-delta-summary.json" >/dev/null
+          test "$(wc -l < "$output/vulpra-modifications-vs-mozilla-159-beta.tsv")" -eq \
+            "$(($(jq -r '.counts.total' "$output/vulpra-full-delta-summary.json")+1))"
+          if bash ci/security-160-vulpra-delta-inventory.sh --inventory \
+            2887d9de1f69c0e9776413da80e7ba0d1225dd9b "$RUNNER_TEMP/wrong-ref" >/dev/null 2>&1; then
+            echo 'FAIL: accepted wrong Mozilla release as beta source' >&2
+            exit 1
+          fi
+          git diff --exit-code
+          echo 'PASS: complete tree-only change inventory and negative-ref rejection'
+          echo 'LIMIT: changes include CI/docs, not a completed Firefox 160 migration'
+      - name: Publish bounded inventory for upstream migration
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra159-full-delta-git-tree-inventory
+          path: |
+            ${{ runner.temp }}/vulpra-beta-delta/vulpra-full-delta-summary.json
+            ${{ runner.temp }}/vulpra-beta-delta/vulpra-modifications-vs-mozilla-159-beta.tsv
+            ${{ runner.temp }}/vulpra-beta-delta/directory-change-counts.tsv
+          if-no-files-found: error
+          retention-days: 30
