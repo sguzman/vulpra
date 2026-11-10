@@ -4,6 +4,8 @@ on:
     branches: [upgrade/firefox-160-overlay-prototype]
     paths:
       - ci/security-160-stage-overlay.sh
+      - browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx
+      - toolkit/components/nimbus/NimbusBootstrap.sys.mjs
       - toolkit/components/moz.build
       - toolkit/components/normandy/jar.mn
       - browser/extensions/newtab/webext-glue/moz.build
@@ -34,7 +36,7 @@ on:
 permissions:
   contents: read
 jobs:
-  stage-twenty-six-exact-source-overlays:
+  stage-twenty-eight-exact-source-overlays:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -73,6 +75,8 @@ jobs:
             toolkit/components/nimbus/moz.build
             toolkit/components/normandy/moz.build
             toolkit/modules/AppConstants.sys.mjs
+            browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx
+            toolkit/components/nimbus/NimbusBootstrap.sys.mjs
             ci/security-160-stage-overlay.sh
       - name: Checkout exact official Firefox 160 source files (separate tree)
         uses: actions/checkout@v4
@@ -113,18 +117,20 @@ jobs:
             toolkit/components/normandy/moz.build
             toolkit/modules/AppConstants.sys.mjs
             browser/app/profile/firefox.js
-      - name: Stage twenty-six exact-overlaid files into private runner temp ONLY
+      - name: Stage twenty-eight exact-overlaid files into private runner temp ONLY
         shell: bash
         run: |
           set -euo pipefail
           bash -n ci/security-160-stage-overlay.sh
           out="$RUNNER_TEMP/vulpra160-overlays"
           bash ci/security-160-stage-overlay.sh --stage "$GITHUB_WORKSPACE/firefox160" "$out"
-          test "$(find "$out" -type f | wc -l)" -eq 26
+          test "$(find "$out" -type f | wc -l)" -eq 28
           grep -Fqx 'MOZ_APP_DISPLAYNAME=Vulpra' "$out/browser/branding/unofficial/configure.sh"
           grep -Fqx -- '-brand-short-name = Vulpra' "$out/browser/branding/unofficial/locales/en-US/brand.ftl"
           grep -Fqx 'pref("general.useragent.compatMode.firefox", true);' "$out/browser/app/profile/firefox.js"
           python3 -m py_compile "$out/python/mozbuild/mozbuild/frontend/emitter.py"
+          node --check "$out/toolkit/components/nimbus/NimbusBootstrap.sys.mjs"
+          node --check --input-type=module < "$out/browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx"
           node --check "$out/browser/extensions/newtab/lib/ActivityStream.sys.mjs"
           node --check "$out/browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs"
           node --check "$out/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs"
@@ -152,5 +158,5 @@ jobs:
           test ! -e "$forbidden"
           git -C "$GITHUB_WORKSPACE/firefox160" diff --exit-code
           git diff --exit-code
-          echo 'PASS: 26 exact-source overlays, no source mutation, no dirty checkout, rejected 3 unsafe output locations'
+          echo 'PASS: 28 exact-source overlays, no source mutation, no dirty checkout, rejected 3 unsafe output locations'
           echo 'LIMIT: isolated overlay staging, not a complete Firefox 160 engine port or security-current browser'
