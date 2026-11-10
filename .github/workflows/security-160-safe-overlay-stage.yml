@@ -104,7 +104,16 @@ jobs:
             echo 'FAIL: accepted live Vulpra source as output' >&2
             exit 1
           fi
+          # A *nonexistent* nested source target must be rejected BEFORE
+          # mkdir, not merely rejected after leaving an untracked directory.
+          forbidden="$GITHUB_WORKSPACE/should-never-be-created-by-overlay"
+          test ! -e "$forbidden"
+          if bash ci/security-160-stage-overlay.sh --stage "$GITHUB_WORKSPACE/firefox160" "$forbidden" >/dev/null 2>&1; then
+            echo 'FAIL: accepted new output path nested inside Vulpra source' >&2
+            exit 1
+          fi
+          test ! -e "$forbidden"
           git -C "$GITHUB_WORKSPACE/firefox160" diff --exit-code
           git diff --exit-code
-          echo 'PASS: 17 exact-source overlays, no source mutation, no dirty checkout, rejected 2 unsafe output locations'
+          echo 'PASS: 17 exact-source overlays, no source mutation, no dirty checkout, rejected 3 unsafe output locations'
           echo 'LIMIT: isolated overlay staging, not a complete Firefox 160 engine port or security-current browser'
