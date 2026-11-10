@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "kind": "vulpra_159_postbeta_hotfix_source_port",
+  "baseline_commit": "b100f0ba13b62021544bc5cf5a9a75b810447427",
+  "upstream_beta_tag": "FIREFOX_159_0b5_RELEASE",
+  "upstream_release_tag": "FIREFOX_159_0_1_RELEASE",
+  "patch_commits": [
+    {
+      "cve": "CVE-2026-117860",
+      "bug": 2046558,
+      "upstream_commit": "9a2dc53c369c7ae5172018b35988e1d2ffeff402",
+      "affected_existing_files": 14
+    },
+    {
+      "cve": "CVE-2026-120572",
+      "bug": 2079035,
+      "upstream_commit": "603a78af8401f8f30c388b3fa330589e35d8b727",
+      "affected_existing_files": 3
+    }
+  ],
+  "patched_files": [
+    {
+      "cve": "CVE-2026-117860",
+      "path": "docshell/base/BrowsingContext.cpp",
+      "preimage_sha": "241224f6f85318ae068b2a8d5c0890db0c9e4bbc",
+      "upstream_fixed_sha": "0986f712c9246d9dee01a95237eb1b69e4b8349e",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "docshell/base/CanonicalBrowsingContext.cpp",
+      "preimage_sha": "e0f4a668c6d267e98ad52b1435f5d10b028b8679",
+      "upstream_fixed_sha": "86b2939a83873627e79ec19b87d13008e2e2109d",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "docshell/base/CanonicalBrowsingContext.h",
+      "preimage_sha": "49a31c22232fe65703d5fc2b8f9ea5cfb398e8b7",
+      "upstream_fixed_sha": "4f00705f303872577da41df1d171c95425e3716a",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "docshell/shistory/SessionHistoryEntry.cpp",
+      "preimage_sha": "319f965e0b779d7972893ab97a6982219f51beb9",
+      "upstream_fixed_sha": "a16e4ec279d722fffbdaf797033f73bb66b9c928",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "docshell/shistory/SessionHistoryEntry.h",
+      "preimage_sha": "2ee5b72e867132ff878d879d336c4c8c7b6436f3",
+      "upstream_fixed_sha": "68e46ffedaf290a27e0bff507f8aca33f52b016b",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "docshell/shistory/nsSHEntryShared.h",
+      "preimage_sha": "558a36de625e72324b60729a410ebc22391b7b7d",
+      "upstream_fixed_sha": "368acfaf59cb92263684cce26c2426cb4079caf0",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "dom/ipc/ContentParent.cpp",
+      "preimage_sha": "3e8987e97db1c14dba93f8e0a1132d20c386aea7",
+      "upstream_fixed_sha": "e7ac12f052d64e780d36eceeb43d3308a5550b0e",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "dom/ipc/ContentParent.h",
+      "preimage_sha": "f2ef070f7124ce5b0d4e6ecf55e6088f42562730",
+      "upstream_fixed_sha": "cffb55b774c4ae34f377aeaa8241b2461a28e265",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "dom/ipc/PContent.ipdl",
+      "preimage_sha": "e41cbabe7103c4a7941d10b94262229500a3e87c",
+      "upstream_fixed_sha": "3715db0dc9dd7411b6104a6dcf869427bb127f29",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "dom/ipc/ParentProcessChannelHandle.cpp",
+      "preimage_sha": "1afc0cb89f74879d3e85207ea36712f3c5c84a4e",
+      "upstream_fixed_sha": "286d235f594175e8ca0aca44234e94f7b0b55f69",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "dom/ipc/ParentProcessChannelHandle.h",
+      "preimage_sha": "ef6f7a71cd92ecf9031c3d29231d201ea59b5125",
+      "upstream_fixed_sha": "0b1fcd547ed54497cdf6e932a98eb9ca26ae2db1",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "dom/ipc/WindowGlobalParent.cpp",
+      "preimage_sha": "2014c80a6eb5fdbead9533b2e405cc32d6522d0e",
+      "upstream_fixed_sha": "59c74d956b8687bf864d3bd1a66bc94e1915771d",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "dom/ipc/WindowGlobalParent.h",
+      "preimage_sha": "c3386ba78041a2093d6981c30be3931892991cf7",
+      "upstream_fixed_sha": "446101c1ad40f8338cc73aa8b058db3b79202812",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-117860",
+      "path": "netwerk/ipc/DocumentLoadListener.cpp",
+      "preimage_sha": "b9465bbcb8884bad5c9e2d93515cd595aa861b49",
+      "upstream_fixed_sha": "10b16322a4a55f7c5d4459489a70347ee1debc4f",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-120572",
+      "path": "layout/generic/AbsoluteContainingBlock.cpp",
+      "preimage_sha": "885ece81d8e394f3d08c4576b6dd8fd95a4c086b",
+      "upstream_fixed_sha": "0f15a8fc81753796e1050e82d598f7e63804e01f",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-120572",
+      "path": "layout/generic/AbsoluteContainingBlock.h",
+      "preimage_sha": "deac3bd8b0392c43a988292f30ed7adf758a8467",
+      "upstream_fixed_sha": "eb95b77d9578ffbdb1a58b7c0f4be94ce6f263c3",
+      "preimage_matches_exact_upstream_patch_parent": true
+    },
+    {
+      "cve": "CVE-2026-120572",
+      "path": "layout/generic/nsLineLayout.cpp",
+      "preimage_sha": "57d0f421b9ababbec708fc9a64f6d40f471387f9",
+      "upstream_fixed_sha": "452ffc656ded21faba0beb0fd2927b7933834f4e",
+      "preimage_matches_exact_upstream_patch_parent": true
+    }
+  ],
+  "upstream_added_regression_test": {
+    "path": "testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html",
+    "upstream_fixed_sha": "31a14963b356d869475bac62ca44991d9275a285"
+  },
+  "acceptance": {
+    "exact_source_patch_postimages_verified_in_tool_session": true,
+    "all_17_preimage_blobs_matched_upstream_patch_parent": true,
+    "compiled_native_security_port": false,
+    "browser_runtime_security_verified": false,
+    "full_advisory_audit_complete": false,
+    "release_ready": false,
+    "frozen_main_m3_comparator_untouched": true,
+    "latest_workstation_parity_verified": false
+  },
+  "notes": "Patch source transplant ONLY on isolated maintenance branch; does not supersede full upstream security update or native build/security/runtime regression acceptance."
+}

@@ -1,0 +1,55 @@
+name: Security 159 Current-Main Exact Port Preflight
+on:
+  push:
+    branches:
+      - security/159-0-1-on-current-main
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-patch-and-original-fixture:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/security/159-0-1-on-current-main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source blobs and original Mozilla regression fixtures
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            docshell/base/BrowsingContext.cpp
+            docshell/base/CanonicalBrowsingContext.cpp
+            docshell/base/CanonicalBrowsingContext.h
+            docshell/shistory/SessionHistoryEntry.cpp
+            docshell/shistory/SessionHistoryEntry.h
+            docshell/shistory/nsSHEntryShared.h
+            dom/ipc/ContentParent.cpp
+            dom/ipc/ContentParent.h
+            dom/ipc/PContent.ipdl
+            dom/ipc/ParentProcessChannelHandle.cpp
+            dom/ipc/ParentProcessChannelHandle.h
+            dom/ipc/WindowGlobalParent.cpp
+            dom/ipc/WindowGlobalParent.h
+            netwerk/ipc/DocumentLoadListener.cpp
+            layout/generic/AbsoluteContainingBlock.cpp
+            layout/generic/AbsoluteContainingBlock.h
+            layout/generic/nsLineLayout.cpp
+            testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html
+            ci/security-159-postbeta-port-check.sh
+            docs/vulpra/SECURITY-159-HOTFIX-PORT.json
+            ci/security-159-crashtest-smoke.py
+            layout/svg/crashtests/2079252.html
+            testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html
+            testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html
+      - name: Verify every original Mozilla security fix-result Git blob
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/security-159-postbeta-port-check.sh
+      - name: Reject forged crashtest results and invalid upstream fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/security-159-crashtest-smoke.py
+          python3 ci/security-159-crashtest-smoke.py --self-test
+          echo 'LIMIT: source-only checks; no rebuilt browser or security-current certification'
