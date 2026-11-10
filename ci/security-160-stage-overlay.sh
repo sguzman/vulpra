@@ -427,6 +427,45 @@ if grep -Fq '    "../lib/AdsFeed.sys.mjs",' "$dest/browser/extensions/newtab/web
   fail 'AdsFeed inadvertently enabled in opt-in allowlist'
 fi
 
-echo 'PASS: twenty-five exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# Normandy: Firefox 160 deleted ClientEnvironment.sys.mjs, and removed the
+# old normandy-content stanza. Keeping the old Vulpra 159 manifest would
+# reference a missing file and overwrite the new upstream resource policy.
+# Keep the entire standard Firefox 160 Normandy manifest intact beneath
+# MOZ_NORMANDY. In the opt-in experimental branch, only list three still-
+# existing helpers. This is a *new adaptation*, not a byte-for-byte Vulpra
+# 159 resource contract; native verification is still required.
+hash_is "$repo/toolkit/components/normandy/jar.mn" 4fd6e7e67d1677030c7997a6641d176cb0dfdab6
+hash_is "$upstream/toolkit/components/normandy/jar.mn" aba68ea151c317ef8328baa7ff78fbac1fc2767a
+hash_is "$upstream/toolkit/components/normandy/lib/NormandyApi.sys.mjs" cce2b00d6febc9f8c73503e2adce217f4ee73c2f
+hash_is "$upstream/toolkit/components/normandy/lib/NormandyUtils.sys.mjs" 7db12c59b7324fe84868b6fb8bf8b6e492a967d5
+hash_is "$upstream/toolkit/components/normandy/schemas/LegacyHeartbeat.schema.json" 3bb1f18fc4555b45ce60f98235f31282fdc71776
+mkdir -p -- "$dest/toolkit/components/normandy"
+awk '
+  {
+    print
+    if ($0 == "% resource normandy %res/normandy/") {
+      print ""
+      print "#ifdef MOZ_NORMANDY"
+      count++
+    }
+  }
+  END { if (count != 1) exit 1 }
+' "$upstream/toolkit/components/normandy/jar.mn" > "$dest/toolkit/components/normandy/jar.mn"
+cat >> "$dest/toolkit/components/normandy/jar.mn" <<'NO_NORMANDY_HELPERS'
+#else
+  res/normandy/lib/NormandyApi.sys.mjs (./lib/NormandyApi.sys.mjs)
+  res/normandy/lib/NormandyUtils.sys.mjs (./lib/NormandyUtils.sys.mjs)
+  res/normandy/schemas/LegacyHeartbeat.schema.json (./schemas/LegacyHeartbeat.schema.json)
+#endif
+NO_NORMANDY_HELPERS
+hash_is "$dest/toolkit/components/normandy/jar.mn" 06317cdd540b6e32eeb195b555923795894f5b0e
+if grep -Fq 'ClientEnvironment.sys.mjs' "$dest/toolkit/components/normandy/jar.mn"; then
+  fail 'deleted Firefox 160 Normandy ClientEnvironment was reintroduced'
+fi
+if grep -Fq 'normandy-content' "$dest/toolkit/components/normandy/jar.mn"; then
+  fail 'removed upstream Normandy content package was reintroduced'
+fi
+
+echo 'PASS: twenty-six exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
