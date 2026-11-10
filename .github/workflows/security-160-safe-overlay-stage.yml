@@ -4,6 +4,7 @@ on:
     branches: [upgrade/firefox-160-overlay-prototype]
     paths:
       - ci/security-160-stage-overlay.sh
+      - toolkit/components/moz.build
       - .github/workflows/security-160-safe-overlay-stage.yml
       - browser/branding/unofficial/configure.sh
       - browser/branding/unofficial/locales/en-US/brand.ftl
@@ -25,7 +26,7 @@ on:
 permissions:
   contents: read
 jobs:
-  stage-seventeen-exact-source-overlays:
+  stage-eighteen-exact-source-overlays:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -40,6 +41,7 @@ jobs:
             browser/branding/unofficial/locales/en-US/brand.ftl
             browser/branding/unofficial/pref/firefox-branding.js
             browser/moz.configure
+            toolkit/components/moz.build
             browser/components/BrowserComponents.manifest
             browser/components/DesktopActorRegistry.sys.mjs
             browser/components/asrouter/moz.build
@@ -67,6 +69,7 @@ jobs:
             browser/branding/unofficial/locales/en-US/brand.ftl
             browser/branding/unofficial/pref/firefox-branding.js
             browser/moz.configure
+            toolkit/components/moz.build
             browser/components/BrowserComponents.manifest
             browser/components/DesktopActorRegistry.sys.mjs
             browser/components/asrouter/moz.build
@@ -80,14 +83,14 @@ jobs:
             toolkit/components/normandy/moz.build
             toolkit/modules/AppConstants.sys.mjs
             browser/app/profile/firefox.js
-      - name: Stage seventeen exact-overlaid files into private runner temp ONLY
+      - name: Stage eighteen exact-overlaid files into private runner temp ONLY
         shell: bash
         run: |
           set -euo pipefail
           bash -n ci/security-160-stage-overlay.sh
           out="$RUNNER_TEMP/vulpra160-overlays"
           bash ci/security-160-stage-overlay.sh --stage "$GITHUB_WORKSPACE/firefox160" "$out"
-          test "$(find "$out" -type f | wc -l)" -eq 17
+          test "$(find "$out" -type f | wc -l)" -eq 18
           grep -Fqx 'MOZ_APP_DISPLAYNAME=Vulpra' "$out/browser/branding/unofficial/configure.sh"
           grep -Fqx -- '-brand-short-name = Vulpra' "$out/browser/branding/unofficial/locales/en-US/brand.ftl"
           grep -Fqx 'pref("general.useragent.compatMode.firefox", true);' "$out/browser/app/profile/firefox.js"
@@ -115,5 +118,5 @@ jobs:
           test ! -e "$forbidden"
           git -C "$GITHUB_WORKSPACE/firefox160" diff --exit-code
           git diff --exit-code
-          echo 'PASS: 17 exact-source overlays, no source mutation, no dirty checkout, rejected 3 unsafe output locations'
+          echo 'PASS: 18 exact-source overlays, no source mutation, no dirty checkout, rejected 3 unsafe output locations'
           echo 'LIMIT: isolated overlay staging, not a complete Firefox 160 engine port or security-current browser'
