@@ -5,6 +5,9 @@ on:
     paths:
       - ci/security-160-stage-overlay.sh
       - toolkit/components/moz.build
+      - browser/extensions/newtab/lib/ActivityStream.sys.mjs
+      - browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+      - browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
       - taskcluster/kinds/toolchain/android.yml
       - python/mozbuild/mozbuild/frontend/emitter.py
       - browser/components/asrouter/modules/ASRouter.sys.mjs
@@ -29,7 +32,7 @@ on:
 permissions:
   contents: read
 jobs:
-  stage-twenty-one-exact-source-overlays:
+  stage-twenty-four-exact-source-overlays:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -44,6 +47,9 @@ jobs:
             browser/branding/unofficial/locales/en-US/brand.ftl
             browser/branding/unofficial/pref/firefox-branding.js
             browser/moz.configure
+            browser/extensions/newtab/lib/ActivityStream.sys.mjs
+            browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+            browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
             taskcluster/kinds/toolchain/android.yml
             python/mozbuild/mozbuild/frontend/emitter.py
             browser/components/asrouter/modules/ASRouter.sys.mjs
@@ -75,6 +81,9 @@ jobs:
             browser/branding/unofficial/locales/en-US/brand.ftl
             browser/branding/unofficial/pref/firefox-branding.js
             browser/moz.configure
+            browser/extensions/newtab/lib/ActivityStream.sys.mjs
+            browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+            browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
             taskcluster/kinds/toolchain/android.yml
             python/mozbuild/mozbuild/frontend/emitter.py
             browser/components/asrouter/modules/ASRouter.sys.mjs
@@ -92,18 +101,21 @@ jobs:
             toolkit/components/normandy/moz.build
             toolkit/modules/AppConstants.sys.mjs
             browser/app/profile/firefox.js
-      - name: Stage twenty-one exact-overlaid files into private runner temp ONLY
+      - name: Stage twenty-four exact-overlaid files into private runner temp ONLY
         shell: bash
         run: |
           set -euo pipefail
           bash -n ci/security-160-stage-overlay.sh
           out="$RUNNER_TEMP/vulpra160-overlays"
           bash ci/security-160-stage-overlay.sh --stage "$GITHUB_WORKSPACE/firefox160" "$out"
-          test "$(find "$out" -type f | wc -l)" -eq 21
+          test "$(find "$out" -type f | wc -l)" -eq 24
           grep -Fqx 'MOZ_APP_DISPLAYNAME=Vulpra' "$out/browser/branding/unofficial/configure.sh"
           grep -Fqx -- '-brand-short-name = Vulpra' "$out/browser/branding/unofficial/locales/en-US/brand.ftl"
           grep -Fqx 'pref("general.useragent.compatMode.firefox", true);' "$out/browser/app/profile/firefox.js"
           python3 -m py_compile "$out/python/mozbuild/mozbuild/frontend/emitter.py"
+          node --check "$out/browser/extensions/newtab/lib/ActivityStream.sys.mjs"
+          node --check "$out/browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs"
+          node --check "$out/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs"
           if grep -Fq 'general.useragent.override' "$out/browser/app/profile/firefox.js"; then
             echo 'FAIL: dangerous blanket user-agent override staged' >&2
             exit 1
@@ -128,5 +140,5 @@ jobs:
           test ! -e "$forbidden"
           git -C "$GITHUB_WORKSPACE/firefox160" diff --exit-code
           git diff --exit-code
-          echo 'PASS: 21 exact-source overlays, no source mutation, no dirty checkout, rejected 3 unsafe output locations'
+          echo 'PASS: 24 exact-source overlays, no source mutation, no dirty checkout, rejected 3 unsafe output locations'
           echo 'LIMIT: isolated overlay staging, not a complete Firefox 160 engine port or security-current browser'
