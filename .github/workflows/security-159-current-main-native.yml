@@ -46,7 +46,7 @@ jobs:
       - name: Checkout exactly the source that will be configured and built
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 3
 
       - name: Reject broken link-input and protected normal-browser contracts
         shell: bash
@@ -58,7 +58,10 @@ jobs:
           # This run compiles the current-main-based, exact-source security candidate, not the historical
           # original full-normal source used by the M3 dependency register.
           test "$GITHUB_SHA" != b1482404dfb8b01342990ee99ea3df0f9756b5f7
-          test "$(git merge-base --is-ancestor 2006922502b6d27a7d89e56662530726441d8b45 HEAD; echo $?)" = 0
+          # Checkout includes this candidate's two parent commits; prove the
+          # verified workstation source commit really is an ancestor.
+          git cat-file -e 2006922502b6d27a7d89e56662530726441d8b45^{commit}
+          git merge-base --is-ancestor 2006922502b6d27a7d89e56662530726441d8b45 HEAD
           grep -Fqx 'pref("general.useragent.compatMode.firefox", true);' browser/app/profile/firefox.js
           python3 ci/m3-native-build-link-inputs.py --self-test
           python3 -m py_compile ci/m3-native-replay-packager.py
