@@ -280,6 +280,32 @@ awk '
 ' "$upstream/python/mozbuild/mozbuild/frontend/emitter.py" > "$dest/python/mozbuild/mozbuild/frontend/emitter.py"
 hash_is "$dest/python/mozbuild/mozbuild/frontend/emitter.py" 564e247580cba4b9e34a2c72be0f2ed64cacac47
 
-echo 'PASS: twenty exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# Android toolchain hash list: two references to absent Android Gradle-plugin
+# files were removed by Vulpra. Original 159 delta is exactly two identical
+# substitutions, and 160 still has the same references. Preserve Firefox
+# 160's NEW Robolectric job and all other Android CI improvements in source.
+hash_is "$repo/taskcluster/kinds/toolchain/android.yml" b1de1ef5ccbd441544029a544dc3662c9458ff70
+hash_is "$upstream/taskcluster/kinds/toolchain/android.yml" 2372d61733194333175d911d28be6be14f7d7683
+mkdir -p -- "$dest/taskcluster/kinds/toolchain"
+awk '
+  $0 == "            - \x27mobile/android/android-components/plugins/dependencies/src/main/java/ApplicationServices.kt\x27" {
+    if ((getline next_line) <= 0 ||
+        next_line != "            - \x27mobile/android/android-components/plugins/dependencies/src/main/java/DependenciesPlugin.kt\x27") {
+      exit 2
+    }
+    print "            # Vulpra Linux-only source pruning removed Android Components\x27 Gradle plugin."
+    print "            # The Android Gradle dependency tasks are unsupported in this fork."
+    print "            # Do not hash paths absent from the source tree while resolving Linux toolchains."
+    count++
+    next
+  }
+  { print }
+  END { if (count != 2) exit 1 }
+' "$upstream/taskcluster/kinds/toolchain/android.yml" > "$dest/taskcluster/kinds/toolchain/android.yml"
+hash_is "$dest/taskcluster/kinds/toolchain/android.yml" 2b2f399363ffdb14c5c96e5f16ef2def162f02ba
+grep -Fq 'linux64-android-robolectric-jars:' "$dest/taskcluster/kinds/toolchain/android.yml" ||
+  fail 'Firefox 160 Robolectric build job missing from adapted source'
+
+echo 'PASS: twenty-one exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
