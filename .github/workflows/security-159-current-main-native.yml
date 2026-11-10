@@ -1,0 +1,486 @@
+# One full normal exact-source native browser build, no feature omission.
+# Retry native package replay after the recorded 2,590,378,712-byte linked
+# debug ELF exceeded the former 2 GiB check; the bounded source-side self-test
+# now explicitly covers that real size. Runtime and independent acceptance
+# remain mandatory, and source-only self-tests cannot stand in for either.
+name: Security 159 Current-Main Patched Native Build and Runtime
+
+on:
+  push:
+    branches: [security/159-0-1-on-current-main]
+    paths:
+      - .github/workflows/security-159-current-main-native.yml
+      - ci/smoke-webextension-package-local.py
+      - ci/security-159-crashtest-smoke.py
+      - layout/svg/crashtests/2079252.html
+      - testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html
+      - testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html
+      - docs/vulpra/SECURITY-159-HOTFIX-PORT.json
+      - docshell/**
+      - dom/ipc/**
+      - layout/generic/**
+      - netwerk/ipc/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vulpra-security-159-current-main-native-link
+  cancel-in-progress: false
+
+jobs:
+  compile-link-package-runtime:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/security/159-0-1-on-current-main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    env:
+      MOZCONFIG: ${{ github.workspace }}/ci/mozconfig-linux-m3-baseline
+      MOZ_HEADLESS: "1"
+      DEBIAN_FRONTEND: noninteractive
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-1590b5-m3-normandy-v1"
+      CARGO_BUILD_JOBS: "1"
+      VULPRA_M3_VERIFY_NIMBUS: "1"
+    steps:
+      - name: Checkout exactly the source that will be configured and built
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Reject broken link-input and protected normal-browser contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          # Fail before the expensive full native build if a security patch differs.
+          bash ci/security-159-postbeta-port-check.sh
+          # This run compiles the current-main-based, exact-source security candidate, not the historical
+          # original full-normal source used by the M3 dependency register.
+          test "$GITHUB_SHA" != b1482404dfb8b01342990ee99ea3df0f9756b5f7
+          test "$(git merge-base --is-ancestor 2006922502b6d27a7d89e56662530726441d8b45 HEAD; echo $?)" = 0
+          grep -Fqx 'pref("general.useragent.compatMode.firefox", true);' browser/app/profile/firefox.js
+          python3 ci/m3-native-build-link-inputs.py --self-test
+          python3 -m py_compile ci/m3-native-replay-packager.py
+          python3 ci/m3-native-replay-packager.py --self-test
+          python3 ci/m3-configure-only-substs.py --self-test
+          python3 -m py_compile ci/smoke-webextension-package-local.py
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          # Source-only negative controls; real replay follows package/runtime.
+          python3 ci/security-159-crashtest-smoke.py --self-test
+          python3 ci/tests/m3-promocard-bundle-contract.py
+          python3 -m py_compile ci/m3-native-elf-package-graph.py
+          echo "PASS: exact source and original unomitted normal Vulpra"
+
+      - name: Prepare native compiler cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+
+      - name: Export GitHub compiler-cache backend credentials
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Bootstrap supported compiler and private browser test dependencies
+        shell: bash
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends python3 python3-venv python3-dev git curl make jq \
+            weston wayland-utils libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 \
+            libnss3 libgbm1 binutils
+          ./mach --no-interactive bootstrap --application-choice browser
+          if ! test -x "$HOME/.mozbuild/clang/bin/clang" || \
+             ! test -x "$HOME/.mozbuild/clang/bin/clang++"; then
+            (cd "$HOME/.mozbuild" && "$GITHUB_WORKSPACE/mach" artifact toolchain --from-build linux64-clang)
+          fi
+          major="$("$HOME/.mozbuild/clang/bin/clang" --version | head -1 | sed -E 's/.*version ([0-9]+).*/\1/')"
+          [[ "$major" =~ ^[0-9]+$ ]] && (( major >= 19 ))
+
+      - name: Compile and test bounded current-native loader callsite examiner
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-current-compiled-loader-api-census.rs \
+            -o "$RUNNER_TEMP/m3-current-loader-census-tests"
+          "$RUNNER_TEMP/m3-current-loader-census-tests" --nocapture
+          rustc --edition=2021 -O ci/m3-current-compiled-loader-api-census.rs \
+            -o "$RUNNER_TEMP/m3-current-loader-census"
+          echo "PASS: current native loader observer compiled and tests executed"
+
+      - name: Record exact-source generated configure substitutions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          ./mach configure
+          python3 ci/m3-configure-only-substs.py \
+            --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
+            --output "$RUNNER_TEMP/m3-native-link-config.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          x=json.loads((Path(os.environ["RUNNER_TEMP"])/"m3-native-link-config.json").read_text())
+          assert x["source_commit"]==os.environ["GITHUB_SHA"]
+          f=x["observed_generated_substs"]
+          for k in ("MOZ_WAYLAND","MOZ_X11","MOZ_SANDBOX","ENABLE_WEBDRIVER",
+                    "MOZ_SERVICES_SYNC","MOZ_NORMANDY","MOZ_CRASHREPORTER",
+                    "MOZ_UPDATER"):
+              assert f[k]["value"]=="1",(k,f[k])
+          assert f["MOZ_DEVTOOLS"]["value"]=="all"
+          assert f["VULPRA_NO_ASROUTER_PROMOS"]["value"] in ("",None)
+          # These two opt-out substitutions are intentionally not in the
+          # older bounded config snapshot; read the generated files directly.
+          substs=Path(os.environ["GITHUB_WORKSPACE"])/"obj-vulpra-linux-m3-baseline/config.statusd/substs"
+          for k in ("VULPRA_NO_NEWTAB_ADSFEED","VULPRA_NO_NEWTAB_PROMOCARD"):
+              p=substs/k
+              value=json.loads(p.read_text()) if p.exists() else None
+              assert value in (None,False,0,""),(k,value)
+          print("PASS: current source identity, protected features and all three normal-build opt-outs")
+          PY
+
+      - name: Reclaim unrelated preinstalled runner SDKs for native browser compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Some GitHub 24.04 hosts have a 72 GiB cow-root, while earlier
+          # successful Vulpra jobs had 145 GiB. Do not weaken the swap and
+          # object-storage safety requirement merely because runner disks vary.
+          # These SDKs are NOT part of the Firefox build/bootstrap, test
+          # harness, system compiler, GitHub Actions Node runtime, mozbuild
+          # toolchains, or sccache. Never touch source, .git, objdir, HOME,
+          # /opt/hostedtoolcache/sccache, or real user browser profiles.
+          echo "Pre-cleanup runner disk:"
+          df -h /mnt
+          # Only delete exact optional preinstalled hosted-runner SDK roots.
+          for path in \
+            /usr/local/lib/android \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/local/share/powershell \
+            /opt/hostedtoolcache/CodeQL; do
+            if test -d "$path" && ! test -L "$path"; then
+              sudo du -sh "$path" || true
+              sudo rm -rf -- "$path"
+            fi
+          done
+          sudo apt-get clean
+          echo "Post-cleanup runner disk:"
+          df -h /mnt
+          echo "PASS: only unrelated preinstalled SDK paths cleared; protected Firefox toolchains unchanged"
+
+      - name: Reserve bounded swap for native Rust/C++ build
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GitHub-hosted /mnt capacity varies. Reserve >= 16 GiB for
+          # compiled browser outputs and <= 24 GiB swap (minimum 8 GiB).
+          # Do not silently proceed with insufficient swap or disk.
+          gib=$((1024*1024*1024))
+          free_bytes="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          [[ "$free_bytes" =~ ^[0-9]+$ ]]
+          headroom=$((16*gib))
+          minimum_swap=$((8*gib))
+          maximum_swap=$((24*gib))
+          df -h /mnt
+          if (( free_bytes < headroom+minimum_swap )); then
+            echo "::error::Insufficient /mnt free bytes ($free_bytes): require >= 24 GiB with swap + object headroom after optional SDK cleanup"
+            exit 1
+          fi
+          available_swap=$((free_bytes-headroom))
+          if (( available_swap > maximum_swap )); then
+            available_swap="$maximum_swap"
+          fi
+          swap_gib=$((available_swap/gib))
+          (( swap_gib >= 8 && swap_gib <= 24 ))
+          echo "Reservable swap: $swap_gib GiB; preserving >= 16 GiB of disk headroom"
+          sudo fallocate -l "$swap_gib"G /mnt/vulpra-m3-native-link.swap
+          sudo chmod 0600 /mnt/vulpra-m3-native-link.swap
+          sudo mkswap /mnt/vulpra-m3-native-link.swap
+          sudo swapon /mnt/vulpra-m3-native-link.swap
+          grep -Fq /mnt/vulpra-m3-native-link.swap /proc/swaps
+          echo "PASS: bounded native-build swap active"
+          df -h /mnt
+
+      - name: Compile complete normal exact-source native Vulpra
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/m3-native-link-build.log"
+
+      - name: Package and independently verify native browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./mach package
+          dist="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline/dist"
+          archive="$(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' -print -quit)"
+          test -n "$archive"
+          test "$(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' | wc -l)" -eq 1
+          mkdir -p .git/vulpra-native-build/packages
+          bash packaging/stage.sh "$archive" \
+            "$GITHUB_WORKSPACE/.git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz"
+          (cd .git/vulpra-native-build/packages && sha256sum -c vulpra-local-m3-native-link-ci.tar.xz.sha256)
+
+      - name: Validate generated libxul inputs, preload order and all packaged native ELFs
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz"
+          # Gecko's executable packager may STRIP/elfhack the output of
+          # dist/bin, so independently reproduce the actual transformation.
+          # Never overwrite the linked library, staged package or source.
+          objdir="$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline"
+          for lib in "$objdir/dist/bin/libxul.so" "$objdir/dist/vulpra/libxul.so"; do
+            test -f "$lib"
+            stat -c 'Native packaging replay input: %n (%s bytes)' "$lib"
+            file "$lib"
+          done
+          ./mach python ci/m3-native-replay-packager.py \
+            --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
+            --source-sha "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/m3-native-packager-replay.json"
+          python3 ci/m3-native-build-link-inputs.py \
+            --objdir "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline" \
+            --package "$package" --source-sha "$GITHUB_SHA" \
+            --transform-report "$RUNNER_TEMP/m3-native-packager-replay.json" \
+            --output "$RUNNER_TEMP/m3-native-link-inputs.json"
+          python3 ci/m3-native-elf-package-graph.py "$package" \
+            --output "$RUNNER_TEMP/m3-native-link-elf-package-graph.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])
+          a=json.loads((p/"m3-native-link-inputs.json").read_text())
+          b=json.loads((p/"m3-native-link-elf-package-graph.json").read_text())
+          c=json.loads((p/"m3-native-link-config.json").read_text())
+          assert a["source_commit"]==c["source_commit"]==os.environ["GITHUB_SHA"]
+          assert a["package"]["package_sha256"]==b["archive_sha256"]
+          # Exact historical full-normal package had 28 native ELFs and 268
+          # direct DT_NEEDED declarations. Never silently accept omissions
+          # while claiming this is the protected normal-browser baseline.
+          assert len(b["elf_members"])==28,len(b["elf_members"])
+          assert b["direct_needed_edges"]==268,b["direct_needed_edges"]
+          assert a["dist_native_loader_order"]["mozgtk_before_mozwayland"]
+          assert a["packaging_transform_replay"]["deterministic_reproduction_verified"] is True
+          assert a["packaging_transform_replay"]["staged_and_reproduced_libxul_sha256"]==a["package"]["libxul_member"]["sha256"]
+          a["workflow_run_id"]=int(os.environ["GITHUB_RUN_ID"])
+          a["runtime_passed_after_link_audit"]=False
+          (p/"m3-native-link-inputs.json").write_text(json.dumps(a,indent=2)+"\n")
+          b["source_commit"]=os.environ["GITHUB_SHA"]
+          (p/"m3-native-link-elf-package-graph.json").write_text(json.dumps(b,indent=2)+"\n")
+          print("PASS: exact-source native libxul response, real ELF and compressed package evidence")
+          PY
+
+      - name: Smoke real packaged Wayland, JS navigation, WebExtensions and Nimbus
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o "$RUNNER_TEMP/geckodriver.tar.gz" \
+            https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP" geckodriver
+          chmod 0755 "$RUNNER_TEMP/geckodriver"
+          folder="$(mktemp -d)"
+          trap 'rm -rf -- "$folder"' EXIT
+          tar -xf .git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz -C "$folder"
+          app="$(find "$folder" -maxdepth 5 -type f -name application.ini -print -quit)"
+          test -n "$app"
+          # Ordinary Ubuntu-host Weston smoke must remain offline with a strict
+          # non-local network guard. Gecko intentionally fails a prohibited
+          # background request when this guard runs in online startup mode.
+          # Scope both settings to this graphical probe; WebDriver exercises
+          # localhost JavaScript separately and normal browser mode is unchanged.
+          VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            VULPRA_WAYLAND_TEST_SECONDS=10 bash packaging/test-wayland.sh "$(dirname "$app")"
+          python3 ci/smoke-m3-localhost-package.py "$GITHUB_WORKSPACE"
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          # Independently fail if current packaged browser did not report
+          # strict loopback self-signed TLS rejection under ordinary trust.
+          webext="$(find .git/vulpra-native-build -maxdepth 1 -type f -name 'webextension-smoke-*.json' -print -quit)"
+          test -n "$webext"
+          jq -e '
+            .status == "pass" and
+            .security.original_firefox_profile_preserved == true and
+            .security.temporary_home == true and
+            (.security.local_untrusted_tls_denial as $tls |
+              $tls.verified == true and
+              $tls.local_self_signed_only == true and
+              $tls.fixture_health_passed == true and
+              $tls.ordinary_tls_client_rejected == true and
+              $tls.webdriver_accept_insecure_certs == false and
+              $tls.webdriver_error == "insecure certificate" and
+              $tls.certificate_store_modified == false and
+              $tls.safebrowsing_tested == false and
+              $tls.sandbox_denial_tested == false and
+              $tls.no_external_egress_proven == false)
+          ' "$webext" >/dev/null
+          echo "PASS: strict current-browser TLS rejection; not Safe Browsing or sandbox enforcement"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"m3-native-link-inputs.json"
+          x=json.loads(p.read_text())
+          x["runtime_passed_after_link_audit"]=True
+          x["runtime_gates"]=["Wayland private Weston","localhost JS navigation",
+                              "isolated profile and WebExtension","Nimbus check"]
+          p.write_text(json.dumps(x,indent=2)+"\n")
+          print("PASS: normal browser packaged runtime acceptance")
+          PY
+
+      - name: Replay four original Mozilla security crashtests in native package
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          PATH="$RUNNER_TEMP:$PATH" python3 ci/security-159-crashtest-smoke.py
+          report=".git/vulpra-native-build/security-159-css-crashtest-replay.json"
+          jq -e --arg source "$GITHUB_SHA" '
+            .schema_version == 1 and
+            .status == "passed_bounded_original_crashtest_replay" and
+            .source_commit == $source and
+            .fixture_git_blob_sha1 == "31a14963b356d869475bac62ca44991d9275a285" and
+            .fixture == "testing/web-platform/tests/css/css-position/crashtests/inline-containing-block-delete-continuations-001.html" and
+            .real_packaged_browser == true and
+            .accept_insecure_certs == false and
+            .temporary_profile_preserved == true and
+            .official_wpt_harness_used == false and
+            .memory_safety_exploit_rejection_proven == false and
+            .security_current == false and
+            .release_ready == false and
+            (.iterations | type == "array" and length == 3) and
+            ([.iterations[].iteration] == [0,1,2]) and
+            all(.iterations[]; (.height | type == "number" and . > 0))
+          ' "$report" >/dev/null
+          echo "PASS: original upstream CSS crashtest executed in real packaged browser; not a full WPT/ASAN security proof"
+          extra=".git/vulpra-native-build/security-159-additional-crashtest-replay.json"
+          jq -e --arg source "$GITHUB_SHA" '
+            .schema_version == 1 and
+            .status == "passed_bounded_original_extra_crashtests" and
+            .source_commit == $source and
+            .real_packaged_browser == true and
+            .accept_insecure_certs == false and
+            .temporary_profile_preserved == true and
+            .original_mozilla_fixture_hashes_verified == true and
+            .official_wpt_harness_used == false and
+            .memory_safety_exploit_rejection_proven == false and
+            .security_current == false and
+            .release_ready == false and
+            (.cases | type == "array" and length == 3) and
+            ([.cases[].name] | sort == ["multicol","svg","table"]) and
+            all(.cases[]; (.git_blob_sha1 | type == "string" and test("^[0-9a-f]{40}$")) and
+              (.iterations | type == "array" and length == 2) and
+              ([.iterations[].iteration] == [0,1]) and
+              all(.iterations[]; (.height | type == "number" and . > 0))) and
+            all(.cases[];
+              if .name == "svg" then
+                .fixture == "layout/svg/crashtests/2079252.html" and
+                .git_blob_sha1 == "a8d78aae061029dcc7cb72e86a18647b2d483625"
+              elif .name == "table" then
+                .fixture == "testing/web-platform/tests/css/css-tables/crashtests/border-collapse-dynamic-crash.html" and
+                .git_blob_sha1 == "6d716acb679c1f174e75a4d3d6ddfc85dcba7852"
+              elif .name == "multicol" then
+                .fixture == "testing/web-platform/tests/css/css-multicol/crashtests/block-break-before.html" and
+                .git_blob_sha1 == "bfb5f0894b80bf39633afcf37be9fdcbb68ab96c"
+              else false end)
+          ' "$extra" >/dev/null
+          echo "PASS: six additional original upstream security crashtest executions, true packaged browser, bounded source-linked evidence; not exploit-memory proof"
+
+      - name: Audit current-source linked native loader callsites
+        shell: bash
+        timeout-minutes: 40
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          "$RUNNER_TEMP/m3-current-loader-census" "$GITHUB_SHA" \
+            "$GITHUB_WORKSPACE/obj-vulpra-linux-m3-baseline/dist/bin/libxul.so" \
+            "$RUNNER_TEMP/m3-current-native-loader-callsite.json"
+          jq -e \
+            --arg source "$GITHUB_SHA" \
+            --arg binary "$(jq -r '.built_libxul_sha256' "$RUNNER_TEMP/m3-native-link-inputs.json")" \
+            '
+              .schema_version == 1 and
+              .source_commit == $source and
+              .binary == "libxul.so" and
+              .unstripped_native_elf_sha256 == $binary and
+              (.unstripped_native_elf_bytes > 10000000) and
+              .status == "compiled_direct_loader_api_callsite_census" and
+              (.native_instruction_lines > 1000) and
+              (.direct_loader_branches > 0) and
+              (.direct_loader_branches <= 100000) and
+              (.distinct_caller_loader_kind_records == (.direct_loader_callsite_records | length)) and
+              (.direct_loader_branches == ([.direct_loader_callsite_records[].native_branches] | add)) and
+              (.independently_accepted_ffmpeg_to_nspr_call_count == 1) and
+              (all(.direct_loader_callsite_records[];
+                (.caller_symbol | type == "string" and length > 0) and
+                (.loader_api | IN("PR_LoadLibraryWithFlags","PR_LoadLibrary",
+                  "PR_LoadLibraryByPathname","dlopen","dlmopen")) and
+                (.branch_kind | IN("call","tail-jump")) and
+                (.native_branches | type == "number" and . > 0))) and
+              .indirect_loader_calls_enumerated == false and
+              .every_dynamic_loader_api_enumerated == false and
+              .actual_dynamic_library_names_verified == false and
+              .conditional_runtime_routes_exercised == false and
+              .all_elf_consumers_covered == false and
+              .arch_workstation_verified == false and
+              .source_pruning_authorized == false and
+              .m3_sixth_gate_closed == false
+            ' "$RUNNER_TEMP/m3-current-native-loader-callsite.json" >/dev/null
+          echo "PASS: current linked native loader branches tied to source and unstripped libxul ELF; no full dlopen closure"
+
+      - name: Preserve bounded current-source native loader callsite evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-159-current-main-native-loader-callsite-evidence
+          path: ${{ runner.temp }}/m3-current-native-loader-callsite.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Preserve bounded native evidence and checksum without full archive
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-159-current-main-source-matched-native-link-evidence
+          path: |
+            ${{ runner.temp }}/m3-native-link-config.json
+            ${{ runner.temp }}/m3-native-link-inputs.json
+            ${{ runner.temp }}/m3-native-packager-replay.json
+            ${{ runner.temp }}/m3-native-link-elf-package-graph.json
+            .git/vulpra-native-build/packages/vulpra-local-m3-native-link-ci.tar.xz.sha256
+            .git/vulpra-native-build/m3-localhost-acceptance.json
+            .git/vulpra-native-build/webextension-smoke-*.json
+            .git/vulpra-native-build/security-159-css-crashtest-replay.json
+            .git/vulpra-native-build/security-159-additional-crashtest-replay.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Preserve bounded failure tail
+        if: failure()
+        shell: bash
+        run: |
+          if test -f "$RUNNER_TEMP/m3-native-link-build.log"; then
+            tail -n 3000 "$RUNNER_TEMP/m3-native-link-build.log" > "$RUNNER_TEMP/m3-native-link-failure-tail.log"
+          fi
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-159-current-main-native-link-failure-tail
+          path: |
+            ${{ runner.temp }}/m3-native-link-failure-tail.log
+            .git/vulpra-native-build/webextension-tls-failure-*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
