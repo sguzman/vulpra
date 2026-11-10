@@ -26,3 +26,18 @@ Two post-beta Firefox 159 fixes were independently transplanted by exact upstrea
 Next engineering action: finish the independent **current-main 159 hotfix candidate's native/runtime CI**, then begin a *separate* Firefox 160 baseline migration effort. The verified local QA binary/profile remains usable as an isolated experimental testbed only, not a substitute for maintained production Firefox.
 
 **Project progress remains overall 61% (Δ+0 pp), M3 5/6 = 83%.** This research and staging do not close M3 dependency/FFI gate six or any security-current/release gate.
+
+## Initial authenticated high-impact Firefox 160 patch-presence crosswalk (2026-11-10)
+
+Four advisory issues were compared **file by file** against (a) the exact Mozilla landed-fix Git commit, (b) tagged \`FIREFOX_159_0b5_RELEASE\`, (c) tagged \`FIREFOX_160_0_RELEASE\`, and (d) Vulpra's current \`main\`. This is a **bounded source audit**, not a complete advisory review or exploit regression.
+
+| Mozilla issue | Source files verified against 159 beta | 160 comparison |
+| --- | ---: | --- |
+| CVE-2026-124853 / Bug 2058035 — Graphics: Text sandbox escape | 2/2 identical pre-fix in Vulpra | Both files in 160 exactly equal landed fix \`94db1bf\` |
+| CVE-2026-124854 / Bug 2060230 — DOM Navigation privilege escalation | 1/1 identical pre-fix in Vulpra | 160 file exactly equals landed fix \`0caf08d\` |
+| CVE-2026-124856 / Bug 2072437 — HTTP boundary conditions | 2/2 identical pre-fix in Vulpra | Header exactly equals landed fix \`5bc7f7a\`; .cpp was further modified in 160 and **does not** equal the landed-fix blob, so this comparison alone cannot attest to every protective hunk in the final file |
+| CVE-2026-124902 / Bug 2083629 — media same-origin policy race | 1/1 identical pre-fix in Vulpra | 160 source file exactly equals landed fix \`e696700\` |
+
+[Machine-readable six-path crosswalk](SECURITY-160-INITIAL-PATCH-GAPS-20261110.json) includes original source, landed-fix and release SHA-1 Git blob IDs, fix commit IDs, and explicit negative acceptance flags. The [read-only verifier](../../ci/security-160-spotcheck.sh) independently pins all six recorded hashes to known public-source evidence and checks real Vulpra source via \`git hash-object\`, including [12 deliberately forged source/advisory/acceptance test inputs](../../ci/tests/security-160-spotcheck-tests.sh). [**CI 42902208277 PASS**](https://github.com/sguzman/vulpra/actions/runs/42902208277); [workflow lint **42902208263 PASS**](https://github.com/sguzman/vulpra/actions/runs/42902208263); [local-recovery guard **42902208308 PASS**](https://github.com/sguzman/vulpra/actions/runs/42902208308).
+
+**Critical limits:** These findings support verified source-patch gaps for four selected high-impact CVEs, not the status of any unreviewed CVE. Source-change presence is not proof of exploitability. The CI tests do **not** exercise a native browser or make Vulpra security-current. All six Vulpra sources remain unchanged, and the user's existing QA installation and profile are untouched.
