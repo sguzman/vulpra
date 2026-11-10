@@ -41,6 +41,7 @@ on:
       # has M3's workflow-file ID on the default branch. Include both names.
       - M3 Source Matched Native Link Inputs and Runtime
       - Security 159 Post-Beta Hotfix Native Build and Runtime
+      - Security 159 Current-Main Patched Native Build and Runtime
     types: [completed]
 
 permissions:
@@ -196,8 +197,12 @@ jobs:
       github.repository == 'sguzman/vulpra' &&
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
-      github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
-      github.event.workflow_run.name == 'Security 159 Post-Beta Hotfix Native Build and Runtime' &&
+      (
+        (github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
+         github.event.workflow_run.name == 'Security 159 Post-Beta Hotfix Native Build and Runtime') ||
+        (github.event.workflow_run.head_branch == 'security/159-0-1-on-current-main' &&
+         github.event.workflow_run.name == 'Security 159 Current-Main Patched Native Build and Runtime')
+       ) &&
       github.event.workflow_run.conclusion != 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 3
@@ -238,8 +243,12 @@ jobs:
       (
         (github.event_name == 'workflow_run' &&
          github.event.workflow_run.head_repository.full_name == 'sguzman/vulpra' &&
-         github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
-         github.event.workflow_run.name == 'Security 159 Post-Beta Hotfix Native Build and Runtime' &&
+         (
+        (github.event.workflow_run.head_branch == 'security/firefox-159-postbeta-hotfixes' &&
+         github.event.workflow_run.name == 'Security 159 Post-Beta Hotfix Native Build and Runtime') ||
+        (github.event.workflow_run.head_branch == 'security/159-0-1-on-current-main' &&
+         github.event.workflow_run.name == 'Security 159 Current-Main Patched Native Build and Runtime')
+       ) &&
          github.event.workflow_run.conclusion == 'success') ||
         (github.event_name == 'push' &&
          github.ref == 'refs/heads/main')
@@ -253,6 +262,9 @@ jobs:
       # historical security-native run; never claim an unperformed CSS test.
       NATIVE_RUN_ID: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || '41909948021' }}
       NATIVE_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || '6e38e78724365b3dd6c02f4d0b0570028a5d2112' }}
+      EXPECTED_NATIVE_BRANCH: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || 'security/firefox-159-postbeta-hotfixes' }}
+      EXPECTED_NATIVE_WORKFLOW: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.name || 'Security 159 Post-Beta Hotfix Native Build and Runtime' }}
+      EXPECTED_NATIVE_ARTIFACT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'security/159-0-1-on-current-main' && 'security-159-current-main-source-matched-native-link-evidence' || 'security-159-source-matched-native-link-evidence' }}
     steps:
       - name: Checkout only bounded verifier, not native build source
         uses: actions/checkout@v4
@@ -270,10 +282,12 @@ jobs:
           jq -e \
             --arg sha "$NATIVE_SOURCE_SHA" \
             --argjson run "$NATIVE_RUN_ID" \
+            --arg expected_branch "$EXPECTED_NATIVE_BRANCH" \
+            --arg expected_workflow "$EXPECTED_NATIVE_WORKFLOW" \
             '.id == $run and .head_sha == $sha and
              .status == "completed" and .conclusion == "success" and
-             .name == "Security 159 Post-Beta Hotfix Native Build and Runtime" and
-              .head_branch == "security/firefox-159-postbeta-hotfixes"' \
+             .name == $expected_workflow and
+              .head_branch == $expected_branch' \
             "$RUNNER_TEMP/native-run-metadata.json" >/dev/null
           echo "PASS: original full native workflow actually succeeded at expected SHA"
       - name: Independently verify exact Mozilla security patch-result source blobs
@@ -346,7 +360,7 @@ jobs:
         run: |
           set -euo pipefail
           gh run download "$NATIVE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name security-159-source-matched-native-link-evidence \
+            --name "$EXPECTED_NATIVE_ARTIFACT" \
             --dir "$RUNNER_TEMP/native-evidence"
       - name: Reconcile all source, binary, SHA and real runtime evidence
         shell: bash
