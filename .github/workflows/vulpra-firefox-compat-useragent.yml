@@ -1,0 +1,41 @@
+# Source-only regression for branded browser UA compatibility, no Firefox build.
+name: Vulpra Firefox-Compatible User-Agent Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - browser/app/profile/firefox.js
+      - modules/libpref/init/all.js
+      - netwerk/protocol/http/nsHttpHandler.cpp
+      - browser/branding/unofficial/configure.sh
+      - ci/tests/vulpra-firefox-compat-useragent-test.sh
+      - .github/workflows/vulpra-firefox-compat-useragent.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firefox-compat-with-vulpra-branding:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only UA contract code and tests
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            browser/app/profile/firefox.js
+            browser/branding/unofficial/configure.sh
+            modules/libpref/init/all.js
+            netwerk/protocol/http/nsHttpHandler.cpp
+            ci/tests/vulpra-firefox-compat-useragent-test.sh
+      - name: Check browser default, compatibility token, Vulpra branding and negative fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/tests/vulpra-firefox-compat-useragent-test.sh
+          bash ci/tests/vulpra-firefox-compat-useragent-test.sh --self-test
+          echo "LIMIT: source-only contract, not native browser rebuild or live website acceptance"
