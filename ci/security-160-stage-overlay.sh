@@ -222,6 +222,42 @@ hash_is "$dest/toolkit/components/moz.build" 4c22a26aee7a8b163e7b315864f5e4dd119
 grep -Fqx '    "widgets",' "$dest/toolkit/components/moz.build" ||
   fail 'Firefox 160 new widgets component registry was lost'
 
-echo 'PASS: eighteen exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# ASRouter: exactly two old Vulpra opt-in promo guards cleanly revert to
+# original Mozilla 159 beta source; 160 retained both corresponding callsites.
+# Preserve the full modern 160 file and port ONLY these exact conditionals.
+hash_is "$repo/browser/components/asrouter/modules/ASRouter.sys.mjs" 2fac89b4c02444fed4ee79d24d19fce445596e06
+hash_is "$upstream/browser/components/asrouter/modules/ASRouter.sys.mjs" ed2ff82a6965fe039d02f1517a6c1358c13e75dd
+mkdir -p -- "$dest/browser/components/asrouter/modules"
+awk '
+  {
+    if ($0 == "        lazy.SidebarChatBotPromo.showPromo(browser, message, force);") {
+      print "        // The isolated Linux candidate physically omits this lazy module."
+      print "        // This immutable build flag prevents loading a missing resource,"
+      print "        // including when a remote message supplies this template."
+      print "        if (!AppConstants.VULPRA_NO_ASROUTER_PROMOS) {"
+      print "          lazy.SidebarChatBotPromo.showPromo(browser, message, force);"
+      print "        }"
+      sidebar++
+    } else if ($0 == "        lazy.SmartWindowNewTabPromo.showPromo(browser, message, trigger, force);") {
+      print "        if (!AppConstants.VULPRA_NO_ASROUTER_PROMOS) {"
+      print "          lazy.SmartWindowNewTabPromo.showPromo("
+      print "            browser,"
+      print "            message,"
+      print "            trigger,"
+      print "            force"
+      print "          );"
+      print "        }"
+      smart++
+    } else {
+      print
+    }
+  }
+  END {
+    if (sidebar != 1 || smart != 1) exit 1
+  }
+' "$upstream/browser/components/asrouter/modules/ASRouter.sys.mjs" > "$dest/browser/components/asrouter/modules/ASRouter.sys.mjs"
+hash_is "$dest/browser/components/asrouter/modules/ASRouter.sys.mjs" d02c8563be6db6d65f6dbbc2ddb12b4bdfc9fe4b
+
+echo 'PASS: nineteen exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
