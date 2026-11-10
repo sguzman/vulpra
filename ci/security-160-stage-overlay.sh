@@ -258,6 +258,28 @@ awk '
 ' "$upstream/browser/components/asrouter/modules/ASRouter.sys.mjs" > "$dest/browser/components/asrouter/modules/ASRouter.sys.mjs"
 hash_is "$dest/browser/components/asrouter/modules/ASRouter.sys.mjs" d02c8563be6db6d65f6dbbc2ddb12b4bdfc9fe4b
 
-echo 'PASS: nineteen exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# The optional --disable-tests emitter guard was exactly the only delta in
+# Vulpra's 159 emitter; keep all updated upstream Firefox 160 emitter internals.
+hash_is "$repo/python/mozbuild/mozbuild/frontend/emitter.py" 3d591dee5d98302d87d972e4118ca77f591eb594
+hash_is "$upstream/python/mozbuild/mozbuild/frontend/emitter.py" 0a8aa0b508003401adb70772860fa147809d2d97
+mkdir -p -- "$dest/python/mozbuild/mozbuild/frontend"
+awk '
+  {
+    print
+    if ($0 == "    def _process_test_manifests(self, context):") {
+      print "        # Nothing to install or validate for a --disable-tests build."
+      print "        if not context.config.substs.get(\"ENABLE_TESTS\"):"
+      print "            return"
+      print ""
+      found++
+    }
+  }
+  END {
+    if (found != 1) exit 1
+  }
+' "$upstream/python/mozbuild/mozbuild/frontend/emitter.py" > "$dest/python/mozbuild/mozbuild/frontend/emitter.py"
+hash_is "$dest/python/mozbuild/mozbuild/frontend/emitter.py" 564e247580cba4b9e34a2c72be0f2ed64cacac47
+
+echo 'PASS: twenty exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
