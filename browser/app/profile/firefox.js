@@ -12,6 +12,12 @@
 // improves readability, particular for conditional blocks that exceed a single
 // screen.
 
+// Vulpra: announce Firefox compatibility to sites that select a degraded
+// fallback when the UA lacks a Firefox token (confirmed on Google Search in
+// an isolated local Vulpra QA profile). Keep Vulpra's own app-name token,
+// branding, and profile isolation; do not globally override the user agent.
+pref("general.useragent.compatMode.firefox", true);
+
 #ifdef XP_UNIX
   #ifndef XP_MACOSX
     #define UNIX_BUT_NOT_MAC
