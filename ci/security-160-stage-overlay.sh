@@ -195,6 +195,33 @@ awk '
 ' "$upstream/browser/components/DesktopActorRegistry.sys.mjs" > "$dest/browser/components/DesktopActorRegistry.sys.mjs"
 hash_is "$dest/browser/components/DesktopActorRegistry.sys.mjs" e6c50e85908a4c870185390d61e396e7004414cc
 
-echo 'PASS: seventeen exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# The Firefox 160 toolkit-components registry gained a "widgets" directory.
+# Reapply the exact Vulpra 159 Normandy comment/split to the 160 file, without
+# overwriting the new widgets registration or any other 160 component.
+hash_is "$repo/toolkit/components/moz.build" 0812acb2ebb454eacba5408c7e08b8cdf99ec755
+hash_is "$upstream/toolkit/components/moz.build" 397419b65bcbcb54508c3515b5bfd45429d6da96
+mkdir -p -- "$dest/toolkit/components"
+awk '
+  {
+    if ($0 == "    DIRS += [\"messaging-system\", \"normandy\"]") {
+      print "    DIRS += [\"messaging-system\"]"
+      print "    # The opt-in variant still traverses Normandy to ship only the small"
+      print "    # shared helper jar required by Nimbus and browser targeting. Its own"
+      print "    # moz.build selects that jar when MOZ_NORMANDY is disabled."
+      print "    DIRS += [\"normandy\"]"
+      count++
+    } else {
+      print
+    }
+  }
+  END {
+    if (count != 1) exit 1
+  }
+' "$upstream/toolkit/components/moz.build" > "$dest/toolkit/components/moz.build"
+hash_is "$dest/toolkit/components/moz.build" 4c22a26aee7a8b163e7b315864f5e4dd11946f52
+grep -Fqx '    "widgets",' "$dest/toolkit/components/moz.build" ||
+  fail 'Firefox 160 new widgets component registry was lost'
+
+echo 'PASS: eighteen exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
