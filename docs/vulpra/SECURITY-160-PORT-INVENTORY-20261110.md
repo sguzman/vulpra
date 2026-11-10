@@ -135,3 +135,29 @@ Every source preimage and generated postimage was checked by **exact SHA-1 Git b
 5. `toolkit/components/normandy/jar.mn` — **confirmed source incompatibility**: old Vulpra's optional no-Normandy manifest references `toolkit/components/normandy/lib/ClientEnvironment.sys.mjs`; this path does **not exist** in the authenticated Firefox 160 release, though `NormandyApi.sys.mjs`, `NormandyUtils.sys.mjs`, and `schemas/LegacyHeartbeat.schema.json` do. Requires new component/resource graph analysis rather than reusing the old manifest.
 
 The above are port obligations, not proof of failing runtime behavior. **21/26** modified browser/code/config files have isolated, exact-source migration overlays. Five remain, and the **entire Firefox 160 browser tree has not been assembled, configured, compiled, packaged, or runtime-tested**. No source-pruning, security-current, release, or M3 closure claimed. Overall **61% (Δ+0 pp)**, M3 **83% (5/6)**.
+
+
+## Fourth port pass: all 26 existing source modifications staged, plus two Vulpra-added source files
+
+The remaining five previously unresolved modified files were adapted against the **actual Firefox 160 release source** rather than copied from Firefox 159.
+
+- `ActivityStream.sys.mjs`: exact original Vulpra delta is a single optional AdsFeed factory filter inside `FEEDS_DATA` initialization; reinserted at the unique surviving 160 anchor. Generated 160 postimage Git SHA `96c542d338f72c22f448a799e6b1b2a569c8c6f3`.
+- `DiscoveryStreamFeed.sys.mjs`: exact old delta comprises one lazy AppConstants getter and two opt-in AdsFeed state guards; all three reinserted into the modern 160 source. Postimage `2f4046cdf9d02cef0260da14acd4fd7c859cf854`.
+- `TopSitesFeed.sys.mjs`: exact old delta comprises one lazy AppConstants getter and one AdsFeed guard; both inserted into the modern 160 source. Postimage `c68ac1440fe93656a563210ecb9d55d79760a573`. JavaScript parser checks were added for all three New Tab modules.
+- `browser/extensions/newtab/webext-glue/moz.build`: the exact original Vulpra beta delta changes only the optional New Tab XPI library wildcard into an opt-in AdsFeed-less allowlist. The authenticated Firefox 160 **root `lib/` inventory still has 47 entries**, and the opt-in Vulpra allowlist covers all **46 other files/directories**, omitting only `AdsFeed.sys.mjs`. The regular build retains its upstream recursive wildcard. The modern Firefox 160 **`newtabPreview.ftl` localization packaging** is preserved. Postimage `6301413e4e5a0f7caf6d2b8195bfc222d3646b7c`.
+- `toolkit/components/normandy/jar.mn`: the 160 source deleted `ClientEnvironment.sys.mjs`, so Vulpra's old four-helper no-Normandy branch **cannot be carried verbatim**. Kept the complete modern 160 normal Normandy manifest unchanged inside the normal `MOZ_NORMANDY` conditional and adapted the experimental no-Normandy branch to three *verified-present* helpers: `NormandyApi.sys.mjs`, `NormandyUtils.sys.mjs`, and `LegacyHeartbeat.schema.json`. This is a **new conditional resource policy**, not the exact 159 runtime contract; opt-in feature behavior still needs native validation. Postimage `06317cdd540b6e32eeb195b555923795894f5b0e`.
+
+Source-only independent runs: [**24-source CI 42912907386 PASS**](https://github.com/sguzman/vulpra/actions/runs/42912907386), [**25-source CI 42913289016 PASS**](https://github.com/sguzman/vulpra/actions/runs/42913289016), and [**26-source CI 42913809736 PASS**](https://github.com/sguzman/vulpra/actions/runs/42913809736).
+
+The complete Git delta inventory lists only **two genuinely Vulpra-added files under browser/toolkit source roots**:
+
+- `browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx`, exact Git blob `717e107fa4af5dbffbb0b98083fe84bc5f0c6705`.
+- `toolkit/components/nimbus/NimbusBootstrap.sys.mjs`, exact Git blob `df7e5b95aa96d930550d794753c1acef942c70da`.
+
+Both were independently found **absent from the full official Firefox 160 Git tree** and staged without overwriting an upstream file; each copied byte-for-byte from Vulpra's existing source Git blob. They are experimental source dependencies for source overlays already staged, not substitutions for upstream browser features. [**28-file isolated staging CI 42914236622 PASS**](https://github.com/sguzman/vulpra/actions/runs/42914236622), with **26 modified existing code/config sources + 2 added opt-in source files**.
+
+Other Vulpra additions are **232 GitHub workflow, 324 `ci/`, 139 `docs/`, 6 `packaging/`, one import script, and one `sourcestamp.txt`**. Those are tracked outside the 28-file Firefox 160 browser-engine overlay. In particular, copying the old `sourcestamp.txt` into a Firefox 160 build would be misleading and is not part of this source candidate.
+
+The 14,909 Firefox 159 beta paths absent from the old Vulpra tree also remain **untouched** by source-overlay staging. Most are platform-specific: 14,384 `mobile/`, 431 `widget/`, 54 Windows installer. The other **40** include repository/editor metadata, testing fixtures, WebGPU test `.gitignore` files, a Chromium build config, and `aiohttp` vendor files. No source deletion is accepted as safe merely because it was absent from earlier Vulpra; **the complete Firefox 160 source should be preserved by default**.
+
+**Status: source-only overlay review 26/26 existing changed code/config files and 2/2 genuinely new runtime source files checked.** An isolated **full upstream 160 Git-tree composition** check and subsequent native browser build/runtime checks are separate required gates. No Firefox 160 binary, profile migration, public release, or security-current status is claimed. Overall Vulpra 61% (Δ0pp), M3 83% (5/6).
