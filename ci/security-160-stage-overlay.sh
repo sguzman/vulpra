@@ -125,6 +125,68 @@ toolkit/modules/AppConstants.sys.mjs 9dc427fd61aea11b6839d542af39c4b887b52b6f b6
 PINNED_STABLE_BASE_OVERLAYS
 test "$count" -eq 10 || fail 'expected ten additional stable-base overlays'
 
-echo 'PASS: fifteen exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# Two upstream-modified 160 source files need context-specific ports.
+# Independently proved that removing exactly these Vulpra 159 edits
+# reproduces the original 159 beta file. The 160 source is NOT overwritten
+# with the beta file. Reapply the exact small patches at unique 160 anchors.
+hash_is "$repo/browser/components/BrowserComponents.manifest" d8f8952b290ff81f6a78a05c66f747f9bc1156d3
+hash_is "$upstream/browser/components/BrowserComponents.manifest" a5b11f0ab58827a6599ddf6b2c195657a048c1f9
+hash_is "$repo/browser/components/DesktopActorRegistry.sys.mjs" 341bb4fd07c8e43c3f16d8f256608730df272d39
+hash_is "$upstream/browser/components/DesktopActorRegistry.sys.mjs" 52cfb1668493ef557419ceb2aff36967de1d8712
+
+mkdir -p -- "$dest/browser/components"
+awk '
+  {
+    if ($0 == "category browser-quit-application-granted resource://normandy/Normandy.sys.mjs Normandy.uninit") {
+      print "#ifdef MOZ_NORMANDY"
+      print
+      print "#endif"
+      count_quit++
+    } else {
+      print
+    }
+    if ($0 == "category browser-before-ui-startup resource://normandy/Normandy.sys.mjs Normandy.init") {
+      inside_init=1
+    } else if (inside_init && $0 == "#endif") {
+      print "#ifdef XP_LINUX"
+      print "#ifndef MOZ_NORMANDY"
+      print "# The opt-in Linux build initializes Nimbus after the UI without the"
+      print "# missing Normandy recipe runner. Keep the normal startup untouched."
+      print "category browser-before-ui-startup moz-src:///toolkit/components/nimbus/NimbusBootstrap.sys.mjs NimbusBootstrap.init"
+      print "#endif"
+      print "#endif"
+      count_init++
+      inside_init=0
+    }
+  }
+  END {
+    if (count_init != 1 || count_quit != 1) exit 1
+  }
+' "$upstream/browser/components/BrowserComponents.manifest" > "$dest/browser/components/BrowserComponents.manifest"
+hash_is "$dest/browser/components/BrowserComponents.manifest" 35571da687bec3207d3d28f03c959d6cd6bc2b9e
+
+awk '
+  {
+    if ($0 == "    ActorManagerParent.addJSProcessActors(JSPROCESSACTORS);") {
+      print "    // about:studies is omitted from no-Normandy builds; avoid registering"
+      print "    // an actor whose parent and child are absent from the lean package."
+      print "    if (!AppConstants.MOZ_NORMANDY) {"
+      print "      delete JSWINDOWACTORS.ShieldFrame;"
+      print "    }"
+      count_init++
+    }
+    print
+    if ($0 == "import { ActorManagerParent } from \"resource://gre/modules/ActorManagerParent.sys.mjs\";") {
+      print "import { AppConstants } from \"resource://gre/modules/AppConstants.sys.mjs\";"
+      count_import++
+    }
+  }
+  END {
+    if (count_init != 1 || count_import != 1) exit 1
+  }
+' "$upstream/browser/components/DesktopActorRegistry.sys.mjs" > "$dest/browser/components/DesktopActorRegistry.sys.mjs"
+hash_is "$dest/browser/components/DesktopActorRegistry.sys.mjs" e6c50e85908a4c870185390d61e396e7004414cc
+
+echo 'PASS: seventeen exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
