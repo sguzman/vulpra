@@ -382,6 +382,51 @@ awk '
 ' "$upstream/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs" > "$dest/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs"
 hash_is "$dest/browser/extensions/newtab/lib/TopSitesFeed.sys.mjs" c68ac1440fe93656a563210ecb9d55d79760a573
 
-echo 'PASS: twenty-four exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
+# New Tab train-hop XPI: Vulpra 159 beta changed only the wildcard
+# library manifest to an optional AdsFeed-less allowlist. Firefox 160 has
+# exactly the same old wildcard anchor; its new per-locale preview Fluent
+# packaging is elsewhere and MUST be retained. The exact 160 root library
+# inventory has 47 entries; the opt-in list covers the other 46, excludes
+# AdsFeed.sys.mjs, and leaves normal builds on the original wildcard path.
+hash_is "$repo/browser/extensions/newtab/webext-glue/moz.build" 2637aaf669255aa633ce1ccd50e7ae5f50d102ba
+hash_is "$upstream/browser/extensions/newtab/webext-glue/moz.build" 60f1e353ae2ac38f8f223b4e48581468782f143c
+mkdir -p -- "$dest/browser/extensions/newtab/webext-glue"
+awk '
+  FNR == NR {
+    if ($0 == "# Maintain the train-hop XPI\x27s library contents in sync with addon-jar.mn.") {
+      grab=1
+      starts++
+    }
+    if ($0 == "FINAL_TARGET_FILES.common += [") {
+      if (grab) {
+        grab=0
+        ends++
+      }
+    }
+    if (grab) patch=patch $0 "\n"
+    next
+  }
+  $0 == "FINAL_TARGET_FILES.lib += [" {
+    printf "%s", patch
+    if ((getline line) <= 0 || line != "    \"../lib/**\",") exit 2
+    if ((getline line) <= 0 || line != "]") exit 2
+    replacement_count++
+    next
+  }
+  { print }
+  END {
+    if (starts != 1 || ends != 1 || replacement_count != 1) exit 1
+  }
+' "$repo/browser/extensions/newtab/webext-glue/moz.build" "$upstream/browser/extensions/newtab/webext-glue/moz.build" > "$dest/browser/extensions/newtab/webext-glue/moz.build"
+hash_is "$dest/browser/extensions/newtab/webext-glue/moz.build" 6301413e4e5a0f7caf6d2b8195bfc222d3646b7c
+grep -Fq 'newtabPreview.ftl' "$dest/browser/extensions/newtab/webext-glue/moz.build" ||
+  fail 'Firefox 160 newtab preview localization was dropped'
+grep -Fq 'if CONFIG["VULPRA_NO_NEWTAB_ADSFEED"]:' "$dest/browser/extensions/newtab/webext-glue/moz.build" ||
+  fail 'optional AdsFeed-less allowlist missing'
+if grep -Fq '    "../lib/AdsFeed.sys.mjs",' "$dest/browser/extensions/newtab/webext-glue/moz.build"; then
+  fail 'AdsFeed inadvertently enabled in opt-in allowlist'
+fi
+
+echo 'PASS: twenty-five exact-source Firefox 160 Vulpra overlay files staged OUTSIDE both source trees'
 echo 'PASS: modern Firefox 160 preference file retained + Firefox compatibility and Vulpra branding'
 echo 'LIMIT: no actual Firefox 160 tree modified, no complete Vulpra port, native build or security-current claim'
