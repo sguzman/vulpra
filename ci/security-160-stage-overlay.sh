@@ -17,13 +17,21 @@ expected_upstream="2887d9de1f69c0e9776413da80e7ba0d1225dd9b"
 test "$(git -C "$upstream" rev-parse HEAD)" = "$expected_upstream" ||
   fail 'refusing to stage against anything but authenticated Firefox 160 release commit'
 
-mkdir -p -- "$3"
-dest="$(cd -- "$3" && pwd -P)"
+# Resolve and reject dangerous destinations BEFORE mkdir. Otherwise a
+# rejected nested path would leave even an empty directory in a source tree.
+dest="$(realpath -m -- "$3")" || fail 'unable to canonicalize output'
 case "$dest/" in
   "$upstream/"*|"$repo/"*) fail 'output must be outside BOTH source checkouts' ;;
 esac
 test "$dest" != "$upstream" && test "$dest" != "$repo" ||
   fail 'output cannot replace a source checkout'
+mkdir -p -- "$dest"
+dest="$(cd -- "$dest" && pwd -P)"
+case "$dest/" in
+  "$upstream/"*|"$repo/"*) fail 'resolved output entered a source checkout' ;;
+esac
+test "$dest" != "$upstream" && test "$dest" != "$repo" ||
+  fail 'resolved output is a source checkout'
 test -z "$(find "$dest" -mindepth 1 -maxdepth 1 -print -quit)" ||
   fail 'output directory must initially be empty'
 
