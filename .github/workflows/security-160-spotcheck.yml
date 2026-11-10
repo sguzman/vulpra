@@ -1,0 +1,48 @@
+name: Firefox 160 Bounded High-Impact Source Patch Presence
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json
+      - ci/security-160-spotcheck.sh
+      - ci/tests/security-160-spotcheck-tests.sh
+      - gfx/thebes/SharedFontList.cpp
+      - gfx/thebes/SharedFontList.h
+      - dom/ipc/ProcessIsolation.cpp
+      - netwerk/protocol/http/nsHttpChannel.cpp
+      - netwerk/protocol/http/nsHttpChannel.h
+      - dom/media/FileBlockCache.cpp
+      - .github/workflows/security-160-spotcheck.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-stale-160-patches-without-unsafe-claims:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exactly the six audited source files and read-only tests
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json
+            ci/security-160-spotcheck.sh
+            ci/tests/security-160-spotcheck-tests.sh
+            gfx/thebes/SharedFontList.cpp
+            gfx/thebes/SharedFontList.h
+            dom/ipc/ProcessIsolation.cpp
+            netwerk/protocol/http/nsHttpChannel.cpp
+            netwerk/protocol/http/nsHttpChannel.h
+            dom/media/FileBlockCache.cpp
+      - name: Reject source-drift and falsified Firefox 160 security-completeness claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-spotcheck.sh
+          bash -n ci/tests/security-160-spotcheck-tests.sh
+          bash ci/tests/security-160-spotcheck-tests.sh
+          echo 'LIMIT: six inspected source files, four CVEs, no source engine upgrade or runtime proof'
