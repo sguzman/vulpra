@@ -177,6 +177,13 @@ jobs:
             "$out/candidate-tree-report.json" >/dev/null
           test "$(wc -l < "$out/changed-paths.txt")" -eq 28
           echo 'PASS: full-source Git-tree candidate assembled without materializing or changing the 160 checkout'
+      - name: Archive verified 28-file overlay for a separate materialization job
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-verified-source-overlay
+          path: ${{ runner.temp }}/vulpra160-overlays/
+          if-no-files-found: error
+          retention-days: 7
       - name: Archive reproducible 160 source-tree assembly ledger
         uses: actions/upload-artifact@v4
         with:
@@ -185,5 +192,109 @@ jobs:
             ${{ runner.temp }}/vulpra160-complete-tree/candidate-tree-report.json
             ${{ runner.temp }}/vulpra160-complete-tree/overlay-paths.txt
             ${{ runner.temp }}/vulpra160-complete-tree/changes-against-exact-firefox160.tsv
+          if-no-files-found: error
+          retention-days: 30
+
+  materialize-verified-firefox160-candidate:
+    needs: stage-twenty-eight-exact-source-overlays
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - name: Check out COMPLETE official Firefox 160 source in isolated CI directory
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          fetch-depth: 1
+          path: firefox160
+      - name: Retrieve independently verified overlay and complete-tree ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-verified-source-overlay
+          path: ${{ runner.temp }}/vulpra160-overlays
+      - name: Retrieve authenticated full-tree identity from assembly job
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          path: ${{ runner.temp }}/vulpra160-ledger
+      - name: Materialize ONLY verified source patches, prove exact complete Git tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          release=2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          source="$GITHUB_WORKSPACE/firefox160"
+          stage="$RUNNER_TEMP/vulpra160-overlays"
+          ledger="$RUNNER_TEMP/vulpra160-ledger"
+          test "$(git -C "$source" rev-parse HEAD)" = "$release"
+          test -z "$(git -C "$source" status --porcelain)"
+          jq -e --arg release "$release" '
+            .firefox160_commit==$release and
+            (.assembled_git_tree|test("^[0-9a-f]{40}$")) and
+            .source_files_modified==26 and .vulpra_source_files_added==2 and
+            .upstream_files_deleted==0 and .all_other_upstream_files_preserved==true and
+            .browser_configured==false and .native_binary_compiled==false
+          ' "$ledger/candidate-tree-report.json" >/dev/null
+          list="$ledger/overlay-paths.txt"
+          test "$(wc -l < "$list")" -eq 28
+          test "$(find "$stage" -type f | wc -l)" -eq 28
+          find "$stage" -type f -printf '%P\n' | LC_ALL=C sort > "$RUNNER_TEMP/actual-overlays.txt"
+          cmp -s "$list" "$RUNNER_TEMP/actual-overlays.txt"
+          test -z "$(find "$stage" -type l -print -quit)"
+          while IFS= read -r path; do
+            test -n "$path"
+            case "$path" in
+              /*|../*|*/../*|*/..|./*|*/./*|*/.) echo "Unsafe path: $path" >&2; exit 1 ;;
+            esac
+            src="$stage/$path"
+            dst="$source/$path"
+            test -f "$src" && test ! -L "$src"
+            test ! -L "$dst"
+            if test -e "$dst"; then
+              test -f "$dst"
+            else
+              test -d "$(dirname "$dst")"
+            fi
+            cp -- "$src" "$dst"
+            test "$(git hash-object -- "$src")" = "$(git hash-object -- "$dst")"
+          done < "$list"
+          # The real default index stays untouched; only a private temporary index
+          # reflects this candidate. Compare its complete tree, not merely 28 hashes.
+          export GIT_INDEX_FILE="$RUNNER_TEMP/firefox160-materialized.index"
+          git -C "$source" read-tree HEAD
+          git -C "$source" add -f --pathspec-from-file="$list"
+          actual="$(git -C "$source" write-tree)"
+          expected="$(jq -r .assembled_git_tree "$ledger/candidate-tree-report.json")"
+          test "$actual" = "$expected" || {
+            echo "FAIL: materialized full tree $actual differs from proven tree $expected" >&2
+            exit 1
+          }
+          git -C "$source" diff --exit-code
+          git -C "$source" diff-tree --no-commit-id -r --name-only HEAD "$actual" |
+            LC_ALL=C sort > "$RUNNER_TEMP/materialized-changed-paths.txt"
+          cmp -s "$list" "$RUNNER_TEMP/materialized-changed-paths.txt"
+          jq -n --arg release "$release" --arg tree "$actual" '{
+            schema_version:1,
+            kind:"materialized_firefox160_vulpra_candidate",
+            upstream_release_commit:$release,
+            complete_materialized_source_tree:$tree,
+            exact_assembly_tree_match:true,
+            verified_overlays:28,
+            upstream_paths_otherwise_preserved:true,
+            only_isolated_ci_checkout_modified:true,
+            browser_configured:false,
+            native_binary_compiled:false,
+            packaged_browser_tested:false,
+            security_current:false
+          }' > "$RUNNER_TEMP/materialized-candidate.json"
+          echo "PASS: complete on-disk Firefox 160 checkout matches independently assembled candidate tree $actual"
+          echo 'LIMIT: source-materialization proof only; configure/native/runtime/security acceptance remain open'
+      - name: Archive on-disk full-source identity, without uploading Firefox source
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          path: ${{ runner.temp }}/materialized-candidate.json
           if-no-files-found: error
           retention-days: 30
