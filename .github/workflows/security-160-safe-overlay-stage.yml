@@ -199,7 +199,13 @@ jobs:
     needs: stage-twenty-eight-exact-source-overlays
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 350
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      MOZ_HEADLESS: "1"
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "vulpra-firefox160-native-v1"
+      CARGO_BUILD_JOBS: "1"
     permissions:
       contents: read
     steps:
@@ -308,10 +314,19 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/mozconfig-linux
+            packaging/stage.sh
+            packaging/vulpra
+            packaging/test-wayland.sh
       - name: Set up Mozilla compiler cache for configure
         uses: mozilla-actions/sccache-action@v0.0.11
         with:
           version: "v0.16.0"
+      - name: Supply GitHub cache credentials to native compiler cache
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
       - name: Bootstrap Firefox 160 native Linux build dependencies
         shell: bash
         working-directory: firefox160
@@ -320,7 +335,7 @@ jobs:
           test -s "$GITHUB_WORKSPACE/vulpra-build-config/ci/mozconfig-linux"
           test -s "$RUNNER_TEMP/materialized-candidate.json"
           sudo apt-get update
-          sudo apt-get install -y python3 python3-venv python3-dev git curl make jq
+          sudo apt-get install -y python3 python3-venv python3-dev git curl make jq weston wayland-utils libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1 binutils
           ./mach --no-interactive bootstrap --application-choice browser
       - name: Configure exact-tree Firefox 160 Vulpra Linux candidate
         shell: bash
@@ -383,5 +398,136 @@ jobs:
         with:
           name: firefox160-vulpra-native-configure-failure
           path: ${{ runner.temp }}/firefox160-vulpra-configure-failure-tail.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Full native-build verification, gated on exact source materialization
+      # and a successful native Firefox 160 configure above.
+      - name: Prepare disposable hosted-runner capacity for full browser build
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /mnt
+          free -h
+          # Exact optional preinstalled SDK roots on disposable CI runners only;
+          # never touch the source, objdir, build toolchains or user profiles.
+          for path in /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/powershell /opt/hostedtoolcache/CodeQL; do
+            if test -d "$path" && test ! -L "$path"; then
+              sudo rm -rf -- "$path"
+            fi
+          done
+          sudo apt-get clean
+          gib=$((1024*1024*1024))
+          free_bytes="$(df --output=avail -B1 /mnt | tail -1 | tr -d ' ')"
+          [[ "$free_bytes" =~ ^[0-9]+$ ]]
+          if (( free_bytes < 24*gib )); then
+            echo "::error::Insufficient runner disk for safe browser build with swap"
+            exit 1
+          fi
+          swap_gib=$(((free_bytes-16*gib)/gib))
+          if (( swap_gib > 24 )); then swap_gib=24; fi
+          (( swap_gib >= 8 ))
+          sudo fallocate -l "$swap_gib"G /mnt/vulpra-firefox160-native.swap
+          sudo chmod 0600 /mnt/vulpra-firefox160-native.swap
+          sudo mkswap /mnt/vulpra-firefox160-native.swap
+          sudo swapon /mnt/vulpra-firefox160-native.swap
+          grep -Fq /mnt/vulpra-firefox160-native.swap /proc/swaps
+          df -h /mnt
+          echo "PASS: isolated CI runner memory/disk precautions ready"
+      - name: Compile exact materialized Firefox 160 Vulpra candidate
+        shell: bash
+        working-directory: firefox160
+        env:
+          MOZCONFIG: ${{ github.workspace }}/vulpra-build-config/ci/mozconfig-linux
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/firefox160-vulpra-configure-proof.json"
+          ./mach build 2>&1 | tee "$RUNNER_TEMP/firefox160-vulpra-native-build.log"
+          test -s obj-vulpra-linux/dist/bin/application.ini
+          echo "PASS: full native Firefox 160 Vulpra compile"
+      - name: Package and verify exact-source Firefox 160 native browser
+        shell: bash
+        working-directory: firefox160
+        env:
+          MOZCONFIG: ${{ github.workspace }}/vulpra-build-config/ci/mozconfig-linux
+        run: |
+          set -euo pipefail
+          ./mach package 2>&1 | tee "$RUNNER_TEMP/firefox160-vulpra-package.log"
+          dist="obj-vulpra-linux/dist"
+          test -s "$dist/bin/application.ini"
+          grep -Fxq 'Name=Vulpra' "$dist/bin/application.ini"
+          grep -Fxq 'Vendor=Vulpra' "$dist/bin/application.ini"
+          mapfile -t archives < <(find "$dist" -maxdepth 1 -type f -name '*.tar.xz' | sort)
+          test "${#archives[@]}" -eq 1
+          stage="$RUNNER_TEMP/vulpra-firefox160-native-ci.tar.xz"
+          bash "$GITHUB_WORKSPACE/vulpra-build-config/packaging/stage.sh" "${archives[0]}" "$stage"
+          (cd "$RUNNER_TEMP" && sha256sum -c vulpra-firefox160-native-ci.tar.xz.sha256)
+          test -s "$stage"
+          echo "PASS: Vulpra 160 native package staged and checksummed"
+      - name: Smoke-test isolated packaged Firefox 160 Vulpra on Linux and Wayland
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/vulpra-firefox160-native-ci.tar.xz"
+          work="$(mktemp -d)"
+          trap 'rm -rf -- "$work"' EXIT
+          mkdir -p "$work/package" "$work/home"
+          tar -xf "$stage" -C "$work/package"
+          mapfile -d '' -t inis < <(find "$work/package" -maxdepth 5 -type f -name application.ini -print0)
+          test "${#inis[@]}" -eq 1
+          appdir="$(dirname "${inis[0]}")"
+          test -x "$appdir/vulpra"
+          grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
+          mkdir -p "$work/home/.mozilla/firefox"
+          printf '[Profile0]\nName=existing-firefox\nPath=existing-profile\n' > "$work/home/.mozilla/firefox/profiles.ini"
+          before="$(sha256sum "$work/home/.mozilla/firefox/profiles.ini")"
+          printf '%s\n' '<!doctype html><title>Vulpra 160 CI</title><h1>Vulpra native smoke</h1><script>document.querySelector("h1").textContent+=" JS"</script>' > "$work/smoke.html"
+          HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" MOZ_HEADLESS=1             timeout 120 "$appdir/vulpra" --headless --screenshot "$work/screenshot.png" "file://$work/smoke.html"
+          test -s "$work/screenshot.png"
+          test "$(sha256sum "$work/home/.mozilla/firefox/profiles.ini")" = "$before"
+          VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1             VULPRA_WAYLAND_TEST_SECONDS=10             bash "$GITHUB_WORKSPACE/vulpra-build-config/packaging/test-wayland.sh" "$appdir"
+          archive_sha="$(sha256sum "$stage" | awk '{print $1}')"
+          tree="$(jq -r .complete_materialized_source_tree "$RUNNER_TEMP/materialized-candidate.json")"
+          jq -n --arg tree "$tree" --arg pkg "$archive_sha" '{
+            schema_version:1,
+            kind:"firefox160_vulpra_native_ci_preview",
+            complete_source_tree:$tree,
+            package_sha256:$pkg,
+            native_configure_passed:true,
+            native_build_passed:true,
+            native_package_passed:true,
+            headless_js_smoke_passed:true,
+            private_wayland_smoke_passed:true,
+            original_firefox_profile_preserved:true,
+            security_current:false,
+            release_ready:false
+          }' > "$RUNNER_TEMP/firefox160-vulpra-native-build-proof.json"
+          echo 'PASS: packaged native headless JS and private Wayland smoke, Firefox profile unchanged'
+          echo 'LIMIT: not full WebExtensions/Nimbus/security regression coverage or release acceptance'
+      - name: Archive bounded Firefox 160 native build/runtime proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-native-build-runtime-proof
+          path: ${{ runner.temp }}/firefox160-vulpra-native-build-proof.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Archive bounded Firefox 160 native failure logs
+        if: failure()
+        shell: bash
+        run: |
+          for name in firefox160-vulpra-native-build firefox160-vulpra-package; do
+            if test -s "$RUNNER_TEMP/$name.log"; then
+              tail -n 2000 "$RUNNER_TEMP/$name.log" > "$RUNNER_TEMP/$name-failure-tail.log"
+            fi
+          done
+      - name: Upload bounded Firefox 160 native failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-native-build-failure
+          path: |
+            ${{ runner.temp }}/firefox160-vulpra-native-build-failure-tail.log
+            ${{ runner.temp }}/firefox160-vulpra-package-failure-tail.log
           if-no-files-found: ignore
           retention-days: 14
