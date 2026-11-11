@@ -199,7 +199,7 @@ jobs:
     needs: stage-twenty-eight-exact-source-overlays
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 120
     permissions:
       contents: read
     steps:
@@ -298,3 +298,90 @@ jobs:
           path: ${{ runner.temp }}/materialized-candidate.json
           if-no-files-found: error
           retention-days: 30
+
+      # Use the exact already-verified source candidate, not a new source copy.
+      - name: Checkout pinned Vulpra Linux configuration (separate CI checkout)
+        uses: actions/checkout@v4
+        with:
+          path: vulpra-build-config
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/mozconfig-linux
+      - name: Set up Mozilla compiler cache for configure
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+      - name: Bootstrap Firefox 160 native Linux build dependencies
+        shell: bash
+        working-directory: firefox160
+        run: |
+          set -euo pipefail
+          test -s "$GITHUB_WORKSPACE/vulpra-build-config/ci/mozconfig-linux"
+          test -s "$RUNNER_TEMP/materialized-candidate.json"
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-venv python3-dev git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+      - name: Configure exact-tree Firefox 160 Vulpra Linux candidate
+        shell: bash
+        working-directory: firefox160
+        env:
+          MOZCONFIG: ${{ github.workspace }}/vulpra-build-config/ci/mozconfig-linux
+        run: |
+          set -euo pipefail
+          release=2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          test "$(git rev-parse HEAD)" = "$release"
+          jq -e --arg sha "$release" '
+            .upstream_release_commit==$sha and
+            .exact_assembly_tree_match==true and
+            .verified_overlays==28 and
+            .upstream_paths_otherwise_preserved==true and
+            .browser_configured==false and
+            .native_binary_compiled==false
+          ' "$RUNNER_TEMP/materialized-candidate.json" >/dev/null
+          test -s "$MOZCONFIG"
+          grep -Fxq 'ac_add_options --with-app-basename=Vulpra' "$MOZCONFIG"
+          grep -Fxq 'ac_add_options --with-branding=browser/branding/unofficial' "$MOZCONFIG"
+          grep -Fxq 'ac_add_options --disable-tests' "$MOZCONFIG"
+          grep -Fxq 'ac_add_options --with-ccache=sccache' "$MOZCONFIG"
+          command -v sccache
+          ./mach configure 2>&1 | tee "$RUNNER_TEMP/firefox160-vulpra-configure.log"
+          test -s obj-vulpra-linux/config.status
+          grep -q 'Vulpra' obj-vulpra-linux/config.status
+          tree="$(jq -r .complete_materialized_source_tree "$RUNNER_TEMP/materialized-candidate.json")"
+          jq -n --arg release "$release" --arg tree "$tree" '{
+            schema_version:1,
+            kind:"native_configured_firefox160_vulpra_candidate",
+            upstream_release_commit:$release,
+            verified_source_tree:$tree,
+            verified_overlays:28,
+            native_linux_configure_passed:true,
+            native_binary_compiled:false,
+            packaged_browser_tested:false,
+            security_current:false
+          }' > "$RUNNER_TEMP/firefox160-vulpra-configure-proof.json"
+          echo "PASS: Firefox 160 native configure for exact Vulpra source candidate $tree"
+          echo 'LIMIT: configure only, no native compilation, package, runtime or security acceptance'
+      - name: Archive Firefox 160 native configuration proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-native-configure-proof
+          path: ${{ runner.temp }}/firefox160-vulpra-configure-proof.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Archive bounded configure failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if test -s "$RUNNER_TEMP/firefox160-vulpra-configure.log"; then
+            tail -n 2000 "$RUNNER_TEMP/firefox160-vulpra-configure.log" > "$RUNNER_TEMP/firefox160-vulpra-configure-failure-tail.log"
+          fi
+      - name: Upload configure failure tail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-native-configure-failure
+          path: ${{ runner.temp }}/firefox160-vulpra-configure-failure-tail.log
+          if-no-files-found: ignore
+          retention-days: 14
