@@ -101,6 +101,27 @@ jobs:
           print(f"PASS: future Firefox 160 acceptance workflow: {len(required)} source contracts and {len(scripts)} shell blocks syntax-checked")
           print("LIMIT: static workflow contract; not actual Firefox 160 compile or browser runtime")
           PY
+      - name: Verify exact Firefox 160 WebDriver dependency binary without browser build
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl --fail --location --show-error --silent --retry 3 --max-time 90 \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz' \
+            --output "$archive"
+          printf '%s  %s\n' \
+            'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/geckodriver-verified"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/geckodriver-verified" geckodriver
+          driver="$RUNNER_TEMP/geckodriver-verified/geckodriver"
+          test -x "$driver"
+          "$driver" --version | grep -Fq 'geckodriver 0.37.1'
+          "$driver" --help > "$RUNNER_TEMP/geckodriver-help.txt"
+          grep -Fq -- '--allow-system-access' "$RUNNER_TEMP/geckodriver-help.txt"
+          grep -Fq -- '--host' "$RUNNER_TEMP/geckodriver-help.txt"
+          grep -Fq -- '--port' "$RUNNER_TEMP/geckodriver-help.txt"
+          echo 'PASS: Mozilla-published SHA-256-pinned geckodriver runs on Ubuntu and supports the necessary opt-in chrome-context flag'
+          echo 'LIMIT: no actual browser, browser runtime, or profile used'
       - name: Existing package staging and launcher isolation fixture regressions
         shell: bash
         run: |
