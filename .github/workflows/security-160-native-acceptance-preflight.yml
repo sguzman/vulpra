@@ -4,6 +4,7 @@ on:
     branches: [upgrade/firefox-160-overlay-prototype]
     paths:
       - .github/workflows/security-160-native-acceptance-preflight.yml
+      - .github/workflows/security-160-safe-overlay-stage.yml
       - ci/smoke-webextension-package-local.py
       - ci/tests/smoke-webextension-package-local-test.sh
       - packaging/test-stage.sh
@@ -63,6 +64,10 @@ jobs:
               'unreleased package replay artifact': 'firefox160-vulpra-unreleased-native-preview-not-approved',
               'WebDriver failure log': 'firefox160-vulpra-webdriver-failure-tail.log',
               'real browser proof artifact': 'firefox160-vulpra-real-webdriver-runtime-proof',
+              'real-runtime source provenance': 'firefox160_verified_git_tree',
+              'real-runtime archive provenance': 'firefox160_staged_archive_sha256',
+              'runtime proof no release approval': 'release_ready: false',
+              'runtime proof no security-current claim': 'security_current: false',
           }
           for name, fragment in required.items():
               assert fragment in workflow, f"Firefox 160 acceptance workflow missing {name}"
