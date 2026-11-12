@@ -65,7 +65,9 @@ def verify_signed_message_result(value, phase):
         safe = {key: value.get(key) for key in (
             "status", "phase", "stage", "extension_identity_matches",
             "background_shortcuts_response", "content_message_sent",
-            "error_class", "matching_local_tab_count") if key in value} if isinstance(value, dict) else {}
+            "error_class", "matching_local_tab_count",
+            "total_disposable_tabs", "tabs_with_url",
+            "localhost_tabs", "page_title_tabs", "tab_schemes") if key in value} if isinstance(value, dict) else {}
         raise RuntimeError("Signed background/content check did not pass: " +
                            json.dumps(safe, sort_keys=True))
     need(value.get("phase") == phase, "Signed message phase mismatch")
@@ -181,6 +183,16 @@ def signed_background_and_content_probe(port, sid, popup_url, server, token, pha
                   const allTabs=await browser.tabs.query({});
                   const tabs=allTabs.filter(tab=>tab.url===url);
                   result.matching_local_tab_count=tabs.length;
+                  result.total_disposable_tabs=allTabs.length;
+                  result.tabs_with_url=allTabs.filter(t=>typeof t.url==="string").length;
+                  result.localhost_tabs=allTabs.filter(t=>
+                    typeof t.url==="string" &&
+                    t.url.startsWith("http://127.0.0.1:")).length;
+                  result.page_title_tabs=allTabs.filter(t=>
+                    t.title==="Vulpra extension smoke").length;
+                  // Report only generic URL scheme, not any web address.
+                  result.tab_schemes=allTabs.slice(0,8).map(t=>
+                    typeof t.url==="string" ? t.url.split(":")[0] : null);
                   if(tabs.length!==1 || !Number.isInteger(tabs[0].id)){
                     complete(result);return;
                   }
