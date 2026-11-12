@@ -19,6 +19,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import zipfile
 
 
@@ -57,6 +59,161 @@ def verify_probe_result(data, phase):
     return True
 
 
+def verify_signed_message_result(value, phase):
+    need(isinstance(value, dict) and value.get("status") == "pass",
+         "Signed background message response was not a pass")
+    need(value.get("phase") == phase, "Signed message phase mismatch")
+    need(value.get("extension_identity_matches") is True,
+         "Signed message sender identity mismatch")
+    need(value.get("background_shortcuts_response") is True,
+         "No real signed background listener response")
+    need(value.get("content_message_sent") is True,
+         "Signed content tab message was not accepted")
+    need(value.get("token_in_report") is False,
+         "Signed message proof leaked probe marker")
+    return True
+
+
+def test_signed_message_negatives():
+    valid = {
+        "status": "pass", "phase": "before_restart",
+        "extension_identity_matches": True,
+        "background_shortcuts_response": True,
+        "content_message_sent": True,
+        "token_in_report": False,
+    }
+    verify_signed_message_result(valid, "before_restart")
+    failures = 0
+    forged = (
+        None, [], {},
+        {**valid, "status": "timeout"},
+        {**valid, "phase": "after_restart"},
+        {**valid, "extension_identity_matches": False},
+        {**valid, "background_shortcuts_response": False},
+        {**valid, "background_shortcuts_response": "true"},
+        {**valid, "content_message_sent": False},
+        {**valid, "content_message_sent": "true"},
+        {**valid, "token_in_report": True},
+        {**valid, "token_in_report": "false"},
+    )
+    for item in forged:
+        try:
+            verify_signed_message_result(item, "before_restart")
+        except RuntimeError:
+            failures += 1
+        else:
+            raise RuntimeError("Forged signed background/content test accepted")
+    need(failures == 12, "Signed message fixture count drifted")
+    print("PASS: 12 forged signed background/content message results rejected")
+
+
+def signed_background_and_content_probe(port, sid, popup_url, server, token, phase):
+    """Real background request/reply and signed content-script event/DOM proof.
+
+    Keep a localhost document alive in its own tab; use the signed
+    extension's unmodified popup to send messages. Never inject helper JS
+    into the inspected web page other than a read-only DOM assertion.
+    """
+    need(phase in ("before_restart", "after_restart"), "Unknown content probe phase")
+    base = "/session/" + sid
+    page_url = f"http://127.0.0.1:{server.server_port}/extension"
+    marker = "Vulpra signed content proof " + token
+    wd.request(port, "POST", base + "/url", {"url": page_url}, timeout_seconds=35)
+    first = wd.request(port, "GET", base + "/window")
+    need(isinstance(first, str) and first, "No original document window")
+    initial = wd.request(port, "POST", base + "/execute/sync", {
+        "script": """return {
+            url:document.URL, title:document.title,
+            clean:document.querySelectorAll('.container-notification').length===0
+        };""",
+        "args": [],
+    })
+    need(isinstance(initial, dict) and initial.get("url") == page_url and
+         initial.get("title") == "Vulpra extension smoke" and
+         initial.get("clean") is True,
+         "Localhost fixture unready or already contains signed content notification")
+    created = wd.request(port, "POST", base + "/window/new", {"type": "tab"})
+    popup_handle = created.get("handle") if isinstance(created, dict) else None
+    need(isinstance(popup_handle, str) and popup_handle != first,
+         "Did not create separate isolated extension popup tab")
+    try:
+        wd.request(port, "POST", base + "/url", {"url": popup_url}, timeout_seconds=35)
+        reply = wd.request(port, "POST", base + "/execute/async", {
+            "script": """
+              const url=arguments[0], marker=arguments[1], phase=arguments[2];
+              const done=arguments[arguments.length-1];
+              let sent=false;
+              const complete=(value)=>{
+                if(sent)return;
+                sent=true;clearTimeout(timer);done(value);
+              };
+              const timer=setTimeout(()=>complete({status:"timeout",phase}),14000);
+              (async()=>{
+                const result={status:"fail",phase,token_in_report:false};
+                try{
+                  result.extension_identity_matches=(
+                    location.protocol==="moz-extension:" &&
+                    browser.runtime.id==="@testpilot-containers");
+                  if(!result.extension_identity_matches){complete(result);return;}
+                  // The 8.4.0 signed background message handler implements
+                  // getShortcuts as a real async storage-backed read.
+                  const shortcuts=await browser.runtime.sendMessage({
+                    method:"getShortcuts"
+                  });
+                  result.background_shortcuts_response=!!shortcuts &&
+                    typeof shortcuts==="object" &&
+                    Object.hasOwn(shortcuts,"open_container_0") &&
+                    Object.hasOwn(shortcuts,"reopen_in_container_0") &&
+                    typeof shortcuts.open_container_0==="string";
+                  if(!result.background_shortcuts_response){complete(result);return;}
+                  const tabs=await browser.tabs.query({url});
+                  if(tabs.length!==1 || !Number.isInteger(tabs[0].id)){
+                    complete(result);return;
+                  }
+                  // Signed content script from the XPI listens for this
+                  // message and creates an actual DOM notification.
+                  await browser.tabs.sendMessage(tabs[0].id,{text:marker});
+                  result.content_message_sent=true;
+                  result.status="pass";
+                }catch(_){result.status="error";}
+                complete(result);
+              })();
+            """,
+            "args": [page_url, marker, phase],
+        }, timeout_seconds=23)
+        verify_signed_message_result(reply, phase)
+        wd.request(port, "POST", base + "/window", {"handle": first})
+        deadline = time.monotonic() + 13
+        matched = False
+        while time.monotonic() < deadline:
+            state = wd.request(port, "POST", base + "/execute/sync", {
+                "script": """
+                  const expected=arguments[0];
+                  return {
+                    url:document.URL,
+                    matched:[...document.querySelectorAll('.container-notification')]
+                      .some(el=>el.textContent===expected)
+                  };
+                """,
+                "args": [marker],
+            })
+            need(isinstance(state, dict) and state.get("url") == page_url,
+                 "WebDriver navigated away from signed content-script fixture")
+            if state.get("matched") is True:
+                matched = True
+                break
+            time.sleep(0.2)
+        need(matched, "Signed add-on content script did not create matching notification")
+    finally:
+        # Close only the temporary popup tab. Do not uninstall the add-on
+        # from within its own extension document (Marionette would die).
+        wd.request(port, "POST", base + "/window", {"handle": popup_handle})
+        wd.request(port, "DELETE", base + "/window")
+        wd.request(port, "POST", base + "/window", {"handle": first})
+    print("PASS: real signed extension background request/reply and content-script DOM "
+          + phase, flush=True)
+
+
 def self_test():
     valid = {
         "status": "pass", "phase": "before_restart",
@@ -89,6 +246,7 @@ def self_test():
             raise RuntimeError("Forged extension storage/background result accepted")
     need(rejected == 12, "Negative fixture count drifted")
     print("PASS: signed extension storage/background checker rejected 12 forged fixtures")
+    test_signed_message_negatives()
 
 
 def extension_popup_url(port, sid, signed_id):
@@ -211,6 +369,13 @@ def run(repo, signed_xpi, digest, output):
              manifest.get("background", {}).get("page") == EXPECTED_BACKGROUND and
              "storage" in manifest.get("permissions", []),
              "Mozilla-signed XPI identity/popup/background/storage shape drifted")
+        need("js/content-script.js" in names and
+             "js/background/messageHandler.js" in names and
+             any(record.get("js") == ["js/content-script.js"] and
+                 "<all_urls>" in record.get("matches", []) and
+                 record.get("run_at") == "document_start"
+                 for record in manifest.get("content_scripts", [])),
+             "Signed XPI missing required original content/background message code")
     with tempfile.TemporaryDirectory(prefix="vulpra160-signed-storage-") as temp:
         root = Path(temp)
         package = root / "package"
@@ -230,6 +395,9 @@ def run(repo, signed_xpi, digest, output):
         sentinel = b"unrelated Firefox profile must not be changed by signed storage QA\n"
         original.write_bytes(sentinel)
         token = secrets.token_hex(24)
+        server = wd.http.server.ThreadingHTTPServer(("127.0.0.1", 0), wd.LocalPage)
+        server.paths = []
+        threading.Thread(target=server.serve_forever, daemon=True).start()
         signed_id = None
         popup_before = None
         with helper.session(driver, binary, profile, home,
@@ -245,6 +413,8 @@ def run(repo, signed_xpi, digest, output):
                  state.get("user_disabled") is False,
                  "Signed extension not active at first launch")
             popup_before = extension_popup_url(port, sid, signed_id)
+            signed_background_and_content_probe(
+                port, sid, popup_before, server, token, "before_restart")
             exercise_extension_page(port, sid, popup_before, token, "before_restart")
         need(original.read_bytes() == sentinel,
              "Existing Firefox sentinel changed after first session")
@@ -259,6 +429,8 @@ def run(repo, signed_xpi, digest, output):
             popup_after = extension_popup_url(port, sid, signed_id)
             need(popup_after == popup_before,
                  "Signed extension moz-extension origin changed across profile restart")
+            signed_background_and_content_probe(
+                port, sid, popup_after, server, token, "after_restart")
             exercise_extension_page(port, sid, popup_after, token, "after_restart")
             # Never uninstall an extension while Marionette is executing in
             # that very extension page: its document/global would disappear.
@@ -269,6 +441,8 @@ def run(repo, signed_xpi, digest, output):
             helper.checked_addon_state(helper.addon_status(port, sid, signed_id), False)
         need(original.read_bytes() == sentinel,
              "Existing Firefox sentinel changed after second session")
+        server.shutdown()
+        server.server_close()
         proof = {
             "schema_version":1,
             "status":"pass",
@@ -285,8 +459,10 @@ def run(repo, signed_xpi, digest, output):
             "signed_extension_origin_unchanged_across_restart":True,
             "signed_addon_uninstalled_after_test":True,
             "other_firefox_profile_sentinel_preserved":True,
-            "actual_background_message_delivery_verified":False,
-            "signed_extension_content_script_injection_verified":False,
+            "actual_background_message_delivery_verified":True,
+            "signed_extension_content_script_injection_verified":True,
+            "signed_background_getShortcuts_response_before_and_after_restart":True,
+            "signed_content_script_tab_message_notified_dom_before_and_after_restart":True,
             "whole_addon_ecosystem_certified":False,
             "sandbox_syscall_denial_executed":False,
             "safe_browsing_provider_ready":False,
@@ -294,7 +470,7 @@ def run(repo, signed_xpi, digest, output):
             "release_ready":False,
         }
         output.write_text(json.dumps(proof, indent=2) + "\n")
-    print("PASS: signed Firefox 160 WebExtension popup + background and storage.local across full restart")
+    print("PASS: signed Firefox 160 WebExtension popup + background, storage.local, real message roundtrip and content-script DOM across full restart")
     print("LIMIT: one AMO extension; no general compatibility, Safe Browsing or sandbox denial proof")
 
 
