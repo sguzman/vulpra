@@ -1,0 +1,174 @@
+# Real signed extension WebExtension storage and popup/background probe, no browser build.
+name: Firefox 160 CSP and HTML Iframe Sandbox Native Runtime (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-csp-iframe-sandbox.yml
+      - ci/security-160-csp-iframe-sandbox.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  csp-frame-runtime:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Authenticate original successful native Firefox 160 source and package
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo,id=43138458940;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+               r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Refusing unauthenticated original native browser build');
+            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            for(const name of ['firefox160-vulpra-unreleased-native-preview-not-approved',
+                               'firefox160-vulpra-materialized-source-proof',
+                               'firefox160-vulpra-complete-git-tree-candidate']){
+              if(!all.some(a=>a.name===name&&!a.expired&&a.size_in_bytes>0))
+                throw Error('Pinned Firefox 160 proof unavailable/expired '+name);
+            }
+            core.info('PASS: immutable Firefox 160 archive and source provenance');
+      - name: Checkout CSP/iframe sandbox WebDriver probes and existing helpers
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-csp-iframe-sandbox.py
+            ci/security-160-persistent-extension-restart.py
+            ci/smoke-webextension-package-local.py
+      - name: Download verified original native Firefox 160 package
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-unreleased-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native-archive
+      - name: Download matching immutable candidate tree identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source-proof
+      - name: Download original 28-overlay source ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/candidate-ledger
+      - name: Reject forged CSP/frame runtime outcomes and authenticate native source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/security-160-csp-iframe-sandbox.py
+          python3 ci/security-160-csp-iframe-sandbox.py --self-test
+          source="$RUNNER_TEMP/source-proof/materialized-candidate.json"
+          ledger="$RUNNER_TEMP/candidate-ledger/candidate-tree-report.json"
+          overlays="$RUNNER_TEMP/candidate-ledger/overlay-paths.txt"
+          package="$RUNNER_TEMP/native-archive/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$source" && test -s "$ledger" && test -s "$overlays" &&
+          test -s "$package" && test -s "$package.sha256"
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true and .security_current==false
+          ' "$source" >/dev/null
+          jq -e '
+            .firefox160_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_git_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .source_files_modified==26 and .vulpra_source_files_added==2 and
+            .upstream_files_deleted==0 and
+            .all_other_upstream_files_preserved==true and .security_current==false
+          ' "$ledger" >/dev/null
+          test "$(wc -l < "$overlays")" -eq 28
+          test "$(sort -u "$overlays" | wc -l)" -eq 28
+          (cd "$(dirname "$package")" && sha256sum -c "$(basename "$package").sha256")
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp -- "$package" "$dest/vulpra-local-firefox160-csp-frame-ci.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-signed-storage-ci.tar.xz > vulpra-local-firefox160-signed-storage-ci.tar.xz.sha256)
+          echo 'PASS: real Firefox 160 archive and exact 28-overlay source proof verified'
+      - name: Install native shared libraries and pinned geckodriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends curl jq python3 libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          file="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl -fLsS --retry 3 --max-time 90 -o "$file" \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/geckodriver-bin"
+          tar -xzf "$file" -C "$RUNNER_TEMP/geckodriver-bin" geckodriver
+          test -x "$RUNNER_TEMP/geckodriver-bin/geckodriver"
+          echo "$RUNNER_TEMP/geckodriver-bin" >> "$GITHUB_PATH"
+      - name: Execute native Firefox 160 CSP blocking and iframe opaque-origin isolation
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          python3 ci/security-160-csp-iframe-sandbox.py \
+            "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/firefox160-csp-frame-security-proof.json" \
+            2>&1 | tee "$RUNNER_TEMP/csp-frame-sandbox-test.log"
+          archive="$RUNNER_TEMP/native-archive/vulpra-firefox160-native-ci.tar.xz"
+          digest="$(sha256sum "$archive" | cut -d' ' -f1)"
+          jq -e --arg digest "$digest" '
+            .schema_version==1 and .status=="pass" and
+            .native_package_sha256==$digest and .localhost_only==true and
+            .real_csp_open_allows_inline_and_external_scripts==true and
+            .real_csp_self_blocks_inline_allows_external==true and
+            .real_csp_none_blocks_inline_and_external==true and
+            .unsandboxed_same_origin_frame_access_allowed==true and
+            .allow_scripts_without_same_origin_denied_parent_dom==true and
+            .sandboxed_frame_opaque_message_origin_observed==true and
+            .allow_same_origin_without_scripts_blocked_child_js==true and
+            .unrelated_firefox_profile_preserved==true and
+            .used_unmodified_native_firefox160_archive==true and
+            .browser_security_prefs_unchanged==true and
+            .sandboxed_frame_seccomp_syscall_denial_tested==false and
+            .full_csp_sandbox_security_policy_audited==false and
+            .provider_backed_safe_browsing_ready==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-csp-frame-security-proof.json" >/dev/null
+          echo 'PASS: packaged Firefox 160 real CSP and HTML sandbox enforcement'
+          echo 'LIMIT: no Linux seccomp denial, whole-policy audit or release approval'
+      - name: Archive bounded Firefox 160 CSP/frame sandbox runtime proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-csp-and-iframe-sandbox-runtime-proof
+          path: ${{ runner.temp }}/firefox160-csp-frame-security-proof.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve bounded sandbox test failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if test -s "$RUNNER_TEMP/signed-extension-storage-test.log"; then
+            tail -n 160 "$RUNNER_TEMP/signed-extension-storage-test.log" > "$RUNNER_TEMP/csp-frame-sandbox-failure-tail.log"
+          fi
+      - name: Archive bounded CSP/frame failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-csp-frame-sandbox-failure
+          path: ${{ runner.temp }}/signed-extension-storage-failure-tail.log
+          if-no-files-found: ignore
+          retention-days: 14
