@@ -151,7 +151,7 @@ let imgCors;
   }
   return {same:safe,cors,foreign:foreignResult,
     webgl:webglResult,first_party_origin:location.origin};
-})().then(result,r=>result).catch(e=>result({error:String(e)}));
+})().then(result).catch(e=>result({error:String(e)}));
 """
 
 
