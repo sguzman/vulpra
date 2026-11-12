@@ -8,7 +8,7 @@
 compile_error!("This reference diagnostic requires the Linux x86_64 CI runner.");
 
 use std::env;
-use std::ffi::{c_int, c_long, c_void};
+use std::ffi::{c_char, c_int, c_long, c_void};
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -33,6 +33,7 @@ struct Probe {
     outcome: Outcome,
     child_cap_sys_admin: Option<bool>,
     child_seccomp_mode: Option<u8>,
+    child_apparmor_profile_class: &'static str,
 }
 const SYS_CAPGET_X86_64: c_long = 125;
 const SYS_PRCTL_X86_64: c_long = 157;
@@ -50,6 +51,7 @@ unsafe extern "C" {
     fn read(fd: c_int, buf: *mut c_void, count: usize) -> isize;
     fn write(fd: c_int, buf: *const c_void, count: usize) -> isize;
     fn close(fd: c_int) -> c_int;
+    fn open(path: *const c_char, flags: c_int) -> c_int;
 }
 
 const SYS_CLONE_X86_64: c_long = 56;
@@ -106,7 +108,39 @@ fn name_for_errno(errno: c_int) -> &'static str {
     }
 }
 
-fn child_capability_snapshot() -> [u8; 2] {
+fn child_apparmor_classification() -> u8 {
+    // Read exactly one fixed procfs attribute using a raw syscall-style
+    // libc open/read/close, before the child's unshare. NEVER emit the
+    // actual LSM profile name, process title, path or raw label bytes.
+    let paths: [&[u8]; 2] = [
+        b"/proc/self/attr/apparmor/current\0",
+        b"/proc/self/attr/current\0",
+    ];
+    for name in paths {
+        let fd = unsafe { open(name.as_ptr().cast::<c_char>(), 0) };
+        if fd < 0 {
+            continue;
+        }
+        let mut data = [0u8; 256];
+        let n = unsafe { read(fd, data.as_mut_ptr().cast::<c_void>(), data.len()) };
+        unsafe { close(fd) };
+        if n <= 0 {
+            continue;
+        }
+        let label = &data[..n as usize];
+        if label.windows(b"unprivileged_userns".len())
+                .any(|part| part == b"unprivileged_userns") {
+            return 2; // Exact named restricted AppArmor profile observed.
+        }
+        if label.starts_with(b"unconfined") {
+            return 1;
+        }
+        return 3; // A different profile, name deliberately withheld.
+    }
+    0 // Unknown/inaccessible, not assumed unconfined.
+}
+
+fn child_capability_snapshot() -> [u8; 3] {
     // Capabilities in this ephemeral *new* user namespace, not host
     // capabilities. CAP_SYS_ADMIN should be available for CLONE_NEWPID.
     let mut header = CapHeader {
@@ -142,10 +176,10 @@ fn child_capability_snapshot() -> [u8; 2] {
     } else {
         255 // unknown, not no filtering
     };
-    [cap, seccomp_byte]
+    [cap, seccomp_byte, child_apparmor_classification()]
 }
 
-fn decode_snapshot(raw: [u8; 2]) -> Result<(Option<bool>, Option<u8>), &'static str> {
+fn decode_snapshot(raw: [u8; 3]) -> Result<(Option<bool>, Option<u8>, &'static str), &'static str> {
     let cap = match raw[0] {
         0 => None,
         1 => Some(false),
@@ -157,7 +191,14 @@ fn decode_snapshot(raw: [u8; 2]) -> Result<(Option<bool>, Option<u8>), &'static 
         255 => None,
         _ => return Err("invalid child seccomp state"),
     };
-    Ok((cap, seccomp))
+    let profile = match raw[2] {
+        0 => "unreadable",
+        1 => "unconfined",
+        2 => "unprivileged_userns",
+        3 => "other-redacted",
+        _ => return Err("invalid child AppArmor classification"),
+    };
+    Ok((cap, seccomp, profile))
 }
 
 fn raw_user_namespace_probe() -> Result<Probe, &'static str> {
@@ -187,6 +228,7 @@ fn raw_user_namespace_probe() -> Result<Probe, &'static str> {
             outcome: classify(-1, errno, None)?,
             child_cap_sys_admin: None,
             child_seccomp_mode: None,
+            child_apparmor_profile_class: "not-applicable",
         });
     }
     if pid == 0 {
@@ -227,7 +269,7 @@ fn raw_user_namespace_probe() -> Result<Probe, &'static str> {
         unsafe { close(fds[0]) };
         return Err("namespace probe child wait failed");
     }
-    let mut raw = [0u8; 2];
+    let mut raw = [0u8; 3];
     let count = unsafe {
         read(fds[0], raw.as_mut_ptr().cast::<c_void>(), raw.len())
     };
@@ -235,11 +277,12 @@ fn raw_user_namespace_probe() -> Result<Probe, &'static str> {
     if count != 2 {
         return Err("namespace probe child omitted capability snapshot");
     }
-    let (cap, seccomp) = decode_snapshot(raw)?;
+    let (cap, seccomp, profile) = decode_snapshot(raw)?;
     Ok(Probe {
         outcome: classify(pid, 0, Some(status))?,
         child_cap_sys_admin: cap,
         child_seccomp_mode: seccomp,
+        child_apparmor_profile_class: profile,
     })
 }
 
@@ -300,15 +343,15 @@ fn negative_tests() -> Result<(), &'static str> {
     }
     assert_eq!(output_stage(Outcome::CloneDenied(1)).0, "clone_newuser_denied");
     assert_eq!(name_for_errno(1), "EPERM");
-    assert_eq!(decode_snapshot([2, 2])?, (Some(true), Some(2)));
-    assert_eq!(decode_snapshot([1, 0])?, (Some(false), Some(0)));
-    assert_eq!(decode_snapshot([0, 255])?, (None, None));
-    for malformed in [[3, 2], [2, 4], [255, 255], [1, 254]] {
+    assert_eq!(decode_snapshot([2, 2, 2])?, (Some(true), Some(2), "unprivileged_userns"));
+    assert_eq!(decode_snapshot([1, 0, 1])?, (Some(false), Some(0), "unconfined"));
+    assert_eq!(decode_snapshot([0, 255, 0])?, (None, None, "unreadable"));
+    for malformed in [[3, 2, 2], [2, 4, 2], [255, 255, 1], [1, 254, 2], [2, 2, 8]] {
         if decode_snapshot(malformed).is_ok() {
             return Err("forged child capabilities or seccomp accepted");
         }
     }
-    println!("PASS: namespace probe classifier rejects seven invalid outcomes and four malformed capability snapshots");
+    println!("PASS: namespace probe classifier rejects seven invalid outcomes and five malformed capability/profile snapshots");
     Ok(())
 }
 
@@ -337,6 +380,8 @@ fn probe_to_json(probe: Probe) -> String {
             "  \"diagnostic_process_apparmor_confined\": {},\n",
             "  \"child_effective_cap_sys_admin_in_new_userns\": {},\n",
             "  \"child_seccomp_mode_after_clone\": {},\n",
+            "  \"child_apparmor_profile_class\": \"{}\",\n",
+            "  \"raw_child_apparmor_profile_persisted\": false,\n",
             "  \"child_capability_read_only_observation\": true,\n",
             "  \"child_effective_capabilities_entire_set_exposed\": false,\n",
             "  \"child_exited_without_host_changes\": true,\n",
@@ -358,7 +403,8 @@ fn probe_to_json(probe: Probe) -> String {
         optional_number(apparmor_limit),
         optional_bool(confined),
         optional_bool(probe.child_cap_sys_admin),
-        optional_number(probe.child_seccomp_mode.map(u64::from))
+        optional_number(probe.child_seccomp_mode.map(u64::from)),
+        probe.child_apparmor_profile_class
     )
 }
 
