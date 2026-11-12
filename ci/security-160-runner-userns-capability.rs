@@ -278,7 +278,7 @@ fn raw_user_namespace_probe() -> Result<Probe, &'static str> {
         read(fds[0], raw.as_mut_ptr().cast::<c_void>(), raw.len())
     };
     unsafe { close(fds[0]) };
-    if count != 2 {
+    if count != raw.len() as isize {
         return Err("namespace probe child omitted capability snapshot");
     }
     let (cap, seccomp, profile) = decode_snapshot(raw)?;
