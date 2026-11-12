@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "kind": "firefox160_additional_boundary_cve_bounded_release_blob_spotcheck",
+  "official_source_repository": "mozilla-firefox/firefox",
+  "firefox160_release_commit": "2887d9de1f69c0e9776413da80e7ba0d1225dd9b",
+  "pinned_vulpra_candidate_tree": "42dd7439a27dde92f89ac5eed13f88117a4d7ab5",
+  "original_native_run_id": 43138458940,
+  "records": [
+    {
+      "cve": "CVE-2026-124855",
+      "mozilla_bug": 2072096,
+      "landed_commit": "6955af1bd121f6da8c590c699d6e2e3fba42bfb9",
+      "path": "dom/file/uri/BlobURL.h",
+      "landed_blob": "9fcd8413ea3732964f60d1115689b1c40f919945",
+      "firefox160_release_blob": "9fcd8413ea3732964f60d1115689b1c40f919945"
+    },
+    {
+      "cve": "CVE-2026-124859",
+      "mozilla_bug": 2074179,
+      "landed_commit": "4b3e088a325ceb62bb355e9abf264f76a0e829f0",
+      "path": "dom/bindings/ErrorResult.h",
+      "landed_blob": "f52099e10089c9a591e06540df19f61a84ebec21",
+      "firefox160_release_blob": "f52099e10089c9a591e06540df19f61a84ebec21"
+    },
+    {
+      "cve": "CVE-2026-124903",
+      "mozilla_bug": 2084673,
+      "landed_commit": "f1c9c8b97e0e162b7b78d6c9d2b1aa38c29e3443",
+      "path": "ipc/glue/NodeChannel.h",
+      "landed_blob": "46ca2748c927e268e753bbcdc4eafb9c25dc8519",
+      "firefox160_release_blob": "46ca2748c927e268e753bbcdc4eafb9c25dc8519"
+    },
+    {
+      "cve": "CVE-2026-124907",
+      "mozilla_bug": 2087324,
+      "landed_commit": "53fa8fe451d46060c0e4be67e55042e22783bc49",
+      "path": "dom/canvas/WebGLMemoryTracker.h",
+      "landed_blob": "5ecd4545e81d45d9f3a5037fa50a72cba7d6dfbf",
+      "firefox160_release_blob": "5ecd4545e81d45d9f3a5037fa50a72cba7d6dfbf"
+    },
+    {
+      "cve": "CVE-2026-124907",
+      "mozilla_bug": 2087324,
+      "landed_commit": "ba26f55c646c3002a3d7c9de475861d1cc675724",
+      "path": "dom/canvas/HostWebGLContext.h",
+      "landed_blob": "29ac44618d172dc81737baa63a7786d1ebd2ce30",
+      "firefox160_release_blob": "29ac44618d172dc81737baa63a7786d1ebd2ce30"
+    }
+  ],
+  "scope": {
+    "selected_files": 5,
+    "selected_cves": 4,
+    "all_relevant_fix_files_reviewed": false,
+    "full_advisory_audited": false,
+    "full_exploit_regressions_run": false,
+    "security_current": false,
+    "release_ready": false
+  },
+  "notes": "Selected exact landed Git blob identities match the official Firefox 160 release in public Mozilla GitHub source, subject to independent CI verification against the archived Vulpra 28-overlay tree. These five headers are illustrative fixed-source paths, not a full review of all changes for any of the four CVEs."
+}
