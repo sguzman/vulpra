@@ -35,7 +35,7 @@ wd = helper.wd
 EXPECTED_ID = "@testpilot-containers"
 EXPECTED_VERSION = "8.4.0"
 EXPECTED_POPUP = "popup.html"
-EXPECTED_BACKGROUND = "/js/background/index.html"
+EXPECTED_BACKGROUND = "js/background/index.html"
 STORAGE_KEY = "__vulpra_ci_signed_extension_restart_probe"
 
 
