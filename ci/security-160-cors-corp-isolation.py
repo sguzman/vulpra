@@ -45,7 +45,7 @@ def need(condition, reason):
 class ResourceServer(http.server.BaseHTTPRequestHandler):
     def _record(self, path, method):
         with self.server.event_lock:
-            self.server.events[(path, method)] += 1
+            self.server.events[(method, path)] += 1
 
     def do_OPTIONS(self):
         path = self.path.split("?", 1)[0]
