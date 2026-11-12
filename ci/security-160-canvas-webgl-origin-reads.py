@@ -110,7 +110,30 @@ const denied=(image)=>{
   catch(e){outcomes.clearRect=String(e.name||'exception');}
   return outcomes;
 };
-function webgl(imgAllowed,imgDenied) {
+
+const bitmapPixel=(bitmap)=>{
+  const cv=document.createElement('canvas');cv.width=cv.height=1;
+  const cx=cv.getContext('2d',{willReadFrequently:true});
+  cx.drawImage(bitmap,0,0);
+  try {return {pixel:Array.from(cx.getImageData(0,0,1,1).data),error:''};}
+  catch(e){return {pixel:null,error:String(e.name||'error')};}
+};
+const offscreen=async(bitmap)=>{
+  if(typeof OffscreenCanvas!=='function')return {available:false};
+  const surface=new OffscreenCanvas(1,1);
+  const cx=surface.getContext('2d',{willReadFrequently:true});
+  cx.drawImage(bitmap,0,0);
+  let pixel=null,read_error='',convert_error='',converted=false,after_clear='';
+  try {pixel=Array.from(cx.getImageData(0,0,1,1).data);}
+  catch(e){read_error=String(e.name||'error');}
+  try {const blob=await surface.convertToBlob(); converted=blob.type==='image/png' && blob.size>0;}
+  catch(e){convert_error=String(e.name||'error');}
+  cx.clearRect(0,0,1,1);
+  try {cx.getImageData(0,0,1,1);after_clear='allowed';}
+  catch(e){after_clear=String(e.name||'error');}
+  return {available:true,pixel,read_error,convert_error,converted,after_clear};
+};
+function webgl(imgAllowed,imgDenied,bitmaps) {
   const cv=document.createElement('canvas');
   cv.width=cv.height=2;
   let gl=null,reason='';
@@ -134,6 +157,9 @@ function webgl(imgAllowed,imgDenied) {
     same:texture(imgAllowed),
     cors:texture(imgCors),
     foreign:texture(imgDenied),
+    bitmap_same:texture(bitmaps.same),
+    bitmap_cors:texture(bitmaps.cors),
+    bitmap_foreign:texture(bitmaps.foreign),
     no_error:gl.NO_ERROR};
 }
 let imgCors;
@@ -143,13 +169,30 @@ let imgCors;
   imgCors=await load(foreign+'/cors.png',true);
   const safe=pixel(same),cors=pixel(imgCors);
   const foreignResult=denied(noCors);
+  const bitmaps={
+    same:await createImageBitmap(same),
+    cors:await createImageBitmap(imgCors),
+    foreign:await createImageBitmap(noCors)
+  };
+  const bitmapResults={
+    same:bitmapPixel(bitmaps.same),
+    cors:bitmapPixel(bitmaps.cors),
+    foreign:bitmapPixel(bitmaps.foreign)
+  };
+  const offscreenResults={
+    same:await offscreen(bitmaps.same),
+    cors:await offscreen(bitmaps.cors),
+    foreign:await offscreen(bitmaps.foreign)
+  };
   let webglResult=null;
   for(let attempt=0;attempt<7;attempt++){
-    webglResult=webgl(same,noCors);
+    webglResult=webgl(same,noCors,bitmaps);
     if(webglResult.available) break;
     await new Promise(r=>setTimeout(r,650));
   }
+  for(const bitmap of Object.values(bitmaps))bitmap.close();
   return {same:safe,cors,foreign:foreignResult,
+    imagebitmap:bitmapResults,offscreen:offscreenResults,
     webgl:webglResult,first_party_origin:location.origin};
 })().then(result).catch(e=>result({error:String(e)}));
 """
@@ -169,19 +212,48 @@ def check(data: dict, require_webgl: bool=True):
     for name in ("getImageData","toDataURL","toBlob","clearRect"):
         need(blocked.get(name)=="SecurityError",
              "Canvas isolation bypass or missing negative outcome: "+name)
+    bitmaps=data.get("imagebitmap")
+    need(isinstance(bitmaps,dict), "Missing actual ImageBitmap origin-preservation evidence")
+    for name in ("same","cors"):
+        v=bitmaps.get(name)
+        need(isinstance(v,dict) and v.get("pixel")==[204,51,119,255] and
+             v.get("error")=="",
+             "Origin-clean "+name+" ImageBitmap pixels unavailable")
+    bm=bitmaps.get("foreign")
+    need(isinstance(bm,dict) and bm.get("error")=="SecurityError" and
+         bm.get("pixel") is None,
+         "Cross-origin non-CORS ImageBitmap lost its taint")
+    off=data.get("offscreen")
+    need(isinstance(off,dict), "OffscreenCanvas source-isolation results missing")
+    for name in ("same","cors"):
+        v=off.get(name)
+        need(isinstance(v,dict) and v.get("available") is True and
+             v.get("pixel")==[204,51,119,255] and
+             v.get("read_error")=="" and v.get("convert_error")=="" and
+             v.get("converted") is True and v.get("after_clear")=="allowed",
+             "Origin-clean "+name+" OffscreenCanvas readback or export unavailable")
+    rejected=off.get("foreign")
+    need(isinstance(rejected,dict) and rejected.get("available") is True and
+         rejected.get("pixel") is None and
+         rejected.get("read_error")=="SecurityError" and
+         rejected.get("convert_error")=="SecurityError" and
+         rejected.get("converted") is False and
+         rejected.get("after_clear")=="SecurityError",
+         "Tainted foreign ImageBitmap escaped through OffscreenCanvas")
     w=data.get("webgl")
     need(isinstance(w,dict), "Missing actual WebGL context evidence")
     if require_webgl:
         need(w.get("available") is True, "WebGL2 unavailable in private Wayland run")
     if w.get("available") is True:
-        for name in ("same","cors"):
+        for name in ("same","cors","bitmap_same","bitmap_cors"):
             v=w.get(name)
             need(isinstance(v,dict) and v.get("exception")=="" and
                  v.get("gl_error")==w.get("no_error")==0,
                  "Approved "+name+" image did not upload as WebGL2 texture")
-        v=w.get("foreign")
-        need(isinstance(v,dict) and v.get("exception")=="SecurityError",
-             "Cross-origin non-CORS image was accepted by WebGL2 texture upload")
+        for name in ("foreign","bitmap_foreign"):
+            v=w.get(name)
+            need(isinstance(v,dict) and v.get("exception")=="SecurityError",
+                 "Cross-origin non-CORS "+name+" accepted by WebGL2 texture upload")
 
 
 def self_test():
@@ -190,7 +262,24 @@ def self_test():
     w={"available":True,"same":{"exception":"","gl_error":0},
        "cors":{"exception":"","gl_error":0},
        "foreign":{"exception":"SecurityError","gl_error":0},"no_error":0}
-    base={"same":pixel,"cors":pixel,"foreign":blocked,"webgl":w}
+    bitmaps={
+        "same":{"pixel":[204,51,119,255],"error":""},
+        "cors":{"pixel":[204,51,119,255],"error":""},
+        "foreign":{"pixel":None,"error":"SecurityError"},
+    }
+    offscreen_clean={"available":True,"pixel":[204,51,119,255],
+                     "read_error":"","convert_error":"","converted":True,
+                     "after_clear":"allowed"}
+    offscreen_foreign={"available":True,"pixel":None,
+                       "read_error":"SecurityError","convert_error":"SecurityError",
+                       "converted":False,"after_clear":"SecurityError"}
+    w["bitmap_same"]={"exception":"","gl_error":0}
+    w["bitmap_cors"]={"exception":"","gl_error":0}
+    w["bitmap_foreign"]={"exception":"SecurityError","gl_error":0}
+    base={"same":pixel,"cors":pixel,"foreign":blocked,"webgl":w,
+          "imagebitmap":bitmaps,
+          "offscreen":{"same":offscreen_clean,"cors":offscreen_clean,
+                       "foreign":offscreen_foreign}}
     check(base)
     forged=[
         {**base,"same":{**pixel,"rgba":[0,0,0,255]}},
@@ -200,6 +289,13 @@ def self_test():
         {**base,"webgl":{**w,"available":False}},
         {**base,"webgl":{**w,"foreign":{"exception":"","gl_error":0}}},
         {**base,"webgl":{**w,"same":{"exception":"SecurityError","gl_error":0}}},
+        {**base,"imagebitmap":{**bitmaps,"foreign":{"pixel":[204,51,119,255],"error":""}}},
+        {**base,"imagebitmap":{**bitmaps,"cors":{"pixel":None,"error":"SecurityError"}}},
+        {**base,"offscreen":{**base["offscreen"],"foreign":{**offscreen_foreign,"converted":True}}},
+        {**base,"offscreen":{**base["offscreen"],"foreign":{**offscreen_foreign,"after_clear":"allowed"}}},
+        {**base,"offscreen":{**base["offscreen"],"cors":{**offscreen_clean,"converted":False}}},
+        {**base,"webgl":{**w,"bitmap_foreign":{"exception":"","gl_error":0}}},
+        {**base,"webgl":{**w,"bitmap_same":{"exception":"SecurityError","gl_error":0}}},
     ]
     for record in forged:
         try:
@@ -208,7 +304,7 @@ def self_test():
             pass
         else:
             raise RuntimeError("Forged Canvas/WebGL regression result accepted")
-    print("PASS: seven forged Canvas/WebGL access and false-success fixtures rejected")
+    print("PASS: fourteen forged Canvas, ImageBitmap, OffscreenCanvas and WebGL2 false-success fixtures rejected")
 
 
 def run(repo: Path, output: Path):
@@ -316,17 +412,26 @@ def run(repo: Path, output: Path):
                     "non_headless_webgl2_context_created":True,
                     "webgl2_same_and_cors_approved_texture_upload":True,
                     "webgl2_cross_origin_non_cors_texture_upload_denied":True,
+                    "imagebitmap_taint_propagates_to_canvas":True,
+                    "offscreen_canvas_taint_blocks_readback_and_export":True,
+                    "offscreen_canvas_taint_persists_after_clear":True,
+                    "imagebitmap_origin_clean_controls_pass":True,
+                    "webgl2_foreign_imagebitmap_texture_denied":True,
+                    "webgl2_allowed_imagebitmap_texture_uploads_pass":True,
                     "real_webdriver_graphical_png_screenshot":True,
                     "existing_firefox_profile_preserved":True,
                     "browser_certificate_verification_not_disabled":True,
                     "software_rendering_weston_only":True,
                     "browser_reported_security_errors":value["foreign"],
                     "webgl_browser_result":value["webgl"],
+                    "imagebitmap_browser_result":value["imagebitmap"],
+                    "offscreen_canvas_browser_result":value["offscreen"],
                     "cve2026_124852_fix_commit_provenance_verified":False,
                     "cve2026_124852_exploit_regression_executed":False,
                     "complete_canvas_webgl_security_policy_verified":False,
                     "security_current":False,"release_ready":False,
                     "limits":[
+                        "ImageBitmap/OffscreenCanvas tests concern standard origin-clean propagation only",
                         "Standard CORS and origin-clean checks, not CVE exploit reproduction",
                         "No Bugzilla 2001244 public fix provenance",
                         "Pixman Weston does not test hardware GPU, DMABuf or VAAPI",
@@ -334,7 +439,7 @@ def run(repo: Path, output: Path):
                     ],
                 }
                 output.write_text(json.dumps(report,indent=2)+"\n")
-                print("PASS: real Firefox 160 private Wayland 2D canvas taint and WebGL2 foreign image upload refusal",flush=True)
+                print("PASS: real Firefox 160 ImageBitmap, OffscreenCanvas and WebGL2 preserved Canvas origin-clean restrictions",flush=True)
         finally:
             if session_id is not None:
                 try:wd.request(driver_port,"DELETE","/session/"+session_id,timeout_seconds=15)
@@ -350,7 +455,7 @@ def run(repo: Path, output: Path):
                 server.shutdown()
                 server.server_close()
         need(output.is_file(),"Missing actual graphical result")
-    print("LIMIT: standard Canvas/WebGL origin rules only; not CVE 124852 exploit or fix-provenance verification",flush=True)
+    print("LIMIT: standard Canvas/ImageBitmap/OffscreenCanvas/WebGL restrictions, not CVE 124852 exploit or source-fix attribution",flush=True)
 
 
 if __name__=="__main__":
