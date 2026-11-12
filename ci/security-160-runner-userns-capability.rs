@@ -14,11 +14,42 @@ use std::io;
 use std::path::Path;
 use std::process;
 
+// Tiny child-to-parent pipe contains only CAP_SYS_ADMIN presence and the
+// child's seccomp mode. Never inspect or export full process capabilities.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct CapData {
+    effective: u32,
+    permitted: u32,
+    inheritable: u32,
+}
+#[repr(C)]
+struct CapHeader {
+    version: u32,
+    pid: i32,
+}
+#[derive(Debug)]
+struct Probe {
+    outcome: Outcome,
+    child_cap_sys_admin: Option<bool>,
+    child_seccomp_mode: Option<u8>,
+}
+const SYS_CAPGET_X86_64: c_long = 125;
+const SYS_PRCTL_X86_64: c_long = 157;
+const PR_GET_SECCOMP: c_long = 21;
+const LINUX_CAPABILITY_VERSION_3: u32 = 0x2008_0522;
+const CAP_SYS_ADMIN: u32 = 21;
+
+
 unsafe extern "C" {
     fn syscall(number: c_long, ...) -> c_long;
     fn unshare(flags: c_int) -> c_int;
     fn waitpid(pid: c_int, status: *mut c_int, options: c_int) -> c_int;
     fn _exit(status: c_int) -> !;
+    fn pipe(fds: *mut c_int) -> c_int;
+    fn read(fd: c_int, buf: *mut c_void, count: usize) -> isize;
+    fn write(fd: c_int, buf: *const c_void, count: usize) -> isize;
+    fn close(fd: c_int) -> c_int;
 }
 
 const SYS_CLONE_X86_64: c_long = 56;
@@ -75,9 +106,67 @@ fn name_for_errno(errno: c_int) -> &'static str {
     }
 }
 
-fn raw_user_namespace_probe() -> Result<Outcome, &'static str> {
-    // Firefox 160 SandboxInfo.cpp uses raw clone(SIGCHLD | CLONE_NEWUSER)
-    // and, in the child, unshare(CLONE_NEWPID). No id mappings or writes.
+fn child_capability_snapshot() -> [u8; 2] {
+    // Capabilities in this ephemeral *new* user namespace, not host
+    // capabilities. CAP_SYS_ADMIN should be available for CLONE_NEWPID.
+    let mut header = CapHeader {
+        version: LINUX_CAPABILITY_VERSION_3,
+        pid: 0,
+    };
+    let mut data = [CapData {
+        effective: 0,
+        permitted: 0,
+        inheritable: 0,
+    }; 2];
+    let capget = unsafe {
+        syscall(
+            SYS_CAPGET_X86_64,
+            &mut header as *mut CapHeader,
+            data.as_mut_ptr(),
+        )
+    };
+    let cap = if capget == 0 {
+        if data[0].effective & (1u32 << CAP_SYS_ADMIN) != 0 {
+            2 // capability present
+        } else {
+            1 // capability absent
+        }
+    } else {
+        0 // CAPGET unavailable or denied; no invented negative claim
+    };
+    let seccomp = unsafe {
+        syscall(SYS_PRCTL_X86_64, PR_GET_SECCOMP, 0, 0, 0, 0)
+    };
+    let seccomp_byte = if (0..=2).contains(&seccomp) {
+        seccomp as u8
+    } else {
+        255 // unknown, not no filtering
+    };
+    [cap, seccomp_byte]
+}
+
+fn decode_snapshot(raw: [u8; 2]) -> Result<(Option<bool>, Option<u8>), &'static str> {
+    let cap = match raw[0] {
+        0 => None,
+        1 => Some(false),
+        2 => Some(true),
+        _ => return Err("forged capability state in child pipe"),
+    };
+    let seccomp = match raw[1] {
+        0..=2 => Some(raw[1]),
+        255 => None,
+        _ => return Err("invalid child seccomp state"),
+    };
+    Ok((cap, seccomp))
+}
+
+fn raw_user_namespace_probe() -> Result<Probe, &'static str> {
+    // Exact two Firefox 160 operations, but added read-only observation
+    // inside the disposable child to identify the missing CAP_SYS_ADMIN.
+    let mut fds = [-1, -1];
+    if unsafe { pipe(fds.as_mut_ptr()) } != 0 {
+        return Err("cannot open isolated child diagnostic pipe");
+    }
     let pid = unsafe {
         syscall(
             SYS_CLONE_X86_64,
@@ -89,11 +178,30 @@ fn raw_user_namespace_probe() -> Result<Outcome, &'static str> {
         )
     };
     if pid < 0 {
-        return classify(-1, io::Error::last_os_error().raw_os_error().unwrap_or(0), None);
+        let errno = io::Error::last_os_error().raw_os_error().unwrap_or(0);
+        unsafe {
+            close(fds[0]);
+            close(fds[1]);
+        }
+        return Ok(Probe {
+            outcome: classify(-1, errno, None)?,
+            child_cap_sys_admin: None,
+            child_seccomp_mode: None,
+        });
     }
     if pid == 0 {
-        // No Rust allocator, filesystem or process environment work after
-        // clone in the child. _exit avoids atexit handlers/parent teardown.
+        // Single-threaded child: no allocator, file operations, output or
+        // process environment manipulation after clone.
+        unsafe { close(fds[0]) };
+        let snapshot = child_capability_snapshot();
+        // Two bounded bytes, and only if the child created successfully.
+        let sent = unsafe {
+            write(fds[1], snapshot.as_ptr().cast::<c_void>(), snapshot.len())
+        };
+        unsafe { close(fds[1]) };
+        if sent != 2 {
+            unsafe { _exit(255) };
+        }
         let ok = unsafe { unshare(CLONE_NEWPID) == 0 };
         if ok {
             unsafe { _exit(0) };
@@ -102,21 +210,37 @@ fn raw_user_namespace_probe() -> Result<Outcome, &'static str> {
         let code = if errno > 0 && errno < 190 {
             CHILD_UNSHARE_ERRNO_BASE + errno
         } else {
-            255 // Distinguish an unclassified error from a clean denial.
+            255
         };
         unsafe { _exit(code) };
     }
+    unsafe { close(fds[1]) };
     let mut status: c_int = 0;
     loop {
         let got = unsafe { waitpid(pid as c_int, &mut status, 0) };
         if got == pid as c_int {
-            return classify(pid, 0, Some(status));
+            break;
         }
         if got == -1 && io::Error::last_os_error().kind() == io::ErrorKind::Interrupted {
             continue;
         }
-        return Err("child wait failed");
+        unsafe { close(fds[0]) };
+        return Err("namespace probe child wait failed");
     }
+    let mut raw = [0u8; 2];
+    let count = unsafe {
+        read(fds[0], raw.as_mut_ptr().cast::<c_void>(), raw.len())
+    };
+    unsafe { close(fds[0]) };
+    if count != 2 {
+        return Err("namespace probe child omitted capability snapshot");
+    }
+    let (cap, seccomp) = decode_snapshot(raw)?;
+    Ok(Probe {
+        outcome: classify(pid, 0, Some(status))?,
+        child_cap_sys_admin: cap,
+        child_seccomp_mode: seccomp,
+    })
 }
 
 fn read_unsigned(path: &str) -> Option<u64> {
@@ -176,12 +300,20 @@ fn negative_tests() -> Result<(), &'static str> {
     }
     assert_eq!(output_stage(Outcome::CloneDenied(1)).0, "clone_newuser_denied");
     assert_eq!(name_for_errno(1), "EPERM");
-    println!("PASS: exact-shaped namespace child-probe classifier rejected seven invalid states");
+    assert_eq!(decode_snapshot([2, 2])?, (Some(true), Some(2)));
+    assert_eq!(decode_snapshot([1, 0])?, (Some(false), Some(0)));
+    assert_eq!(decode_snapshot([0, 255])?, (None, None));
+    for malformed in [[3, 2], [2, 4], [255, 255], [1, 254]] {
+        if decode_snapshot(malformed).is_ok() {
+            return Err("forged child capabilities or seccomp accepted");
+        }
+    }
+    println!("PASS: namespace probe classifier rejects seven invalid outcomes and four malformed capability snapshots");
     Ok(())
 }
 
-fn probe_to_json(outcome: Outcome) -> String {
-    let (stage, errno) = output_stage(outcome);
+fn probe_to_json(probe: Probe) -> String {
+    let (stage, errno) = output_stage(probe.outcome);
     let num = errno.map_or_else(|| "null".to_string(), |e| e.to_string());
     let errname = errno.map_or("NONE", name_for_errno);
     let apparmor = read_apparmor_enabled();
@@ -203,6 +335,10 @@ fn probe_to_json(outcome: Outcome) -> String {
             "  \"apparmor_module_enabled\": {},\n",
             "  \"apparmor_unprivileged_userns_restriction\": {},\n",
             "  \"diagnostic_process_apparmor_confined\": {},\n",
+            "  \"child_effective_cap_sys_admin_in_new_userns\": {},\n",
+            "  \"child_seccomp_mode_after_clone\": {},\n",
+            "  \"child_capability_read_only_observation\": true,\n",
+            "  \"child_effective_capabilities_entire_set_exposed\": false,\n",
             "  \"child_exited_without_host_changes\": true,\n",
             "  \"test_did_not_modify_kernel_policy_or_sandbox\": true,\n",
             "  \"policy_root_cause_proven\": false,\n",
@@ -220,7 +356,9 @@ fn probe_to_json(outcome: Outcome) -> String {
         optional_number(max_userns),
         optional_bool(apparmor),
         optional_number(apparmor_limit),
-        optional_bool(confined)
+        optional_bool(confined),
+        optional_bool(probe.child_cap_sys_admin),
+        optional_number(probe.child_seccomp_mode.map(u64::from))
     )
 }
 
