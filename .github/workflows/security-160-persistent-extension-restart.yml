@@ -130,6 +130,8 @@ jobs:
           jq -e '
             .schema_version==1 and .status=="pass" and
             .signed_install_non_temporary==true and
+            .unsigned_non_temporary_install_rejected==true and
+            .same_unsigned_xpi_installed_temporarily==true and
             .signed_extension_active_before_restart==true and
             .signed_extension_active_after_restart==true and
             .signed_extension_version_preserved==true and
@@ -140,7 +142,7 @@ jobs:
             .xpinstall_signing_requirement_not_disabled_by_test==true and
             .release_ready==false and .security_current==false
           ' "$RUNNER_TEMP/firefox160-signed-extension-restart.json" >/dev/null
-          echo 'PASS: signed add-on retained after full browser restart, temporary unsigned add-on removed'
+          echo 'PASS: permanent unsigned install rejected; Mozilla-signed add-on persists across restart, temporary unsigned add-on removed'
           echo 'LIMIT: no whole-extension ecosystem, full storage or security-current approval'
       - name: Archive bounded actual Firefox 160 signed extension restart proof
         if: success()
