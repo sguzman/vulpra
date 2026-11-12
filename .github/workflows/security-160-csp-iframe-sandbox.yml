@@ -161,14 +161,14 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          if test -s "$RUNNER_TEMP/signed-extension-storage-test.log"; then
-            tail -n 160 "$RUNNER_TEMP/signed-extension-storage-test.log" > "$RUNNER_TEMP/csp-frame-sandbox-failure-tail.log"
+          if test -s "$RUNNER_TEMP/csp-frame-sandbox-test.log"; then
+            tail -n 160 "$RUNNER_TEMP/csp-frame-sandbox-test.log" > "$RUNNER_TEMP/csp-frame-sandbox-failure-tail.log"
           fi
       - name: Archive bounded CSP/frame failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: firefox160-csp-frame-sandbox-failure
-          path: ${{ runner.temp }}/signed-extension-storage-failure-tail.log
+          path: ${{ runner.temp }}/csp-frame-sandbox-failure-tail.log
           if-no-files-found: ignore
           retention-days: 14
