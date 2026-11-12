@@ -101,7 +101,7 @@ jobs:
           dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
           mkdir -p "$dest"
           cp -- "$package" "$dest/vulpra-local-firefox160-csp-frame-ci.tar.xz"
-          (cd "$dest" && sha256sum vulpra-local-firefox160-signed-storage-ci.tar.xz > vulpra-local-firefox160-signed-storage-ci.tar.xz.sha256)
+          (cd "$dest" && sha256sum vulpra-local-firefox160-csp-frame-ci.tar.xz > vulpra-local-firefox160-csp-frame-ci.tar.xz.sha256)
           echo 'PASS: real Firefox 160 archive and exact 28-overlay source proof verified'
       - name: Install native shared libraries and pinned geckodriver
         shell: bash
