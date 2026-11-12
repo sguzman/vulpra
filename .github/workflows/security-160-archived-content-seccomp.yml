@@ -122,6 +122,15 @@ jobs:
              .stage=="clone_and_unshare_succeeded") and
             .child_exited_without_host_changes==true and
             .test_did_not_modify_kernel_policy_or_sandbox==true and
+            .child_capability_read_only_observation==true and
+            .child_effective_capabilities_entire_set_exposed==false and
+            (.child_effective_cap_sys_admin_in_new_userns==true or
+             .child_effective_cap_sys_admin_in_new_userns==false or
+             .child_effective_cap_sys_admin_in_new_userns==null) and
+            (.child_seccomp_mode_after_clone==0 or
+             .child_seccomp_mode_after_clone==1 or
+             .child_seccomp_mode_after_clone==2 or
+             .child_seccomp_mode_after_clone==null) and
             .policy_root_cause_proven==false and
             .same_as_firefox_parent_process_context_proven==false and
             .linux_content_worker_namespace_isolation_verified==false and
@@ -131,7 +140,9 @@ jobs:
           jq -c '{stage,errno_name,
             kernel_unprivileged_userns_clone,kernel_max_user_namespaces,
             apparmor_module_enabled,apparmor_unprivileged_userns_restriction,
-            diagnostic_process_apparmor_confined}' \
+            diagnostic_process_apparmor_confined,
+            child_effective_cap_sys_admin_in_new_userns,
+            child_seccomp_mode_after_clone}' \
             "$RUNNER_TEMP/firefox160-runner-userns-child-report.json"
           echo 'LIMIT: independent runner child is not the Firefox content process; no causal LSM proof'
       - name: Launch real Firefox 160 localhost content and observe native seccomp filters
@@ -206,6 +217,13 @@ jobs:
               verified_firefox160_browser_probe_cache:$cached,
               independent_runner_child_stage:$stage,
               runner_child_errno:$host.errno_name,
+              runner_child_cap_sys_admin_inside_new_userns:
+                $host.child_effective_cap_sys_admin_in_new_userns,
+              runner_child_seccomp_mode_after_clone:
+                $host.child_seccomp_mode_after_clone,
+              denied_unshare_with_cap_sys_admin_absent_observed:
+                ($stage=="clone_succeeded_unshare_newpid_denied" and
+                 $host.child_effective_cap_sys_admin_in_new_userns==false),
               kernel_unprivileged_userns_clone:$host.kernel_unprivileged_userns_clone,
               kernel_max_user_namespaces:$host.kernel_max_user_namespaces,
               apparmor_module_enabled:$host.apparmor_module_enabled,
@@ -217,6 +235,9 @@ jobs:
               firefox_real_content_worker_count:$browser.actual_content_worker_count,
               firefox_observed_user_namespace_distinct_count:
                 $browser.content_worker_distinct_namespace_counts_by_kind.user,
+              denied_unshare_with_cap_sys_admin_present_observed:
+                ($stage=="clone_succeeded_unshare_newpid_denied" and
+                 $host.child_effective_cap_sys_admin_in_new_userns==true),
               exact_denial_policy_or_lsm_cause_proven:false,
               worker_namespace_isolation_verified:false,
               actual_content_worker_seccomp_denial_exercised:false,
@@ -235,6 +256,9 @@ jobs:
           ' "$report" >/dev/null
           jq -c '{verified_firefox160_browser_probe_cache,
                   independent_runner_child_stage,runner_child_errno,
+                  runner_child_cap_sys_admin_inside_new_userns,
+                  runner_child_seccomp_mode_after_clone,
+                  denied_unshare_with_cap_sys_admin_absent_observed,
                   same_runner_child_and_firefox_probe_consistent,
                   exact_denial_policy_or_lsm_cause_proven}' "$report"
           echo 'PASS: Firefox parent cached capability and independent same-run child probe align'
