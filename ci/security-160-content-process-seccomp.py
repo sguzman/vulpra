@@ -213,9 +213,8 @@ def run(repo: Path, output: Path):
                 wd.request(port, "POST", base + "/moz/context", {"context": "chrome"})
                 try:
                     pref_level = wd.request(port, "POST", base + "/execute/sync", {
-                        "script": """const {Services}=ChromeUtils.importESModule(
-                            "resource://gre/modules/Services.sys.mjs");
-                          return Services.prefs.getIntPref("security.sandbox.content.level", 0);""",
+                        "script": """return Services.prefs.getIntPref(
+                          "security.sandbox.content.level", 0);""",
                         "args": [],
                     })
                 finally:
