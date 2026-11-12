@@ -35,6 +35,8 @@ struct Probe {
     child_seccomp_mode: Option<u8>,
     child_apparmor_profile_class: &'static str,
 }
+const SYS_OPENAT_X86_64: c_long = 257;
+const AT_FDCWD: c_int = -100;
 const SYS_CAPGET_X86_64: c_long = 125;
 const SYS_PRCTL_X86_64: c_long = 157;
 const PR_GET_SECCOMP: c_long = 21;
@@ -51,7 +53,6 @@ unsafe extern "C" {
     fn read(fd: c_int, buf: *mut c_void, count: usize) -> isize;
     fn write(fd: c_int, buf: *const c_void, count: usize) -> isize;
     fn close(fd: c_int) -> c_int;
-    fn open(path: *const c_char, flags: c_int) -> c_int;
 }
 
 const SYS_CLONE_X86_64: c_long = 56;
@@ -117,7 +118,10 @@ fn child_apparmor_classification() -> u8 {
         b"/proc/self/attr/current\0",
     ];
     for name in paths {
-        let fd = unsafe { open(name.as_ptr().cast::<c_char>(), 0) };
+        let fd = unsafe {
+            syscall(SYS_OPENAT_X86_64, c_long::from(AT_FDCWD),
+                    name.as_ptr().cast::<c_char>(), 0, 0)
+        } as c_int;
         if fd < 0 {
             continue;
         }
