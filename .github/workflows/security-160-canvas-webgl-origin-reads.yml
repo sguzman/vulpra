@@ -1,6 +1,6 @@
 # A behavioral browser regression check, not an exploit replay or security fix audit.
 # Uses only existing Firefox 160 native package from pinned exact-source CI.
-name: Firefox 160 Private Wayland Canvas and WebGL2 Origin Security Regression (No Build)
+name: Firefox 160 Private Wayland Canvas ImageBitmap OffscreenCanvas WebGL2 Origin Regression (No Build)
 on:
   push:
     branches: [upgrade/firefox-160-overlay-prototype]
@@ -142,6 +142,17 @@ jobs:
             .non_headless_webgl2_context_created==true and
             .webgl2_same_and_cors_approved_texture_upload==true and
             .webgl2_cross_origin_non_cors_texture_upload_denied==true and
+            .imagebitmap_taint_propagates_to_canvas==true and
+            .offscreen_canvas_taint_blocks_readback_and_export==true and
+            .offscreen_canvas_taint_persists_after_clear==true and
+            .imagebitmap_origin_clean_controls_pass==true and
+            .webgl2_foreign_imagebitmap_texture_denied==true and
+            .webgl2_allowed_imagebitmap_texture_uploads_pass==true and
+            .imagebitmap_browser_result.foreign.error=="SecurityError" and
+            .offscreen_canvas_browser_result.foreign.read_error=="SecurityError" and
+            .offscreen_canvas_browser_result.foreign.convert_error=="SecurityError" and
+            .offscreen_canvas_browser_result.foreign.after_clear=="SecurityError" and
+            .webgl_browser_result.bitmap_foreign.exception=="SecurityError" and
             .real_webdriver_graphical_png_screenshot==true and
             .existing_firefox_profile_preserved==true and
             .browser_certificate_verification_not_disabled==true and
@@ -157,7 +168,7 @@ jobs:
                  original_package_reused_without_browser_rebuild:true}
           ' "$RUNNER_TEMP/firefox160-canvas-webgl-origin.json" \
             > "$RUNNER_TEMP/firefox160-canvas-webgl-origin-proof.json"
-          echo 'PASS: Firefox 160 actual Canvas and WebGL2 origin boundaries on isolated Pixman Weston'
+          echo 'PASS: Firefox 160 Canvas, ImageBitmap, OffscreenCanvas and WebGL2 origin security restrictions on isolated Weston'
           echo 'LIMIT: no Bug 2001244 fix source, CVE exploit reproduction or real hardware GPU evidence'
       - name: Archive native private-Wayland Canvas and WebGL2 origin proof
         if: success()
