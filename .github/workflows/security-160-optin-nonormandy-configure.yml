@@ -132,11 +132,31 @@ jobs:
           test "$VULPRA_EXPERIMENT_NO_NORMANDY" = "1"
           ./mach configure 2>&1 | tee "$RUNNER_TEMP/firefox160-no-normandy-configure.log"
           objdir="$GITHUB_WORKSPACE/firefox160/obj-vulpra-linux-normandy-experiment"
-          test -s "$objdir/config.status"
-          test -s "$objdir/config.statusd/substs/MOZ_NORMANDY"
-          jq -e '. == false or . == null or . == 0 or . == ""' \
-            "$objdir/config.statusd/substs/MOZ_NORMANDY" >/dev/null
-          grep -Fq 'Vulpra' "$objdir/config.status"
+          # First CI run reached "Configure complete!" but its unchecked
+          # post-configure assertion exited 1. Diagnose each generated state
+          # independently; never turn a missing/true Normandy value into PASS.
+          test -s "$objdir/config.status" || {
+            echo "::error::mach configure returned zero but config.status is absent"
+            exit 1
+          }
+          subst="$objdir/config.statusd/substs/MOZ_NORMANDY"
+          if test ! -s "$subst"; then
+            echo "::error::MOZ_NORMANDY generated substitute is missing/empty"
+            if test -d "$objdir/config.statusd/substs"; then
+              find "$objdir/config.statusd/substs" -maxdepth 1 -type f -iname '*normandy*' -printf '%f\\n' | sort
+            fi
+            exit 1
+          fi
+          echo "Generated MOZ_NORMANDY substitution (JSON):"
+          cat "$subst"
+          if ! jq -e '. == false or . == null or . == 0 or . == ""' "$subst" >/dev/null; then
+            echo "::error::MOZ_NORMANDY generated substitution is not disabled"
+            exit 1
+          fi
+          if ! grep -Fq 'Vulpra' "$objdir/config.status"; then
+            echo "::error::Vulpra branding absent in generated config.status"
+            exit 1
+          fi
           expected="$(jq -r .assembled_git_tree "$RUNNER_TEMP/vulpra160-ledger/candidate-tree-report.json")"
           jq -n --arg tree "$expected" '{
             schema_version:1,
