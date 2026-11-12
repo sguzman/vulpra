@@ -27,8 +27,9 @@ jobs:
             if (run.repository?.full_name !== 'sguzman/vulpra' ||
                 run.head_branch !== 'upgrade/firefox-160-overlay-prototype' ||
                 run.name !== 'Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
-                run.head_sha !== expectedCommit) {
-              throw Error('Refusing non-pinned Firefox 160 source or workflow run');
+                run.head_sha !== expectedCommit ||
+                run.status !== 'completed' || run.conclusion !== 'success') {
+              throw Error('Refusing unverified, incomplete or unsuccessful pinned Firefox 160 native run');
             }
             const all = await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
               {owner,repo,run_id:id,per_page:100});
