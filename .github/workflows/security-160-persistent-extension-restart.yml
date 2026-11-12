@@ -1,0 +1,167 @@
+# No Firefox rebuild or user profile changes. One archived native CI candidate.
+name: Firefox 160 Signed Add-on Persistence and Temporary Eviction (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-persistent-extension-restart.yml
+      - ci/security-160-persistent-extension-restart.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  signed-extension-restart:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Verify the complete successful original Firefox 160 native run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const id=43138458940;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+               r.status!=='completed'||r.conclusion!=='success')
+              throw Error('Firefox 160 native source run mismatch');
+            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            for(const name of ['firefox160-vulpra-unreleased-native-preview-not-approved',
+                               'firefox160-vulpra-materialized-source-proof']){
+              if(!all.some(a=>a.name===name&&!a.expired&&a.size_in_bytes>0))
+                throw Error('Required source-run artifact unavailable: '+name);
+            }
+            core.info('PASS: native run provenance and required artifacts');
+      - name: Checkout persistent add-on restart test and existing WebDriver helpers
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-persistent-extension-restart.py
+            ci/smoke-webextension-package-local.py
+      - name: Download authentic unreleased native Firefox 160 archive
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-unreleased-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-native-archive
+      - name: Download exact source identity from the same native build
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-source-proof
+      - name: Verify source tree and package checksum, test restart-state refusals
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/security-160-persistent-extension-restart.py
+          python3 ci/security-160-persistent-extension-restart.py --self-test
+          src="$RUNNER_TEMP/firefox160-source-proof/materialized-candidate.json"
+          package="$RUNNER_TEMP/firefox160-native-archive/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$src" && test -s "$package" && test -s "$package.sha256"
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$src" >/dev/null
+          (cd "$(dirname "$package")" && sha256sum -c "$(basename "$package").sha256")
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp "$package" "$dest/vulpra-local-firefox160-persistent-ci.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-persistent-ci.tar.xz > vulpra-local-firefox160-persistent-ci.tar.xz.sha256)
+          echo 'PASS: Firefox 160 exact-tree native archive verified and restart contracts'
+      - name: Install pinned geckodriver and browser shared libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends curl jq python3 libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          file="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl -fLsS --retry 3 --max-time 90 -o "$file" \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/geckodriver-bin"
+          tar -xzf "$file" -C "$RUNNER_TEMP/geckodriver-bin" geckodriver
+          echo "$RUNNER_TEMP/geckodriver-bin" >> "$GITHUB_PATH"
+      - name: Download Mozilla-signed fixed-version 8.4.0 Firefox Containers XPI
+        shell: bash
+        run: |
+          set -euo pipefail
+          meta="$RUNNER_TEMP/mozilla-signed-addon-version.json"
+          curl -fLsS --retry 3 --max-time 90 -o "$meta" \
+            'https://addons.mozilla.org/api/v5/addons/addon/multi-account-containers/versions/8.4.0/'
+          url="$(jq -er '.file.url | select(type=="string")' "$meta")"
+          hash="$(jq -er '.file.hash | select(type=="string")' "$meta")"
+          test "$url" = 'https://addons.mozilla.org/firefox/downloads/file/5168122/multi_account_containers-8.4.0.xpi'
+          [[ "$hash" =~ ^sha256:[a-fA-F0-9]{64}$ ]]
+          sha="$(printf '%s' "$hash" | cut -c8- | tr '[:upper:]' '[:lower:]')"
+          xpi="$RUNNER_TEMP/mozilla-multi-account-containers-8.4.0-signed.xpi"
+          curl -fLsS --retry 3 --max-time 90 -o "$xpi" "$url"
+          printf '%s  %s\n' "$sha" "$xpi" | sha256sum -c -
+          test "$(stat -c %s "$xpi")" -gt 100000
+          printf '%s\n' "$sha" > "$RUNNER_TEMP/mozilla-signed-addon-sha256.txt"
+          echo 'PASS: Mozilla-hosted exact XPI version and AMO hash match'
+      - name: Compare real permanent signed XPI with temporary unsigned XPI across restart
+        shell: bash
+        timeout-minutes: 9
+        run: |
+          set -euo pipefail
+          sha="$(cat "$RUNNER_TEMP/mozilla-signed-addon-sha256.txt")"
+          python3 ci/security-160-persistent-extension-restart.py \
+            "$GITHUB_WORKSPACE" \
+            "$RUNNER_TEMP/mozilla-multi-account-containers-8.4.0-signed.xpi" \
+            "$sha" \
+            "$RUNNER_TEMP/firefox160-signed-extension-restart.json" \
+            2>&1 | tee "$RUNNER_TEMP/firefox160-signed-extension-restart.log"
+          jq -e '
+            .schema_version==1 and .status=="pass" and
+            .signed_install_non_temporary==true and
+            .signed_extension_active_before_restart==true and
+            .signed_extension_active_after_restart==true and
+            .signed_extension_version_preserved==true and
+            .temporary_unsigned_extension_removed_by_restart==true and
+            .signed_extension_uninstalled_after_test==true and
+            .separate_browser_processes_same_profile==true and
+            .original_firefox_profile_preserved==true and
+            .xpinstall_signing_requirement_not_disabled_by_test==true and
+            .release_ready==false and .security_current==false
+          ' "$RUNNER_TEMP/firefox160-signed-extension-restart.json" >/dev/null
+          echo 'PASS: signed add-on retained after full browser restart, temporary unsigned add-on removed'
+          echo 'LIMIT: no whole-extension ecosystem, full storage or security-current approval'
+      - name: Archive bounded actual Firefox 160 signed extension restart proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-signed-extension-restart-proof
+          path: ${{ runner.temp }}/firefox160-signed-extension-restart.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve bounded failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if test -s "$RUNNER_TEMP/firefox160-signed-extension-restart.log"; then
+            tail -n 250 "$RUNNER_TEMP/firefox160-signed-extension-restart.log" > "$RUNNER_TEMP/firefox160-extension-failure-tail.log"
+          fi
+      - name: Upload bounded failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-signed-extension-restart-failure
+          path: ${{ runner.temp }}/firefox160-extension-failure-tail.log
+          if-no-files-found: ignore
+          retention-days: 14
