@@ -207,7 +207,11 @@ def verify_server_requests(client, resource):
          "Blocked preflight incorrectly sent its protected GET")
     # No silent extra host requests; favicon requests are not recorded.
     need(client == expected_client and resource == expected_resource,
-         "Local server request ledger differs from actual CORS/CORP expectations")
+         "Local server request ledger mismatch (localhost route/method/count only): " +
+         "client=" + repr(sorted(client.items())) +
+         " expected_client=" + repr(sorted(expected_client.items())) +
+         " resource=" + repr(sorted(resource.items())) +
+         " expected_resource=" + repr(sorted(expected_resource.items())))
     return True
 
 
