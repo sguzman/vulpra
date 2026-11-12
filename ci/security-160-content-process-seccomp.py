@@ -320,6 +320,52 @@ def evaluate_worker_namespaces(parent_pid, children, parent_namespaces,
     }
 
 
+def reconcile_user_namespace_support(observation, cached, level,
+                                     disabled, permissive, force_pref):
+    """Do not call missing namespaces proof of an active isolated namespace.
+
+    Firefox 160 SandboxInfo.cpp caches its *actual* CLONE_NEWUSER followed
+    by unshare(CLONE_NEWPID) capability probe in MOZ_ASSUME_USER_NS.
+    SandboxLaunch.cpp only requests CLONE_NEWUSER for content when the
+    kHasUserNamespaces capability check passes, and at level >=4 the
+    content path intends to chroot when namespace support is available.
+    """
+    if type(level) is not int or level < 1:
+        raise RuntimeError("Content sandbox level missing or disabled")
+    if type(disabled) is not bool or type(permissive) is not bool or \
+            type(force_pref) is not bool:
+        raise RuntimeError("Sandbox environment checks were not booleans")
+    if disabled or permissive:
+        raise RuntimeError("Firefox content sandbox disabled or permissive")
+    if cached not in ("0", "1", ""):
+        raise RuntimeError("Unrecognized Firefox cached user namespace probe")
+    counts = observation.get("content_worker_distinct_namespace_counts_by_kind")
+    count = observation.get("observed_content_worker_namespace_groups")
+    if not isinstance(counts, dict) or type(count) is not int or count <= 0 or \
+            type(counts.get("user")) is not int:
+        raise RuntimeError("Incomplete live namespace comparison")
+    if counts["user"] > count:
+        raise RuntimeError("More user namespace splits than content workers")
+    if cached == "1" and level >= 4 and counts["user"] != count:
+        raise RuntimeError(
+            "Firefox cached user namespace capability, but sampled worker "
+            "groups did not enter separate user namespaces")
+    return {
+        "firefox_parent_cached_user_namespace_probe":
+            "supported" if cached == "1" else
+            "unavailable" if cached == "0" else "not-run-or-not-exposed",
+        "firefox_parent_content_sandbox_disabled_env": disabled,
+        "firefox_parent_permissive_content_sandbox_env": permissive,
+        "firefox_parent_force_content_namespace_pref": force_pref,
+        "user_namespace_separation_consistent_with_probe":
+            (counts["user"] == count if cached == "1" and level >= 4 else None),
+        "linux_content_sandbox_namespace_capability_proven": cached == "1",
+        "namespace_absence_caused_by_runner_policy_verified": False,
+        "all_namespaces_are_isolated": False,
+        "seccomp_syscall_denial_actually_exercised": False,
+    }
+
+
 def capture_worker_namespaces(children, browser_pid):
     """Read /proc symlinks and root metadata only; do not attach or ptrace."""
     spawners = {x["pid"] for x in children if x["ppid"] == browser_pid}
@@ -452,6 +498,35 @@ def self_test():
             raise AssertionError("Forged/missing namespace record was accepted")
     assert rejected_ns == 9
     print("PASS: 9 corrupted namespace fixtures rejected; inaccessible roots reported as unknown")
+    source_supported = reconcile_user_namespace_support(
+        good_ns, "1", 6, False, False, False)
+    assert source_supported["linux_content_sandbox_namespace_capability_proven"] is True
+    source_unavailable = reconcile_user_namespace_support(
+        same_ns, "0", 6, False, False, False)
+    assert source_unavailable["firefox_parent_cached_user_namespace_probe"] == "unavailable"
+    assert source_unavailable["user_namespace_separation_consistent_with_probe"] is None
+    unknown = reconcile_user_namespace_support(
+        same_ns, "", 6, False, False, False)
+    assert unknown["firefox_parent_cached_user_namespace_probe"] == "not-run-or-not-exposed"
+    negative_support = [
+        (same_ns, "1", 6, False, False, False),
+        (good_ns, "bad", 6, False, False, False),
+        (good_ns, "1", 0, False, False, False),
+        (good_ns, "1", 6, True, False, False),
+        (good_ns, "1", 6, False, True, False),
+        (good_ns, "1", 6, False, False, "false"),
+        ({}, "1", 6, False, False, False),
+    ]
+    denied = 0
+    for args in negative_support:
+        try:
+            reconcile_user_namespace_support(*args)
+        except RuntimeError:
+            denied += 1
+        else:
+            raise AssertionError("Forged Firefox namespace capability accepted")
+    assert denied == 7
+    print("PASS: seven forged/disabled user-namespace capability fixtures rejected")
 
 
 def run(repo: Path, output: Path):
@@ -542,6 +617,18 @@ def run(repo: Path, output: Path):
                           "security.sandbox.content.level", 0);""",
                         "args": [],
                     })
+                    runtime_security = wd.request(port, "POST", base + "/execute/sync", {
+                        "script": """return {
+                          cachedUserNamespaceProbe: Services.env.get("MOZ_ASSUME_USER_NS"),
+                          disabled: Services.env.exists("MOZ_DISABLE_CONTENT_SANDBOX"),
+                          permissive: Services.env.exists("MOZ_PERMISSIVE_CONTENT_SANDBOX"),
+                          forceNamespace: Services.prefs.getBoolPref(
+                            "security.sandbox.content.force-namespace", false)
+                        };""",
+                        "args": [],
+                    })
+                    if not isinstance(runtime_security, dict):
+                        raise RuntimeError("Missing privileged Firefox sandbox status")
                 finally:
                     wd.request(port, "POST", base + "/moz/context", {"context": "content"})
                 deadline = time.monotonic() + 15
@@ -575,6 +662,13 @@ def run(repo: Path, output: Path):
                 # from the same authenticated Firefox content workers.
                 thread_evidence = capture_worker_thread_seccomp(last, browser_pid)
                 namespace_evidence = capture_worker_namespaces(last, browser_pid)
+                namespace_capability = reconcile_user_namespace_support(
+                    namespace_evidence,
+                    runtime_security.get("cachedUserNamespaceProbe"),
+                    pref_level,
+                    runtime_security.get("disabled"),
+                    runtime_security.get("permissive"),
+                    runtime_security.get("forceNamespace"))
                 if original.read_bytes() != sentinel:
                     raise RuntimeError("Existing Firefox profile was altered")
                 report = {
@@ -587,12 +681,14 @@ def run(repo: Path, output: Path):
                     **evidence,
                     **thread_evidence,
                     **namespace_evidence,
+                    **namespace_capability,
                     "release_ready": False,
                     "security_current": False,
                     "limits": [
                         "All *observed live threads* of authenticated content workers checked, not transient future threads",
                         "Linux seccomp mode/filter presence, not attempted syscall denial",
                         "Namespace identities are compared with browser parent; matching or unreadable namespace never mislabeled as isolated",
+                        "User namespaces are conditioned on Firefox's capability probe and kernel/LSM; content namespaces absent on CI are not claimed enabled",
                         "Some user/network/IPC namespaces are conditional on kernel/graphics support; no semantics or blocked-syscall audit",
                         "No proof each filter is the expected Mozilla sandbox policy",
                         "Not a full Safe Browsing or external-network egress test",
@@ -606,7 +702,10 @@ def run(repo: Path, output: Path):
                 print("AUDIT: worker namespace distinct-from-parent counts=" +
                       json.dumps(namespace_evidence["content_worker_distinct_namespace_counts_by_kind"], sort_keys=True) +
                       " unreadable=" + json.dumps(namespace_evidence["content_worker_unreadable_namespace_counts_by_kind"], sort_keys=True) +
-                      " distinct-root-count=" + str(namespace_evidence["content_worker_distinct_root_directory_count"]), flush=True)
+                      " distinct-root-count=" + str(namespace_evidence["content_worker_distinct_root_directory_count"]) +
+                      " unreadable-root-count=" + str(namespace_evidence["content_worker_unreadable_root_directory_count"]) +
+                      " sandbox-level=" + str(pref_level) +
+                      " firefox-user-ns-probe=" + namespace_capability["firefox_parent_cached_user_namespace_probe"], flush=True)
                 print("LIMIT: does not prove sandbox policy correctness or syscall denial", flush=True)
         finally:
             if session_id:
