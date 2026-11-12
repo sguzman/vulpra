@@ -26,10 +26,10 @@ jq -e '
     "CVE-2026-124859","CVE-2026-124903","CVE-2026-124907"] and
   ([.commits[].changed_paths[]]|length)==31 and
   ([.commits[].changed_paths[]]|unique|length)==27 and
-  all(.commits[];
+  all(.commits[]; . as $record |
     (.upstream_commit|test("^[a-f0-9]{40}$")) and
     (.mozilla_bug|type=="number") and
-    (.commit_title|startswith("Bug " + (.mozilla_bug|tostring) + " -")) and
+    (.commit_title|startswith("Bug " + ($record.mozilla_bug|tostring) + " -")) and
     (.changed_paths|type=="array" and length>0 and length<20) and
     (.changed_paths==(.changed_paths|unique|sort)) and
     all(.changed_paths[];
