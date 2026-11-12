@@ -114,17 +114,18 @@ jobs:
             .verified_real_localhost_content==true and
             .original_firefox_profile_preserved==true and
             .linux_content_sandbox_level>0 and
-            .content_process_count>=1 and
-            .distinct_native_content_processes==true and
-            .content_processes_direct_children_of_browser==true and
-            .all_content_process_seccomp_mode_filter==true and
-            .all_content_processes_have_seccomp_filters==true and
+            .actual_content_worker_count>=1 and
+            .browser_child_spawning_process_count>=1 and
+            .all_worker_processes_descend_from_browser_spawners==true and
+            .all_observed_content_workers_have_seccomp_filters==true and
+            .all_observed_content_workers_have_no_new_privileges==true and
+            .unfiltered_browser_child_process_is_explicitly_reported==true and
             .seccomp_syscall_denial_actually_exercised==false and
             .content_sandbox_policy_strength_verified==false and
             .release_ready==false and .security_current==false
           ' "$RUNNER_TEMP/firefox160-content-sandbox-proof.json" >/dev/null
-          echo 'PASS: real Firefox 160 native content-process seccomp filter presence verified'
-          echo 'LIMIT: no syscall-denial, sandbox filter-policy or full security acceptance proven'
+          echo 'PASS: real Firefox 160 seccomp-filtered content workers observed; unfiltered spawning children separately reported'
+          echo 'LIMIT: observed direct browser spawning child may be unfiltered; no syscall-denial, sandbox filter-policy or full security acceptance proven'
       - name: Archive bounded Firefox 160 Linux content-process observation
         if: success()
         uses: actions/upload-artifact@v4
