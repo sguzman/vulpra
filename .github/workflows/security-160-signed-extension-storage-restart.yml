@@ -136,7 +136,7 @@ jobs:
           test "$(stat -c %s "$xpi")" -gt 100000
           printf '%s\n' "$sha" > "$RUNNER_TEMP/signed-xpi-sha256.txt"
           echo 'PASS: exact AMO XPI, version, official SHA-256 and download origin verified'
-      - name: Execute signed extension page storage and background proof across two real browser launches
+      - name: Execute signed extension background message, content-script DOM and storage across two real launches
         shell: bash
         timeout-minutes: 10
         run: |
@@ -164,15 +164,17 @@ jobs:
             .signed_extension_origin_unchanged_across_restart==true and
             .signed_addon_uninstalled_after_test==true and
             .other_firefox_profile_sentinel_preserved==true and
-            .actual_background_message_delivery_verified==false and
-            .signed_extension_content_script_injection_verified==false and
+            .actual_background_message_delivery_verified==true and
+            .signed_extension_content_script_injection_verified==true and
+            .signed_background_getShortcuts_response_before_and_after_restart==true and
+            .signed_content_script_tab_message_notified_dom_before_and_after_restart==true and
             .whole_addon_ecosystem_certified==false and
             .sandbox_syscall_denial_executed==false and
             .safe_browsing_provider_ready==false and
             .security_current==false and .release_ready==false
           ' "$RUNNER_TEMP/firefox160-signed-extension-storage-proof.json" >/dev/null
-          echo 'PASS: real signed WebExtension storage.local persisted across full Firefox restart'
-          echo 'LIMIT: no broad extension compatibility, content-script, Safe Browsing or sandbox enforcement proof'
+          echo 'PASS: real Mozilla-signed WebExtension storage, background message reply and content-script DOM persisted across restart'
+          echo 'LIMIT: one signed AMO extension only; no cross-addon matrix, Safe Browsing or sandbox enforcement proof'
       - name: Archive bounded signed extension storage and background proof
         if: success()
         uses: actions/upload-artifact@v4
