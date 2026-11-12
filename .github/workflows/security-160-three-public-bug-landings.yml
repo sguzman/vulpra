@@ -99,6 +99,11 @@ jobs:
             .selected_cves==3 and .selected_public_commits==3 and
             .checked_file_records==11 and .checked_unique_paths==11 and
             (.exact_landing_vs_release_blobs+.different_release_blobs)==11 and
+            .exact_landing_vs_release_blobs==8 and .different_release_blobs==3 and
+            .divergent_release_files_with_added_lines_checked==3 and
+            .selected_public_patch_nonblank_added_lines_found_in_release==21 and
+            .all_selected_divergent_added_lines_verbatim_in_final_release==true and
+            .full_changed_hunks_or_semantics_verified==false and
             .vulpra_overlay_collisions==0 and
             .publicly_searched_commit_set_exhaustive==false and
             .all_fix_hunks_and_followups_verified==false and
@@ -107,7 +112,8 @@ jobs:
           ' "$RUNNER_TEMP/firefox160-three-public-security-landings-source-crosswalk.json" >/dev/null
           jq -c '{
             selected_cves, checked_file_records,
-            exact_landing_vs_release_blobs,different_release_blobs,vulpra_overlay_collisions
+            exact_landing_vs_release_blobs,different_release_blobs,
+            selected_public_patch_nonblank_added_lines_found_in_release,vulpra_overlay_collisions
           }' "$RUNNER_TEMP/firefox160-three-public-security-landings-source-crosswalk.json"
       - name: Archive bounded evidence of public landing source retention
         if: success()
