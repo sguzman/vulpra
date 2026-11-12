@@ -1,0 +1,113 @@
+# Source-only verification: no build, no exploit or security-current claim.
+name: Firefox 160 Five Bounded Security Fix Blob Retention Checks (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-boundary-fix-source-retention.yml
+      - ci/security-160-boundary-fix-source-retention.sh
+      - docs/vulpra/SECURITY-160-BOUNDARY-FIX-SPOTCHECK-20261111.json
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-selected-latest-security-fix-blobs:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate original complete source-tree candidate CI and artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo, id=43138458940;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+               r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Refusing unverified Mozilla Firefox 160 candidate');
+            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            for(const name of ['firefox160-vulpra-complete-git-tree-candidate',
+                               'firefox160-vulpra-materialized-source-proof']){
+              if(!all.some(a=>a.name===name&&!a.expired&&a.size_in_bytes>0))
+                throw Error('Missing or expired verified source artifact: '+name);
+            }
+            core.info('PASS: successful original native run, candidate tree and source materialization artifacts');
+      - name: Checkout only pinned bounded security source audit scripts and metadata
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-boundary-fix-source-retention.sh
+            docs/vulpra/SECURITY-160-BOUNDARY-FIX-SPOTCHECK-20261111.json
+      - name: Download original complete 28-file overlay and candidate-tree ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-candidate-ledger
+      - name: Download original independently materialized exact-source tree proof
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-source-identity
+      - name: Verify bounded source metadata contracts and negative-security-claim fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          script="ci/security-160-boundary-fix-source-retention.sh"
+          manifest="docs/vulpra/SECURITY-160-BOUNDARY-FIX-SPOTCHECK-20261111.json"
+          bash -n "$script"
+          bash "$script" --self-test "$manifest"
+          jq '.scope.security_current=true' "$manifest" > "$RUNNER_TEMP/forged-current.json"
+          if bash "$script" --self-test "$RUNNER_TEMP/forged-current.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged security-current state passed' >&2; exit 1
+          fi
+          jq '(.records[0].landed_blob)="ffffffffffffffffffffffffffffffffffffffff"' \
+             "$manifest" > "$RUNNER_TEMP/forged-fix.json"
+          if bash "$script" --self-test "$RUNNER_TEMP/forged-fix.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged upstream fix SHA passed' >&2; exit 1
+          fi
+          echo 'PASS: immutable five-source-blob contract and forged security/fix negative cases'
+      - name: Independently authenticate official Mozilla landed fixes and exact 160 release blobs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          bash ci/security-160-boundary-fix-source-retention.sh --verify \
+            docs/vulpra/SECURITY-160-BOUNDARY-FIX-SPOTCHECK-20261111.json \
+            "$RUNNER_TEMP/firefox160-candidate-ledger" \
+            "$RUNNER_TEMP/firefox160-source-identity/materialized-candidate.json" \
+            "$RUNNER_TEMP/firefox160-additional-boundary-source-proof.json"
+          jq -e '
+            .schema_version==1 and
+            .exact_landed_fix_blobs_in_official_release==5 and
+            .selected_advisory_cves_source_spotchecked==4 and
+            .selected_security_source_paths_overwritten_by_vulpra==0 and
+            .source_candidate_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .complete_fixes_for_these_cves_independently_verified==false and
+            .all_advisory_cves_independently_verified==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-additional-boundary-source-proof.json" >/dev/null
+          echo 'PASS: four additional high-impact advisory issues have selected exact-upstream source file spotchecks'
+          echo 'LIMIT: complete CVE fixes and security-current status remain unverified'
+      - name: Archive bounded exact-blob security source retention proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-five-boundary-fix-blob-retention-proof
+          path: ${{ runner.temp }}/firefox160-additional-boundary-source-proof.json
+          if-no-files-found: error
+          retention-days: 30

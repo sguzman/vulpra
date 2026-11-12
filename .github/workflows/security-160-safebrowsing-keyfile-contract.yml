@@ -1,0 +1,33 @@
+name: Firefox 160 Safe Browsing Keyfile Staging Contract (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - ci/security-160-safebrowsing-keyfile-stage.sh
+      - ci/tests/security-160-safebrowsing-keyfile-stage-tests.sh
+      - .github/workflows/security-160-safebrowsing-keyfile-contract.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  synthetic-keyfile-staging-contract:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout staging helper, negative fixtures and original mozconfig only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/mozconfig-linux
+            ci/security-160-safebrowsing-keyfile-stage.sh
+            ci/tests/security-160-safebrowsing-keyfile-stage-tests.sh
+      - name: Enforce fail-closed ephemeral keyfile staging with synthetic input
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-safebrowsing-keyfile-stage.sh
+          bash -n ci/tests/security-160-safebrowsing-keyfile-stage-tests.sh
+          bash ci/tests/security-160-safebrowsing-keyfile-stage-tests.sh
+          echo 'LIMIT: no real key, no provider consent, no Firefox compilation, no release approval'

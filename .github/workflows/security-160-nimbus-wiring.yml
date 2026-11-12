@@ -1,0 +1,100 @@
+name: Firefox 160 Nimbus / Normandy Source Wiring (No Native Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - ci/security-160-nimbus-wiring.sh
+      - .github/workflows/security-160-nimbus-wiring.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-optin-source-contracts:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout read-only source graph verifier
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-nimbus-wiring.sh
+      - name: Checkout exact Firefox 160 Nimbus API and jar sources
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: firefox160
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            toolkit/components/nimbus/ExperimentAPI.sys.mjs
+            toolkit/components/nimbus/jar.mn
+      - name: Retrieve independently verified Firefox 160 source overlays
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-verified-source-overlay
+          run-id: 43112919678
+          repository: sguzman/vulpra
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/verified160-overlays
+      - name: Retrieve independent Firefox 160 full Git-tree ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          run-id: 43112919678
+          repository: sguzman/vulpra
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/verified160-ledger
+      - name: Verify exact-source subsystem wiring and reject three mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-nimbus-wiring.sh
+          stage="$RUNNER_TEMP/verified160-overlays"
+          ledger="$RUNNER_TEMP/verified160-ledger"
+          upstream="$GITHUB_WORKSPACE/firefox160"
+          proof="$RUNNER_TEMP/firefox160-nimbus-source-wiring.json"
+          bash ci/security-160-nimbus-wiring.sh --check "$stage" "$ledger" "$upstream" "$proof"
+          jq -e '
+            .kind=="firefox160_vulpra_bounded_nimbus_normandy_source_wiring" and
+            .exact_source_postimages_verified==7 and
+            .nimbus_bootstrap_import_target_present_in_160==true and
+            .no_normandy_resource_helpers_retained==3 and
+            .no_normandy_runtime_exercised==false and
+            .security_current==false and
+            .release_ready==false
+          ' "$proof" >/dev/null
+          cp -a "$stage" "$RUNNER_TEMP/corrupt-stage"
+          sed -i 's/resource:\/\/nimbus\/ExperimentAPI.sys.mjs/resource:\/\/nimbus\/UnknownAPI.sys.mjs/' \
+            "$RUNNER_TEMP/corrupt-stage/toolkit/components/nimbus/NimbusBootstrap.sys.mjs"
+          if bash ci/security-160-nimbus-wiring.sh --check "$RUNNER_TEMP/corrupt-stage" "$ledger" "$upstream" "$RUNNER_TEMP/bad-source.json" >/dev/null 2>&1; then
+            echo 'FAIL: accepted mutated Nimbus source' >&2
+            exit 1
+          fi
+          cp -a "$ledger" "$RUNNER_TEMP/corrupt-ledger"
+          jq '.upstream_files_deleted=1' "$ledger/candidate-tree-report.json" > "$RUNNER_TEMP/corrupt-ledger/candidate-tree-report.json"
+          if bash ci/security-160-nimbus-wiring.sh --check "$stage" "$RUNNER_TEMP/corrupt-ledger" "$upstream" "$RUNNER_TEMP/bad-ledger.json" >/dev/null 2>&1; then
+            echo 'FAIL: accepted altered upstream deletion claim' >&2
+            exit 1
+          fi
+          cp -a "$stage" "$RUNNER_TEMP/corrupt-jar-stage"
+          sed -i '/NormandyUtils.sys.mjs/d' "$RUNNER_TEMP/corrupt-jar-stage/toolkit/components/normandy/jar.mn"
+          if bash ci/security-160-nimbus-wiring.sh --check "$RUNNER_TEMP/corrupt-jar-stage" "$ledger" "$upstream" "$RUNNER_TEMP/bad-jar.json" >/dev/null 2>&1; then
+            echo 'FAIL: accepted missing no-Normandy helper' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/bad-source.json"
+          test ! -e "$RUNNER_TEMP/bad-ledger.json"
+          test ! -e "$RUNNER_TEMP/bad-jar.json"
+          echo 'PASS: source wiring and three negative integrity controls'
+          echo 'LIMIT: no no-Normandy configure, native build, runtime or security acceptance'
+      - name: Archive bounded Nimbus / Normandy source-wiring proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-nimbus-normandy-source-contract
+          path: ${{ runner.temp }}/firefox160-nimbus-source-wiring.json
+          if-no-files-found: error
+          retention-days: 30

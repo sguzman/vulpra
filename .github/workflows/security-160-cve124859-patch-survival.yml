@@ -1,0 +1,102 @@
+# A patch-added-line crosscheck against official Firefox 160 source.
+# A green result does NOT certify a complete security fix or binary exploit denial.
+name: Firefox 160 Bug 2074179 Security Patch Added-Line Source Verification (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-cve124859-patch-survival.yml
+      - ci/security-160-cve124859-patch-survival.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  three-source-file-retention:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate pinned successful Firefox 160 native source run and proofs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo,id=43138458940;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+               r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Original source-provenance run not authenticated');
+            const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            for(const name of ['firefox160-vulpra-complete-git-tree-candidate',
+                               'firefox160-vulpra-materialized-source-proof']){
+              if(!a.some(x=>x.name===name&&!x.expired&&x.size_in_bytes>0))
+                throw Error('Missing or expired exact original source artifacts');
+            }
+            core.info('PASS: official Firefox 160 immutable candidate source proof authenticated');
+      - name: Checkout only pinned CVE source-line survival verifier
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-cve124859-patch-survival.sh
+      - name: Download exact candidate source overlay ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-candidate-ledger
+      - name: Download original materialized exact Firefox 160 source identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-source-identity
+      - name: Verify syntax and bounded, no-release source claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/security-160-cve124859-patch-survival.sh
+          bash ci/security-160-cve124859-patch-survival.sh --self-test
+          echo 'LIMIT: source-added-line presence is not complete CVE-fix certification'
+      - name: Compare public landed source patch additions against final Firefox 160 files
+        shell: bash
+        timeout-minutes: 7
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash ci/security-160-cve124859-patch-survival.sh --verify \
+            "$RUNNER_TEMP/firefox160-candidate-ledger" \
+            "$RUNNER_TEMP/firefox160-source-identity/materialized-candidate.json" \
+            "$RUNNER_TEMP/firefox160-cve124859-patch-added-lines-proof.json"
+          jq -e '
+            .schema_version==1 and
+            .kind=="firefox160_cve2026_124859_added_source_lines_check" and
+            .files_compared==3 and
+            .nontrivial_added_lines_verified>=10 and
+            .exact_landed_source_blob_count==1 and
+            .changed_whole_file_blob_count==2 and
+            .missing_selected_source_lines==0 and
+            .candidate_overwritten_security_files==0 and
+            .complete_patch_hunks_and_deleted_lines_checked==false and
+            .complete_cve_fix_verified==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-cve124859-patch-added-lines-proof.json" >/dev/null
+          echo 'PASS: all selected nontrivial added source lines survived in release; broader CVE verification remains open'
+      - name: Archive bounded source-line survival evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-cve124859-added-security-patch-lines-retention
+          path: ${{ runner.temp }}/firefox160-cve124859-patch-added-lines-proof.json
+          if-no-files-found: error
+          retention-days: 30

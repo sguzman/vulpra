@@ -1,0 +1,135 @@
+# Records Mozilla advisory metadata, not source-fix applicability or security clearance.
+name: Firefox 160 Mozilla Advisory Structured Risk-Triage Inventory (Source Only)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-mfsa-structured-triage.yml
+      - ci/security-160-mfsa-structured-triage.lua
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  parse-and-prioritize-advisory:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout read-only Lua triage and prior flat-inventory parser
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-mfsa-structured-triage.lua
+            ci/security-160-mfsa-inventory.sh
+      - name: Retrieve original frozen four-CVE source spotcheck from main
+        uses: actions/checkout@v4
+        with:
+          repository: sguzman/vulpra
+          ref: main
+          path: main-security
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json
+      - name: Install minimal Lua 5.4 parser and validate strict fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y --no-install-recommends lua5.4 jq
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          lua5.4 -e 'assert(loadfile("ci/security-160-mfsa-structured-triage.lua"))'
+          manifest="main-security/docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json"
+          jq -e '.scope.cves_checked==4 and .scope.security_current==false and .scope.release_ready==false' "$manifest" >/dev/null
+          jq -r '.patch_files[].cve' "$manifest" | LC_ALL=C sort -u > "$RUNNER_TEMP/four-checked-cves.txt"
+          test "$(wc -l < "$RUNNER_TEMP/four-checked-cves.txt")" -eq 4
+          sample="$RUNNER_TEMP/sample-mfsa.html"
+          {
+            printf '%s\n' '<html><title>Security Vulnerabilities fixed in Firefox 160</title><body><h1>Mozilla Foundation Security Advisory 2026-125</h1>'
+            for id in $(seq 124852 124876); do
+              cve="CVE-2026-$id"
+              case "$id" in
+                124853|124854|124856|124902) ;;
+              esac
+              printf '<h4>#%s: Sandbox escape in Graphics component</h4><p>Reporter Mozilla</p><p>Impact high</p><p>References Bug 2086000</p>\n' "$cve"
+            done
+            printf '<h4>#CVE-2026-124902: Same-origin policy bypass in Audio/Video</h4><p>Reporter Mozilla</p><p>Impact high</p><p>References Bug 2083629</p>\n'
+            printf '</body></html>\n'
+          } > "$sample"
+          lua5.4 ci/security-160-mfsa-structured-triage.lua --extract \
+            "$sample" "$RUNNER_TEMP/four-checked-cves.txt" "$RUNNER_TEMP/triage-fixture.json"
+          jq -e '
+            .schema_version==1 and .unique_structured_cve_headings==26 and
+            .previously_source_spotchecked_cves==4 and
+            .other_cves_without_individual_source_review==22 and
+            .high_priority_boundary_review_count==26 and
+            .by_impact.high==26 and .all_advisory_fixes_independently_verified==false and
+            .security_current==false and .release_ready==false and
+            ([.entries[].cve]|unique|length)==26
+          ' "$RUNNER_TEMP/triage-fixture.json" >/dev/null
+          sed 's/Impact high/Impact impossible/g' "$sample" > "$RUNNER_TEMP/forged-impact.html"
+          if lua5.4 ci/security-160-mfsa-structured-triage.lua --extract \
+              "$RUNNER_TEMP/forged-impact.html" "$RUNNER_TEMP/four-checked-cves.txt" \
+              "$RUNNER_TEMP/invalid-impact-proof.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged advisory impact was accepted' >&2; exit 1
+          fi
+          sed 's/CVE-2026-124902/CVE-2026-126999/g' "$sample" > "$RUNNER_TEMP/missing-checked.html"
+          if lua5.4 ci/security-160-mfsa-structured-triage.lua --extract \
+              "$RUNNER_TEMP/missing-checked.html" "$RUNNER_TEMP/four-checked-cves.txt" \
+              "$RUNNER_TEMP/missing-checked-proof.json" >/dev/null 2>&1; then
+            echo 'FAIL: missing known source-checked CVE was accepted' >&2; exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/invalid-impact-proof.json"
+          test ! -e "$RUNNER_TEMP/missing-checked-proof.json"
+          echo 'PASS: Lua structured advisory parser, 26 sample entries, negative impact and missing-CVE refusals'
+      - name: Fetch official Mozilla advisory and reconcile all CVE records against flat inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          advisory="$RUNNER_TEMP/official-mfsa2026-125.html"
+          manifest="main-security/docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json"
+          curl --fail --location --show-error --silent --retry 3 --max-time 90 \
+            'https://www.mozilla.org/en-US/security/advisories/mfsa2026-125/' -o "$advisory"
+          bash ci/security-160-mfsa-inventory.sh --extract \
+            "$advisory" "$manifest" "$RUNNER_TEMP/firefox160-mfsa-flat-inventory.json"
+          lua5.4 ci/security-160-mfsa-structured-triage.lua --extract \
+            "$advisory" "$RUNNER_TEMP/four-checked-cves.txt" \
+            "$RUNNER_TEMP/firefox160-mfsa-structured-triage.json"
+          jq -e --slurpfile flat "$RUNNER_TEMP/firefox160-mfsa-flat-inventory.json" '
+            .schema_version==1 and
+            .kind=="firefox160_mfsa2026_125_structured_triage_not_patch_audit" and
+            .unique_structured_cve_headings==$flat[0].unique_cve_identifiers_in_html and
+            .previously_source_spotchecked_cves==$flat[0].previously_checked_source_cve_identifiers and
+            .other_cves_without_individual_source_review==$flat[0].other_advisory_cve_identifiers_without_individual_source_spotchecks and
+            ([.entries[].cve]|sort)==($flat[0].identifiers|sort) and
+            ([.entries[]|select(.previously_source_spotchecked==true)|.cve]|sort)==
+              ($flat[0].previously_source_spotchecked_identifiers|sort) and
+            (.by_impact.critical+.by_impact.high+.by_impact.moderate+.by_impact.low)==
+              .unique_structured_cve_headings and
+            ([.entries[]|select(.triage_tier=="high_boundary_review")]|length)==
+              .high_priority_boundary_review_count and
+            all(.entries[]; .independently_verified_fix==false and
+              .applicability_reviewed==false and (.title|length)>4 and
+              (.impact=="high" or .impact=="moderate" or .impact=="low" or .impact=="critical")) and
+            .all_advisory_fixes_independently_verified==false and
+            .ranking_is_a_review_queue_not_exploitability_or_fix_verdict==true and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-mfsa-structured-triage.json" >/dev/null
+          jq -c '{total:.unique_structured_cve_headings,
+            impact:.by_impact,
+            high_boundary_review:.high_priority_boundary_review_count,
+            source_spotchecked:.previously_source_spotchecked_cves,
+            still_unreviewed:.other_cves_without_individual_source_review}' \
+            "$RUNNER_TEMP/firefox160-mfsa-structured-triage.json"
+          echo 'PASS: official Mozilla advisory parsed by title, impact, bug and review-tier; reconciled with independent CVE inventory'
+          echo 'LIMIT: all per-CVE applicability and fix verdicts remain unverified in this new metadata-only pass'
+      - name: Preserve structured official advisory review queue and flat coverage baseline
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-mfsa2026-125-structured-unreviewed-security-queue
+          path: |
+            ${{ runner.temp }}/firefox160-mfsa-structured-triage.json
+            ${{ runner.temp }}/firefox160-mfsa-flat-inventory.json
+          if-no-files-found: error
+          retention-days: 30

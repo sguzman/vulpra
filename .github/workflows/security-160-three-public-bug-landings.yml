@@ -1,0 +1,125 @@
+# Source-only verification against the authenticated Firefox 160 native candidate.
+name: Firefox 160 Three Additional Public Security Bug Landing Crosswalk (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - ci/security-160-three-public-bug-landings.sh
+      - docs/vulpra/SECURITY-160-THREE-PUBLIC-BUG-LANDINGS-20261112.json
+      - .github/workflows/security-160-three-public-bug-landings.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audited-public-security-landings:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Authenticate immutable native Firefox 160 candidate and source proofs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo, id=43138458940;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+               r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Refusing wrong Firefox 160 source-run identity');
+            const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            for(const name of ['firefox160-vulpra-complete-git-tree-candidate',
+                               'firefox160-vulpra-materialized-source-proof']){
+              if(!artifacts.some(a=>a.name===name&&!a.expired&&a.size_in_bytes>0))
+                throw Error('Original source proof unavailable/expired: '+name);
+            }
+            core.info('PASS: authenticated original native candidate source proof');
+      - name: Checkout only read-only source verifier and reviewed bug-landing manifest
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-three-public-bug-landings.sh
+            docs/vulpra/SECURITY-160-THREE-PUBLIC-BUG-LANDINGS-20261112.json
+      - name: Download original 28-overlay source-ledger proof
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/candidate-ledger
+      - name: Download immutable materialized Firefox 160 candidate identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source-identity
+      - name: Reject forged Mozilla fix claims and mutated landing metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          manifest=docs/vulpra/SECURITY-160-THREE-PUBLIC-BUG-LANDINGS-20261112.json
+          script=ci/security-160-three-public-bug-landings.sh
+          bash -n "$script"
+          bash "$script" --self-test "$manifest"
+          jq '.limits.security_current=true' "$manifest" > "$RUNNER_TEMP/forged-security-current.json"
+          if bash "$script" --self-test "$RUNNER_TEMP/forged-security-current.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged security current claim accepted' >&2; exit 1
+          fi
+          jq '(.landings[0].changed_paths[0])="netwerk/FAKE_UNVERIFIED.cpp"' "$manifest" > "$RUNNER_TEMP/forged-file.json"
+          if bash "$script" --self-test "$RUNNER_TEMP/forged-file.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged changed-file path accepted' >&2; exit 1
+          fi
+          jq '(.landings[1].upstream_commit)="0000000000000000000000000000000000000000"' "$manifest" > "$RUNNER_TEMP/forged-commit.json"
+          if bash "$script" --self-test "$RUNNER_TEMP/forged-commit.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged public bug commit accepted' >&2; exit 1
+          fi
+          echo 'PASS: three selected public bugs pinned, three false-security fixtures rejected'
+      - name: Verify every changed path in original public Mozilla commits versus release and Vulpra overlays
+        shell: bash
+        timeout-minutes: 12
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash ci/security-160-three-public-bug-landings.sh --verify \
+            docs/vulpra/SECURITY-160-THREE-PUBLIC-BUG-LANDINGS-20261112.json \
+            "$RUNNER_TEMP/candidate-ledger" \
+            "$RUNNER_TEMP/source-identity/materialized-candidate.json" \
+            "$RUNNER_TEMP/firefox160-three-public-security-landings-source-crosswalk.json"
+          jq -e '
+            .kind=="firefox160_three_public_bug_source_identity_review" and
+            .selected_cves==3 and .selected_public_commits==3 and
+            .checked_file_records==11 and .checked_unique_paths==11 and
+            (.exact_landing_vs_release_blobs+.different_release_blobs)==11 and
+            .exact_landing_vs_release_blobs==8 and .different_release_blobs==3 and
+            .divergent_release_files_with_added_lines_checked==3 and
+            .selected_public_patch_nonblank_added_lines_found_in_release==21 and
+            .all_selected_divergent_added_lines_verbatim_in_final_release==true and
+            .full_changed_hunks_or_semantics_verified==false and
+            .vulpra_overlay_collisions==0 and
+            .publicly_searched_commit_set_exhaustive==false and
+            .all_fix_hunks_and_followups_verified==false and
+            .native_exploit_regression_executed==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-three-public-security-landings-source-crosswalk.json" >/dev/null
+          jq -c '{
+            selected_cves, checked_file_records,
+            exact_landing_vs_release_blobs,different_release_blobs,
+            selected_public_patch_nonblank_added_lines_found_in_release,vulpra_overlay_collisions
+          }' "$RUNNER_TEMP/firefox160-three-public-security-landings-source-crosswalk.json"
+      - name: Archive bounded evidence of public landing source retention
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-three-more-public-security-bug-landings-source-proof
+          path: ${{ runner.temp }}/firefox160-three-public-security-landings-source-crosswalk.json
+          if-no-files-found: error
+          retention-days: 30

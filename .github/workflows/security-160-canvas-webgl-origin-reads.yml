@@ -1,0 +1,195 @@
+# A behavioral browser regression check, not an exploit replay or security fix audit.
+# Uses only existing Firefox 160 native package from pinned exact-source CI.
+name: Firefox 160 Private Wayland Canvas ImageBitmap OffscreenCanvas WebGL2 Origin Regression (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-canvas-webgl-origin-reads.yml
+      - ci/security-160-canvas-webgl-origin-reads.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  cross-origin-blob-url-access:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 26
+    steps:
+      - name: Authenticate completed exact-source native Firefox 160 run and artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo,id=43138458940;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+               r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Refusing wrong or unsuccessful original Firefox 160 native run');
+            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            for(const name of ['firefox160-vulpra-unreleased-native-preview-not-approved',
+                               'firefox160-vulpra-materialized-source-proof']){
+              if(!all.some(a=>a.name===name&&!a.expired&&a.size_in_bytes>0))
+                throw Error('Missing or expired original native artifact '+name);
+            }
+            core.info('PASS: exact original source/build identity and archived artifact presence');
+      - name: Checkout only bounded Canvas and WebGL2 regression harness and WebDriver helper
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-canvas-webgl-origin-reads.py
+            ci/smoke-webextension-package-local.py
+      - name: Download existing unreleased Firefox 160 native package and checksum
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-unreleased-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-native-archive
+      - name: Download complete original Firefox 160 source identity from same native CI
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-source-proof
+      - name: Prove exact source, archive and forged Canvas/WebGL outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/security-160-canvas-webgl-origin-reads.py
+          python3 ci/security-160-canvas-webgl-origin-reads.py --self-test
+          source="$RUNNER_TEMP/firefox160-source-proof/materialized-candidate.json"
+          package="$RUNNER_TEMP/firefox160-native-archive/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$source" && test -s "$package" && test -s "$package.sha256"
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$source" >/dev/null
+          (cd "$(dirname "$package")" && sha256sum -c "$(basename "$package").sha256")
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp "$package" "$dest/vulpra-local-firefox160-blob-origin-ci.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-blob-origin-ci.tar.xz > vulpra-local-firefox160-blob-origin-ci.tar.xz.sha256)
+          echo 'PASS: exact native Firefox 160 binary, SHA-256, source and origin-contract negatives'
+      - name: Install Weston, native Firefox libraries and checksum-pinned geckodriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends curl jq python3 weston wayland-utils libegl1 libgl1 libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          file="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl -fLsS --retry 3 --max-time 90 -o "$file" \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/geckodriver-bin"
+          tar -xzf "$file" -C "$RUNNER_TEMP/geckodriver-bin" geckodriver
+          echo "$RUNNER_TEMP/geckodriver-bin" >> "$GITHUB_PATH"
+      - name: Run real Firefox 160 private Wayland Canvas and WebGL2 origin checks
+        shell: bash
+        timeout-minutes: 14
+        run: |
+          set -euo pipefail
+          runtime="$RUNNER_TEMP/vulpra-canvas-wayland"
+          mkdir -p "$runtime"
+          chmod 700 "$runtime"
+          export XDG_RUNTIME_DIR="$runtime"
+          export WAYLAND_DISPLAY=vulpra-canvas-wayland
+          export GDK_BACKEND=wayland MOZ_ENABLE_WAYLAND=1 XDG_SESSION_TYPE=wayland
+          unset DISPLAY MOZ_HEADLESS || true
+          weston --backend=headless-backend.so --renderer=pixman \
+            --socket="$WAYLAND_DISPLAY" --idle-time=0 \
+            --log="$RUNNER_TEMP/vulpra-canvas-weston.log" \
+            > "$RUNNER_TEMP/vulpra-canvas-weston-stdout.log" 2>&1 &
+          compositor=$!
+          trap 'kill "$compositor" 2>/dev/null || true; wait "$compositor" 2>/dev/null || true' EXIT
+          ready=false
+          for _ in $(seq 1 90); do
+            if test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"; then ready=true; break; fi
+            if ! kill -0 "$compositor" 2>/dev/null; then break; fi
+            sleep 0.2
+          done
+          test "$ready" = true || { echo 'FAIL: private Weston not ready' >&2; exit 1; }
+          wayland-info > "$RUNNER_TEMP/canvas-wayland-info.txt"
+          grep -q wl_compositor "$RUNNER_TEMP/canvas-wayland-info.txt"
+          grep -q xdg_wm_base "$RUNNER_TEMP/canvas-wayland-info.txt"
+          python3 ci/security-160-canvas-webgl-origin-reads.py \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/firefox160-canvas-webgl-origin.json" \
+            2>&1 | tee "$RUNNER_TEMP/firefox160-canvas-webgl-origin.log"
+          package="$RUNNER_TEMP/firefox160-native-archive/vulpra-firefox160-native-ci.tar.xz"
+          digest="$(sha256sum "$package" | cut -d' ' -f1)"
+          jq -e --arg sha "$digest" '
+            .schema_version==1 and
+            .kind=="firefox160_private_wayland_canvas_webgl_cross_origin_security_boundary" and
+            .status=="pass" and .package_sha256==$sha and
+            .firefox160_real_non_headless_wayland_browser==true and
+            .two_distinct_http_loopback_origins==true and
+            .same_origin_canvas_pixel_readback==true and
+            .cross_origin_cors_canvas_pixel_readback==true and
+            .cross_origin_without_cors_canvas_tainted==true and
+            .canvas_taint_survived_clear_rect==true and
+            .non_headless_webgl2_context_created==true and
+            .webgl2_same_and_cors_approved_texture_upload==true and
+            .webgl2_cross_origin_non_cors_texture_upload_denied==true and
+            .imagebitmap_taint_propagates_to_canvas==true and
+            .offscreen_canvas_taint_blocks_readback_and_export==true and
+            .offscreen_canvas_taint_persists_after_clear==true and
+            .imagebitmap_origin_clean_controls_pass==true and
+            .webgl2_foreign_imagebitmap_texture_denied==true and
+            .webgl2_allowed_imagebitmap_texture_uploads_pass==true and
+            .imagebitmap_browser_result.foreign.error=="SecurityError" and
+            .offscreen_canvas_browser_result.foreign.read_error=="SecurityError" and
+            .offscreen_canvas_browser_result.foreign.convert_error=="SecurityError" and
+            .offscreen_canvas_browser_result.foreign.after_clear=="SecurityError" and
+            .webgl_browser_result.bitmap_foreign.exception=="SecurityError" and
+            .real_webdriver_graphical_png_screenshot==true and
+            .existing_firefox_profile_preserved==true and
+            .browser_certificate_verification_not_disabled==true and
+            .software_rendering_weston_only==true and
+            .cve2026_124852_fix_commit_provenance_verified==false and
+            .cve2026_124852_exploit_regression_executed==false and
+            .complete_canvas_webgl_security_policy_verified==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-canvas-webgl-origin.json" >/dev/null
+          jq --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' '
+            . + {original_native_run_id:43138458940,
+                 original_candidate_git_tree:$tree,
+                 original_package_reused_without_browser_rebuild:true}
+          ' "$RUNNER_TEMP/firefox160-canvas-webgl-origin.json" \
+            > "$RUNNER_TEMP/firefox160-canvas-webgl-origin-proof.json"
+          echo 'PASS: Firefox 160 Canvas, ImageBitmap, OffscreenCanvas and WebGL2 origin security restrictions on isolated Weston'
+          echo 'LIMIT: no Bug 2001244 fix source, CVE exploit reproduction or real hardware GPU evidence'
+      - name: Archive native private-Wayland Canvas and WebGL2 origin proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-private-wayland-canvas-webgl-origin-proof
+          path: ${{ runner.temp }}/firefox160-canvas-webgl-origin-proof.json
+          retention-days: 30
+          if-no-files-found: error
+      - name: Preserve bounded Canvas WebGL2 test failure log
+        if: failure()
+        shell: bash
+        run: |
+          if test -s "$RUNNER_TEMP/firefox160-canvas-webgl-origin.log"; then
+            tail -n 200 "$RUNNER_TEMP/firefox160-canvas-webgl-origin.log" > "$RUNNER_TEMP/canvas-webgl-origin-failure-tail.log"
+          fi
+      - name: Archive bounded test failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-canvas-webgl-origin-failure
+          path: ${{ runner.temp }}/canvas-webgl-origin-failure-tail.log
+          retention-days: 14
+          if-no-files-found: ignore
