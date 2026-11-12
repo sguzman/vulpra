@@ -81,7 +81,7 @@ jq -e '
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
 : > "$scratch/rows.jsonl"
-exact=0; diverged=0; checked=0
+exact=0; diverged=0; checked=0; divergent_addition_lines=0; divergent_hunk_files=0
 while IFS=$'\t' read -r cve bug commit; do
   jq -r --arg sha "$commit" '.landings[] | select(.upstream_commit==$sha) | .changed_paths[]' \
     "$manifest" > "$scratch/expected-paths"
@@ -106,24 +106,60 @@ while IFS=$'\t' read -r cve bug commit; do
       die "Cannot check official release blob: $source_path"
     [[ "$landed" =~ ^[a-f0-9]{40}$ && "$release" =~ ^[a-f0-9]{40}$ ]] ||
       die "Invalid release or landing blob SHA for $source_path"
+    additions=0
     if [[ "$landed" == "$release" ]]; then
       classification=exact_landing_blob; exact=$((exact+1))
     else
       classification=release_has_different_blob; diverged=$((diverged+1))
+      # A later unrelated source edit can alter the blob while preserving
+      # an earlier security fix. Compare selected *added lines* from the
+      # authenticated public patch to the final Firefox 160 file. This is
+      # only literal hunk survival, not proof of complete fix semantics.
+      jq -er --arg path "$source_path" '
+        .files[] | select(.filename==$path) | .patch | select(type=="string")
+      ' "$scratch/commit.json" > "$scratch/selected-patch" ||
+        die "Missing public patch for changed release blob $source_path"
+      awk '/^\+[^+]/ {
+        line=substr($0,2)
+        if (line ~ /[^[:space:]]/) print line
+      }' "$scratch/selected-patch" > "$scratch/added-lines"
+      [[ -s "$scratch/added-lines" ]] ||
+        die "No nonblank public additions to trace in divergent file $source_path"
+      gh api "repos/mozilla-firefox/firefox/contents/$source_path?ref=2887d9de1f69c0e9776413da80e7ba0d1225dd9b" \
+        --jq '.content' | base64 -d > "$scratch/release-content" ||
+        die "Failed to retrieve verified official release content for $source_path"
+      # All added nonblank lines must survive exactly as printed. Each
+      # source path is already proven unmodified by the Vulpra overlay.
+      while IFS= read -r line; do
+        grep -Fxq -- "$line" "$scratch/release-content" ||
+          die "Selected public added line missing from final release $source_path"
+        additions=$((additions+1))
+      done < "$scratch/added-lines"
+      divergent_addition_lines=$((divergent_addition_lines+additions))
+      divergent_hunk_files=$((divergent_hunk_files+1))
     fi
     checked=$((checked+1))
     jq -cn --arg cve "$cve" --argjson bug "$bug" --arg commit "$commit" \
       --arg path "$source_path" --arg landed "$landed" --arg release "$release" \
-      --arg class "$classification" '{
+      --arg class "$classification" --argjson additions "$additions" '{
         cve:$cve,mozilla_bug:$bug,public_commit:$commit,path:$path,
         public_landing_blob:$landed,firefox160_release_blob:$release,
-        comparison:$class,vulpra_overlay_collision:false,complete_fix_verified:false
+        comparison:$class,divergent_release_added_lines_observed:$additions,
+        vulpra_overlay_collision:false,complete_fix_verified:false
       }' >> "$scratch/rows.jsonl"
   done < "$scratch/expected-paths"
 done < <(jq -r '.landings[] | [.cve,(.mozilla_bug|tostring),.upstream_commit] | @tsv' "$manifest")
 [[ "$checked" -eq 11 && $((exact+diverged)) -eq 11 ]] || die 'Incomplete selected source-file check'
+# Source-review reconciliation of this *frozen* release and these three
+# selected public commits: eight identical blobs and three changed blobs.
+# Twenty-one nonblank public patch additions survive in those changed files.
+[[ "$exact" -eq 8 && "$diverged" -eq 3 &&
+   "$divergent_hunk_files" -eq 3 && "$divergent_addition_lines" -eq 21 ]] ||
+   die 'Selected public landing/release identity or added-line reconciliation drifted'
 jq -n --slurpfile rows "$scratch/rows.jsonl" \
   --argjson exact "$exact" --argjson diverged "$diverged" \
+  --argjson hunk_files "$divergent_hunk_files" \
+  --argjson added "$divergent_addition_lines" \
   --arg ledger_sha "$(sha256sum "$ledger/candidate-tree-report.json" | cut -d' ' -f1)" \
   --arg source_sha "$(sha256sum "$identity" | cut -d' ' -f1)" '{
     schema_version:1,kind:"firefox160_three_public_bug_source_identity_review",
@@ -134,6 +170,10 @@ jq -n --slurpfile rows "$scratch/rows.jsonl" \
     selected_cves:3,selected_public_commits:3,checked_file_records:($rows|length),
     checked_unique_paths:($rows|map(.path)|unique|length),
     exact_landing_vs_release_blobs:$exact,different_release_blobs:$diverged,
+    divergent_release_files_with_added_lines_checked:$hunk_files,
+    selected_public_patch_nonblank_added_lines_found_in_release:$added,
+    all_selected_divergent_added_lines_verbatim_in_final_release:true,
+    full_changed_hunks_or_semantics_verified:false,
     vulpra_overlay_collisions:0,rows:$rows,
     publicly_searched_commit_set_exhaustive:false,
     all_fix_hunks_and_followups_verified:false,
@@ -145,6 +185,11 @@ jq -n --slurpfile rows "$scratch/rows.jsonl" \
 jq -e '
   .checked_file_records==11 and .checked_unique_paths==11 and
   (.exact_landing_vs_release_blobs+.different_release_blobs)==11 and
+  .exact_landing_vs_release_blobs==8 and .different_release_blobs==3 and
+  .divergent_release_files_with_added_lines_checked==3 and
+  .selected_public_patch_nonblank_added_lines_found_in_release==21 and
+  .all_selected_divergent_added_lines_verbatim_in_final_release==true and
+  .full_changed_hunks_or_semantics_verified==false and
   .vulpra_overlay_collisions==0 and
   all(.rows[]; .vulpra_overlay_collision==false and .complete_fix_verified==false) and
   .all_fix_hunks_and_followups_verified==false and
@@ -152,4 +197,5 @@ jq -e '
 ' "$output" >/dev/null || die 'Final proof failed audit contract'
 printf 'PASS: %s/11 changed-path source identities audited: %s exact, %s divergent, no Vulpra collision\n' \
   "$checked" "$exact" "$diverged"
-echo 'LIMIT: public commit identity and path noncollision only; neither full CVE closure nor release authorization'
+printf 'PASS: %s nonblank public patch additions remain verbatim in %s changed release source files\\n' "$divergent_addition_lines" "$divergent_hunk_files"
+echo 'LIMIT: literal additions surviving do not establish full patch semantics, exploits or release approval'
