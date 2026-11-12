@@ -1,0 +1,179 @@
+name: Firefox 160 Experimental No-Normandy Native Configure (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-optin-nonormandy-configure.yml
+      - ci/mozconfig-linux-normandy-experiment
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-source-experimental-native-configure:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    env:
+      MOZCONFIG: ${{ github.workspace }}/vulpra-ci/ci/mozconfig-linux-normandy-experiment
+      VULPRA_EXPERIMENT_NO_NORMANDY: "1"
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Checkout existing isolated experimental Linux build configuration
+        uses: actions/checkout@v4
+        with:
+          path: vulpra-ci
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/mozconfig-linux-normandy-experiment
+      - name: Checkout complete authenticated Firefox 160 release tree
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: firefox160
+          fetch-depth: 1
+      - name: Download independently verified 28-file Vulpra source overlay
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-verified-source-overlay
+          run-id: 43112919678
+          repository: sguzman/vulpra
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/vulpra160-overlays
+      - name: Download independently assembled full-source candidate identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          run-id: 43112919678
+          repository: sguzman/vulpra
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/vulpra160-ledger
+      - name: Materialize exactly the complete already verified Firefox 160 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          release=2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          source="$GITHUB_WORKSPACE/firefox160"
+          overlay="$RUNNER_TEMP/vulpra160-overlays"
+          ledger="$RUNNER_TEMP/vulpra160-ledger"
+          report="$ledger/candidate-tree-report.json"
+          list="$ledger/overlay-paths.txt"
+          test "$(git -C "$source" rev-parse HEAD)" = "$release"
+          test -z "$(git -C "$source" status --porcelain)"
+          jq -e --arg release "$release" '
+            .firefox160_commit == $release and
+            (.assembled_git_tree | test("^[0-9a-f]{40}$")) and
+            .source_files_modified == 26 and
+            .vulpra_source_files_added == 2 and
+            .upstream_files_deleted == 0 and
+            .all_other_upstream_files_preserved == true and
+            .native_binary_compiled == false and
+            .security_current == false
+          ' "$report" >/dev/null
+          test "$(wc -l < "$list")" -eq 28
+          test "$(find "$overlay" -type f | wc -l)" -eq 28
+          test -z "$(find "$overlay" -type l -print -quit)"
+          find "$overlay" -type f -printf '%P\n' | LC_ALL=C sort > "$RUNNER_TEMP/actual-overlay-paths"
+          cmp -s "$list" "$RUNNER_TEMP/actual-overlay-paths"
+          while IFS= read -r path; do
+            test -n "$path"
+            case "$path" in
+              /*|../*|*/../*|*/..|./*|*/./*|*/.) echo "::error::unsafe source path: $path"; exit 1;;
+            esac
+            input="$overlay/$path"
+            output="$source/$path"
+            test -f "$input" && test ! -L "$input"
+            test ! -L "$output"
+            if test -e "$output"; then
+              test -f "$output"
+            else
+              test -d "$(dirname "$output")"
+            fi
+            cp -- "$input" "$output"
+            test "$(git hash-object -- "$input")" = "$(git hash-object -- "$output")"
+          done < "$list"
+          export GIT_INDEX_FILE="$RUNNER_TEMP/firefox160-no-normandy.index"
+          git -C "$source" read-tree HEAD
+          git -C "$source" add -f --pathspec-from-file="$list"
+          actual="$(git -C "$source" write-tree)"
+          expected="$(jq -r .assembled_git_tree "$report")"
+          test "$actual" = "$expected" || {
+            echo "::error::full source tree mismatch: $actual != $expected"
+            exit 1
+          }
+          git -C "$source" diff --exit-code
+          echo "PASS: no-Normandy configure input is the same exact full Firefox 160 source candidate $actual"
+      - name: Prepare Mozilla native compiler toolchain
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+      - name: Bootstrap Linux native Firefox 160 configure prerequisites
+        shell: bash
+        working-directory: firefox160
+        run: |
+          set -euo pipefail
+          test -s "$MOZCONFIG"
+          test "$VULPRA_EXPERIMENT_NO_NORMANDY" = "1"
+          grep -Fxq 'export VULPRA_EXPERIMENT_NO_NORMANDY=1' "$MOZCONFIG"
+          grep -Fqx 'ac_add_options --with-app-basename=Vulpra' "$MOZCONFIG"
+          grep -Fqx 'ac_add_options --disable-tests' "$MOZCONFIG"
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            python3 python3-venv python3-dev git curl make jq
+          ./mach --no-interactive bootstrap --application-choice browser
+          command -v sccache
+      - name: Configure the opt-in Firefox 160 Linux candidate with Normandy disabled
+        shell: bash
+        working-directory: firefox160
+        run: |
+          set -euo pipefail
+          test "$VULPRA_EXPERIMENT_NO_NORMANDY" = "1"
+          ./mach configure 2>&1 | tee "$RUNNER_TEMP/firefox160-no-normandy-configure.log"
+          objdir="$GITHUB_WORKSPACE/firefox160/obj-vulpra-linux-normandy-experiment"
+          test -s "$objdir/config.status"
+          test -s "$objdir/config.statusd/substs/MOZ_NORMANDY"
+          jq -e '. == false or . == null or . == 0 or . == ""' \
+            "$objdir/config.statusd/substs/MOZ_NORMANDY" >/dev/null
+          grep -Fq 'Vulpra' "$objdir/config.status"
+          expected="$(jq -r .assembled_git_tree "$RUNNER_TEMP/vulpra160-ledger/candidate-tree-report.json")"
+          jq -n --arg tree "$expected" '{
+            schema_version:1,
+            kind:"firefox160_exact_source_no_normandy_linux_configure",
+            verified_complete_source_tree:$tree,
+            verified_source_overlays:28,
+            opt_in_no_normandy:true,
+            moz_normandy_generated_subst_disabled:true,
+            native_configure_passed:true,
+            native_binary_compiled:false,
+            packaged_runtime_tested:false,
+            normal_browser_variant_unchanged:true,
+            security_current:false,
+            release_ready:false
+          }' > "$RUNNER_TEMP/firefox160-no-normandy-configure-proof.json"
+          echo 'PASS: full Firefox 160 source configured with experimental Normandy-off option'
+          echo 'LIMIT: configure only; no compiled, packaged or runtime-tested experimental browser'
+      - name: Archive bounded experimental native configure proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-no-normandy-configure
+          path: ${{ runner.temp }}/firefox160-no-normandy-configure-proof.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve bounded experimental configure diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          if test -s "$RUNNER_TEMP/firefox160-no-normandy-configure.log"; then
+            tail -n 2000 "$RUNNER_TEMP/firefox160-no-normandy-configure.log" > "$RUNNER_TEMP/firefox160-no-normandy-failure-tail.log"
+          fi
+      - name: Upload bounded experimental configure failure tail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-no-normandy-configure-failure
+          path: ${{ runner.temp }}/firefox160-no-normandy-failure-tail.log
+          if-no-files-found: ignore
+          retention-days: 14
