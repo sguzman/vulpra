@@ -116,6 +116,7 @@ jobs:
           toolkit/components/url-classifier/SafeBrowsing.sys.mjs	fd8285620dd9e56deab8f3a80a10cd7f09188a4a
           toolkit/components/url-classifier/UrlClassifierListManager.sys.mjs	e2f703adbaf014c44a4c8948c9e5021348c06b88
           modules/libpref/init/all.js	fe38d0281a27648e34fff5c457ad7dc8c1841f5c
+          remote/shared/RecommendedPreferences.sys.mjs	5a2038843353eb01443edee215465f7ff88675e5
           CHECKED_SOURCE
           dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
           mkdir -p "$dest"
@@ -157,6 +158,8 @@ jobs:
             .strict_webdriver_tls_configuration==true and
             .configuration_readiness_gate_passed==true and
             (.blocking_reasons|length)==0 and
+            .web_driver_recommended_security_disabling_prefs_off==true and
+            .observed.automation_recommended_prefs_disabled==true and
             .observed.google5_credential_check_accepted==true and
             .observed.google5_https_update_endpoint_present==true and
             .observed.google5_https_hash_lookup_endpoint_present==true and
