@@ -126,13 +126,20 @@ jobs:
             .all_observed_content_worker_threads_have_no_new_privileges==true and
             .all_observed_content_worker_thread_groups_include_main_tid==true and
             .all_possible_transient_threads_exhaustively_audited==false and
+            .observed_content_worker_namespace_groups==.actual_content_worker_count and
+            .observed_readable_namespace_comparisons>=.actual_content_worker_count and
+            .content_worker_distinct_namespace_counts_by_kind!=null and
+            .content_worker_unreadable_namespace_counts_by_kind!=null and
+            .namespace_observation_read_only==true and
+            .process_namespace_policy_strength_verified==false and
+            .all_kernel_namespace_features_guaranteed_available==false and
             .unfiltered_browser_child_process_is_explicitly_reported==true and
             .seccomp_syscall_denial_actually_exercised==false and
             .content_sandbox_policy_strength_verified==false and
             .release_ready==false and .security_current==false
           ' "$RUNNER_TEMP/firefox160-content-sandbox-proof.json" >/dev/null
-          echo 'PASS: every observed live authenticated Firefox 160 content-worker thread has seccomp filters and NoNewPrivs; spawning processes reported separately'
-          echo 'LIMIT: transient future threads, actual syscall denial, filter-policy correctness and full release security acceptance remain unverified'
+          echo 'PASS: actual Firefox 160 worker threads have seccomp/NoNewPrivs, and namespace/root isolation is independently compared against parent'
+          echo 'LIMIT: conditional/unavailable namespaces not silently counted isolated; no syscall denial, future-thread, policy-semantic or release proof'
       - name: Archive bounded Firefox 160 Linux content-process observation
         if: success()
         uses: actions/upload-artifact@v4
