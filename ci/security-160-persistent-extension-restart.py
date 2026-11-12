@@ -221,6 +221,19 @@ def run(repo, signed_xpi, expected_xpi_sha, report_path):
         with session(geckodriver, browser, profile, home,
                      work / "geckodriver-first.log", "first") as (port, sid):
             checked_addon_state(addon_status(port, sid, TEMPORARY_ID), False)
+            # The exact same syntactically valid XPI MUST be refused when
+            # permanent but allowed temporarily. This tests the actual
+            # non-temporary rejection boundary without changing any pref.
+            try:
+                wd.request(port, "POST", "/session/" + sid + "/moz/addon/install",
+                           {"path": str(unsigned), "temporary": False},
+                           timeout_seconds=30)
+            except RuntimeError as error:
+                unsigned_permanent_error = str(error)[:350]
+            else:
+                raise RuntimeError("Unsigned WebExtension was accepted as a permanent install")
+            checked_addon_state(addon_status(port, sid, TEMPORARY_ID), False)
+            print("PASS: unsigned XPI rejected as non-temporary before temporary installation", flush=True)
             unsigned_id = wd.request(port, "POST",
                 "/session/" + sid + "/moz/addon/install",
                 {"path": str(unsigned), "temporary": True})
@@ -261,6 +274,9 @@ def run(repo, signed_xpi, expected_xpi_sha, report_path):
             "signed_extension_version": manifest["version"],
             "signed_extension_id": signed_id,
             "signed_install_non_temporary": True,
+            "unsigned_non_temporary_install_rejected": True,
+            "unsigned_non_temporary_rejection_reason": unsigned_permanent_error,
+            "same_unsigned_xpi_installed_temporarily": True,
             "signed_extension_active_before_restart": before.get("active") is True,
             "signed_extension_active_after_restart": after.get("active") is True,
             "signed_extension_version_preserved": before.get("version") == after.get("version"),
