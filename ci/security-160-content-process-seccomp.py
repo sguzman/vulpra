@@ -10,6 +10,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -232,6 +233,123 @@ def capture_worker_thread_seccomp(children, parent_pid):
     return evaluate_worker_thread_seccomp(children, parent_pid, observed)
 
 
+
+NAMESPACE_KINDS = ("user", "ipc", "net", "mnt", "pid")
+
+
+def evaluate_worker_namespaces(parent_pid, children, parent_namespaces,
+                               worker_namespaces, parent_root, worker_roots):
+    """Compare procfs namespace symlink IDs; never publish inode IDs or paths.
+
+    Kernel/graphics support may alter Firefox's namespace selection.
+    A matching namespace is reported honestly and is NOT treated as
+    unfiltered seccomp or an automatically failed namespace promise.
+    """
+    spawners = {x["pid"] for x in children if x["ppid"] == parent_pid}
+    workers = {x["pid"] for x in children if x["pid"] not in spawners}
+    if not workers or set(worker_namespaces) != workers or set(worker_roots) != workers:
+        raise RuntimeError("Missing/forged authenticated worker namespace groups")
+    if set(parent_namespaces) != set(NAMESPACE_KINDS):
+        raise RuntimeError("Missing/extra parent namespace kind")
+    if parent_root is not None and (
+            not isinstance(parent_root, tuple) or len(parent_root) != 2 or
+            any(type(v) is not int or v <= 0 for v in parent_root)):
+        raise RuntimeError("Malformed parent root directory identity")
+    for kind, identity in parent_namespaces.items():
+        if identity is not None and not re.fullmatch(
+                re.escape(kind) + r":\[[0-9]+\]", identity):
+            raise RuntimeError("Invalid procfs parent namespace identity")
+    results = []
+    accessible = 0
+    for pid in sorted(workers):
+        info = worker_namespaces[pid]
+        if not isinstance(info, dict) or set(info) != set(NAMESPACE_KINDS):
+            raise RuntimeError("Worker namespace kinds omitted/forged")
+        statuses = {}
+        for kind in NAMESPACE_KINDS:
+            value = info[kind]
+            if value is not None and (
+                    not isinstance(value, str) or
+                    re.fullmatch(re.escape(kind) + r":\[[0-9]+\]", value) is None):
+                raise RuntimeError("Invalid worker namespace symlink identity")
+            if parent_namespaces[kind] is not None and value is not None:
+                statuses[kind] = value != parent_namespaces[kind]
+                accessible += 1
+            else:
+                statuses[kind] = None
+        root = worker_roots[pid]
+        if root is not None and (
+                not isinstance(root, tuple) or len(root) != 2 or
+                any(type(v) is not int or v <= 0 for v in root)):
+            raise RuntimeError("Invalid worker root identity")
+        results.append({
+            "namespace_differs_from_browser_parent": statuses,
+            "worker_root_differs_from_browser_parent":
+                root != parent_root if root is not None and
+                parent_root is not None else None,
+        })
+    if accessible < len(workers):
+        raise RuntimeError("Insufficient readable parent/worker procfs namespaces")
+    kinds = {
+        kind: sum(row["namespace_differs_from_browser_parent"][kind] is True
+                  for row in results)
+        for kind in NAMESPACE_KINDS
+    }
+    unknown = {
+        kind: sum(row["namespace_differs_from_browser_parent"][kind] is None
+                  for row in results)
+        for kind in NAMESPACE_KINDS
+    }
+    return {
+        "observed_content_worker_namespace_groups": len(workers),
+        "observed_readable_namespace_comparisons": accessible,
+        "content_worker_distinct_namespace_counts_by_kind": kinds,
+        "content_worker_unreadable_namespace_counts_by_kind": unknown,
+        "content_worker_distinct_root_directory_count":
+            sum(row["worker_root_differs_from_browser_parent"] is True
+                for row in results),
+        "content_worker_unreadable_root_directory_count":
+            sum(row["worker_root_differs_from_browser_parent"] is None
+                for row in results),
+        "content_worker_namespace_relative_to_browser": results,
+        "namespace_observation_read_only": True,
+        "process_namespace_policy_strength_verified": False,
+        "all_kernel_namespace_features_guaranteed_available": False,
+        "seccomp_syscall_denial_actually_exercised": False,
+    }
+
+
+def capture_worker_namespaces(children, browser_pid):
+    """Read /proc symlinks and root metadata only; do not attach or ptrace."""
+    spawners = {x["pid"] for x in children if x["ppid"] == browser_pid}
+    workers = [x for x in children if x["pid"] not in spawners]
+
+    def namespace(pid, kind):
+        try:
+            return os.readlink(f"/proc/{pid}/ns/{kind}")
+        except OSError:
+            return None
+
+    def root_id(pid):
+        try:
+            info = os.stat(f"/proc/{pid}/root")
+            return (info.st_dev, info.st_ino)
+        except OSError:
+            return None
+
+    parent_namespaces = {kind: namespace(browser_pid, kind)
+                         for kind in NAMESPACE_KINDS}
+    child_namespaces = {
+        p["pid"]: {kind: namespace(p["pid"], kind) for kind in NAMESPACE_KINDS}
+        for p in workers
+    }
+    parent_root = root_id(browser_pid)
+    child_roots = {p["pid"]: root_id(p["pid"]) for p in workers}
+    return evaluate_worker_namespaces(
+        browser_pid, children, parent_namespaces, child_namespaces,
+        parent_root, child_roots)
+
+
 def self_test():
     raw = "Name:\tvulpra\nPPid:\t400\nSeccomp:\t2\nSeccomp_filters:\t3\nNoNewPrivs:\t1\n"
     browser = {"pid": 327, "seccomp_mode": 0, "seccomp_filter_count": 0}
@@ -286,6 +404,49 @@ def self_test():
         raise AssertionError("Forged or unprotected Firefox thread accepted")
     assert rejected == 12
     print("PASS: content-worker per-thread protection validator rejected 12 malformed/unfiltered fixtures")
+    browser_ns = {name: f"{name}:[12345]" for name in NAMESPACE_KINDS}
+    child_ns = dict(browser_ns)
+    child_ns["net"] = "net:[54321]"
+    child_ns["user"] = "user:[54321]"
+    good_ns = evaluate_worker_namespaces(
+        327, [spawner, worker], browser_ns, {401: child_ns},
+        (1, 3), {401: (1, 2)})
+    assert good_ns["content_worker_distinct_namespace_counts_by_kind"]["net"] == 1
+    assert good_ns["content_worker_distinct_root_directory_count"] == 1
+    # Equivalence and denied visibility must never be falsely converted
+    # into proof of isolated namespaces.
+    same_ns = evaluate_worker_namespaces(
+        327, [spawner, worker], browser_ns, {401: browser_ns},
+        (1, 3), {401: (1, 3)})
+    assert same_ns["content_worker_distinct_namespace_counts_by_kind"]["net"] == 0
+    assert same_ns["content_worker_distinct_root_directory_count"] == 0
+    bad_cases = [
+        (browser_ns, {}, (1, 3), {}),
+        (browser_ns, {999: child_ns}, (1, 3), {999: (1, 2)}),
+        ({}, {401: child_ns}, (1, 3), {401: (1, 2)}),
+        (browser_ns, {401: {}}, (1, 3), {401: (1, 2)}),
+        ({**browser_ns, "net": "ipc:[12345]"}, {401: child_ns},
+         (1, 3), {401: (1, 2)}),
+        (browser_ns, {401: {**child_ns, "net": "bad"}}, (1, 3),
+         {401: (1, 2)}),
+        (browser_ns, {401: {**child_ns, "net": True}}, (1, 3),
+         {401: (1, 2)}),
+        (browser_ns, {401: child_ns}, (1, 3), {401: (1, True)}),
+        (browser_ns, {401: child_ns}, (1, 3), {401: None}),
+        ({kind: None for kind in NAMESPACE_KINDS},
+         {401: child_ns}, (1, 3), {401: (1, 2)}),
+    ]
+    rejected_ns = 0
+    for browser, workers, base_root, roots in bad_cases:
+        try:
+            evaluate_worker_namespaces(
+                327, [spawner, worker], browser, workers, base_root, roots)
+        except RuntimeError:
+            rejected_ns += 1
+        else:
+            raise AssertionError("Forged/missing namespace record was accepted")
+    assert rejected_ns == 9  # a genuinely unreadable root is reported, not forged
+    print("PASS: 9 corrupted namespace fixtures rejected; inaccessible roots reported as unknown")
 
 
 def run(repo: Path, output: Path):
@@ -408,6 +569,7 @@ def run(repo: Path, output: Path):
                 # leaders. Check every live /proc/<pid>/task/<tid>/status
                 # from the same authenticated Firefox content workers.
                 thread_evidence = capture_worker_thread_seccomp(last, browser_pid)
+                namespace_evidence = capture_worker_namespaces(last, browser_pid)
                 if original.read_bytes() != sentinel:
                     raise RuntimeError("Existing Firefox profile was altered")
                 report = {
@@ -419,11 +581,14 @@ def run(repo: Path, output: Path):
                     "original_firefox_profile_preserved": True,
                     **evidence,
                     **thread_evidence,
+                    **namespace_evidence,
                     "release_ready": False,
                     "security_current": False,
                     "limits": [
                         "All *observed live threads* of authenticated content workers checked, not transient future threads",
                         "Linux seccomp mode/filter presence, not attempted syscall denial",
+                        "Namespace identities are compared with browser parent; matching or unreadable namespace never mislabeled as isolated",
+                        "Some user/network/IPC namespaces are conditional on kernel/graphics support; no semantics or blocked-syscall audit",
                         "No proof each filter is the expected Mozilla sandbox policy",
                         "Not a full Safe Browsing or external-network egress test",
                         "Not a VAAPI/DMABuf or other platform security audit",
@@ -432,7 +597,11 @@ def run(repo: Path, output: Path):
                 if output.exists():
                     raise RuntimeError("Refusing to replace existing sandbox proof")
                 output.write_text(json.dumps(report, indent=2) + "\n")
-                print("PASS: real Firefox 160 content workers AND all observed live worker threads have seccomp/NoNewPrivs", flush=True)
+                print("PASS: real Firefox 160 content workers and live threads have seccomp/NoNewPrivs; namespace comparisons recorded read-only", flush=True)
+                print("AUDIT: worker namespace distinct-from-parent counts=" +
+                      json.dumps(namespace_evidence["content_worker_distinct_namespace_counts_by_kind"], sort_keys=True) +
+                      " unreadable=" + json.dumps(namespace_evidence["content_worker_unreadable_namespace_counts_by_kind"], sort_keys=True) +
+                      " distinct-root-count=" + str(namespace_evidence["content_worker_distinct_root_directory_count"]), flush=True)
                 print("LIMIT: does not prove sandbox policy correctness or syscall denial", flush=True)
         finally:
             if session_id:
