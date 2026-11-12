@@ -109,6 +109,26 @@ fn name_for_errno(errno: c_int) -> &'static str {
     }
 }
 
+fn profile_token_matches(label: &[u8], token: &[u8]) -> bool {
+    // Require complete AppArmor profile names: rejecting substring lookalikes
+    // prevents a different policy from being mislabeled as unprivileged_userns.
+    label.starts_with(token)
+        && matches!(label.get(token.len()), None | Some(b' ' | b'\n' | b'\0'))
+}
+
+fn classify_apparmor_label(label: &[u8]) -> u8 {
+    if label.is_empty() {
+        return 0; // unknown, not a falsified 'unconfined'
+    }
+    if profile_token_matches(label, b"unprivileged_userns") {
+        return 2;
+    }
+    if profile_token_matches(label, b"unconfined") {
+        return 1;
+    }
+    3 // other/redacted, do not disclose actual security profile name
+}
+
 fn child_apparmor_classification() -> u8 {
     // Read exactly one fixed procfs attribute using a raw syscall-style
     // libc open/read/close, before the child's unshare. NEVER emit the
@@ -131,15 +151,7 @@ fn child_apparmor_classification() -> u8 {
         if n <= 0 {
             continue;
         }
-        let label = &data[..n as usize];
-        if label.windows(b"unprivileged_userns".len())
-                .any(|part| part == b"unprivileged_userns") {
-            return 2; // Exact named restricted AppArmor profile observed.
-        }
-        if label.starts_with(b"unconfined") {
-            return 1;
-        }
-        return 3; // A different profile, name deliberately withheld.
+        return classify_apparmor_label(&data[..n as usize]);
     }
     0 // Unknown/inaccessible, not assumed unconfined.
 }
@@ -347,6 +359,14 @@ fn negative_tests() -> Result<(), &'static str> {
     }
     assert_eq!(output_stage(Outcome::CloneDenied(1)).0, "clone_newuser_denied");
     assert_eq!(name_for_errno(1), "EPERM");
+    assert_eq!(classify_apparmor_label(b"unprivileged_userns (enforce)\n"), 2);
+    assert_eq!(classify_apparmor_label(b"unprivileged_userns\n"), 2);
+    assert_eq!(classify_apparmor_label(b"unprivileged_userns-malicious (enforce)"), 3);
+    assert_eq!(classify_apparmor_label(b"my-unprivileged_userns (enforce)"), 3);
+    assert_eq!(classify_apparmor_label(b"unprivileged_userns/child (enforce)"), 3);
+    assert_eq!(classify_apparmor_label(b"unconfined (enforce)\n"), 1);
+    assert_eq!(classify_apparmor_label(b"unconfined-variant\n"), 3);
+    assert_eq!(classify_apparmor_label(b""), 0);
     assert_eq!(decode_snapshot([2, 2, 2])?, (Some(true), Some(2), "unprivileged_userns"));
     assert_eq!(decode_snapshot([1, 0, 1])?, (Some(false), Some(0), "unconfined"));
     assert_eq!(decode_snapshot([0, 255, 0])?, (None, None, "unreadable"));
@@ -355,7 +375,7 @@ fn negative_tests() -> Result<(), &'static str> {
             return Err("forged child capabilities or seccomp accepted");
         }
     }
-    println!("PASS: namespace probe classifier rejects seven invalid outcomes and five malformed capability/profile snapshots");
+    println!("PASS: namespace probe rejected seven invalid outcomes, five malformed snapshots and eight AppArmor lookalikes/controls");
     Ok(())
 }
 
