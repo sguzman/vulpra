@@ -260,6 +260,10 @@ def run(repo, signed_xpi, digest, output):
             need(popup_after == popup_before,
                  "Signed extension moz-extension origin changed across profile restart")
             exercise_extension_page(port, sid, popup_after, token, "after_restart")
+            # Never uninstall an extension while Marionette is executing in
+            # that very extension page: its document/global would disappear.
+            wd.request(port, "POST", "/session/" + sid + "/url",
+                       {"url": "about:blank"}, timeout_seconds=20)
             wd.request(port, "POST", "/session/" + sid + "/moz/addon/uninstall",
                        {"id": signed_id}, timeout_seconds=30)
             helper.checked_addon_state(helper.addon_status(port, sid, signed_id), False)
