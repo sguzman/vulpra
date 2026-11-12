@@ -65,7 +65,7 @@ def verify_signed_message_result(value, phase):
         safe = {key: value.get(key) for key in (
             "status", "phase", "stage", "extension_identity_matches",
             "background_shortcuts_response", "content_message_sent",
-            "error_class") if key in value} if isinstance(value, dict) else {}
+            "error_class", "matching_local_tab_count") if key in value} if isinstance(value, dict) else {}
         raise RuntimeError("Signed background/content check did not pass: " +
                            json.dumps(safe, sort_keys=True))
     need(value.get("phase") == phase, "Signed message phase mismatch")
@@ -174,7 +174,13 @@ def signed_background_and_content_probe(port, sid, popup_url, server, token, pha
                     typeof shortcuts.open_container_0==="string";
                   if(!result.background_shortcuts_response){complete(result);return;}
                   result.stage="tab_lookup";
-                  const tabs=await browser.tabs.query({url});
+                  // tabs.query({url}) uses WebExtension match-pattern rules;
+                  // a localhost URL with an explicit port is not a valid
+                  // pattern match. Enumerate only this disposable test
+                  // profile's tabs and compare exact full URL instead.
+                  const allTabs=await browser.tabs.query({});
+                  const tabs=allTabs.filter(tab=>tab.url===url);
+                  result.matching_local_tab_count=tabs.length;
                   if(tabs.length!==1 || !Number.isInteger(tabs[0].id)){
                     complete(result);return;
                   }
