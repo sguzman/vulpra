@@ -176,7 +176,7 @@ jobs:
               p = subprocess.run(['bash','-n'],input=script,text=True,capture_output=True)
               assert p.returncode == 0, 'Bash syntax error: ' + p.stderr
           for script in js_blocks:
-              p = subprocess.run(['node','--check'],input=script,text=True,capture_output=True)
+              p = subprocess.run(['node','--input-type=module','--check'],input=script,text=True,capture_output=True)
               assert p.returncode == 0, 'GitHub JS syntax error: ' + p.stderr
           print(f"PASS: artifact-only replay has {len(required)} provenance contracts, {len(shell_blocks)} shell blocks and {len(js_blocks)} JavaScript block syntax-checked")
           print("LIMIT: no artifact or actual Firefox 160 browser runtime replayed in this test")
