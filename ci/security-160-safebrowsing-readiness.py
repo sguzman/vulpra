@@ -124,6 +124,8 @@ const phishing=feature('phishing'),malware=feature('malware'),downloads=feature(
 return {
   test_schema_version:1,
   runtime_prefs:flags,
+  automation_recommended_prefs_disabled:
+    !prefs.getBoolPref('remote.prefs.recommended',false),
   expected_table_presence:{
     phishing:tables.phishing.some(n=>n.includes('phish')),
     malware:tables.malware.some(n=>n.includes('malware')),
@@ -167,11 +169,13 @@ def readiness_criteria(data: dict) -> tuple[bool, list[str]]:
         "google5_https_hash_lookup_endpoint_present",
         "secret_values_or_endpoint_urls_returned",
         "no_malicious_url_or_threat_update_requested_by_probe",
+        "automation_recommended_prefs_disabled",
     ]
     need(all(isinstance(data.get(k), bool) for k in fields),
          "Safe Browsing service/key evidence not strictly boolean")
     need(data["secret_values_or_endpoint_urls_returned"] is False and
-         data["no_malicious_url_or_threat_update_requested_by_probe"] is True,
+         data["no_malicious_url_or_threat_update_requested_by_probe"] is True and
+         data["automation_recommended_prefs_disabled"] is True,
          "Secret handling or test network scope violated")
     need(data.get("default_user_pref_override_count") == 0,
          "Test profile has unexpected Safe Browsing preference overrides")
@@ -241,6 +245,7 @@ def self_test():
         "runtime_features": features,
         "secret_values_or_endpoint_urls_returned": False,
         "no_malicious_url_or_threat_update_requested_by_probe": True,
+        "automation_recommended_prefs_disabled": True,
     }
     ok, reasons = readiness_criteria(baseline)
     need(ok and not reasons, "Valid Safe Browsing readiness fixture did not pass")
@@ -328,6 +333,13 @@ def run(repo: Path, output: Path):
                             "binary": str(browser),
                             "args": ["-headless", "-no-remote", "-profile", str(profile)],
                             "prefs": {
+                                # Gecko's RecommendedPreferences.sys.mjs
+                                # disables Safe Browsing on the DEFAULT branch
+                                # for WebDriver. An ordinary browser does not
+                                # have those automation defaults. Opt out
+                                # before Firefox launches, never rewrite the
+                                # Safe Browsing feature prefs themselves.
+                                "remote.prefs.recommended": False,
                                 "app.update.enabled": False,
                                 "extensions.update.enabled": False,
                                 "browser.shell.checkDefaultBrowser": False,
@@ -376,6 +388,7 @@ def run(repo: Path, output: Path):
                     "native_firefox160_webdriver_and_disposable_profile_verified": True,
                     "original_firefox_profile_preserved": True,
                     "strict_webdriver_tls_configuration": True,
+                    "web_driver_recommended_security_disabling_prefs_off": True,
                     "observed": observed,
                     "configuration_readiness_gate_passed": ready,
                     "blocking_reasons": blockers,
