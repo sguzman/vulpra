@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/security-160-native-acceptance-preflight.yml
       - .github/workflows/security-160-safe-overlay-stage.yml
+      - .github/workflows/security-160-artifact-webdriver-replay.yml
       - ci/smoke-webextension-package-local.py
       - ci/tests/smoke-webextension-package-local-test.sh
       - packaging/test-stage.sh
@@ -27,6 +28,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             .github/workflows/security-160-safe-overlay-stage.yml
+            .github/workflows/security-160-artifact-webdriver-replay.yml
             .github/workflows/security-160-native-acceptance-preflight.yml
             ci/smoke-webextension-package-local.py
             ci/tests/smoke-webextension-package-local-test.sh
@@ -127,6 +129,74 @@ jobs:
           grep -Fq -- '--port' "$RUNNER_TEMP/geckodriver-help.txt"
           echo 'PASS: Mozilla-published SHA-256-pinned geckodriver runs on Ubuntu and supports the necessary opt-in chrome-context flag'
           echo 'LIMIT: no actual browser, browser runtime, or profile used'
+      - name: Verify artifact-only Firefox 160 WebDriver replay syntax and provenance controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, re, subprocess
+          source = pathlib.Path('.github/workflows/security-160-artifact-webdriver-replay.yml').read_text()
+          required = {
+              'original exact source commit': '0624235fdc956ab18af3c3f310b3588ca72fff61',
+              'original native run ID': '43138458940',
+              'Mozilla release commit': '2887d9de1f69c0e9776413da80e7ba0d1225dd9b',
+              'exact candidate Git tree': '42dd7439a27dde92f89ac5eed13f88117a4d7ab5',
+              'same-run package artifact': 'firefox160-vulpra-unreleased-native-preview-not-approved',
+              'same-run source proof artifact': 'firefox160-vulpra-materialized-source-proof',
+              'package checksum verification': 'sha256sum -c',
+              'artifact-ready guard': "steps.inspect.outputs.ready == 'true'",
+              'real WebDriver': 'ci/smoke-webextension-package-local.py',
+              'local TLS rejection': '.security.local_untrusted_tls_denial.verified == true',
+              'Nimbus readiness': '.nimbus.store_ready == true and .nimbus.api_ready == true',
+              'unreleased only': 'release_ready: false',
+              'security-current not asserted': 'security_current: false',
+          }
+          for name, fragment in required.items():
+              assert fragment in source, f"Artifact replay missing {name}"
+          assert './mach build' not in source, 'Replay unexpectedly compiles browser'
+          lines = source.splitlines()
+          def block(index, indent):
+              result = []
+              for line in lines[index+1:]:
+                  if not line.strip():
+                      result.append('')
+                      continue
+                  n = len(line) - len(line.lstrip())
+                  if n <= indent:
+                      break
+                  result.append(line[indent+2:])
+              return '\n'.join(result) + '\n'
+          shell_blocks, js_blocks = [], []
+          for index, line in enumerate(lines):
+              m = re.match(r'^(\s+)(run|script): \|\s*
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash packaging/test-stage.sh
+          bash packaging/test-launcher.sh
+          echo 'PASS: native Vulpra executable and separate guarded launcher fixture contracts'
+      - name: Existing WebDriver probe and security-denial parser fixture regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          bash ci/tests/smoke-webextension-package-local-test.sh \
+            "$GITHUB_WORKSPACE/ci/smoke-webextension-package-local.py"
+          echo 'PASS: WebDriver JS/HTTP/DOM, extension fixture, Nimbus and TLS negative parser controls'
+          echo 'LIMIT: no browser process, full native build, or release acceptance tested here'
+, line)
+              if m:
+                  (shell_blocks if m.group(2) == 'run' else js_blocks).append(block(index, len(m.group(1))))
+          assert len(shell_blocks) >= 4 and len(js_blocks) == 1
+          for script in shell_blocks:
+              p = subprocess.run(['bash','-n'],input=script,text=True,capture_output=True)
+              assert p.returncode == 0, 'Bash syntax error: ' + p.stderr
+          for script in js_blocks:
+              p = subprocess.run(['node','--check'],input=script,text=True,capture_output=True)
+              assert p.returncode == 0, 'GitHub JS syntax error: ' + p.stderr
+          print(f"PASS: artifact-only replay has {len(required)} provenance contracts, {len(shell_blocks)} shell blocks and {len(js_blocks)} JavaScript block syntax-checked")
+          print("LIMIT: no artifact or actual Firefox 160 browser runtime replayed in this test")
+          PY
       - name: Existing package staging and launcher isolation fixture regressions
         shell: bash
         run: |
