@@ -131,6 +131,13 @@ jobs:
             .content_worker_distinct_namespace_counts_by_kind!=null and
             .content_worker_unreadable_namespace_counts_by_kind!=null and
             .namespace_observation_read_only==true and
+            (.firefox_parent_cached_user_namespace_probe=="supported" or
+             .firefox_parent_cached_user_namespace_probe=="unavailable" or
+             .firefox_parent_cached_user_namespace_probe=="not-run-or-not-exposed") and
+            .firefox_parent_content_sandbox_disabled_env==false and
+            .firefox_parent_permissive_content_sandbox_env==false and
+            .namespace_absence_caused_by_runner_policy_verified==false and
+            .all_namespaces_are_isolated==false and
             .process_namespace_policy_strength_verified==false and
             .all_kernel_namespace_features_guaranteed_available==false and
             .unfiltered_browser_child_process_is_explicitly_reported==true and
@@ -138,7 +145,7 @@ jobs:
             .content_sandbox_policy_strength_verified==false and
             .release_ready==false and .security_current==false
           ' "$RUNNER_TEMP/firefox160-content-sandbox-proof.json" >/dev/null
-          echo 'PASS: actual Firefox 160 worker threads have seccomp/NoNewPrivs, and namespace/root isolation is independently compared against parent'
+          echo 'PASS: actual Firefox 160 worker threads have seccomp/NoNewPrivs, namespace/root separation compared and cached Firefox user-namespace probe reconciled'
           echo 'LIMIT: conditional/unavailable namespaces not silently counted isolated; no syscall denial, future-thread, policy-semantic or release proof'
       - name: Archive bounded Firefox 160 Linux content-process observation
         if: success()
