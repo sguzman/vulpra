@@ -5,6 +5,7 @@ on:
     branches: [upgrade/firefox-160-overlay-prototype]
     paths:
       - .github/workflows/security-160-archived-wayland-vp9-graphics.yml
+      - ci/security-160-wayland-vp9-webgl-diagnostic.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -47,7 +48,7 @@ jobs:
           fetch-depth: 1
           sparse-checkout-cone-mode: false
           sparse-checkout: |
-            ci/m3-packaged-wayland-vp9-providers.sh
+            ci/security-160-wayland-vp9-webgl-diagnostic.sh
             ci/m3-deny-optional-native-providers.c
       - name: Download Firefox 160 unreleased browser and original checksum
         uses: actions/download-artifact@v4
@@ -98,8 +99,8 @@ jobs:
           printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
           tar -xzf "$file" -C "$RUNNER_TEMP" geckodriver
           test -x "$RUNNER_TEMP/geckodriver"
-          bash -n ci/m3-packaged-wayland-vp9-providers.sh
-          bash ci/m3-packaged-wayland-vp9-providers.sh --self-test
+          bash -n ci/security-160-wayland-vp9-webgl-diagnostic.sh
+          bash ci/security-160-wayland-vp9-webgl-diagnostic.sh --self-test
       - name: Exercise real non-headless Firefox 160 Wayland VP9, canvas and WebGL
         shell: bash
         timeout-minutes: 18
@@ -108,7 +109,7 @@ jobs:
           cc -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror \
             ci/m3-deny-optional-native-providers.c \
             -o "$RUNNER_TEMP/vulpra-deny-optional-native-providers.so" -ldl
-          bash ci/m3-packaged-wayland-vp9-providers.sh \
+          bash ci/security-160-wayland-vp9-webgl-diagnostic.sh \
             "$GITHUB_WORKSPACE" "$RUNNER_TEMP/vulpra-deny-optional-native-providers.so" \
             "$RUNNER_TEMP/geckodriver" "$RUNNER_TEMP/m3-packaged-wayland-vp9-providers.json" \
             2>&1 | tee "$RUNNER_TEMP/firefox160-wayland-vp9.log"
@@ -147,7 +148,10 @@ jobs:
             mode,
             video_decoded: .vp9_decoded_frames_and_time_verified,
             canvas_video_readback,
+            webgl2_initial_context_available,
             webgl2_context_available,
+            webgl2_delayed_retry_attempts,
+            webgl2_context_creation_error: .observed_graphics_state.webgl2_context_creation_error,
             webdriver_png: .actual_webdriver_png_screenshot,
             interposer_attached: .browser_interposer_attached,
             denied_before: .ffmpeg_denials_before_video_navigation,
