@@ -240,12 +240,12 @@ fn raw_user_namespace_probe() -> Result<Probe, &'static str> {
         // process environment manipulation after clone.
         unsafe { close(fds[0]) };
         let snapshot = child_capability_snapshot();
-        // Two bounded bytes, and only if the child created successfully.
+        // Bounded telemetry bytes, and only after namespace clone succeeds.
         let sent = unsafe {
             write(fds[1], snapshot.as_ptr().cast::<c_void>(), snapshot.len())
         };
         unsafe { close(fds[1]) };
-        if sent != 2 {
+        if sent != snapshot.len() as isize {
             unsafe { _exit(255) };
         }
         let ok = unsafe { unshare(CLONE_NEWPID) == 0 };
