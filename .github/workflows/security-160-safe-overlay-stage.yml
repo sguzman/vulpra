@@ -580,7 +580,29 @@ jobs:
             .security.local_untrusted_tls_denial.webdriver_accept_insecure_certs==false and
             .nimbus.store_ready==true and .nimbus.api_ready==true
           ' "${reports[0]}" >/dev/null
-          cp -- "${reports[0]}" "$RUNNER_TEMP/firefox160-vulpra-webdriver-proof.json"
+          # Bind the real runtime assertions to the exact authenticated
+          # native source tree and packaged archive, not just a package name.
+          tree="$(jq -r .complete_materialized_source_tree "$RUNNER_TEMP/materialized-candidate.json")"
+          pkg_sha="$(sha256sum "$archive" | cut -d' ' -f1)"
+          test "${#tree}" -eq 40
+          test "${#pkg_sha}" -eq 64
+          jq --arg tree "$tree" --arg package_sha256 "$pkg_sha" '
+            . + {
+              firefox160_verified_git_tree: $tree,
+              firefox160_staged_archive_sha256: $package_sha256,
+              tested_native_build: true,
+              release_ready: false,
+              security_current: false
+            }
+          ' "${reports[0]}" > "$RUNNER_TEMP/firefox160-vulpra-webdriver-proof.json"
+          jq -e --arg tree "$tree" --arg sha "$pkg_sha" '
+            .status == "pass" and
+            .firefox160_verified_git_tree == $tree and
+            .firefox160_staged_archive_sha256 == $sha and
+            .tested_native_build == true and
+            .release_ready == false and
+            .security_current == false
+          ' "$RUNNER_TEMP/firefox160-vulpra-webdriver-proof.json" >/dev/null
           echo 'PASS: actual Firefox 160 JS/HTTP/DOM, temporary WebExtension, strict TLS denial, and Nimbus readiness'
           echo 'LIMIT: Safe Browsing, sandbox denial, signed add-ons, media and full security acceptance remain unverified'
       - name: Archive real Firefox 160 WebDriver runtime evidence
