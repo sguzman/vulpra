@@ -230,6 +230,17 @@ def run(repo: Path, output: Path):
                     except RuntimeError:
                         time.sleep(0.3)
                 if evidence is None:
+                    # One bounded, non-sensitive diagnostic snapshot only:
+                    # never copy process command lines, paths or environments.
+                    states = [
+                        {"direct_child": child["ppid"] == browser_pid,
+                         "seccomp": child["seccomp_mode"],
+                         "filters": child["seccomp_filter_count"],
+                         "nnp": child["no_new_privileges"]}
+                        for child in last
+                    ]
+                    print("AUDIT: content-sandbox-pref-level=" + repr(pref_level) +
+                          " content-process-states=" + json.dumps(states), flush=True)
                     raise RuntimeError(
                         "Native content-process sandbox evidence not confirmed; "
                         f"found {len(last)} native content processes"
