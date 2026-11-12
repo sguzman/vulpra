@@ -65,9 +65,7 @@ def verify_signed_message_result(value, phase):
         safe = {key: value.get(key) for key in (
             "status", "phase", "stage", "extension_identity_matches",
             "background_shortcuts_response", "content_message_sent",
-            "error_class", "matching_local_tab_count",
-            "total_disposable_tabs", "tabs_with_url",
-            "localhost_tabs", "page_title_tabs", "tab_schemes") if key in value} if isinstance(value, dict) else {}
+            "error_class", "created_local_page_loaded") if key in value} if isinstance(value, dict) else {}
         raise RuntimeError("Signed background/content check did not pass: " +
                            json.dumps(safe, sort_keys=True))
     need(value.get("phase") == phase, "Signed message phase mismatch")
@@ -77,6 +75,8 @@ def verify_signed_message_result(value, phase):
          "No real signed background listener response")
     need(value.get("content_message_sent") is True,
          "Signed content tab message was not accepted")
+    need(value.get("created_local_page_loaded") is True,
+         "Signed localhost content page did not finish loading")
     need(value.get("token_in_report") is False,
          "Signed message proof leaked probe marker")
     return True
@@ -88,6 +88,7 @@ def test_signed_message_negatives():
         "extension_identity_matches": True,
         "background_shortcuts_response": True,
         "content_message_sent": True,
+        "created_local_page_loaded": True,
         "token_in_report": False,
     }
     verify_signed_message_result(valid, "before_restart")
@@ -101,6 +102,7 @@ def test_signed_message_negatives():
         {**valid, "background_shortcuts_response": "true"},
         {**valid, "content_message_sent": False},
         {**valid, "content_message_sent": "true"},
+        {**valid, "created_local_page_loaded": False},
         {**valid, "token_in_report": True},
         {**valid, "token_in_report": "false"},
     )
@@ -111,110 +113,98 @@ def test_signed_message_negatives():
             failures += 1
         else:
             raise RuntimeError("Forged signed background/content test accepted")
-    need(failures == 12, "Signed message fixture count drifted")
-    print("PASS: 12 forged signed background/content message results rejected")
+    need(failures == 13, "Signed message fixture count drifted")
+    print("PASS: 13 forged signed background/content message results rejected")
 
 
 def signed_background_and_content_probe(port, sid, popup_url, server, token, phase):
-    """Real background request/reply and signed content-script event/DOM proof.
+    """Exercise unmodified signed MV2 background and content-script messaging.
 
-    Keep a localhost document alive in its own tab; use the signed
-    extension's unmodified popup to send messages. Never inject helper JS
-    into the inspected web page other than a read-only DOM assertion.
+    Create the page from the real signed extension, not WebDriver /window/new:
+    geckodriver may replace the original navigation with about:blank when
+    adding an automation tab. WebDriver only reads the created page's DOM.
     """
     need(phase in ("before_restart", "after_restart"), "Unknown content probe phase")
     base = "/session/" + sid
     page_url = f"http://127.0.0.1:{server.server_port}/extension"
     marker = "Vulpra signed content proof " + token
-    wd.request(port, "POST", base + "/url", {"url": page_url}, timeout_seconds=35)
-    first = wd.request(port, "GET", base + "/window")
-    need(isinstance(first, str) and first, "No original document window")
-    initial = wd.request(port, "POST", base + "/execute/sync", {
-        "script": """return {
-            url:document.URL, title:document.title,
-            clean:document.querySelectorAll('.container-notification').length===0
-        };""",
-        "args": [],
-    })
-    need(isinstance(initial, dict) and initial.get("url") == page_url and
-         initial.get("title") == "Vulpra extension smoke" and
-         initial.get("clean") is True,
-         "Localhost fixture unready or already contains signed content notification")
-    created = wd.request(port, "POST", base + "/window/new", {"type": "tab"})
-    popup_handle = created.get("handle") if isinstance(created, dict) else None
-    need(isinstance(popup_handle, str) and popup_handle != first,
-         "Did not create separate isolated extension popup tab")
-    try:
-        wd.request(port, "POST", base + "/url", {"url": popup_url}, timeout_seconds=35)
-        reply = wd.request(port, "POST", base + "/execute/async", {
-            "script": """
-              const url=arguments[0], marker=arguments[1], phase=arguments[2];
-              const done=arguments[arguments.length-1];
-              let sent=false;
-              const complete=(value)=>{
-                if(sent)return;
-                sent=true;clearTimeout(timer);done(value);
-              };
-              const timer=setTimeout(()=>complete({status:"timeout",phase}),14000);
-              (async()=>{
-                const result={status:"fail",phase,stage:"init",token_in_report:false};
-                try{
-                  result.extension_identity_matches=(
-                    location.protocol==="moz-extension:" &&
-                    browser.runtime.id==="@testpilot-containers");
-                  if(!result.extension_identity_matches){complete(result);return;}
-                  result.stage="background_request";
-                  // The 8.4.0 signed background message handler implements
-                  // getShortcuts as a real async storage-backed read.
-                  const shortcuts=await browser.runtime.sendMessage({
-                    method:"getShortcuts"
-                  });
-                  result.background_shortcuts_response=!!shortcuts &&
-                    typeof shortcuts==="object" &&
-                    Object.hasOwn(shortcuts,"open_container_0") &&
-                    Object.hasOwn(shortcuts,"reopen_in_container_0") &&
-                    typeof shortcuts.open_container_0==="string";
-                  if(!result.background_shortcuts_response){complete(result);return;}
-                  result.stage="tab_lookup";
-                  // tabs.query({url}) uses WebExtension match-pattern rules;
-                  // a localhost URL with an explicit port is not a valid
-                  // pattern match. Enumerate only this disposable test
-                  // profile's tabs and compare exact full URL instead.
-                  const allTabs=await browser.tabs.query({});
-                  const tabs=allTabs.filter(tab=>tab.url===url);
-                  result.matching_local_tab_count=tabs.length;
-                  result.total_disposable_tabs=allTabs.length;
-                  result.tabs_with_url=allTabs.filter(t=>typeof t.url==="string").length;
-                  result.localhost_tabs=allTabs.filter(t=>
-                    typeof t.url==="string" &&
-                    t.url.startsWith("http://127.0.0.1:")).length;
-                  result.page_title_tabs=allTabs.filter(t=>
-                    t.title==="Vulpra extension smoke").length;
-                  // Report only generic URL scheme, not any web address.
-                  result.tab_schemes=allTabs.slice(0,8).map(t=>
-                    typeof t.url==="string" ? t.url.split(":")[0] : null);
-                  if(tabs.length!==1 || !Number.isInteger(tabs[0].id)){
-                    complete(result);return;
-                  }
-                  result.stage="tab_message";
-                  // Signed content script from the XPI listens for this
-                  // message and creates an actual DOM notification.
-                  await browser.tabs.sendMessage(tabs[0].id,{text:marker});
-                  result.content_message_sent=true;
-                  result.status="pass";
-                  result.stage="done";
-                }catch(error){
-                  result.status="error";
-                  result.error_class=String(error?.name||"Error").slice(0,32);
+    wd.request(port, "POST", base + "/url", {"url": popup_url}, timeout_seconds=35)
+    popup_handle = wd.request(port, "GET", base + "/window")
+    need(isinstance(popup_handle, str) and popup_handle,
+         "No signed extension popup WebDriver window handle")
+    original_handles = wd.request(port, "GET", base + "/window/handles")
+    need(isinstance(original_handles, list) and
+         popup_handle in original_handles and
+         all(isinstance(handle, str) for handle in original_handles),
+         "Invalid original browser window list")
+    reply = wd.request(port, "POST", base + "/execute/async", {
+        "script": """
+          const url=arguments[0], marker=arguments[1], phase=arguments[2];
+          const done=arguments[arguments.length-1];
+          let sent=false;
+          const complete=(result)=>{
+            if(sent)return;
+            sent=true;clearTimeout(timer);done(result);
+          };
+          const timer=setTimeout(()=>complete({status:"timeout",phase}),14500);
+          (async()=>{
+            const result={status:"fail",phase,stage:"init",token_in_report:false};
+            try{
+              result.extension_identity_matches=(
+                location.protocol==="moz-extension:" &&
+                browser.runtime.id==="@testpilot-containers");
+              if(!result.extension_identity_matches){complete(result);return;}
+              result.stage="background_request";
+              // Read-only native MAC 8.4.0 listener (not a test-added hook).
+              const shortcuts=await browser.runtime.sendMessage({
+                method:"getShortcuts"
+              });
+              result.background_shortcuts_response=!!shortcuts &&
+                typeof shortcuts==="object" &&
+                Object.hasOwn(shortcuts,"open_container_0") &&
+                Object.hasOwn(shortcuts,"reopen_in_container_0") &&
+                typeof shortcuts.open_container_0==="string";
+              if(!result.background_shortcuts_response){complete(result);return;}
+              result.stage="create_localhost_page";
+              const tab=await browser.tabs.create({url,active:false});
+              if(!Number.isInteger(tab?.id)){complete(result);return;}
+              let ready=false;
+              for(let i=0;i<50;i++){
+                const state=await browser.tabs.get(tab.id);
+                if(state.status==="complete" && state.url===url){
+                  ready=true;break;
                 }
-                complete(result);
-              })();
-            """,
-            "args": [page_url, marker, phase],
-        }, timeout_seconds=23)
-        verify_signed_message_result(reply, phase)
-        wd.request(port, "POST", base + "/window", {"handle": first})
-        deadline = time.monotonic() + 13
+                await new Promise(r=>setTimeout(r,100));
+              }
+              result.created_local_page_loaded=ready;
+              if(!ready){complete(result);return;}
+              result.stage="tab_message";
+              // MAC's own signed content-script.js uses its onMessage
+              // listener to append a .container-notification DOM element.
+              await browser.tabs.sendMessage(tab.id,{text:marker});
+              result.content_message_sent=true;
+              result.status="pass";result.stage="done";
+            }catch(error){
+              result.status="error";
+              result.error_class=String(error?.name||"Error").slice(0,32);
+            }
+            complete(result);
+          })();
+        """,
+        "args": [page_url, marker, phase],
+    }, timeout_seconds=24)
+    verify_signed_message_result(reply, phase)
+    need(reply.get("created_local_page_loaded") is True,
+         "Signed extension failed to load localhost content page")
+    windows = wd.request(port, "GET", base + "/window/handles")
+    need(isinstance(windows, list), "Invalid WebDriver window handles")
+    new_handles = set(windows) - set(original_handles)
+    need(len(new_handles) == 1,
+         "Signed extension did not produce exactly one inspectable new page")
+    page_handle = next(iter(new_handles))
+    try:
+        wd.request(port, "POST", base + "/window", {"handle": page_handle})
+        deadline = time.monotonic() + 10
         matched = False
         while time.monotonic() < deadline:
             state = wd.request(port, "POST", base + "/execute/sync", {
@@ -222,26 +212,28 @@ def signed_background_and_content_probe(port, sid, popup_url, server, token, pha
                   const expected=arguments[0];
                   return {
                     url:document.URL,
+                    title:document.title,
                     matched:[...document.querySelectorAll('.container-notification')]
                       .some(el=>el.textContent===expected)
                   };
                 """,
                 "args": [marker],
             })
-            need(isinstance(state, dict) and state.get("url") == page_url,
-                 "WebDriver navigated away from signed content-script fixture")
+            need(isinstance(state, dict) and state.get("url") == page_url and
+                 state.get("title") == "Vulpra extension smoke",
+                 "Signed content-script test page navigation changed")
             if state.get("matched") is True:
                 matched = True
                 break
-            time.sleep(0.2)
-        need(matched, "Signed add-on content script did not create matching notification")
+            time.sleep(0.15)
+        need(matched,
+             "Signed content script did not create DOM notification on localhost page")
     finally:
-        # Close only the temporary popup tab. Do not uninstall the add-on
-        # from within its own extension document (Marionette would die).
-        wd.request(port, "POST", base + "/window", {"handle": popup_handle})
+        # Close only disposable localhost tab, retain extension popup for
+        # the existing storage test, then later navigate away before uninstall.
         wd.request(port, "DELETE", base + "/window")
-        wd.request(port, "POST", base + "/window", {"handle": first})
-    print("PASS: real signed extension background request/reply and content-script DOM "
+        wd.request(port, "POST", base + "/window", {"handle": popup_handle})
+    print("PASS: real signed background request/reply and content-script DOM "
           + phase, flush=True)
 
 
