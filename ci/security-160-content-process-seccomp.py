@@ -256,8 +256,9 @@ def evaluate_worker_namespaces(parent_pid, children, parent_namespaces,
             any(type(v) is not int or v <= 0 for v in parent_root)):
         raise RuntimeError("Malformed parent root directory identity")
     for kind, identity in parent_namespaces.items():
-        if identity is not None and not re.fullmatch(
-                re.escape(kind) + r":\[[0-9]+\]", identity):
+        if identity is not None and (
+                not isinstance(identity, str) or
+                re.fullmatch(re.escape(kind) + r":\[[0-9]+\]", identity) is None):
             raise RuntimeError("Invalid procfs parent namespace identity")
     results = []
     accessible = 0
@@ -420,6 +421,11 @@ def self_test():
         (1, 3), {401: (1, 3)})
     assert same_ns["content_worker_distinct_namespace_counts_by_kind"]["net"] == 0
     assert same_ns["content_worker_distinct_root_directory_count"] == 0
+    unreadable_root = evaluate_worker_namespaces(
+        327, [spawner, worker], browser_ns, {401: child_ns},
+        (1, 3), {401: None})
+    assert unreadable_root["content_worker_unreadable_root_directory_count"] == 1
+    assert unreadable_root["content_worker_distinct_root_directory_count"] == 0
     bad_cases = [
         (browser_ns, {}, (1, 3), {}),
         (browser_ns, {999: child_ns}, (1, 3), {999: (1, 2)}),
@@ -432,7 +438,6 @@ def self_test():
         (browser_ns, {401: {**child_ns, "net": True}}, (1, 3),
          {401: (1, 2)}),
         (browser_ns, {401: child_ns}, (1, 3), {401: (1, True)}),
-        (browser_ns, {401: child_ns}, (1, 3), {401: None}),
         ({kind: None for kind in NAMESPACE_KINDS},
          {401: child_ns}, (1, 3), {401: (1, 2)}),
     ]
@@ -445,7 +450,7 @@ def self_test():
             rejected_ns += 1
         else:
             raise AssertionError("Forged/missing namespace record was accepted")
-    assert rejected_ns == 9  # a genuinely unreadable root is reported, not forged
+    assert rejected_ns == 9
     print("PASS: 9 corrupted namespace fixtures rejected; inaccessible roots reported as unknown")
 
 
