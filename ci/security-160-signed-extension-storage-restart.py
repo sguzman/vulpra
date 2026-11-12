@@ -60,8 +60,14 @@ def verify_probe_result(data, phase):
 
 
 def verify_signed_message_result(value, phase):
-    need(isinstance(value, dict) and value.get("status") == "pass",
-         "Signed background message response was not a pass")
+    if not isinstance(value, dict) or value.get("status") != "pass":
+        # No random marker, actual URLs or credentials in CI diagnostics.
+        safe = {key: value.get(key) for key in (
+            "status", "phase", "stage", "extension_identity_matches",
+            "background_shortcuts_response", "content_message_sent",
+            "error_class") if key in value} if isinstance(value, dict) else {}
+        raise RuntimeError("Signed background/content check did not pass: " +
+                           json.dumps(safe, sort_keys=True))
     need(value.get("phase") == phase, "Signed message phase mismatch")
     need(value.get("extension_identity_matches") is True,
          "Signed message sender identity mismatch")
@@ -149,12 +155,13 @@ def signed_background_and_content_probe(port, sid, popup_url, server, token, pha
               };
               const timer=setTimeout(()=>complete({status:"timeout",phase}),14000);
               (async()=>{
-                const result={status:"fail",phase,token_in_report:false};
+                const result={status:"fail",phase,stage:"init",token_in_report:false};
                 try{
                   result.extension_identity_matches=(
                     location.protocol==="moz-extension:" &&
                     browser.runtime.id==="@testpilot-containers");
                   if(!result.extension_identity_matches){complete(result);return;}
+                  result.stage="background_request";
                   // The 8.4.0 signed background message handler implements
                   // getShortcuts as a real async storage-backed read.
                   const shortcuts=await browser.runtime.sendMessage({
@@ -166,16 +173,22 @@ def signed_background_and_content_probe(port, sid, popup_url, server, token, pha
                     Object.hasOwn(shortcuts,"reopen_in_container_0") &&
                     typeof shortcuts.open_container_0==="string";
                   if(!result.background_shortcuts_response){complete(result);return;}
+                  result.stage="tab_lookup";
                   const tabs=await browser.tabs.query({url});
                   if(tabs.length!==1 || !Number.isInteger(tabs[0].id)){
                     complete(result);return;
                   }
+                  result.stage="tab_message";
                   // Signed content script from the XPI listens for this
                   // message and creates an actual DOM notification.
                   await browser.tabs.sendMessage(tabs[0].id,{text:marker});
                   result.content_message_sent=true;
                   result.status="pass";
-                }catch(_){result.status="error";}
+                  result.stage="done";
+                }catch(error){
+                  result.status="error";
+                  result.error_class=String(error?.name||"Error").slice(0,32);
+                }
                 complete(result);
               })();
             """,
