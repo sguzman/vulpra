@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/security-160-archived-content-seccomp.yml
       - ci/security-160-content-process-seccomp.py
+      - ci/security-160-runner-userns-capability.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -45,6 +46,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/security-160-content-process-seccomp.py
+            ci/security-160-runner-userns-capability.rs
             ci/smoke-webextension-package-local.py
       - name: Download checksummed unreleased Firefox 160 binary package
         uses: actions/download-artifact@v4
@@ -99,6 +101,39 @@ jobs:
           tar -xzf "$file" -C "$RUNNER_TEMP/geckodriver-bin" geckodriver
           test -x "$RUNNER_TEMP/geckodriver-bin/geckodriver"
           echo "$RUNNER_TEMP/geckodriver-bin" >> "$GITHUB_PATH"
+      - name: Reproduce Firefox 160 user namespace capability probe in isolated Rust child
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "x86_64"
+          command -v rustc >/dev/null
+          rustc --edition=2021 -D warnings -C opt-level=1 \
+            ci/security-160-runner-userns-capability.rs \
+            -o "$RUNNER_TEMP/firefox160-userns-child-probe"
+          "$RUNNER_TEMP/firefox160-userns-child-probe" --self-test
+          "$RUNNER_TEMP/firefox160-userns-child-probe" --probe \
+            "$RUNNER_TEMP/firefox160-runner-userns-child-report.json"
+          jq -e '
+            .schema_version==1 and .status=="pass" and
+            .probe_kind=="firefox160_upstream_clone_newuser_then_unshare_newpid_x86_64" and
+            (.stage=="clone_newuser_denied" or
+             .stage=="clone_succeeded_unshare_newpid_denied" or
+             .stage=="clone_and_unshare_succeeded") and
+            .child_exited_without_host_changes==true and
+            .test_did_not_modify_kernel_policy_or_sandbox==true and
+            .policy_root_cause_proven==false and
+            .same_as_firefox_parent_process_context_proven==false and
+            .linux_content_worker_namespace_isolation_verified==false and
+            .forbidden_content_worker_syscall_denial_verified==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-runner-userns-child-report.json" >/dev/null
+          jq -c '{stage,errno_name,
+            kernel_unprivileged_userns_clone,kernel_max_user_namespaces,
+            apparmor_module_enabled,apparmor_unprivileged_userns_restriction,
+            diagnostic_process_apparmor_confined}' \
+            "$RUNNER_TEMP/firefox160-runner-userns-child-report.json"
+          echo 'LIMIT: independent runner child is not the Firefox content process; no causal LSM proof'
       - name: Launch real Firefox 160 localhost content and observe native seccomp filters
         shell: bash
         timeout-minutes: 7
@@ -147,12 +182,71 @@ jobs:
           ' "$RUNNER_TEMP/firefox160-content-sandbox-proof.json" >/dev/null
           echo 'PASS: actual Firefox 160 worker threads have seccomp/NoNewPrivs, namespace/root separation compared and cached Firefox user-namespace probe reconciled'
           echo 'LIMIT: conditional/unavailable namespaces not silently counted isolated; no syscall denial, future-thread, policy-semantic or release proof'
+      - name: Correlate native Firefox user namespace failure with same-run child result
+        shell: bash
+        run: |
+          set -euo pipefail
+          firefox="$RUNNER_TEMP/firefox160-content-sandbox-proof.json"
+          runner="$RUNNER_TEMP/firefox160-runner-userns-child-report.json"
+          report="$RUNNER_TEMP/firefox160-userns-crosswalk.json"
+          test -s "$firefox" && test -s "$runner" && ! -e "$report"
+          jq -n --slurpfile f "$firefox" --slurpfile r "$runner" '
+            ($f[0]) as $browser |
+            ($r[0]) as $host |
+            ($browser.firefox_parent_cached_user_namespace_probe) as $cached |
+            ($host.stage) as $stage |
+            (($cached=="unavailable" and
+               ($stage=="clone_newuser_denied" or
+                $stage=="clone_succeeded_unshare_newpid_denied")) or
+             ($cached=="supported" and
+              $stage=="clone_and_unshare_succeeded")) as $aligned |
+            {
+              schema_version:1,status:(if $aligned then "pass" else "mismatch" end),
+              exact_original_native_build_run:43138458940,
+              verified_firefox160_browser_probe_cache:$cached,
+              independent_runner_child_stage:$stage,
+              runner_child_errno:$host.errno_name,
+              kernel_unprivileged_userns_clone:$host.kernel_unprivileged_userns_clone,
+              kernel_max_user_namespaces:$host.kernel_max_user_namespaces,
+              apparmor_module_enabled:$host.apparmor_module_enabled,
+              apparmor_unprivileged_userns_restriction:$host.apparmor_unprivileged_userns_restriction,
+              runner_child_apparmor_confined:$host.diagnostic_process_apparmor_confined,
+              same_runner_child_and_firefox_probe_consistent:$aligned,
+              firefox_sandbox_disabled:$browser.firefox_parent_content_sandbox_disabled_env,
+              firefox_sandbox_permissive:$browser.firefox_parent_permissive_content_sandbox_env,
+              firefox_real_content_worker_count:$browser.actual_content_worker_count,
+              firefox_observed_user_namespace_distinct_count:
+                $browser.content_worker_distinct_namespace_counts_by_kind.user,
+              exact_denial_policy_or_lsm_cause_proven:false,
+              worker_namespace_isolation_verified:false,
+              actual_content_worker_seccomp_denial_exercised:false,
+              security_current:false,release_ready:false
+            }
+          ' > "$report"
+          jq -e '
+            .schema_version==1 and .status=="pass" and
+            .same_runner_child_and_firefox_probe_consistent==true and
+            .firefox_sandbox_disabled==false and
+            .firefox_sandbox_permissive==false and
+            .exact_denial_policy_or_lsm_cause_proven==false and
+            .worker_namespace_isolation_verified==false and
+            .actual_content_worker_seccomp_denial_exercised==false and
+            .security_current==false and .release_ready==false
+          ' "$report" >/dev/null
+          jq -c '{verified_firefox160_browser_probe_cache,
+                  independent_runner_child_stage,runner_child_errno,
+                  same_runner_child_and_firefox_probe_consistent,
+                  exact_denial_policy_or_lsm_cause_proven}' "$report"
+          echo 'PASS: Firefox parent cached capability and independent same-run child probe align'
       - name: Archive bounded Firefox 160 Linux content-process observation
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: firefox160-vulpra-content-seccomp-observation-proof
-          path: ${{ runner.temp }}/firefox160-content-sandbox-proof.json
+          path: |
+            ${{ runner.temp }}/firefox160-content-sandbox-proof.json
+            ${{ runner.temp }}/firefox160-runner-userns-child-report.json
+            ${{ runner.temp }}/firefox160-userns-crosswalk.json
           if-no-files-found: error
           retention-days: 30
       - name: Record bounded seccomp observation failure diagnostics
