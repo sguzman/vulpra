@@ -1,5 +1,6 @@
 # Examine actual native Firefox 160 content processes in /proc on hosted Linux.
-# This observes seccomp mode/filter presence, NOT syscall-denial semantics.
+# This reads each observed worker's main process status AND live thread statuses,
+# not syscall-denial semantics, filter BPF contents or transient future threads.
 name: Firefox 160 Native Content-Process Seccomp Observation (No Browser Build)
 on:
   push:
@@ -119,13 +120,19 @@ jobs:
             .all_worker_processes_descend_from_browser_spawners==true and
             .all_observed_content_workers_have_seccomp_filters==true and
             .all_observed_content_workers_have_no_new_privileges==true and
+            .observed_content_worker_thread_count>=.actual_content_worker_count and
+            .observed_content_worker_thread_groups==.actual_content_worker_count and
+            .all_observed_content_worker_threads_have_seccomp_filters==true and
+            .all_observed_content_worker_threads_have_no_new_privileges==true and
+            .all_observed_content_worker_thread_groups_include_main_tid==true and
+            .all_possible_transient_threads_exhaustively_audited==false and
             .unfiltered_browser_child_process_is_explicitly_reported==true and
             .seccomp_syscall_denial_actually_exercised==false and
             .content_sandbox_policy_strength_verified==false and
             .release_ready==false and .security_current==false
           ' "$RUNNER_TEMP/firefox160-content-sandbox-proof.json" >/dev/null
-          echo 'PASS: real Firefox 160 seccomp-filtered content workers observed; unfiltered spawning children separately reported'
-          echo 'LIMIT: observed direct browser spawning child may be unfiltered; no syscall-denial, sandbox filter-policy or full security acceptance proven'
+          echo 'PASS: every observed live authenticated Firefox 160 content-worker thread has seccomp filters and NoNewPrivs; spawning processes reported separately'
+          echo 'LIMIT: transient future threads, actual syscall denial, filter-policy correctness and full release security acceptance remain unverified'
       - name: Archive bounded Firefox 160 Linux content-process observation
         if: success()
         uses: actions/upload-artifact@v4
