@@ -77,30 +77,63 @@ def content_processes(browser_binary, parent_pid):
 
 
 def evaluate_sandbox(parent, children, pref_level):
-    # Host-runner/seccomp evidence is deliberately NOT treated as proof of
-    # actual sandbox syscall denial or a complete policy enforcement audit.
+    """Only leaf content workers count as sandboxed; surface spawners separately.
+
+    Firefox's observed topology includes one direct child with NO seccomp
+    filter which spawns real filtered content processes. This test must not
+    conceal or mislabel that child as sandboxed, and must never claim actual
+    syscall-denial enforcement or Mozilla filter-policy correctness.
+    """
     if not isinstance(pref_level, int) or isinstance(pref_level, bool) or pref_level <= 0:
         raise RuntimeError("Firefox Linux content sandbox level disabled/unavailable")
     if not children:
-        raise RuntimeError("No real native Firefox -contentproc children observed")
-    if any(c["ppid"] != parent["pid"] for c in children):
-        raise RuntimeError("Unexpected Firefox content process parentage")
-    if any(c["seccomp_mode"] != 2 or c["seccomp_filter_count"] < 1 for c in children):
-        raise RuntimeError("One or more Firefox content processes lacked observable seccomp filters")
+        raise RuntimeError("No real native Firefox -contentproc descendants observed")
+    pids = {p["pid"] for p in children}
+    if len(pids) != len(children) or parent["pid"] in pids:
+        raise RuntimeError("Duplicate or fabricated native process identities")
+    spawning = [p for p in children if p["ppid"] == parent["pid"]]
+    if not spawning:
+        raise RuntimeError("No directly parented browser spawning process found")
+    spawner_pids = {p["pid"] for p in spawning}
+    workers = [p for p in children if p["pid"] not in spawner_pids]
+    if not workers:
+        raise RuntimeError("No separate content worker descendants found")
+    # Require every spawner to have a worker, and every worker to be linked
+    # to one of the browser's observed native child spawning processes.
+    worker_ppids = {p["ppid"] for p in workers}
+    if any(p["pid"] not in worker_ppids for p in spawning):
+        raise RuntimeError("Unexplained direct browser content-process child")
+    if any(p["ppid"] not in spawner_pids for p in workers):
+        raise RuntimeError("Content-process worker parent not authenticated")
+    if any(p["seccomp_mode"] != 2 or p["seccomp_filter_count"] < 1 or
+           p["no_new_privileges"] != 1 for p in workers):
+        raise RuntimeError("A live content worker lacked seccomp/NoNewPrivs enforcement")
+    # Spawners are explicitly reported, including unfiltered spawners.
+    unfiltered = [p for p in spawning if p["seccomp_mode"] != 2 or p["seccomp_filter_count"] < 1]
     return {
         "linux_content_sandbox_level": pref_level,
-        "content_process_count": len(children),
-        "distinct_native_content_processes": True,
-        "content_processes_direct_children_of_browser": True,
-        "all_content_process_seccomp_mode_filter": True,
-        "all_content_processes_have_seccomp_filters": True,
-        "sampled_process_statuses": [
+        "observed_native_content_process_count": len(children),
+        "actual_content_worker_count": len(workers),
+        "browser_child_spawning_process_count": len(spawning),
+        "browser_child_unfiltered_spawning_process_count": len(unfiltered),
+        "all_worker_processes_descend_from_browser_spawners": True,
+        "all_observed_content_workers_have_seccomp_filters": True,
+        "all_observed_content_workers_have_no_new_privileges": True,
+        "unfiltered_browser_child_process_is_explicitly_reported": True,
+        "spawning_process_statuses": [
             {
-                "content_pid": c["pid"], "parent_pid": c["ppid"],
-                "seccomp_mode": c["seccomp_mode"],
-                "seccomp_filter_count": c["seccomp_filter_count"],
-                "no_new_privileges": c["no_new_privileges"],
-            } for c in children
+                "seccomp_mode": p["seccomp_mode"],
+                "seccomp_filter_count": p["seccomp_filter_count"],
+                "no_new_privileges": p["no_new_privileges"],
+                "spawned_worker_count": sum(w["ppid"] == p["pid"] for w in workers),
+            } for p in spawning
+        ],
+        "content_worker_statuses": [
+            {
+                "seccomp_mode": p["seccomp_mode"],
+                "seccomp_filter_count": p["seccomp_filter_count"],
+                "no_new_privileges": p["no_new_privileges"],
+            } for p in workers
         ],
         "parent_process_seccomp_mode": parent["seccomp_mode"],
         "parent_process_filter_count": parent["seccomp_filter_count"],
@@ -110,23 +143,31 @@ def evaluate_sandbox(parent, children, pref_level):
 
 
 def self_test():
-    raw = "Name:\tvulpra\nPPid:\t327\nSeccomp:\t2\nSeccomp_filters:\t3\nNoNewPrivs:\t1\n"
-    base = {"pid": 327, "seccomp_mode": 0, "seccomp_filter_count": 0}
-    child = {"pid": 400, **status_fields(raw)}
-    assert evaluate_sandbox(base, [child], 6)["all_content_process_seccomp_mode_filter"]
+    raw = "Name:\tvulpra\nPPid:\t400\nSeccomp:\t2\nSeccomp_filters:\t3\nNoNewPrivs:\t1\n"
+    browser = {"pid": 327, "seccomp_mode": 0, "seccomp_filter_count": 0}
+    spawner = {"pid": 400, "ppid": 327, "seccomp_mode": 0,
+               "seccomp_filter_count": 0, "no_new_privileges": 0}
+    worker = {"pid": 401, **status_fields(raw)}
+    observed = evaluate_sandbox(browser, [spawner, worker], 6)
+    assert observed["all_observed_content_workers_have_seccomp_filters"]
+    assert observed["browser_child_unfiltered_spawning_process_count"] == 1
     for invalid, level in [
-        ([{**child, "seccomp_mode": 0}], 6),
-        ([{**child, "seccomp_filter_count": 0}], 6),
-        ([{**child, "ppid": 1}], 6),
+        ([spawner, {**worker, "seccomp_mode": 0}], 6),
+        ([spawner, {**worker, "seccomp_filter_count": 0}], 6),
+        ([spawner, {**worker, "no_new_privileges": 0}], 6),
+        ([spawner, {**worker, "ppid": 1}], 6),
+        ([spawner], 6),
+        ([worker], 6),
+        ([spawner, worker, {**spawner, "pid": 402}], 6),
         ([], 6),
-        ([child], 0),
+        ([spawner, worker], 0),
     ]:
         try:
-            evaluate_sandbox(base, invalid, level)
+            evaluate_sandbox(browser, invalid, level)
         except RuntimeError:
             continue
-        raise AssertionError("Forged, missing or unfiltered content sandbox accepted")
-    print("PASS: seccomp parser and all negative process/sandbox checks")
+        raise AssertionError("Forged, missing, orphaned or unfiltered worker accepted")
+    print("PASS: topology-aware seccomp parser and nine negative process/sandbox cases")
 
 
 def run(repo: Path, output: Path):
