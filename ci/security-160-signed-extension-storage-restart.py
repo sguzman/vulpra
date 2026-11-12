@@ -194,6 +194,16 @@ def run(repo, signed_xpi, digest, output):
         need("manifest.json" in names and any(x.startswith("META-INF/") for x in names),
              "Signed XPI manifest/signing metadata absent")
         manifest = json.loads(xpi.read("manifest.json"))
+        print("AUDIT: signed AMO XPI manifest structure " + json.dumps({
+            "version": manifest.get("version"),
+            "browser_specific_gecko_id": manifest.get(
+                "browser_specific_settings", {}).get("gecko", {}).get("id"),
+            "legacy_gecko_id": manifest.get(
+                "applications", {}).get("gecko", {}).get("id"),
+            "popup": manifest.get("browser_action", {}).get("default_popup"),
+            "background_page": manifest.get("background", {}).get("page"),
+            "storage_permission": "storage" in manifest.get("permissions", []),
+        }, sort_keys=True), flush=True)
         need(manifest.get("version") == EXPECTED_VERSION and
              manifest.get("browser_specific_settings", {}).get("gecko", {}).get("id") ==
              EXPECTED_ID and
