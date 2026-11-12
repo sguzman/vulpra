@@ -1,0 +1,168 @@
+name: Firefox 160 Artifact-Only WebDriver Replay (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-artifact-webdriver-replay.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  replay-verified-native-artifact:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Verify pinned source run and presence of unreleased package artifact
+        id: inspect
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const id = 43138458940;
+            const expectedCommit = '0624235fdc956ab18af3c3f310b3588ca72fff61';
+            const {data: run} = await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if (run.repository?.full_name !== 'sguzman/vulpra' ||
+                run.head_branch !== 'upgrade/firefox-160-overlay-prototype' ||
+                run.name !== 'Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+                run.head_sha !== expectedCommit) {
+              throw Error('Refusing non-pinned Firefox 160 source or workflow run');
+            }
+            const all = await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            const required = ['firefox160-vulpra-unreleased-native-preview-not-approved',
+              'firefox160-vulpra-materialized-source-proof'];
+            const ready = required.every(name =>
+              all.some(a => a.name === name && !a.expired && a.size_in_bytes > 0));
+            core.setOutput('ready', String(ready));
+            if (!ready) core.notice('Native Firefox 160 archive not yet available; skipping artifact-only replay without a new build');
+            else core.info('Verified pinned native CI source and both package/source artifacts');
+      - name: Checkout pinned Firefox 160 WebDriver script only
+        if: steps.inspect.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: 0624235fdc956ab18af3c3f310b3588ca72fff61
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/smoke-webextension-package-local.py
+      - name: Download unreleased native archive and checksum from same run
+        if: steps.inspect.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-unreleased-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-package
+      - name: Download exact complete-source identity from same run
+        if: steps.inspect.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-source
+      - name: Verify source Git tree, original archive SHA-256 and stage locally
+        if: steps.inspect.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/firefox160-source/materialized-candidate.json"
+          archive="$RUNNER_TEMP/firefox160-package/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$src" && test -s "$archive" && test -s "$archive.sha256"
+          jq -e '
+            .upstream_release_commit == "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree == "42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays == 28 and .exact_assembly_tree_match == true and
+            .upstream_paths_otherwise_preserved == true
+          ' "$src" > /dev/null
+          (cd "$(dirname "$archive")" && sha256sum -c "$(basename "$archive").sha256")
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp -- "$archive" "$dest/vulpra-local-firefox160-verified-replay.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-verified-replay.tar.xz > vulpra-local-firefox160-verified-replay.tar.xz.sha256)
+          echo 'PASS: exact Firefox 160 source tree, native run and archived package checksum'
+      - name: Install native browser shared libraries and SHA-256-verified geckodriver
+        if: steps.inspect.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 openssl jq libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          file="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl --fail --location --show-error --silent --retry 3 --max-time 90 \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz' -o "$file"
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/verified-driver"
+          tar -xzf "$file" -C "$RUNNER_TEMP/verified-driver" geckodriver
+          test -x "$RUNNER_TEMP/verified-driver/geckodriver"
+          "$RUNNER_TEMP/verified-driver/geckodriver" --version
+          echo "$RUNNER_TEMP/verified-driver" >> "$GITHUB_PATH"
+      - name: Run real packaged browser JS, WebExtension, strict TLS and Nimbus tests only
+        if: steps.inspect.outputs.ready == 'true'
+        shell: bash
+        env:
+          VULPRA_M3_VERIFY_NIMBUS: "1"
+        run: |
+          set -euo pipefail
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE" 2>&1 | tee "$RUNNER_TEMP/firefox160-replay-webdriver.log"
+          report="$(find .git/vulpra-native-build -maxdepth 1 -name 'webextension-smoke-*.json' -type f -print -quit)"
+          test -s "$report"
+          archive="$RUNNER_TEMP/firefox160-package/vulpra-firefox160-native-ci.tar.xz"
+          digest="$(sha256sum "$archive" | cut -d' ' -f1)"
+          jq --arg sha "$digest" '
+            . + {
+              original_native_ci_run_id: "43138458940",
+              original_native_ci_commit: "0624235fdc956ab18af3c3f310b3588ca72fff61",
+              firefox160_verified_git_tree: "42dd7439a27dde92f89ac5eed13f88117a4d7ab5",
+              firefox160_staged_archive_sha256: $sha,
+              tested_native_binary_without_rebuild: true,
+              release_ready: false,
+              security_current: false
+            }
+          ' "$report" > "$RUNNER_TEMP/firefox160-replay-webdriver-proof.json"
+          jq -e --arg sha "$digest" '
+            .status == "pass" and
+            .javascript_navigation.verified == true and
+            .webextension.temporary_unsigned_install == true and
+            .webextension.content_scripts == true and
+            .webextension.background_messaging == true and
+            .webextension.storage_local == true and
+            .webextension.uninstall == true and
+            .security.original_firefox_profile_preserved == true and
+            .security.local_untrusted_tls_denial.verified == true and
+            .security.local_untrusted_tls_denial.webdriver_accept_insecure_certs == false and
+            .nimbus.store_ready == true and .nimbus.api_ready == true and
+            .firefox160_staged_archive_sha256 == $sha and
+            .tested_native_binary_without_rebuild == true and
+            .release_ready == false and .security_current == false
+          ' "$RUNNER_TEMP/firefox160-replay-webdriver-proof.json" > /dev/null
+          echo 'PASS: real Firefox 160 WebDriver runtime replay with no native browser rebuild'
+          echo 'LIMIT: no general security-current or release acceptance'
+      - name: Upload authenticated Firefox 160 artifact-only runtime proof
+        if: success() && steps.inspect.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-artifact-only-webdriver-proof
+          path: ${{ runner.temp }}/firefox160-replay-webdriver-proof.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save bounded replay diagnostics when WebDriver fails
+        if: failure()
+        shell: bash
+        run: |
+          if test -s "$RUNNER_TEMP/firefox160-replay-webdriver.log"; then
+            tail -n 350 "$RUNNER_TEMP/firefox160-replay-webdriver.log" > "$RUNNER_TEMP/firefox160-replay-webdriver-failure-tail.log"
+          fi
+      - name: Upload bounded replay diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-artifact-only-runtime-failure
+          path: ${{ runner.temp }}/firefox160-replay-webdriver-failure-tail.log
+          if-no-files-found: ignore
+          retention-days: 14
