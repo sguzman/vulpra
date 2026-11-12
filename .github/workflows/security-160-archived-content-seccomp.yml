@@ -124,6 +124,12 @@ jobs:
             .test_did_not_modify_kernel_policy_or_sandbox==true and
             .child_capability_read_only_observation==true and
             .child_effective_capabilities_entire_set_exposed==false and
+            (.child_apparmor_profile_class=="unprivileged_userns" or
+             .child_apparmor_profile_class=="unconfined" or
+             .child_apparmor_profile_class=="other-redacted" or
+             .child_apparmor_profile_class=="unreadable" or
+             .child_apparmor_profile_class=="not-applicable") and
+            .raw_child_apparmor_profile_persisted==false and
             (.child_effective_cap_sys_admin_in_new_userns==true or
              .child_effective_cap_sys_admin_in_new_userns==false or
              .child_effective_cap_sys_admin_in_new_userns==null) and
@@ -142,7 +148,8 @@ jobs:
             apparmor_module_enabled,apparmor_unprivileged_userns_restriction,
             diagnostic_process_apparmor_confined,
             child_effective_cap_sys_admin_in_new_userns,
-            child_seccomp_mode_after_clone}' \
+            child_seccomp_mode_after_clone,
+            child_apparmor_profile_class}' \
             "$RUNNER_TEMP/firefox160-runner-userns-child-report.json"
           echo 'LIMIT: independent runner child is not the Firefox content process; no causal LSM proof'
       - name: Launch real Firefox 160 localhost content and observe native seccomp filters
@@ -221,6 +228,11 @@ jobs:
                 $host.child_effective_cap_sys_admin_in_new_userns,
               runner_child_seccomp_mode_after_clone:
                 $host.child_seccomp_mode_after_clone,
+              runner_child_apparmor_profile_class:
+                $host.child_apparmor_profile_class,
+              restricted_profile_and_missing_cap_observed:
+                ($host.child_apparmor_profile_class=="unprivileged_userns" and
+                 $host.child_effective_cap_sys_admin_in_new_userns==false),
               denied_unshare_with_cap_sys_admin_absent_observed:
                 ($stage=="clone_succeeded_unshare_newpid_denied" and
                  $host.child_effective_cap_sys_admin_in_new_userns==false),
@@ -258,6 +270,8 @@ jobs:
                   independent_runner_child_stage,runner_child_errno,
                   runner_child_cap_sys_admin_inside_new_userns,
                   runner_child_seccomp_mode_after_clone,
+                  runner_child_apparmor_profile_class,
+                  restricted_profile_and_missing_cap_observed,
                   denied_unshare_with_cap_sys_admin_absent_observed,
                   same_runner_child_and_firefox_probe_consistent,
                   exact_denial_policy_or_lsm_cause_proven}' "$report"
