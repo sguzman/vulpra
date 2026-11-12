@@ -1,0 +1,127 @@
+# Source-only crosswalk: all changed paths in six selected public Mozilla
+# security bug commits, not an exhaustive CVE-fix or security-current audit.
+name: Firefox 160 Six Boundary Fix Commits — Full Changed-Path Crosswalk (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-boundary-commit-coverage.yml
+      - ci/security-160-boundary-commit-coverage.sh
+      - docs/vulpra/SECURITY-160-BOUNDARY-COMMIT-PATHS-20261112.json
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  selected-upstream-commit-files-vs-release:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Authenticate exact-source Firefox 160 native run and original source proof
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo, id=43138458940;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+               r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Refusing unverified original Firefox 160 candidate');
+            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            for(const name of ['firefox160-vulpra-complete-git-tree-candidate',
+                               'firefox160-vulpra-materialized-source-proof']){
+              if(!all.some(a=>a.name===name&&!a.expired&&a.size_in_bytes>0))
+                throw Error('Missing or expired original immutable source proof: '+name);
+            }
+            core.info('PASS: original source run, pinned commit and source artifacts');
+      - name: Checkout only exact selected bug-commit comparison and frozen metadata
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-boundary-commit-coverage.sh
+            docs/vulpra/SECURITY-160-BOUNDARY-COMMIT-PATHS-20261112.json
+      - name: Download original verified 28-overlay Git-tree candidate ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-candidate-ledger
+      - name: Download original materialized Firefox 160 source identity proof
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/firefox160-source-identity
+      - name: Prove pinned full changed-path manifest and negative security controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          script=ci/security-160-boundary-commit-coverage.sh
+          manifest=docs/vulpra/SECURITY-160-BOUNDARY-COMMIT-PATHS-20261112.json
+          bash -n "$script"
+          bash "$script" --self-test "$manifest"
+          jq '.limits.security_current=true' "$manifest" > "$RUNNER_TEMP/forged-current.json"
+          if bash "$script" --self-test "$RUNNER_TEMP/forged-current.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged security-current claim passed' >&2; exit 1
+          fi
+          jq '(.commits[0].changed_paths[0])="dom/UNKNOWN_UNVERIFIED.cpp"' "$manifest" > "$RUNNER_TEMP/forged-path.json"
+          if bash "$script" --self-test "$RUNNER_TEMP/forged-path.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged changed path passed' >&2; exit 1
+          fi
+          jq '(.commits[0].upstream_commit)="0000000000000000000000000000000000000000"' "$manifest" > "$RUNNER_TEMP/forged-commit.json"
+          if bash "$script" --self-test "$RUNNER_TEMP/forged-commit.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged development commit passed' >&2; exit 1
+          fi
+          echo 'PASS: strict six-commit file-path manifest and three negative controls'
+      - name: Authenticate every selected Mozilla commit-file path, final 160 blob and overlay noncollision
+        shell: bash
+        timeout-minutes: 13
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash ci/security-160-boundary-commit-coverage.sh --verify \
+            docs/vulpra/SECURITY-160-BOUNDARY-COMMIT-PATHS-20261112.json \
+            "$RUNNER_TEMP/firefox160-candidate-ledger" \
+            "$RUNNER_TEMP/firefox160-source-identity/materialized-candidate.json" \
+            "$RUNNER_TEMP/firefox160-six-commits-all-file-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .kind=="firefox160_six_selected_security_landings_all_changed_paths_crosswalk" and
+            .checked_commit_file_records==31 and
+            .checked_unique_source_paths==27 and
+            (.exact_public_landed_file_blobs+.different_public_landed_vs_release_blobs)==31 and
+            .vulpra_overlay_collisions==0 and
+            .development_commit_ancestry_in_release_not_assumed==true and
+            .source_patch_hunks_for_diverged_files_audited==false and
+            .all_fix_changes_for_selected_cves_verified==false and
+            .full_advisory_audited==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-six-commits-all-file-crosswalk.json" >/dev/null
+          jq -c '{
+            checked:.checked_commit_file_records,
+            unique_paths:.checked_unique_source_paths,
+            exactly_matching:.exact_public_landed_file_blobs,
+            release_divergent:.different_public_landed_vs_release_blobs,
+            overlays:.vulpra_overlay_collisions
+          }' "$RUNNER_TEMP/firefox160-six-commits-all-file-crosswalk.json"
+          echo 'LIMIT: divergence does not prove loss of fix; still no exhaustive CVE fix or security-current claim'
+      - name: Archive all selected official-source file comparison outcomes
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-selected-six-boundary-commits-all-changed-file-crosswalk
+          path: ${{ runner.temp }}/firefox160-six-commits-all-file-crosswalk.json
+          if-no-files-found: error
+          retention-days: 30
