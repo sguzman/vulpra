@@ -1,0 +1,119 @@
+name: Firefox 160 Native Acceptance Preflight (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-native-acceptance-preflight.yml
+      - ci/smoke-webextension-package-local.py
+      - ci/tests/smoke-webextension-package-local-test.sh
+      - packaging/test-stage.sh
+      - packaging/test-launcher.sh
+      - packaging/vulpra
+      - packaging/stage.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime-qa-contract-and-fixtures:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout updated future native runtime workflow and its offline fixtures
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/security-160-safe-overlay-stage.yml
+            .github/workflows/security-160-native-acceptance-preflight.yml
+            ci/smoke-webextension-package-local.py
+            ci/tests/smoke-webextension-package-local-test.sh
+            packaging/measure-build.sh
+            packaging/stage.sh
+            packaging/test-stage.sh
+            packaging/test-launcher.sh
+            packaging/vulpra
+      - name: Static syntax and source contract preflight of future Firefox 160 build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile ci/smoke-webextension-package-local.py
+          for script in packaging/stage.sh packaging/test-stage.sh packaging/test-launcher.sh packaging/vulpra ci/tests/smoke-webextension-package-local-test.sh; do
+            bash -n "$script"
+          done
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import subprocess
+
+          workflow = pathlib.Path(".github/workflows/security-160-safe-overlay-stage.yml").read_text()
+          required = {
+              'source tree and native compile': 'Compile exact materialized Firefox 160 Vulpra candidate',
+              'source identity': 'Materialize ONLY verified source patches',
+              'native Vulpra launcher in headless smoke': 'timeout 120 "$appdir/vulpra-launch" --headless --screenshot',
+              'actual native executable ELF': '7f454c46',
+              'screenshot-only proof': 'headless_screenshot_rendered:true',
+              'checksum-pinned geckodriver': 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e',
+              'WebDriver runtime script checkout': 'ci/smoke-webextension-package-local.py',
+              'real runtime invocation': 'python3 "$script" "$PWD"',
+              'real JS navigation result': '.javascript_navigation.verified==true',
+              'strict HTTPS refusal': '.security.local_untrusted_tls_denial.verified==true',
+              'Nimbus runtime': '.nimbus.api_ready==true',
+              'unreleased package replay artifact': 'firefox160-vulpra-unreleased-native-preview-not-approved',
+              'WebDriver failure log': 'firefox160-vulpra-webdriver-failure-tail.log',
+              'real browser proof artifact': 'firefox160-vulpra-real-webdriver-runtime-proof',
+          }
+          for name, fragment in required.items():
+              assert fragment in workflow, f"Firefox 160 acceptance workflow missing {name}"
+          assert 'headless_js_smoke_passed:true' not in workflow, \
+              'A PNG screenshot cannot be counted as executed JavaScript'
+          step_names = re.findall(r'^      - name: (.+)$', workflow, flags=re.M)
+          assert len(step_names) >= 25, 'Native pipeline unexpectedly truncated'
+          assert len(set(step_names)) == len(step_names), 'Duplicated workflow step names'
+          # Extract each YAML shell run block and check Bash syntax without
+          # executing build, network or dependency-bootstrap instructions.
+          lines = workflow.splitlines()
+          scripts = []
+          for index, line in enumerate(lines):
+              m = re.match(r'^(\s+)run: \|\s*$', line)
+              if m is None:
+                  continue
+              base = len(m.group(1))
+              script_lines = []
+              for candidate in lines[index + 1:]:
+                  if not candidate.strip():
+                      script_lines.append('')
+                      continue
+                  indent = len(candidate) - len(candidate.lstrip())
+                  if indent <= base:
+                      break
+                  script_lines.append(candidate[base + 2:])
+              assert script_lines, f"Empty run script at line {index + 1}"
+              scripts.append('\n'.join(script_lines) + '\n')
+          assert len(scripts) >= 8, f"Only {len(scripts)} shell run blocks found"
+          for index, script in enumerate(scripts):
+              result = subprocess.run(
+                  ['bash', '-n'], input=script, text=True, capture_output=True
+              )
+              assert result.returncode == 0, \
+                  f"Shell block #{index + 1} invalid: {result.stderr}"
+          print(f"PASS: future Firefox 160 acceptance workflow: {len(required)} source contracts and {len(scripts)} shell blocks syntax-checked")
+          print("LIMIT: static workflow contract; not actual Firefox 160 compile or browser runtime")
+          PY
+      - name: Existing package staging and launcher isolation fixture regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash packaging/test-stage.sh
+          bash packaging/test-launcher.sh
+          echo 'PASS: native Vulpra executable and separate guarded launcher fixture contracts'
+      - name: Existing WebDriver probe and security-denial parser fixture regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          bash ci/tests/smoke-webextension-package-local-test.sh \
+            "$GITHUB_WORKSPACE/ci/smoke-webextension-package-local.py"
+          echo 'PASS: WebDriver JS/HTTP/DOM, extension fixture, Nimbus and TLS negative parser controls'
+          echo 'LIMIT: no browser process, full native build, or release acceptance tested here'
