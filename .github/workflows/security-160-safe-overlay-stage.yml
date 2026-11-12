@@ -1,4 +1,4 @@
-name: Firefox 160 Vulpra Overlay Staging (No Browser Rebuild)
+name: Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate
 on:
   push:
     branches: [upgrade/firefox-160-overlay-prototype]
@@ -317,6 +317,7 @@ jobs:
             packaging/stage.sh
             packaging/vulpra
             packaging/test-wayland.sh
+            ci/smoke-webextension-package-local.py
       - name: Set up Mozilla compiler cache for configure
         uses: mozilla-actions/sccache-action@v0.0.11
         with:
@@ -464,6 +465,20 @@ jobs:
           (cd "$RUNNER_TEMP" && sha256sum -c vulpra-firefox160-native-ci.tar.xz.sha256)
           test -s "$stage"
           echo "PASS: Vulpra 160 native package staged and checksummed"
+      # This is an unreleased, isolated CI candidate, not a supported
+      # browser download or a security-updated production release.
+      # Keep the actual built archive so WebDriver/runtime failures can be
+      # replayed independently without recompiling Firefox for hours.
+      - name: Archive unreleased Firefox 160 native CI package for independent QA replay
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-unreleased-native-preview-not-approved
+          path: |
+            ${{ runner.temp }}/vulpra-firefox160-native-ci.tar.xz
+            ${{ runner.temp }}/vulpra-firefox160-native-ci.tar.xz.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
       - name: Smoke-test isolated packaged Firefox 160 Vulpra on Linux and Wayland
         shell: bash
         run: |
@@ -477,14 +492,22 @@ jobs:
           test "${#inis[@]}" -eq 1
           appdir="$(dirname "${inis[0]}")"
           test -x "$appdir/vulpra"
+          # A native Firefox 160 Vulpra package must retain its own ELF and
+          # the separate profile-isolating wrapper installed by stage.sh.
+          test -x "$appdir/vulpra-launch"
+          test "$(head -c 4 "$appdir/vulpra" | od -An -tx1 | tr -d '[:space:]')" = '7f454c46'
           grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
           mkdir -p "$work/home/.mozilla/firefox"
           printf '[Profile0]\nName=existing-firefox\nPath=existing-profile\n' > "$work/home/.mozilla/firefox/profiles.ini"
           before="$(sha256sum "$work/home/.mozilla/firefox/profiles.ini")"
           printf '%s\n' '<!doctype html><title>Vulpra 160 CI</title><h1>Vulpra native smoke</h1><script>document.querySelector("h1").textContent+=" JS"</script>' > "$work/smoke.html"
-          HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" MOZ_HEADLESS=1             timeout 120 "$appdir/vulpra" --headless --screenshot "$work/screenshot.png" "file://$work/smoke.html"
+          HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" MOZ_HEADLESS=1 \
+            timeout 120 "$appdir/vulpra-launch" --headless --screenshot "$work/screenshot.png" "file://$work/smoke.html"
           test -s "$work/screenshot.png"
+          test "$(head -c 8 "$work/screenshot.png" | od -An -tx1 | tr -d '[:space:]')" = '89504e470d0a1a0a'
           test "$(sha256sum "$work/home/.mozilla/firefox/profiles.ini")" = "$before"
+          test -d "$work/home/.local/share/vulpra/default"
+          test ! -L "$work/home/.local/share/vulpra/default"
           VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1             VULPRA_WAYLAND_TEST_SECONDS=10             bash "$GITHUB_WORKSPACE/vulpra-build-config/packaging/test-wayland.sh" "$appdir"
           archive_sha="$(sha256sum "$stage" | awk '{print $1}')"
           tree="$(jq -r .complete_materialized_source_tree "$RUNNER_TEMP/materialized-candidate.json")"
@@ -496,14 +519,78 @@ jobs:
             native_configure_passed:true,
             native_build_passed:true,
             native_package_passed:true,
-            headless_js_smoke_passed:true,
+            headless_screenshot_rendered:true,
             private_wayland_smoke_passed:true,
             original_firefox_profile_preserved:true,
             security_current:false,
             release_ready:false
           }' > "$RUNNER_TEMP/firefox160-vulpra-native-build-proof.json"
-          echo 'PASS: packaged native headless JS and private Wayland smoke, Firefox profile unchanged'
-          echo 'LIMIT: not full WebExtensions/Nimbus/security regression coverage or release acceptance'
+          echo 'PASS: packaged native headless screenshot via private launcher, plus private Wayland smoke'
+          echo 'LIMIT: screenshot does NOT prove JS; real WebDriver check runs separately'
+      - name: Install exact SHA-256-pinned geckodriver for real packaged runtime tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl --fail --location --show-error --silent --retry 3 --max-time 90 \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz' \
+            -o "$archive"
+          printf '%s  %s\n' \
+            'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/verified-geckodriver"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/verified-geckodriver" geckodriver
+          test -x "$RUNNER_TEMP/verified-geckodriver/geckodriver"
+          "$RUNNER_TEMP/verified-geckodriver/geckodriver" --version
+          echo "$RUNNER_TEMP/verified-geckodriver" >> "$GITHUB_PATH"
+      - name: Real packaged Firefox 160 JavaScript, WebExtension, TLS and Nimbus runtime acceptance
+        shell: bash
+        working-directory: firefox160
+        env:
+          VULPRA_M3_VERIFY_NIMBUS: "1"
+        run: |
+          set -euo pipefail
+          command -v geckodriver
+          command -v openssl
+          test -s "$RUNNER_TEMP/firefox160-vulpra-native-build-proof.json"
+          archive="$RUNNER_TEMP/vulpra-firefox160-native-ci.tar.xz"
+          (cd "$RUNNER_TEMP" && sha256sum -c vulpra-firefox160-native-ci.tar.xz.sha256)
+          # Reuse the repository's real WebDriver proof script unchanged, with
+          # the artifact in its existing verified archive/sidecar contract.
+          pkgdir="$PWD/.git/vulpra-native-build/packages"
+          mkdir -p "$pkgdir"
+          name="vulpra-local-firefox160-ci.tar.xz"
+          cp -- "$archive" "$pkgdir/$name"
+          (cd "$pkgdir" && sha256sum "$name" > "$name.sha256")
+          script="$GITHUB_WORKSPACE/vulpra-build-config/ci/smoke-webextension-package-local.py"
+          test -s "$script"
+          python3 "$script" --self-test-cert-parser
+          python3 "$script" "$PWD" 2>&1 | tee "$RUNNER_TEMP/firefox160-vulpra-webdriver.log"
+          mapfile -t reports < <(find .git/vulpra-native-build -maxdepth 1 -type f -name 'webextension-smoke-*.json' | sort)
+          test "${#reports[@]}" -eq 1
+          jq -e '
+            .status=="pass" and
+            .javascript_navigation.verified==true and
+            .webextension.temporary_unsigned_install==true and
+            .webextension.content_scripts==true and
+            .webextension.background_messaging==true and
+            .webextension.storage_local==true and
+            .webextension.uninstall==true and
+            .security.original_firefox_profile_preserved==true and
+            .security.local_untrusted_tls_denial.verified==true and
+            .security.local_untrusted_tls_denial.webdriver_accept_insecure_certs==false and
+            .nimbus.store_ready==true and .nimbus.api_ready==true
+          ' "${reports[0]}" >/dev/null
+          cp -- "${reports[0]}" "$RUNNER_TEMP/firefox160-vulpra-webdriver-proof.json"
+          echo 'PASS: actual Firefox 160 JS/HTTP/DOM, temporary WebExtension, strict TLS denial, and Nimbus readiness'
+          echo 'LIMIT: Safe Browsing, sandbox denial, signed add-ons, media and full security acceptance remain unverified'
+      - name: Archive real Firefox 160 WebDriver runtime evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-real-webdriver-runtime-proof
+          path: ${{ runner.temp }}/firefox160-vulpra-webdriver-proof.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Archive bounded Firefox 160 native build/runtime proof
         if: success()
         uses: actions/upload-artifact@v4
@@ -516,7 +603,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          for name in firefox160-vulpra-native-build firefox160-vulpra-package; do
+          for name in firefox160-vulpra-native-build firefox160-vulpra-package firefox160-vulpra-webdriver; do
             if test -s "$RUNNER_TEMP/$name.log"; then
               tail -n 2000 "$RUNNER_TEMP/$name.log" > "$RUNNER_TEMP/$name-failure-tail.log"
             fi
@@ -529,5 +616,6 @@ jobs:
           path: |
             ${{ runner.temp }}/firefox160-vulpra-native-build-failure-tail.log
             ${{ runner.temp }}/firefox160-vulpra-package-failure-tail.log
+            ${{ runner.temp }}/firefox160-vulpra-webdriver-failure-tail.log
           if-no-files-found: ignore
           retention-days: 14
