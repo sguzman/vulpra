@@ -197,5 +197,5 @@ jq -e '
 ' "$output" >/dev/null || die 'Final proof failed audit contract'
 printf 'PASS: %s/11 changed-path source identities audited: %s exact, %s divergent, no Vulpra collision\n' \
   "$checked" "$exact" "$diverged"
-printf 'PASS: %s nonblank public patch additions remain verbatim in %s changed release source files\\n' "$divergent_addition_lines" "$divergent_hunk_files"
+printf 'PASS: %s nonblank public patch additions remain verbatim in %s changed release source files\n' "$divergent_addition_lines" "$divergent_hunk_files"
 echo 'LIMIT: literal additions surviving do not establish full patch semantics, exploits or release approval'
