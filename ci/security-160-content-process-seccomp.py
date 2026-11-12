@@ -142,6 +142,96 @@ def evaluate_sandbox(parent, children, pref_level):
     }
 
 
+
+def evaluate_worker_thread_seccomp(children, parent_pid, samples_by_pid):
+    """Fail closed on any visible unfiltered content *thread*, not just PID.
+
+    Thread statuses are read without ptrace or process injection. We check
+    live Firefox worker thread groups only, NOT the unfiltered forkserver/
+    spawning processes explicitly reported by evaluate_sandbox().
+    """
+    spawners = {p["pid"] for p in children if p["ppid"] == parent_pid}
+    workers = [p for p in children if p["pid"] not in spawners]
+    required = {p["pid"] for p in workers}
+    if not required or set(samples_by_pid) != required:
+        raise RuntimeError("Content-worker thread group missing or spoofed")
+    checked_tids = set()
+    count = 0
+    group_stats = []
+    for pid in sorted(required):
+        tasks = samples_by_pid[pid]
+        if not isinstance(tasks, list) or not tasks:
+            raise RuntimeError("Content-worker task set is empty")
+        tids = {t.get("tid") for t in tasks if isinstance(t, dict)}
+        if pid not in tids or len(tids) != len(tasks) or any(
+                not isinstance(tid, int) or isinstance(tid, bool) or tid <= 1
+                for tid in tids):
+            raise RuntimeError("Content-worker task group does not contain unique main TID")
+        for task in tasks:
+            tid = task["tid"]
+            if tid in checked_tids:
+                raise RuntimeError("Thread TID incorrectly shared between worker groups")
+            checked_tids.add(tid)
+            if (type(task.get("seccomp_mode")) is not int or
+                    type(task.get("seccomp_filter_count")) is not int or
+                    type(task.get("no_new_privileges")) is not int or
+                    task["seccomp_mode"] != 2 or
+                    task["seccomp_filter_count"] < 1 or
+                    task["no_new_privileges"] != 1):
+                raise RuntimeError("Live content-worker thread missing seccomp/NoNewPrivs")
+            count += 1
+        group_stats.append({"thread_count": len(tasks),
+                            "minimum_observed_thread_seccomp_filters":
+                                min(t["seccomp_filter_count"] for t in tasks)})
+    if count < len(workers):
+        raise RuntimeError("Fewer verified content threads than content workers")
+    return {
+        "observed_content_worker_thread_count": count,
+        "observed_content_worker_thread_groups": len(group_stats),
+        "all_observed_content_worker_threads_have_seccomp_filters": True,
+        "all_observed_content_worker_threads_have_no_new_privileges": True,
+        "all_observed_content_worker_thread_groups_include_main_tid": True,
+        "worker_thread_groups": group_stats,
+        "all_possible_transient_threads_exhaustively_audited": False,
+        "seccomp_syscall_denial_actually_exercised": False,
+        "content_sandbox_policy_strength_verified": False,
+    }
+
+
+def capture_worker_thread_seccomp(children, parent_pid):
+    """Read /proc/<worker>/task/<tid>/status with no attachment or mutation.
+
+    A thread that exits between listing and reading is ignored; process-main
+    disappearance and a worker with no live tasks are hard failures. This is
+    one bounded observation, not a perpetual thread-creation guarantee.
+    """
+    spawners = {p["pid"] for p in children if p["ppid"] == parent_pid}
+    workers = [p for p in children if p["pid"] not in spawners]
+    observed = {}
+    for worker in workers:
+        pid = worker["pid"]
+        task_root = Path("/proc") / str(pid) / "task"
+        tids = sorted(int(p.name) for p in task_root.iterdir()
+                      if p.name.isdecimal())
+        tasks = []
+        for tid in tids:
+            try:
+                fields = status_fields(
+                    (task_root / str(tid) / "status").read_text())
+            except FileNotFoundError:
+                # A thread may exit between enumeration and status read;
+                # any disappeared main TID is not accepted.
+                if tid == pid:
+                    raise RuntimeError("Content-worker main thread vanished")
+                continue
+            tasks.append({"tid": tid,
+                          "seccomp_mode": fields["seccomp_mode"],
+                          "seccomp_filter_count": fields["seccomp_filter_count"],
+                          "no_new_privileges": fields["no_new_privileges"]})
+        observed[pid] = tasks
+    return evaluate_worker_thread_seccomp(children, parent_pid, observed)
+
+
 def self_test():
     raw = "Name:\tvulpra\nPPid:\t400\nSeccomp:\t2\nSeccomp_filters:\t3\nNoNewPrivs:\t1\n"
     browser = {"pid": 327, "seccomp_mode": 0, "seccomp_filter_count": 0}
@@ -168,6 +258,34 @@ def self_test():
             continue
         raise AssertionError("Forged, missing, orphaned or unfiltered worker accepted")
     print("PASS: topology-aware seccomp parser and nine negative process/sandbox cases")
+    main = {"tid": 401, "seccomp_mode": 2,
+            "seccomp_filter_count": 3, "no_new_privileges": 1}
+    secondary = {**main, "tid": 402}
+    valid = {401: [main, secondary]}
+    evidence = evaluate_worker_thread_seccomp([spawner, worker], 327, valid)
+    assert evidence["observed_content_worker_thread_count"] == 2
+    assert evidence["all_observed_content_worker_threads_have_seccomp_filters"]
+    forged = [
+        {}, {401: []}, {401: [secondary]}, {999: [main, secondary]},
+        {401: [main, main]},
+        {401: [{**main, "tid": 0}, secondary]},
+        {401: [main, {**secondary, "seccomp_mode": 0}]},
+        {401: [main, {**secondary, "seccomp_filter_count": 0}]},
+        {401: [main, {**secondary, "no_new_privileges": 0}]},
+        {401: [main, {**secondary, "no_new_privileges": True}]},
+        {401: [main, {**secondary, "seccomp_filter_count": "2"}]},
+        {401: [main, {**secondary, "seccomp_mode": False}]},
+    ]
+    rejected = 0
+    for case in forged:
+        try:
+            evaluate_worker_thread_seccomp([spawner, worker], 327, case)
+        except RuntimeError:
+            rejected += 1
+            continue
+        raise AssertionError("Forged or unprotected Firefox thread accepted")
+    assert rejected == 12
+    print("PASS: content-worker per-thread protection validator rejected 12 malformed/unfiltered fixtures")
 
 
 def run(repo: Path, output: Path):
@@ -286,6 +404,10 @@ def run(repo: Path, output: Path):
                         "Native content-process sandbox evidence not confirmed; "
                         f"found {len(last)} native content processes"
                     )
+                # The preceding /proc/<pid>/status probe only covers group
+                # leaders. Check every live /proc/<pid>/task/<tid>/status
+                # from the same authenticated Firefox content workers.
+                thread_evidence = capture_worker_thread_seccomp(last, browser_pid)
                 if original.read_bytes() != sentinel:
                     raise RuntimeError("Existing Firefox profile was altered")
                 report = {
@@ -296,9 +418,11 @@ def run(repo: Path, output: Path):
                     "verified_real_localhost_content": True,
                     "original_firefox_profile_preserved": True,
                     **evidence,
+                    **thread_evidence,
                     "release_ready": False,
                     "security_current": False,
                     "limits": [
+                        "All *observed live threads* of authenticated content workers checked, not transient future threads",
                         "Linux seccomp mode/filter presence, not attempted syscall denial",
                         "No proof each filter is the expected Mozilla sandbox policy",
                         "Not a full Safe Browsing or external-network egress test",
@@ -308,7 +432,7 @@ def run(repo: Path, output: Path):
                 if output.exists():
                     raise RuntimeError("Refusing to replace existing sandbox proof")
                 output.write_text(json.dumps(report, indent=2) + "\n")
-                print("PASS: real Firefox 160 content processes have observable seccomp filters", flush=True)
+                print("PASS: real Firefox 160 content workers AND all observed live worker threads have seccomp/NoNewPrivs", flush=True)
                 print("LIMIT: does not prove sandbox policy correctness or syscall denial", flush=True)
         finally:
             if session_id:
