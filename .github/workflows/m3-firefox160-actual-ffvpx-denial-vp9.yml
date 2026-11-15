@@ -9,6 +9,7 @@ on:
       - .github/workflows/m3-firefox160-actual-ffvpx-denial-vp9.yml
       - ci/m3-deny-optional-native-providers.c
       - ci/m3-packaged-ffmpeg-vp9-video.sh
+      - ci/m3-firefox160-ffvpx-mozlog-observer.rs
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,6 +22,7 @@ jobs:
     env:
       VULPRA_M3_COMPILED_SOURCE_SHA: '0624235fdc956ab18af3c3f310b3588ca72fff61'
       VULPRA_M3_VP9_DENIAL_GROUP: 'ffvpx'
+      VULPRA_M3_FFVPX_LOG_OBSERVER: ${{ runner.temp }}/ffvpx-mozlog-observer
     steps:
       - name: Authenticate exact original Firefox160 native producer, preservation and source-owner contract
         uses: actions/github-script@v7
@@ -59,6 +61,7 @@ jobs:
           sparse-checkout: |
             ci/m3-packaged-ffmpeg-vp9-video.sh
             ci/m3-deny-optional-native-providers.c
+            ci/m3-firefox160-ffvpx-mozlog-observer.rs
       - name: Retrieve original byte-preserving native Firefox160 archive
         uses: actions/download-artifact@v4
         with:
@@ -140,6 +143,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rustc --edition=2021 --test ci/m3-firefox160-ffvpx-mozlog-observer.rs \
+            -o "$RUNNER_TEMP/ffvpx-mozlog-tests"
+          "$RUNNER_TEMP/ffvpx-mozlog-tests"
+          rustc --edition=2021 -O ci/m3-firefox160-ffvpx-mozlog-observer.rs \
+            -o "$VULPRA_M3_FFVPX_LOG_OBSERVER"
           cc -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror \
             ci/m3-deny-optional-native-providers.c \
             -o "$RUNNER_TEMP/vulpra-deny-optional-native-providers.so" -ldl
@@ -203,6 +211,9 @@ jobs:
             .denied_FFVPX_loader_attempts>0 and
             .denied_FFVPX_libmozavcodec_load_attempts>=1 and
             .denied_FFVPX_libmozavutil_load_attempts>=1 and
+            .private_mozilla_ffvpx_logs_observed_in_both_modes==true and
+            .observed_FFVPX_NoProvidedLib_source_log_in_denied_mode==true and
+            .FFVPX_NoProvidedLib_source_log_count_in_denied_mode>=1 and
             (.denied_FFVPX_libmozavcodec_load_attempts+
              .denied_FFVPX_libmozavutil_load_attempts)==.denied_FFVPX_loader_attempts and
             .denied_FFmpeg_loader_attempts==null and
@@ -245,6 +256,15 @@ jobs:
               ffvpx_actual_native_denied_dlopen_attempt_count:$m.denied_FFVPX_loader_attempts,
               ffvpx_libmozavcodec_denied_dlopen_attempt_count:$m.denied_FFVPX_libmozavcodec_load_attempts,
               ffvpx_libmozavutil_denied_dlopen_attempt_count:$m.denied_FFVPX_libmozavutil_load_attempts,
+              private_mozilla_ffvpx_decoder_logs_captured:$m.private_mozilla_ffvpx_logs_observed_in_both_modes,
+              ffvpx_real_NoProvidedLib_link_failure_logged:$m.observed_FFVPX_NoProvidedLib_source_log_in_denied_mode,
+              ffvpx_real_NoProvidedLib_link_failure_log_count:$m.FFVPX_NoProvidedLib_source_log_count_in_denied_mode,
+              ffvpx_denied_pdm_log_lines:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.platform_decoder_module_log_lines][0]//0),
+              ffvpx_denied_rdd_pdm_order_log_count:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.rdd_pdm_order_markers][0]//0),
+              ffvpx_denied_agnostic_decoder_support_log_count:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.agnostic_decoder_support_markers][0]//0),
               ffvpx_denials_during_video_navigation:$m.denial_attempts_after_video_navigation,
               baseline_vp9_decoded_frames_and_advancing_time:$m.baseline_VP9_playback_passed,
               with_bundled_ffvpx_denied_vp9_decoded_frames_and_advancing_time:$m.denied_VP9_playback_passed,
@@ -269,6 +289,10 @@ jobs:
             .ffvpx_actual_native_denied_dlopen_attempt_count>0 and
             .ffvpx_libmozavcodec_denied_dlopen_attempt_count>=1 and
             .ffvpx_libmozavutil_denied_dlopen_attempt_count>=1 and
+            .private_mozilla_ffvpx_decoder_logs_captured==true and
+            .ffvpx_real_NoProvidedLib_link_failure_logged==true and
+            .ffvpx_real_NoProvidedLib_link_failure_log_count>=1 and
+            .ffvpx_denied_pdm_log_lines>=1 and
             (.ffvpx_libmozavcodec_denied_dlopen_attempt_count+
              .ffvpx_libmozavutil_denied_dlopen_attempt_count)==.ffvpx_actual_native_denied_dlopen_attempt_count and
             .baseline_vp9_decoded_frames_and_advancing_time==true and
@@ -282,7 +306,9 @@ jobs:
             (.ffvpx_actual_native_denied_dlopen_attempt_count|tostring) +
             " time(s) (codec="+(.ffvpx_libmozavcodec_denied_dlopen_attempt_count|tostring) +
             ", util="+(.ffvpx_libmozavutil_denied_dlopen_attempt_count|tostring) +
-            "); baseline VP9 decoded; denied VP9 result=" +
+            "); observed FFVPX NoProvidedLib="+
+            (.ffvpx_real_NoProvidedLib_link_failure_log_count|tostring) +
+            "; baseline VP9 decoded; denied VP9 result=" +
             .observed_denied_vp9_outcome +
             ". Source guard not machine-attributed."' \
             "$RUNNER_TEMP/firefox160-actual-bundled-ffvpx-denial-outcome.json" >> "$GITHUB_STEP_SUMMARY"
