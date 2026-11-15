@@ -50,13 +50,21 @@ if test "$#" -ne 4; then
   exit 2
 fi
 repo="$1"; shim="$2"; gecko="$3"; output="$4"
+# Historical FFmpeg replay is the default. Explicit FFVPX testing is opt-in:
+# the two bundled mozav* libraries are NOT host FFmpeg provider candidates.
+deny_group="${VULPRA_M3_VP9_DENIAL_GROUP:-ffmpeg}"
+case "$deny_group" in
+  ffmpeg) expected_output="$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-video.json" ;;
+  ffvpx) expected_output="$RUNNER_TEMP/m3-packaged-ffvpx-vp9-video.json" ;;
+  *) echo 'Refusing unsupported native provider denial group' >&2; exit 2 ;;
+esac
 test "$repo" = "$GITHUB_WORKSPACE"
 test "$(git -C "$repo" rev-parse HEAD)" = "$GITHUB_SHA"
 # A replay may run a newer test harness against a previously compiled,
 # source-pinned package. Keep both identities distinct in its evidence.
 compiled_source="${VULPRA_M3_COMPILED_SOURCE_SHA:-$GITHUB_SHA}"
 [[ "$compiled_source" =~ ^[0-9a-f]{40}$ ]]
-test "$output" = "$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-video.json"
+test "$output" = "$expected_output"
 test ! -e "$output"
 test -s "$shim" && test ! -L "$shim"
 test -x "$gecko"
@@ -143,7 +151,7 @@ run_mode() {
   port="$(new_port)"
   if test "$mode" = denied; then
     env -u VULPRA_M3_DENY_FIXTURE_EXE \
-      LD_PRELOAD="$shim" VULPRA_M3_DENY_GROUP=ffmpeg VULPRA_M3_DENY_LOG="$log" \
+      LD_PRELOAD="$shim" VULPRA_M3_DENY_GROUP="$deny_group" VULPRA_M3_DENY_LOG="$log" \
       HOME="$home" XDG_DATA_HOME="$home/.local/share" MOZ_HEADLESS=1 \
       NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
       "$gecko" --host 127.0.0.1 --port "$port" > "$tmp/$mode-geckodriver.log" 2>&1 &
@@ -214,13 +222,17 @@ run_mode() {
     isolated_profile_preserved:$preserved,
     observed_video_state:$state
   }' >> "$tmp/modes.jsonl"
-  echo "AUDIT: $mode VP9_decoded=$video_ok media_error=$media_error FFmpeg_denied_before=$before denied_after=$after responsive=$alive"
+  echo "AUDIT: $mode VP9_decoded=$video_ok media_error=$media_error provider_group=$deny_group denied_before=$before denied_after=$after responsive=$alive"
   stop_driver
 }
 run_mode baseline
 run_mode denied
-jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive "$archive_sha" '{
-  schema_version:1,status:"real_packaged_VP9_WebDriver_video_decode_with_FFmpeg_denial",
+jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive "$archive_sha" --arg denial "$deny_group" '{
+  schema_version:1,
+  status:(if $denial=="ffvpx" then
+    "real_packaged_VP9_WebDriver_video_decode_with_bundled_FFVPX_denial"
+    else "real_packaged_VP9_WebDriver_video_decode_with_FFmpeg_denial" end),
+  denial_group:$denial,
   source_commit:$source,test_harness_commit:$harness,
   normal_packaged_archive_sha256:$archive,
   fixture_VP9_codec_validated:true,
@@ -228,7 +240,12 @@ jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive 
   baseline_VP9_playback_passed:([.[]|select(.mode=="baseline")|.vp9_decoded_frames_and_time_verified][0]//false),
   denied_VP9_playback_passed:([.[]|select(.mode=="denied")|.vp9_decoded_frames_and_time_verified][0]//false),
   denied_VP9_media_error_observed:([.[]|select(.mode=="denied")|.media_error_observed][0]//false),
-  denied_FFmpeg_loader_attempts:([.[]|select(.mode=="denied")|.ffmpeg_denials_after_video_navigation][0]//0),
+  denied_FFmpeg_loader_attempts:(if $denial=="ffmpeg" then
+    ([.[]|select(.mode=="denied")|.ffmpeg_denials_after_video_navigation][0]//0)
+    else null end),
+  denied_FFVPX_loader_attempts:(if $denial=="ffvpx" then
+    ([.[]|select(.mode=="denied")|.ffmpeg_denials_after_video_navigation][0]//0)
+    else null end),
   denial_attempts_after_video_navigation:([.[]|select(.mode=="denied")|.new_denials_during_video_navigation][0]//0),
   exact_source_private_webdriver_modes_safe:(
     length==2 and (map(.mode)|sort)==["baseline","denied"] and
@@ -236,7 +253,22 @@ jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive 
   VP9_playback_with_FFmpeg_denied_demonstrated:(
     [.[]|select(.mode=="denied")|.vp9_decoded_frames_and_time_verified][0]//false),
   real_denied_FFmpeg_attempt_observed:(
-    [.[]|select(.mode=="denied")|(.browser_interposer_attached and .ffmpeg_denials_after_video_navigation>0)][0]//false),
+    if $denial=="ffmpeg" then
+      ([.[]|select(.mode=="denied")|(.browser_interposer_attached and .ffmpeg_denials_after_video_navigation>0)][0]//false)
+    else false end),
+  real_denied_FFVPX_attempt_observed:(
+    if $denial=="ffvpx" then
+      ([.[]|select(.mode=="denied")|(.browser_interposer_attached and .ffmpeg_denials_after_video_navigation>0)][0]//false)
+    else false end),
+  denied_VP9_outcome:(if [.[]|select(.mode=="denied")|.vp9_decoded_frames_and_time_verified][0] then
+    "decoded_frames_and_advancing_time"
+    elif [.[]|select(.mode=="denied")|.media_error_observed][0] then
+    "media_error"
+    else "no_verified_decoded_frames_or_media_error" end),
+  real_denied_native_provider_load_outcome_proven_only_for_named_group:true,
+  source_owner_direct_machine_caller_proven:false,
+  FFVPX_missing_provider_source_guard_taken_proven:false,
+  successful_alternative_decoder_identified:false,
   specific_VP9_decoder_implementation_identified:false,
   alternative_H264_software_decoder_fallback_proven:false,
   VAAPI_Wayland_DMABuf_runtime_fallback_proven:false,
@@ -249,10 +281,13 @@ jq -e '
   .schema_version==1 and .fixture_VP9_codec_validated==true and
   .baseline_VP9_playback_passed==true and
   .exact_source_private_webdriver_modes_safe==true and
-  .real_denied_FFmpeg_attempt_observed==true and
+  ((.denial_group=="ffmpeg" and .real_denied_FFmpeg_attempt_observed==true) or
+   (.denial_group=="ffvpx" and .real_denied_FFVPX_attempt_observed==true and
+      .denied_FFVPX_loader_attempts>0)) and
+  .FFVPX_missing_provider_source_guard_taken_proven==false and
   .specific_VP9_decoder_implementation_identified==false and
   .alternative_H264_software_decoder_fallback_proven==false and
   .m3_sixth_gate_closed==false and .source_pruning_authorized==false
 ' "$output" >/dev/null
-echo "PASS: actual packaged browser VP9/WebM baseline decoded frames; FFmpeg-denied media outcome recorded"
-echo "LIMIT: denial may cause VP9/WebM error; software decoder fallback, VAAPI, DMABuf and full closure unproven"
+echo "PASS: actual packaged browser VP9/WebM baseline decoded frames; real $deny_group denial outcome recorded"
+echo "LIMIT: direct FFVPX loader caller, specific decoding engine, missing-provider source guard, VAAPI, DMABuf and full closure unproven"
