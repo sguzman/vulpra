@@ -134,7 +134,7 @@ dbunchanged=false
 if (cd "$work" && sha256sum -c db-hashes-private.txt >/dev/null 2>&1); then dbunchanged=true; fi
 jq -s --arg commit "$GITHUB_SHA" --argjson unchanged "$dbunchanged" '{
   schema_version:1,
-  status:"real_original_firefox160_ephemeral_SQL_DB_PKCS11_FIPS_mode_and_provider_denials",
+  status:"real_original_firefox160_ephemeral_SQL_DB_FIPS_requested_NSS_device_error",
   official_Mozilla_Firefox160_commit:"2887d9de1f69c0e9776413da80e7ba0d1225dd9b",
   original_vulpra_28_overlay_source_tree:"42dd7439a27dde92f89ac5eed13f88117a4d7ab5",
   original_native_browser_archive_sha256:"530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb",
@@ -184,6 +184,42 @@ jq -s --arg commit "$GITHUB_SHA" --argjson unchanged "$dbunchanged" '{
       .actual_denied_softoken_native_loads>0 and
       .original_NSS_Init_sql_rc!=0)),
   original_temporary_NSS_DB_bytes_unchanged_after_all_original_native_probes:$unchanged,
+  original_plain_SQL_NSS_Init_successfully_executed_nonFIPS:
+    (any(.[];.mode=="normal_sql" and
+      .original_NSS_Init_sql_rc==0 and
+      .original_NSS_Init_error_code==0 and
+      .original_PK11_IsFIPS_mode==0 and
+      .internal_slot_present==1 and
+      .internal_key_slot_present==1 and
+      .internal_default_and_key_slot_same_identity==0 and
+      .original_CKM_SHA256_mechanism_supported==1 and
+      .original_PK11_GenerateRandom_rc==0)),
+  original_FIPS_requested_NSS_Init_reported_PKCS11_DEVICE_ERROR:
+    (any(.[];.mode=="temporary_fips_sql" and
+      .original_NSS_Init_sql_rc==-1 and
+      .original_NSS_Init_error_code==-8023 and
+      .original_PK11_IsFIPS_mode==-2 and
+      .actual_total_denied_native_loads==0)),
+  FIPS_requested_mode_could_not_query_PK11_IsFIPS_due_to_init_failure:true,
+  original_FIPS_request_with_softoken_blocked_reported_load_library_error:
+    (any(.[];.mode=="temporary_fips_softoken_missing" and
+      .original_NSS_Init_sql_rc==-1 and
+      .original_NSS_Init_error_code==-5977 and
+      .actual_denied_softoken_native_loads==2 and
+      .actual_denied_freebl_native_loads==0)),
+  FIPS_request_with_only_freebl_deny_did_not_reach_freebl_load:
+    (any(.[];.mode=="temporary_fips_freebl_missing" and
+      .original_NSS_Init_sql_rc==-1 and
+      .original_NSS_Init_error_code==-8023 and
+      .actual_denied_softoken_native_loads==0 and
+      .actual_denied_freebl_native_loads==0)),
+  FIPS_request_with_both_deny_stops_at_softoken:
+    (any(.[];.mode=="temporary_fips_both_targeted" and
+      .original_NSS_Init_sql_rc==-1 and
+      .original_NSS_Init_error_code==-5977 and
+      .actual_denied_softoken_native_loads==2 and
+      .actual_denied_freebl_native_loads==0)),
+  FIPS_device_error_underlying_cause_disassembled_or_proven:false,
   exact_temp_NSS_SQL_profile_only_no_user_or_system_trust_modification:true,
   all_five_probe_processes_terminated_without_crash_or_timeout:
     (length==5 and all(.[];.probe_exit==0 and
@@ -201,11 +237,17 @@ jq -s --arg commit "$GITHUB_SHA" --argjson unchanged "$dbunchanged" '{
 jq -e '
   .schema_version==1 and
   .original_plain_SQL_PK11_IsFIPS_witnessed_false==true and
-  .original_NSS_read_only_PK11_IsFIPS_witnessed_true==true and
-  .original_FIPS_SQL_PKCS11_SHA256_mechanism_and_RNG_successful==true and
+  .original_NSS_read_only_PK11_IsFIPS_witnessed_true==false and
+  .original_plain_SQL_NSS_Init_successfully_executed_nonFIPS==true and
+  .original_FIPS_requested_NSS_Init_reported_PKCS11_DEVICE_ERROR==true and
+  .FIPS_requested_mode_could_not_query_PK11_IsFIPS_due_to_init_failure==true and
+  .original_FIPS_request_with_softoken_blocked_reported_load_library_error==true and
+  .FIPS_request_with_only_freebl_deny_did_not_reach_freebl_load==true and
+  .FIPS_request_with_both_deny_stops_at_softoken==true and
+  .original_temporary_NSS_DB_bytes_unchanged_after_all_original_native_probes==true and
   .all_five_probe_processes_terminated_without_crash_or_timeout==true and
   .exact_temp_NSS_SQL_profile_only_no_user_or_system_trust_modification==true and
   .source_pruning_authorized==false and .m3_sixth_gate_closed==false
 ' "$report" >/dev/null
-echo 'PASS: original Firefox160 native NSS_Init observed temporary FIPS SQL DB mode and nonFIPS control with protected PKCS11 APIs'
-echo 'LIMIT: FIPS140 certification, all crypto policy, hardware tokens, end-user OS and whole Rust/C++ FFI not established'
+echo 'PASS: temporary FIPS database was enabled by host tooling, but original packaged Firefox160 NSS_Init returns source-defined PKCS11 DEVICE ERROR; normal SQL baseline works, no FIPS mode falsely claimed'
+echo 'LIMIT: device-error underlying cause unproven; no successful original NSS FIPS mode, certification, full crypto policy or native Rust/C++ FFI gate'
