@@ -78,7 +78,7 @@ def access_witness(path):
     for line in path.read_text(errors="replace").splitlines():
         # The real source package must cause library file access under strace.
         # Export only counts, not raw arguments or any per-process identifiers.
-        if re.search(r'^(?:\[pid\s+[0-9]+\]\s+)?(?:open|openat|openat2|newfstatat|stat|statx|access|faccessat|faccessat2|readlink|readlinkat)\(',line):
+        if re.search(r'^(?:(?:\[pid\s+[0-9]+\]|[0-9]+)\s+)?(?:open|openat|openat2|newfstatat|stat|statx|access|faccessat|faccessat2|readlink|readlinkat)\(',line):
             total_file_syscall_lines+=1
         if "libsoftokn3.so" in line:
             original_softoken_so_syscall_mentions+=1
@@ -167,6 +167,10 @@ def main():
                         env=env,outfile=out)
             parsed=parsed_probe(out)
             tries,missing,syscalls,softoken_so_mentions,nss_so_mentions=access_witness(trace)
+            print("AUDIT: sanitized strace liveness "+name+
+                  " file_calls="+str(syscalls)+
+                  " softoken_elf_mentions="+str(softoken_so_mentions)+
+                  " nss_elf_mentions="+str(nss_so_mentions))
             if syscalls==0 or softoken_so_mentions==0 or nss_so_mentions==0:
                 raise RuntimeError("file syscall tracing inactive or missing original NSS binary loading")
             unchanged=all((db/k).is_file() and
