@@ -292,7 +292,21 @@ def main():
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--source-commit",
+                        choices=[SOURCE, "2887d9de1f69c0e9776413da80e7ba0d1225dd9b"])
+    parser.add_argument("--archive-sha256")
+    global SOURCE, ARCHIVE
     args = parser.parse_args()
+    # The historical original workflow still uses the exact built-in SHA
+    # and source pin. Firefox 160 opt-in must supply BOTH and its archive
+    # checksum must be independently verified by the caller beforehand.
+    if (args.source_commit is None) != (args.archive_sha256 is None):
+        parser.error("source and package SHA-256 overrides must be paired")
+    if args.source_commit is not None:
+        if (args.source_commit != "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" or
+                not re.fullmatch(r"[0-9a-f]{64}", args.archive_sha256)):
+            parser.error("Only independently source-pinned Firefox 160 is supported")
+        SOURCE, ARCHIVE = args.source_commit, args.archive_sha256
     if args.self_test:
         print("PASS:", selftest(), "malformed version provenance fixtures rejected")
         if args.archive is None:
