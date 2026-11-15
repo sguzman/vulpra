@@ -13,6 +13,8 @@ const MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
 const MAX_EVENTS: usize = 1_000_000;
 const ORIGINAL_SHA: &str = "7aa4f20d1f6058e2ef92d73dec875f3bbfe98ee5a5fe1ea1b11fcb294762069a";
 const ORIGINAL_SOURCE: &str = "b1482404dfb8b01342990ee99ea3df0f9756b5f7";
+const FIREFOX160_SOURCE: &str = "2887d9de1f69c0e9776413da80e7ba0d1225dd9b";
+const FIREFOX160_SHA: &str = "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb";
 
 fn clean_basename(s: &str) -> Option<&str> {
     let name = s.rsplit('/').next()?;
@@ -90,12 +92,18 @@ fn analyze(folder: &Path) -> Result<(usize, usize, usize, BTreeSet<String>), Str
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 3 { return Err("usage: m3-native-libxul-bindings TRACE_DIR OUTPUT_JSON".into()); }
-    let (traces, events, unique, providers) = analyze(Path::new(&args[1]))?;
+    let (source, sha, status, folder, output) = match args.as_slice() {
+        [_, folder, output] => (ORIGINAL_SOURCE, ORIGINAL_SHA,
+            "observed_original_native_libxul_glibc_symbol_bindings", folder, output),
+        [_, flag, folder, output] if flag == "--firefox160" => (FIREFOX160_SOURCE, FIREFOX160_SHA,
+            "observed_firefox160_native_libxul_glibc_symbol_bindings", folder, output),
+        _ => return Err("usage: m3-native-libxul-bindings [--firefox160] TRACE_DIR OUTPUT_JSON".into()),
+    };
+    let (traces, events, unique, providers) = analyze(Path::new(folder))?;
     let names = providers.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(",");
     let result = format!(concat!(
         "{{\n  \"schema_version\": 1,\n",
-        "  \"status\": \"observed_original_native_libxul_glibc_symbol_bindings\",\n",
+        "  \"status\": \"{}\",\n",
         "  \"original_source_commit\": \"{}\",\n",
         "  \"original_archive_sha256\": \"{}\",\n",
         "  \"browser_pid_traces_with_libxul_bindings\": {},\n",
@@ -110,8 +118,8 @@ fn run() -> Result<(), String> {
         "  \"lazy_and_transitive_feature_coverage_proven\": false,\n",
         "  \"end_to_end_crash_update_inference_media_proven\": false,\n",
         "  \"new_source_pruning_authorized\": false\n}}\n"
-    ), ORIGINAL_SOURCE, ORIGINAL_SHA, traces, events, unique, providers.len(), names);
-    let mut f = File::create(&args[2]).map_err(|e| e.to_string())?;
+    ), status, source, sha, traces, events, unique, providers.len(), names);
+    let mut f = File::create(output).map_err(|e| e.to_string())?;
     f.write_all(result.as_bytes()).map_err(|e| e.to_string())?;
     println!("PASS: {events} observed libxul symbol-binding events over {traces} native traces; {unique} distinct symbol/provider pairs (names redacted)");
     Ok(())
@@ -122,6 +130,12 @@ fn main() { if let Err(e) = run() { eprintln!("FAIL: bounded libxul binding obse
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn separate_firefox160_provenance_and_original_mode() {
+        assert_ne!(FIREFOX160_SOURCE, ORIGINAL_SOURCE);
+        assert_ne!(FIREFOX160_SHA, ORIGINAL_SHA);
+        assert_eq!(FIREFOX160_SHA.len(), 64);
+        assert_eq!(FIREFOX160_SOURCE.len(), 40);
+    }
     #[test] fn parse_glibc_bindings() {
         let line = "  123: binding file /tmp/vulpra/libxul.so [0] to /lib/x86_64-linux-gnu/libc.so.6 [0]: normal symbol `malloc' [GLIBC_2.2.5]";
         assert_eq!(binding(line), Some(("libc.so.6", "malloc")));
