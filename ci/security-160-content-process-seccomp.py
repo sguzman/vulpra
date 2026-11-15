@@ -78,21 +78,65 @@ def gecko_type_from_argv(argv):
     return kind
 
 
+# Authoritative live Gecko process roles come from official Firefox 160
+# ChromeUtils.requestProcInfo(). Source: dom/base/ChromeUtils.cpp and
+# dom/chrome-webidl/ChromeUtils.webidl. Forkserver descendants can retain
+# stale /proc cmdline argument data; the -contentproc switch by itself is NOT
+# evidence that a process runs web content. Only bounded PID/type is received.
+CHROME_CONTENT_ROLES = frozenset((
+    "web", "webIsolated", "file", "extension", "privilegedabout",
+    "privilegedmozilla", "withCoopCoep", "webServiceWorker",
+    "preallocated", "inference",
+))
+CHROME_NON_CONTENT_ROLES = {
+    "forkServer": "forkserver", "socket": "socket", "rdd": "rdd",
+    "utility": "utility", "gpu": "gpu", "vr": "vr",
+    "gmpPlugin": "gmplugin", "ipdlUnitTest": "ipdlunittest",
+}
+
+
+def verify_chrome_process_roles(proof, browser_pid):
+    if not isinstance(proof, dict) or type(proof.get("parent_pid")) is not int or (
+            proof["parent_pid"] != browser_pid):
+        raise RuntimeError("Privileged process census browser PID mismatch")
+    children = proof.get("children")
+    if not isinstance(children, list) or not children:
+        raise RuntimeError("Firefox ChromeUtils process census is empty")
+    result = {}
+    for entry in children:
+        if not isinstance(entry, dict) or set(entry) != {"pid", "type"}:
+            raise RuntimeError("ChromeUtils PID/type response not bounded")
+        pid, raw_type = entry["pid"], entry["type"]
+        if type(pid) is not int or pid <= 1 or pid == browser_pid or pid in result:
+            raise RuntimeError("ChromeUtils process PID invalid/duplicate")
+        if raw_type in CHROME_CONTENT_ROLES:
+            role = "tab"
+        elif isinstance(raw_type, str) and raw_type in CHROME_NON_CONTENT_ROLES:
+            role = CHROME_NON_CONTENT_ROLES[raw_type]
+        else:
+            raise RuntimeError("Unknown Firefox 160 Gecko WebIDL process type")
+        result[pid] = role
+    if not {"tab", "forkserver"}.issubset(set(result.values())):
+        raise RuntimeError("Native Firefox process census lacks content or forkserver")
+    return result
+
+
 def read_process(pid):
     root = Path("/proc") / str(pid)
     # Preserve the real argument boundaries for the upstream last-argument
     # Gecko role discriminator, but never archive command lines or user data.
     raw = (root / "cmdline").read_bytes()
     argv = raw.rstrip(b"\0").split(b"\0") if raw else []
-    gecko_type = gecko_type_from_argv(argv)
-    cmd = raw.replace(b"\0", b" ").decode(errors="replace")
+    # A forkserver's children can retain stale kernel argv strings, so
+    # this only confirms the native -contentproc process family.
+    is_child = b"-contentproc" in argv
     exe = os.path.realpath(root / "exe")
     fields = status_fields((root / "status").read_text())
-    return {"pid": pid, "exe": exe, "cmdline": cmd,
-            "gecko_process_type": gecko_type, **fields}
+    return {"pid": pid, "exe": exe,
+            "is_gecko_subprocess": is_child, **fields}
 
 
-def content_processes(browser_binary, parent_pid):
+def content_processes(browser_binary, parent_pid, roles_by_pid):
     found = []
     target = os.path.realpath(browser_binary)
     for item in Path("/proc").iterdir():
@@ -102,10 +146,11 @@ def content_processes(browser_binary, parent_pid):
             process = read_process(int(item.name))
             if process["exe"] != target:
                 continue
-            if process["gecko_process_type"] == "browser":
+            if not process["is_gecko_subprocess"]:
                 continue
-            if process["pid"] == parent_pid:
+            if process["pid"] == parent_pid or process["pid"] not in roles_by_pid:
                 continue
+            process["gecko_process_type"] = roles_by_pid[process["pid"]]
             found.append(process)
         except (OSError, RuntimeError, PermissionError):
             continue
@@ -476,6 +521,41 @@ def self_test():
     assert gecko_type_from_argv(
         (b"/bin/vulpra", b"-contentproc", b"3", b"forkserver")) == "forkserver"
     assert gecko_type_from_argv((b"/bin/vulpra", b"-headless")) == "browser"
+    roles = verify_chrome_process_roles({
+        "parent_pid": 327, "children": [
+            {"pid": 400, "type": "forkServer"},
+            {"pid": 401, "type": "web"},
+            {"pid": 402, "type": "socket"},
+            {"pid": 403, "type": "webIsolated"},
+        ]
+    }, 327)
+    assert roles == {400: "forkserver", 401: "tab", 402: "socket", 403: "tab"}
+    forged_chrome = [
+        {"parent_pid": 327, "children": []},
+        {"parent_pid": 0, "children": [
+            {"pid": 400, "type": "forkServer"}, {"pid": 401, "type": "web"}]},
+        {"parent_pid": 327, "children": [
+            {"pid": 400, "type": "forkServer"}, {"pid": 400, "type": "web"}]},
+        {"parent_pid": 327, "children": [
+            {"pid": 400, "type": "forkServer"}, {"pid": 401, "type": "unknown"}]},
+        {"parent_pid": 327, "children": [
+            {"pid": 400, "type": "forkServer"}, {"pid": 401, "type": "socket"}]},
+        {"parent_pid": 327, "children": [
+            {"pid": 400, "type": "forkServer"},
+            {"pid": 401, "type": "web", "origin": "forged"}]},
+        {"parent_pid": 327, "children": [
+            {"pid": 400, "type": "forkServer"}, {"pid": True, "type": "web"}]},
+        {"parent_pid": 327, "children": [
+            {"pid": 400, "type": "forkServer"}, {"pid": 327, "type": "web"}]},
+    ]
+    for false_proof in forged_chrome:
+        try:
+            verify_chrome_process_roles(false_proof, 327)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Forged privileged Gecko PID/type accepted")
+    print("PASS: eight forged Firefox ChromeUtils PID/type fixtures rejected")
     for bad_argv in [
         (b"/bin/vulpra", b"-contentproc", b"99", b"bad"),
         (b"/bin/vulpra", b"-contentproc", b"5", b"tab-socket"),
@@ -729,11 +809,34 @@ def run(repo: Path, output: Path):
                         raise RuntimeError("Missing privileged Firefox sandbox status")
                 finally:
                     wd.request(port, "POST", base + "/moz/context", {"context": "content"})
+                # Use original Firefox's privileged process bookkeeping,
+                # rather than kernel argv inherited from a Gecko forkserver.
+                wd.request(port, "POST", base + "/moz/context", {"context": "chrome"})
+                try:
+                    proc_roles = wd.request(port, "POST", base + "/execute/async", {
+                        "script": """
+                          const done=arguments[arguments.length-1];
+                          ChromeUtils.requestProcInfo().then(
+                            ({pid,children})=>done({
+                              parent_pid:pid,
+                              children:children.map(({pid,type})=>({pid,type}))
+                            }),
+                            _=>done({error:"native-process-census-rejected"})
+                          );
+                        """,
+                        "args": [],
+                    }, timeout_seconds=40)
+                finally:
+                    wd.request(port, "POST", base + "/moz/context",
+                               {"context": "content"})
+                authoritative_roles = verify_chrome_process_roles(
+                    proc_roles, browser_pid)
                 deadline = time.monotonic() + 15
                 evidence = None
                 last = []
                 while time.monotonic() < deadline:
-                    last = content_processes(browser, browser_pid)
+                    last = content_processes(browser, browser_pid,
+                                             authoritative_roles)
                     try:
                         evidence = evaluate_sandbox(parent, last, pref_level)
                         break
@@ -781,6 +884,9 @@ def run(repo: Path, output: Path):
                     **namespace_evidence,
                     **namespace_capability,
                     "mozilla_gecko_process_type_source_reviewed": True,
+                    "native_chromeutils_process_type_authenticated": True,
+                    "procfs_forkserver_argv_not_used_for_process_roles": True,
+                    "privileged_chromeutils_pid_type_count": len(authoritative_roles),
                     "all_gecko_content_workers_verified_as_tab_role": True,
                     "non_content_child_processes_not_assumed_content_sandboxed": True,
                     "release_ready": False,
@@ -791,7 +897,7 @@ def run(repo: Path, output: Path):
                         "Namespace identities are compared with browser parent; matching or unreadable namespace never mislabeled as isolated",
                         "User namespaces are conditioned on Firefox's capability probe and kernel/LSM; content namespaces absent on CI are not claimed enabled",
                         "Some user/network/IPC namespaces are conditional on kernel/graphics support; no semantics or blocked-syscall audit",
-                        "Gecko tab workers distinguished from forkserver/socket/RDD/utility and other process roles using final original command-line process-type token",
+                        "Web content versus socket, RDD, utility and forkserver roles derived from privileged Firefox ChromeUtils PID/type; /proc argv may be stale after forkserver",
                         "Other Gecko process roles have DIFFERENT sandbox policies and are reported, not counted as web content workers",
                         "No proof each filter is the expected Mozilla sandbox policy",
                         "Not a full Safe Browsing or external-network egress test",
