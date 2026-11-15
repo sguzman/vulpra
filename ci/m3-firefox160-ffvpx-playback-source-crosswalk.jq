@@ -56,7 +56,7 @@ check($m.schema_version==1 and
       $m.source_commit=="0624235fdc956ab18af3c3f310b3588ca72fff61" and
       $m.test_harness_commit=="dbdb564bcc09cb84810a17a10c46781872595dad" and
       $m.normal_packaged_archive_sha256==$archive and
-      $m.original_native_run_id==43138458940 and
+      $m.original_native_run_id=="43138458940" and
       $m.firefox160_candidate_git_tree==$tree and
       $m.original_package_reused_without_browser_rebuild==true and
       $m.fixture_VP9_codec_validated==true and
