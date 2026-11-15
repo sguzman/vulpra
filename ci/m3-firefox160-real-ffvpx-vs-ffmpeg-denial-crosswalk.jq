@@ -4,7 +4,7 @@
 # actual bundled FFVPX denial VP9 WebDriver replay. One native compiled archive;
 # distinct experiments, NOT a single decoder callstack or a global fallback.
 def check($ok;$reason): if $ok then . else error($reason) end;
-def has_ffvpx($p): any($l.initialized_dynamic_request_edges[];
+def has_ffvpx($xs;$p): any($xs[];
    .requester_basename=="libnspr4.so" and .requested_library_basename==$p);
 check(($source|length)==1 and ($loader|length)==1 and
       ($ffmpeg|length)==1 and ($ffvpx|length)==1;
@@ -43,7 +43,8 @@ check($l.schema_version==1 and
       $l.observed_initialized_library_basename_count==94 and
       $l.initialized_dynamic_request_edge_count==18 and
       ($l.initialized_dynamic_request_edges|length)==18 and
-      has_ffvpx("libmozavcodec.so") and has_ffvpx("libmozavutil.so") and
+      has_ffvpx($l.initialized_dynamic_request_edges;"libmozavcodec.so") and
+      has_ffvpx($l.initialized_dynamic_request_edges;"libmozavutil.so") and
       $l.only_same_browser_pid_trace_initialized_targets_classified_as_initialized==true and
       $l.glibc_reported_request_relationships_not_proven_callstacks==true and
       $l.all_conditional_dlopen_and_dlsym_edges_proven==false and
