@@ -501,6 +501,103 @@ def capture_other_gecko_role_boundaries(children, browser_pid):
     }
 
 
+def evaluate_service_thread_seccomp(children, threads_by_pid):
+    """Verify all observed live threads of actual Socket/RDD/Utility roles.
+
+    Authenticated native ChromeUtils PID/type identities and /proc status
+    must agree. No reading raw thread command lines, no ptrace, no injection.
+    Service roles have distinct kernel namespace policies, so this checker
+    intentionally validates only seccomp filters and NoNewPrivs per thread.
+    """
+    service = [p for p in children
+               if p["gecko_process_type"] in ("socket", "rdd", "utility")]
+    expected = {role: [p["pid"] for p in service
+                       if p["gecko_process_type"] == role]
+                for role in ("socket", "rdd", "utility")}
+    if any(len(pids) != 1 for pids in expected.values()):
+        raise RuntimeError("Missing/duplicate authenticated Gecko service process")
+    pids = {p["pid"] for p in service}
+    if len(pids) != 3 or not isinstance(threads_by_pid, dict) or (
+            set(threads_by_pid) != pids):
+        raise RuntimeError("Gecko service thread groups absent, extra or duplicated")
+    seen = set()
+    stats = {}
+    for role in sorted(expected):
+        pid = expected[role][0]
+        tasks = threads_by_pid[pid]
+        if not isinstance(tasks, list) or not tasks:
+            raise RuntimeError("Empty Gecko service live-thread sample")
+        tids = set()
+        minimum_filters = None
+        for task in tasks:
+            if not isinstance(task, dict) or set(task) != {
+                    "tid", "seccomp_mode", "seccomp_filter_count",
+                    "no_new_privileges"}:
+                raise RuntimeError("Malformed Gecko service thread snapshot")
+            tid = task["tid"]
+            if type(tid) is not int or tid <= 1 or tid in tids or tid in seen:
+                raise RuntimeError("Missing/duplicated Gecko service thread TID")
+            tids.add(tid)
+            seen.add(tid)
+            mode = task["seccomp_mode"]
+            count = task["seccomp_filter_count"]
+            nnp = task["no_new_privileges"]
+            if (type(mode) is not int or type(count) is not int or
+                    type(nnp) is not int or mode != 2 or count < 1 or nnp != 1):
+                raise RuntimeError("Actual Gecko service thread lacks seccomp/NoNewPrivs")
+            minimum_filters = count if minimum_filters is None else min(
+                minimum_filters, count)
+        if pid not in tids:
+            raise RuntimeError("Gecko service main thread not in live sample")
+        stats[role] = {
+            "observed_thread_count": len(tasks),
+            "minimum_observed_seccomp_filter_count": minimum_filters,
+            "main_thread_included": True,
+        }
+    return {
+        "gecko_service_thread_role_groups_observed": 3,
+        "gecko_service_thread_count_observed":
+            sum(row["observed_thread_count"] for row in stats.values()),
+        "gecko_service_all_observed_threads_seccomp_filtered": True,
+        "gecko_service_all_observed_threads_no_new_privileges": True,
+        "gecko_service_main_threads_all_included": True,
+        "gecko_service_thread_roles": stats,
+        "gecko_service_transient_future_threads_exhaustively_audited": False,
+        "gecko_service_forbidden_syscall_denial_actually_exercised": False,
+    }
+
+
+def capture_service_thread_seccomp(children):
+    """One bounded read-only /proc/<pid>/task/<tid>/status observation.
+
+    Disappeared non-main TIDs are excluded from the snapshot, not counted
+    as verified. If the process main TID disappears, fail closed.
+    """
+    service = [p for p in children
+               if p["gecko_process_type"] in ("socket", "rdd", "utility")]
+    snapshots = {}
+    for proc in service:
+        pid = proc["pid"]
+        tasks_root = Path("/proc") / str(pid) / "task"
+        tids = sorted(int(x.name) for x in tasks_root.iterdir()
+                      if x.name.isdecimal())
+        tasks = []
+        for tid in tids:
+            try:
+                fields = status_fields(
+                    (tasks_root / str(tid) / "status").read_text())
+            except FileNotFoundError:
+                if tid == pid:
+                    raise RuntimeError("Gecko service main thread disappeared")
+                continue
+            tasks.append({
+                "tid": tid, "seccomp_mode": fields["seccomp_mode"],
+                "seccomp_filter_count": fields["seccomp_filter_count"],
+                "no_new_privileges": fields["no_new_privileges"]})
+        snapshots[pid] = tasks
+    return evaluate_service_thread_seccomp(children, snapshots)
+
+
 # Source-bound role-specific sandbox-launch expectations for this narrow
 # Linux testcase, from Firefox 160 SandboxLaunch.cpp (official release
 # 2887d9de...). Socket intentionally shares the parent *network* namespace
@@ -920,6 +1017,56 @@ def self_test():
             continue
         raise AssertionError("Forged Gecko service role protections accepted")
     print("PASS: ten falsified socket/RDD/utility role-specific sandbox fixtures rejected")
+    service_children = [
+        {"pid": 502, "gecko_process_type": "socket"},
+        {"pid": 503, "gecko_process_type": "rdd"},
+        {"pid": 504, "gecko_process_type": "utility"}]
+    base_service_threads = {
+        pid: [{"tid": pid, "seccomp_mode": 2,
+               "seccomp_filter_count": 3, "no_new_privileges": 1},
+              {"tid": pid + 20, "seccomp_mode": 2,
+               "seccomp_filter_count": 2, "no_new_privileges": 1}]
+        for pid in (502, 503, 504)}
+    verified_service_threads = evaluate_service_thread_seccomp(
+        service_children, base_service_threads)
+    assert verified_service_threads["gecko_service_thread_count_observed"] == 6
+    assert verified_service_threads["gecko_service_all_observed_threads_seccomp_filtered"]
+    assert verified_service_threads["gecko_service_all_observed_threads_no_new_privileges"]
+    assert verified_service_threads["gecko_service_thread_roles"]["socket"][
+        "minimum_observed_seccomp_filter_count"] == 2
+
+    def tamper(pid, index, key, value):
+        report = {k: [dict(row) for row in rows]
+                  for k, rows in base_service_threads.items()}
+        report[pid][index][key] = value
+        return report
+
+    bad_thread_samples = [
+        {},
+        {k: v for k, v in base_service_threads.items() if k != 503},
+        {**base_service_threads, 999: base_service_threads[502]},
+        {**base_service_threads, 502: []},
+        {**base_service_threads, 502: base_service_threads[502][1:]},
+        {**base_service_threads,
+         502: [base_service_threads[502][0]] * 2},
+        tamper(502, 1, "seccomp_mode", 0),
+        tamper(503, 1, "seccomp_filter_count", 0),
+        tamper(504, 1, "no_new_privileges", 0),
+        tamper(502, 1, "seccomp_mode", True),
+        tamper(503, 1, "seccomp_filter_count", "2"),
+        tamper(504, 1, "tid", base_service_threads[503][1]["tid"]),
+        tamper(502, 1, "no_new_privileges", False),
+    ]
+    rejected_service_threads = 0
+    for forged in bad_thread_samples:
+        try:
+            evaluate_service_thread_seccomp(service_children, forged)
+        except RuntimeError:
+            rejected_service_threads += 1
+        else:
+            raise AssertionError("Forged/unfiltered Gecko service thread accepted")
+    assert rejected_service_threads == 13
+    print("PASS: thirteen falsified Gecko service live-thread protection fixtures rejected")
 
 
 def run(repo: Path, output: Path):
@@ -1087,6 +1234,7 @@ def run(repo: Path, output: Path):
                 namespace_evidence = capture_worker_namespaces(last, browser_pid)
                 other_role_evidence = capture_other_gecko_role_boundaries(
                     last, browser_pid)
+                service_thread_evidence = capture_service_thread_seccomp(last)
                 namespace_capability = reconcile_user_namespace_support(
                     namespace_evidence,
                     runtime_security.get("cachedUserNamespaceProbe"),
@@ -1110,6 +1258,7 @@ def run(repo: Path, output: Path):
                     **namespace_evidence,
                     **other_role_evidence,
                     **other_role_validation,
+                    **service_thread_evidence,
                     **namespace_capability,
                     "mozilla_gecko_process_type_source_reviewed": True,
                     "native_chromeutils_process_type_authenticated": True,
@@ -1127,7 +1276,8 @@ def run(repo: Path, output: Path):
                         "Some user/network/IPC namespaces are conditional on kernel/graphics support; no semantics or blocked-syscall audit",
                         "Web content versus socket, RDD, utility and forkserver roles derived from privileged Firefox ChromeUtils PID/type; /proc argv may be stale after forkserver",
                         "Other Gecko process roles have DIFFERENT sandbox policies and are reported, not counted as web content workers",
-                        "Socket/RDD/utility roles have bounded kernel namespace/filter observations only; no role-specific enforcement semantics or syscall denial accepted",
+                        "Socket/RDD/utility roles have bounded observed live-thread seccomp/NoNewPrivs and kernel namespace comparisons; no forbidden syscall denial accepted",
+                        "Transient/future Gecko service threads are not exhaustively observed",
                         "No proof each filter is the expected Mozilla sandbox policy",
                         "Not a full Safe Browsing or external-network egress test",
                         "Not a VAAPI/DMABuf or other platform security audit",
@@ -1145,6 +1295,11 @@ def run(repo: Path, output: Path):
                       json.dumps({p["gecko_role"]: p["namespace_differs_from_browser_parent"]
                                   for p in other_role_evidence["other_gecko_role_kernel_observations"]}, sort_keys=True),
                       flush=True)
+                print("AUDIT: Gecko Socket/RDD/Utility observed live threads=" +
+                      json.dumps({role: details["observed_thread_count"]
+                                  for role, details in service_thread_evidence[
+                                      "gecko_service_thread_roles"].items()}, sort_keys=True) +
+                      " all-seccomp-and-NoNewPrivs=true", flush=True)
                 print("AUDIT: worker namespace distinct-from-parent counts=" +
                       json.dumps(namespace_evidence["content_worker_distinct_namespace_counts_by_kind"], sort_keys=True) +
                       " unreadable=" + json.dumps(namespace_evidence["content_worker_unreadable_namespace_counts_by_kind"], sort_keys=True) +
