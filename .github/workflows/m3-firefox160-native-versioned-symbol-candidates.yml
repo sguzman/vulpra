@@ -15,7 +15,7 @@ jobs:
   native-versioned-symbol-names:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -200,6 +200,65 @@ jobs:
             " packaged/host candidate export names (NOT real binding)"' \
             "$RUNNER_TEMP/firefox160-versioned-symbol-candidates-${{ matrix.os }}.json" >> "$GITHUB_STEP_SUMMARY"
           echo 'LIMIT: individual static versioned name@version candidate only, not all unversioned imports, actual relocations, dynamic dlopen, target host or pruning approval.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Inspect unversioned undefined dynamic symbol names without executing ELF
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz"
+          digest="$(sha256sum "$archive" | cut -d ' ' -f1)"
+          python3 ci/m3-native-elf-symbol-provider-candidates.py \
+            --mode unversioned \
+            --source-commit 2887d9de1f69c0e9776413da80e7ba0d1225dd9b \
+            --archive-sha256 "$digest" --archive "$archive" \
+            --output "$RUNNER_TEMP/firefox160-unversioned-symbol-candidates-${{ matrix.os }}.json"
+          jq -e --arg digest "$digest" --arg os "${{ matrix.os }}" '
+            .schema_version==1 and
+            .original_native_source_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .original_archive_sha256==$digest and
+            .scanned_userspace_id=="ubuntu" and
+            .scanned_userspace_version==($os|ltrimstr("ubuntu-")) and
+            .original_native_elf_members==28 and
+            (.unversioned_undefined_dynamic_symbol_imports>0) and
+            (.unversioned_undefined_dynamic_symbol_imports<=150000) and
+            .unversioned_undefined_dynamic_symbol_imports==
+              (.unversioned_import_candidate_details|length) and
+            .unversioned_undefined_dynamic_symbol_imports==
+              (.direct_needed_export_name_candidates+
+               .weak_imports_without_direct_candidate+
+               .strong_imports_without_direct_candidate) and
+            all(.unversioned_import_candidate_details[];
+              (.undefined_symbol|type)=="string" and
+              (.requester_basename|type)=="string" and
+              (.undefined_symbol_bind=="GLOBAL" or .undefined_symbol_bind=="WEAK") and
+              (.direct_needed_candidate_provider_basenames|type)=="array" and
+              (.candidate_class=="direct_needed_export_name_candidate" or
+               .candidate_class=="weak_import_without_direct_candidate" or
+               .candidate_class=="strong_import_without_direct_candidate")) and
+            .unversioned_imports_examined==true and
+            .all_unversioned_imports_loader_resolved==false and
+            .actual_elf_symbol_bindings_resolved==false and
+            .transitive_preload_and_dynamic_scope_complete==false and
+            .runtime_dlopen_or_feature_coverage_complete==false and
+            .target_arch_hyprland_symbol_abi_proven==false and
+            .browser_or_host_elf_executed==false and
+            .new_source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-unversioned-symbol-candidates-${{ matrix.os }}.json" >/dev/null
+          jq -r '"BARE IMPORT CANDIDATES: " +
+            (.unversioned_undefined_dynamic_symbol_imports|tostring) + " total, " +
+            (.direct_needed_export_name_candidates|tostring) + " have direct-needed name candidates, " +
+            (.weak_imports_without_direct_candidate|tostring) + " unmatched weak, " +
+            (.strong_imports_without_direct_candidate|tostring) + " unmatched strong. None prove runtime binding."' \
+            "$RUNNER_TEMP/firefox160-unversioned-symbol-candidates-${{ matrix.os }}.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded Firefox160 bare symbol name candidates
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-unversioned-symbol-candidates-${{ matrix.os }}-not-abi-release
+          path: ${{ runner.temp }}/firefox160-unversioned-symbol-candidates-${{ matrix.os }}.json
+          if-no-files-found: warn
+          retention-days: 30
       - name: Archive bounded Firefox160 versioned symbol names and conservative scope
         if: always()
         uses: actions/upload-artifact@v4
