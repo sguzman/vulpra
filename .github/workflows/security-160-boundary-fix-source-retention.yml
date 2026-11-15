@@ -17,26 +17,34 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
-      - name: Authenticate original complete source-tree candidate CI and artifacts
+      - name: Authenticate original Firefox 160 source and preserved 28-overlay ledger
         uses: actions/github-script@v7
         with:
           script: |
-            const {owner,repo}=context.repo, id=43138458940;
-            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            const {owner,repo}=context.repo;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:43138458940});
             if(r.repository?.full_name!=='sguzman/vulpra' ||
-               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
                r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
                r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
                r.status!=='completed' || r.conclusion!=='success')
-              throw Error('Refusing unverified Mozilla Firefox 160 candidate');
+              throw Error('Original exact-source build identity mismatch');
+            const {data:m}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:43724581614});
+            if(m.repository?.full_name!=='sguzman/vulpra' ||
+               m.head_sha!=='a143cf143253b2159597573f658e609fd0662411' ||
+               m.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               m.name!=='Firefox 160 Verified Native Archive Preservation (No Build)' ||
+               m.status!=='completed' || m.conclusion!=='success')
+              throw Error('Exact original source preservation run unauthenticated');
             const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
-              {owner,repo,run_id:id,per_page:100});
-            for(const name of ['firefox160-vulpra-complete-git-tree-candidate',
-                               'firefox160-vulpra-materialized-source-proof']){
-              if(!all.some(a=>a.name===name&&!a.expired&&a.size_in_bytes>0))
-                throw Error('Missing or expired verified source artifact: '+name);
+              {owner,repo,run_id:43724581614,per_page:100});
+            for(const name of ['firefox160-vulpra-preserved-complete-git-tree-candidate',
+                               'firefox160-vulpra-preserved-materialized-source-proof']){
+              const matches=all.filter(a=>a.name===name&&!a.expired&&a.size_in_bytes>0 &&
+                 new Date(a.expires_at)>new Date());
+              if(matches.length!==1) throw Error('Preserved source ledger/proof unavailable: '+name);
             }
-            core.info('PASS: successful original native run, candidate tree and source materialization artifacts');
+            core.info('PASS: original native source and 90-day preserved ledger authenticated');
       - name: Checkout only pinned bounded security source audit scripts and metadata
         uses: actions/checkout@v4
         with:
@@ -47,17 +55,17 @@ jobs:
       - name: Download original complete 28-file overlay and candidate-tree ledger
         uses: actions/download-artifact@v4
         with:
-          name: firefox160-vulpra-complete-git-tree-candidate
+          name: firefox160-vulpra-preserved-complete-git-tree-candidate
           repository: sguzman/vulpra
-          run-id: 43138458940
+          run-id: 43724581614
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/firefox160-candidate-ledger
       - name: Download original independently materialized exact-source tree proof
         uses: actions/download-artifact@v4
         with:
-          name: firefox160-vulpra-materialized-source-proof
+          name: firefox160-vulpra-preserved-materialized-source-proof
           repository: sguzman/vulpra
-          run-id: 43138458940
+          run-id: 43724581614
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/firefox160-source-identity
       - name: Verify bounded source metadata contracts and negative-security-claim fixtures
