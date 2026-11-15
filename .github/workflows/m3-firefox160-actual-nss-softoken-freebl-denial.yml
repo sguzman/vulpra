@@ -1,0 +1,193 @@
+# Original byte-pinned Firefox160 native NSS API, exercised directly without
+# deleting any shared library or starting a personal browser. Missing
+# softoken/FreeBL and combined failures are observed, not assumed graceful.
+name: M3 Firefox 160 Original NSS FreeBL and Softoken Missing-Provider Replay
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-actual-nss-softoken-freebl-denial.yml
+      - ci/m3-deny-optional-native-providers.c
+      - ci/m3-firefox160-original-nss-api-probe.c
+      - ci/m3-firefox160-nss-guarded-provider-replay.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-native-nss-missing-provider-apis:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - name: Authenticate source-pinned original compiled Firefox160 archive and NSS owner producer
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)',
+                'firefox160-vulpra-preserved-native-preview-not-approved'],
+              [43745057569,'b43a2309f5d6557ac0ba86874563544a7f973574',
+                'M3 Firefox 160 Exact NSS FFVPX Loader Source Ownership',
+                'firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra'||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype'||
+                 r.head_sha!==sha||r.name!==name||
+                 r.status!=='completed'||r.conclusion!=='success')
+                throw Error('Untrusted original NSS browser archive/source producer '+id);
+              const arts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(arts.filter(a=>a.name===artifact&&!a.expired&&a.size_in_bytes>0 &&
+                   new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Missing/expired NSS original source or native artifact '+artifact);
+            }
+      - name: Checkout only native NSS fixture, guarded-denial shim and replay script
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-deny-optional-native-providers.c
+            ci/m3-firefox160-original-nss-api-probe.c
+            ci/m3-firefox160-nss-guarded-provider-replay.sh
+      - name: Checkout six exact official upstream Firefox160 NSS source/loader files
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: upstream-original-nss
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/nss/lib/pk11wrap/pk11load.c
+            security/nss/lib/softoken/manifest.mn
+            security/nss/lib/freebl/loader.c
+            security/nss/lib/freebl/genload.c
+            security/nss/lib/freebl/blname.c
+            security/nss/lib/freebl/manifest.mn
+      - name: Verify six NSS original Git blob identities and native guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          root=upstream-original-nss
+          test "$(git -C "$root" rev-parse HEAD)" = \
+            '2887d9de1f69c0e9776413da80e7ba0d1225dd9b'
+          while read -r blob path; do
+            test "$(git -C "$root" rev-parse "HEAD:$path")" = "$blob"
+            test "$(git -C "$root" hash-object -- "$path")" = "$blob"
+          done <<'SOURCES'
+          3fb57828311d699b14d26eb213d6029dd11d66dd security/nss/lib/pk11wrap/pk11load.c
+          43ebfd8a6113a5141f4d09ecef73070b78b261a1 security/nss/lib/softoken/manifest.mn
+          bb8fe3a7f9cf16a14154f5eb5b5c1ea376c7c093 security/nss/lib/freebl/loader.c
+          e3231e3e527f463b47148b74cb3d7b39ab31456a security/nss/lib/freebl/genload.c
+          4bad74ada087feb407a03f811b8e52d0856bb163 security/nss/lib/freebl/blname.c
+          39633d5b46d331f8e7987250c74a29251633461d security/nss/lib/freebl/manifest.mn
+          SOURCES
+          grep -Fq 'PORT_LoadLibraryFromOrigin(my_shlib_name,' "$root/security/nss/lib/pk11wrap/pk11load.c"
+          grep -Fq 'PR_CallOnce(&loadSoftokenOnce, &softoken_LoadDSO)' "$root/security/nss/lib/pk11wrap/pk11load.c"
+          grep -Fq 'return SECFailure;' "$root/security/nss/lib/pk11wrap/pk11load.c"
+          grep -Fq 'PR_FindFunctionSymbol(handle, "FREEBL_GetVector")' "$root/security/nss/lib/freebl/loader.c"
+          grep -Fq 'if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())' "$root/security/nss/lib/freebl/loader.c"
+          grep -Fq 'PR_LoadLibraryWithFlags(libSpec, PR_LD_NOW | PR_LD_LOCAL)' "$root/security/nss/lib/freebl/genload.c"
+          grep -Fq 'SHLIB_PREFIX "freeblpriv" SHLIB_VERSION "." SHLIB_SUFFIX' "$root/security/nss/lib/freebl/blname.c"
+          grep -Fq 'LIBRARY_NAME = freeblpriv' "$root/security/nss/lib/freebl/manifest.mn"
+          grep -Fq 'LIBRARY_NAME = softokn' "$root/security/nss/lib/softoken/manifest.mn"
+          echo 'PASS: six official Firefox160 NSS FreeBL/softoken original guarded-loader Git blobs, immutable release' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retrieve exact preserved original Firefox160 compiled browser package
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/original
+      - name: Retrieve independent original four-NSS-FFVPX protected source route proof
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks
+          repository: sguzman/vulpra
+          run-id: 43745057569
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/owners
+      - name: Verify exact original package/source contract and unpack into temporary CI directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          owners="$RUNNER_TEMP/owners/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .official_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_candidate_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .original_native_archive_sha256=="530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .original_exact_source_verified_blob_count==10 and
+            .original_source_files_nonoverlaid_by_vulpra==true and
+            ([.source_candidate_rows[]|
+              select(.id=="nss_softoken" or .id=="nss_freebl")|.candidate_provider]|sort)==
+              ["libfreeblpriv3.so","libsoftokn3.so"] and
+            .exact_runtime_loader_caller_source_function_verified==false and
+            .all_conditional_ffi_and_protected_fallbacks_exercised==false and
+            .m3_sixth_gate_closed==false
+          ' "$owners" >/dev/null
+          archive="$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive"|cut -d' ' -f1)" = \
+            '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb'
+          mkdir -p "$RUNNER_TEMP/nss-original-app"
+          tar -xf "$archive" -C "$RUNNER_TEMP/nss-original-app"
+          find "$RUNNER_TEMP/nss-original-app" -type f -name libnss3.so -print > \
+            "$RUNNER_TEMP/nss-original-candidates.txt"
+          test "$(wc -l < "$RUNNER_TEMP/nss-original-candidates.txt")" -eq 1
+          path="$(cat "$RUNNER_TEMP/nss-original-candidates.txt")"
+          printf 'NSS_ORIGINAL_PATH=%s\n' "$path" >> "$GITHUB_ENV"
+          for name in libnss3.so libsoftokn3.so libfreeblpriv3.so libnspr4.so; do
+            test -s "$(dirname "$path")/$name"
+          done
+      - name: Compile small native original NSS API probe and provider-denial shim
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            ci/m3-firefox160-original-nss-api-probe.c \
+            -o "$RUNNER_TEMP/vulpra_nss_probe" -ldl
+          cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared \
+            ci/m3-deny-optional-native-providers.c \
+            -o "$RUNNER_TEMP/vulpra-deny-native-nss.so" -ldl
+          bash -n ci/m3-firefox160-nss-guarded-provider-replay.sh
+      - name: Run genuine original NSS init, RNG and independent missing-provider outcomes
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          bash ci/m3-firefox160-nss-guarded-provider-replay.sh \
+            "$NSS_ORIGINAL_PATH" "$RUNNER_TEMP/vulpra-deny-native-nss.so" \
+            "$RUNNER_TEMP/vulpra_nss_probe" \
+            "$RUNNER_TEMP/firefox160-original-nss-guarded-provider-observation.json"
+          jq -e '
+            .schema_version==1 and
+            .baseline_original_NSS_initialized_and_generated_random==true and
+            .genuine_original_packaged_nss3_API_invoked==true and
+            .actual_real_firefox_browser_or_TLS_flow_tested==false and
+            .all_NSS_PKCS11_FIPS_crypto_security_paths_tested==false and
+            .original_NSS_direct_dlopen_machine_callstacks_proven==false and
+            .complete_Rust_CXX_FFI_dlopen_dlsym_graph_closed==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-original-nss-guarded-provider-observation.json" >/dev/null
+          jq -r '"AUDIT: original source-pinned NSS softoken_denied_observed="+
+             (.original_softoken_denial_actually_observed|tostring)+
+             " freebl_denied_observed="+(.original_freebl_denial_actually_observed|tostring)+
+             " both_names_actually_denied_in_combined_mode="+
+             (.combined_mode_both_named_denials_actually_observed|tostring)+
+             " all_denied_processes_graceful="+
+             (.all_missing_provider_tests_completed_without_process_crash_or_timeout|tostring)' \
+             "$RUNNER_TEMP/firefox160-original-nss-guarded-provider-observation.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve bounded native NSS provider failures, never raw paths or random bytes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-original-packaged-nss-freebl-softoken-native-api-missing-provider-not-TLS
+          path: ${{ runner.temp }}/firefox160-original-nss-guarded-provider-observation.json
+          if-no-files-found: warn
+          retention-days: 30
