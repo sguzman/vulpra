@@ -325,6 +325,11 @@ jobs:
                 .mozilla_ffvpx_private_log_observation.mediaformatreader_unclassified_decoder_initialized_count][0]//0),
               denied_mediaformatreader_unclassified_video_decoder_init_logs:([$m.modes[]|select(.mode=="denied")|
                 .mozilla_ffvpx_private_log_observation.mediaformatreader_unclassified_decoder_initialized_count][0]//0),
+              baseline_bounded_source_defined_video_decoder_names:([$m.modes[]|select(.mode=="baseline")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_safely_bounded_code_defined_decoder_descriptions][0]//[]),
+              denied_bounded_source_defined_video_decoder_names:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_safely_bounded_code_defined_decoder_descriptions][0]//[]),
+              exact_decoder_backend_selected_independent_of_source_description_proven:false,
               ffvpx_denied_rdd_pdm_order_log_count:([$m.modes[]|select(.mode=="denied")|
                 .mozilla_ffvpx_private_log_observation.rdd_pdm_order_markers][0]//0),
               ffvpx_denied_agnostic_decoder_support_log_count:([$m.modes[]|select(.mode=="denied")|
@@ -362,6 +367,11 @@ jobs:
             .denied_mediaformatreader_video_decoder_init_logs>=0 and
             .baseline_mediaformatreader_libvpx_video_decoder_init_logs>=0 and
             .denied_mediaformatreader_libvpx_video_decoder_init_logs>=0 and
+            .baseline_mediaformatreader_video_decoder_init_logs>=1 and
+            .denied_mediaformatreader_video_decoder_init_logs>=1 and
+            (.baseline_bounded_source_defined_video_decoder_names|length)>=1 and
+            (.denied_bounded_source_defined_video_decoder_names|length)>=1 and
+            .exact_decoder_backend_selected_independent_of_source_description_proven==false and
             (.ffvpx_libmozavcodec_denied_dlopen_attempt_count+
              .ffvpx_libmozavutil_denied_dlopen_attempt_count)==.ffvpx_actual_native_denied_dlopen_attempt_count and
             .baseline_vp9_decoded_frames_and_advancing_time==true and
@@ -377,6 +387,8 @@ jobs:
             ", util="+(.ffvpx_libmozavutil_denied_dlopen_attempt_count|tostring) +
             "); observed FFVPX NoProvidedLib="+
             (.ffvpx_real_NoProvidedLib_link_failure_log_count|tostring) +
+            "; denied decoder descriptions: " +
+            (.denied_bounded_source_defined_video_decoder_names|join(",")) +
             "; baseline VP9 decoded; denied VP9 result=" +
             .observed_denied_vp9_outcome +
             ". Source guard not machine-attributed."' \
