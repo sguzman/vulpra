@@ -95,6 +95,10 @@ jobs:
           ' "$ledger" >/dev/null
           test "$(wc -l < "$overlays")" -eq 28
           test "$(sort -u "$overlays" | wc -l)" -eq 28
+          changes="$RUNNER_TEMP/ledger/changes-against-exact-firefox160.tsv"
+          test -s "$changes"
+          test "$(cut -f2 "$changes" | sort | sha256sum | cut -d' ' -f1)" = \
+            "$(sort "$overlays" | sha256sum | cut -d' ' -f1)"
           digest="$(sha256sum "$archive" | cut -d' ' -f1)"
           echo "Authenticated original native package SHA-256: $digest" >> "$GITHUB_STEP_SUMMARY"
           echo 'Original Firefox 160 candidate; UNRELEASED, not security-current.' >> "$GITHUB_STEP_SUMMARY"
@@ -120,9 +124,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firefox160-vulpra-preserved-complete-git-tree-candidate
-          path: |
-            ${{ runner.temp }}/ledger/candidate-tree-report.json
-            ${{ runner.temp }}/ledger/overlay-paths.txt
+          path: ${{ runner.temp }}/ledger/
           if-no-files-found: error
           retention-days: 90
       - name: Verify uploaded preservation artifacts exist and are nonempty
