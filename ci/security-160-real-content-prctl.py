@@ -208,7 +208,7 @@ def run(repo, output):
                             .currentWindowGlobal.getActor("VulpraSeccompProbe");
                           return await actor.sendQuery("VulpraTestBlockedPrctl",
                             {token:"vulpra160-prctl-capbset-read"});
-                        })().then(done, e=>done({probeError:String(e?.name||"actor-failed")}));
+                        })().then(done, e=>done({probeError:String(e?.name||"actor-failed")+" "+String(e?.message||"").replace(/file:\/\/[^ ]+/g,"[redacted-file-uri]").slice(0,150)}));
                     """, "args": []
                 }, timeout_seconds=45)
                 census = wd.request(port, "POST", base + "/execute/async", {
@@ -225,7 +225,7 @@ def run(repo, output):
                 if type(pid) is not int:
                     kind = actor_result.get("probeError", "missing-result") if isinstance(
                         actor_result, dict) else "unstructured-result"
-                    if not isinstance(kind, str) or len(kind) > 80:
+                    if not isinstance(kind, str) or len(kind) > 180:
                         kind = "invalid-error-kind"
                     raise RuntimeError("No native content-side actor process ID: " + kind)
                 proc = obs.read_process(pid)
