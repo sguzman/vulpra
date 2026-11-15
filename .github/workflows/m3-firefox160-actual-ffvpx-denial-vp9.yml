@@ -76,7 +76,10 @@ jobs:
             dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp
             dom/media/platforms/ffmpeg/FFmpegLog.h
             dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp
-      - name: Verify six exact original Firefox160 Git blob source-log anchors
+            dom/media/platforms/wrappers/MediaChangeMonitor.h
+            dom/media/platforms/wrappers/MediaChangeMonitor.cpp
+            dom/media/platforms/agnostic/AgnosticDecoderModule.cpp
+      - name: Verify nine exact original Firefox160 Git blob source-log anchors
         shell: bash
         run: |
           set -euo pipefail
@@ -92,15 +95,23 @@ jobs:
           ee24d18570d146d70252f5237810729c3319fcee dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp
           80347b5586afe49e5f32c8631c3c6e3e0c1bb160 dom/media/platforms/ffmpeg/FFmpegLog.h
           4d3eaf7529a534008f9150c2a16a04e5ef211566 dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp
+          9aa56dc1e7ab470290c27804612df11e1f54da18 dom/media/platforms/wrappers/MediaChangeMonitor.h
+          df6457efd1d0893836303c9544def0a5b734a702 dom/media/platforms/wrappers/MediaChangeMonitor.cpp
+          ddb9953176c1ee8cbfc02b6e881bb91d5c485388 dom/media/platforms/agnostic/AgnosticDecoderModule.cpp
           SOURCES
           grep -Fq 'Decoder init finished for ' "$root/dom/media/MediaFormatReader.cpp"
+          grep -Fq 'decoder.mDescription = mVideo.mDecoder->GetDescriptionName();' "$root/dom/media/MediaFormatReader.cpp"
+          grep -Fq '"desc:{} pending:{} waiting:{} eos:{} ds:{} sid:{} waitcdm:{}"' "$root/dom/media/MediaFormatReader.cpp"
+          grep -Fq 'return "MediaChangeMonitor decoder (pending)"_ns;' "$root/dom/media/platforms/wrappers/MediaChangeMonitor.h"
+          grep -Fq 'mPDMFactory->CreateDecoder(currentParams)' "$root/dom/media/platforms/wrappers/MediaChangeMonitor.cpp"
+          grep -Fq 'm = new VPXDecoder(aParams);' "$root/dom/media/platforms/agnostic/AgnosticDecoderModule.cpp"
           grep -Fq 'description: \"{}\"' "$root/dom/media/MediaFormatReader.cpp"
           grep -Fq 'return "libvpx video decoder"_ns;' "$root/dom/media/platforms/agnostic/VPXDecoder.h"
           grep -Fq 'return "ffvpx video decoder"_ns;' "$root/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h"
           grep -Fq 'return "ffmpeg video decoder"_ns;' "$root/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h"
           grep -Fq 'return LinkResult::NoProvidedLib;' "$root/dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp"
           grep -Fq 'FFMPEGP_LOG("Link result: {}",' "$root/dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp"
-          echo 'PASS: six exact official Firefox160 decoder identity/failure logging source files, no source edits'
+          echo 'PASS: nine exact official Firefox160 wrapper/decoder identity/failure logging source files, no source edits'
       - name: Retrieve original byte-preserving native Firefox160 archive
         uses: actions/download-artifact@v4
         with:
@@ -304,7 +315,7 @@ jobs:
               ffvpx_real_NoProvidedLib_link_failure_log_count:$m.FFVPX_NoProvidedLib_source_log_count_in_denied_mode,
               ffvpx_denied_pdm_log_lines:([$m.modes[]|select(.mode=="denied")|
                 .mozilla_ffvpx_private_log_observation.platform_decoder_module_log_lines][0]//0),
-              exact_original_Firefox160_decoder_log_source_blobs_verified:6,
+              exact_original_Firefox160_decoder_log_source_blobs_verified:9,
               baseline_mediaformatreader_video_decoder_init_logs:([$m.modes[]|select(.mode=="baseline")|
                 .mozilla_ffvpx_private_log_observation.mediaformatreader_video_decoder_initialized_log_count][0]//0),
               denied_mediaformatreader_video_decoder_init_logs:([$m.modes[]|select(.mode=="denied")|
@@ -329,6 +340,14 @@ jobs:
                 .mozilla_ffvpx_private_log_observation.mediaformatreader_safely_bounded_code_defined_decoder_descriptions][0]//[]),
               denied_bounded_source_defined_video_decoder_names:([$m.modes[]|select(.mode=="denied")|
                 .mozilla_ffvpx_private_log_observation.mediaformatreader_safely_bounded_code_defined_decoder_descriptions][0]//[]),
+              baseline_mediaformatreader_video_update_log_count:([$m.modes[]|select(.mode=="baseline")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_video_update_log_count][0]//0),
+              denied_mediaformatreader_video_update_log_count:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_video_update_log_count][0]//0),
+              baseline_resolved_post_frame_video_decoder_descriptions:([$m.modes[]|select(.mode=="baseline")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_resolved_post_frame_video_decoder_descriptions][0]//[]),
+              denied_resolved_post_frame_video_decoder_descriptions:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_resolved_post_frame_video_decoder_descriptions][0]//[]),
               exact_decoder_backend_selected_independent_of_source_description_proven:false,
               ffvpx_denied_rdd_pdm_order_log_count:([$m.modes[]|select(.mode=="denied")|
                 .mozilla_ffvpx_private_log_observation.rdd_pdm_order_markers][0]//0),
@@ -362,7 +381,7 @@ jobs:
             .ffvpx_real_NoProvidedLib_link_failure_logged==true and
             .ffvpx_real_NoProvidedLib_link_failure_log_count>=1 and
             .ffvpx_denied_pdm_log_lines>=1 and
-            .exact_original_Firefox160_decoder_log_source_blobs_verified==6 and
+            .exact_original_Firefox160_decoder_log_source_blobs_verified==9 and
             .baseline_mediaformatreader_video_decoder_init_logs>=0 and
             .denied_mediaformatreader_video_decoder_init_logs>=0 and
             .baseline_mediaformatreader_libvpx_video_decoder_init_logs>=0 and
@@ -371,6 +390,10 @@ jobs:
             .denied_mediaformatreader_video_decoder_init_logs>=1 and
             (.baseline_bounded_source_defined_video_decoder_names|length)>=1 and
             (.denied_bounded_source_defined_video_decoder_names|length)>=1 and
+            .baseline_mediaformatreader_video_update_log_count>=1 and
+            .denied_mediaformatreader_video_update_log_count>=1 and
+            (.baseline_resolved_post_frame_video_decoder_descriptions|type)=="array" and
+            (.denied_resolved_post_frame_video_decoder_descriptions|type)=="array" and
             .exact_decoder_backend_selected_independent_of_source_description_proven==false and
             (.ffvpx_libmozavcodec_denied_dlopen_attempt_count+
              .ffvpx_libmozavutil_denied_dlopen_attempt_count)==.ffvpx_actual_native_denied_dlopen_attempt_count and
