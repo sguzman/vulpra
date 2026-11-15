@@ -17,26 +17,36 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 26
     steps:
-      - name: Authenticate completed exact-source native Firefox 160 run and artifacts
+      - name: Authenticate original Firefox 160 build and byte-preserving archive
         uses: actions/github-script@v7
         with:
           script: |
-            const {owner,repo}=context.repo,id=43138458940;
-            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
-            if(r.repository?.full_name!=='sguzman/vulpra' ||
-               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
-               r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
-               r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
-               r.status!=='completed' || r.conclusion!=='success')
-              throw Error('Refusing wrong or unsuccessful original Firefox 160 native run');
-            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
-              {owner,repo,run_id:id,per_page:100});
-            for(const name of ['firefox160-vulpra-unreleased-native-preview-not-approved',
-                               'firefox160-vulpra-materialized-source-proof']){
-              if(!all.some(a=>a.name===name&&!a.expired&&a.size_in_bytes>0))
-                throw Error('Missing or expired original native artifact '+name);
+            const {owner,repo}=context.repo;
+            const original=await github.rest.actions.getWorkflowRun({owner,repo,run_id:43138458940});
+            const r=original.data;
+            if (r.repository?.full_name!=='sguzman/vulpra' ||
+                r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                r.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+                r.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+                r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Original native browser build is unauthenticated');
+            const mirror=await github.rest.actions.getWorkflowRun({owner,repo,run_id:43724079346});
+            const m=mirror.data;
+            if (m.repository?.full_name!=='sguzman/vulpra' ||
+                m.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                m.head_sha!=='b2f65ae909a1077cc5841cdb8b35af2438925a3f' ||
+                m.name!=='Firefox 160 Verified Native Archive Preservation (No Build)' ||
+                m.status!=='completed' || m.conclusion!=='success')
+              throw Error('Original-byte preservation run is unauthenticated');
+            const list=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:43724079346,per_page:100});
+            for(const name of ['firefox160-vulpra-preserved-native-preview-not-approved',
+                               'firefox160-vulpra-preserved-materialized-source-proof']){
+              const matches=list.filter(a=>a.name===name && !a.expired && a.size_in_bytes>0 &&
+                new Date(a.expires_at)>new Date());
+              if(matches.length!==1) throw Error('Preserved archive missing/expired/ambiguous: '+name);
             }
-            core.info('PASS: exact original source/build identity and archived artifact presence');
+            core.info('PASS: original native producer and verified byte-preserving mirror');
       - name: Checkout only bounded Canvas and WebGL2 regression harness and WebDriver helper
         uses: actions/checkout@v4
         with:
@@ -47,17 +57,17 @@ jobs:
       - name: Download existing unreleased Firefox 160 native package and checksum
         uses: actions/download-artifact@v4
         with:
-          name: firefox160-vulpra-unreleased-native-preview-not-approved
+          name: firefox160-vulpra-preserved-native-preview-not-approved
           repository: sguzman/vulpra
-          run-id: 43138458940
+          run-id: 43724079346
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/firefox160-native-archive
       - name: Download complete original Firefox 160 source identity from same native CI
         uses: actions/download-artifact@v4
         with:
-          name: firefox160-vulpra-materialized-source-proof
+          name: firefox160-vulpra-preserved-materialized-source-proof
           repository: sguzman/vulpra
-          run-id: 43138458940
+          run-id: 43724079346
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/firefox160-source-proof
       - name: Prove exact source, archive and forged Canvas/WebGL outcomes
