@@ -29,6 +29,8 @@ AUX = re.compile(r"\bName:\s+(\S+)\s+Flags:\s+\S+\s+Version:\s+(\d+)")
 SYMBOL = re.compile(r"[A-Za-z_$?][A-Za-z0-9_.$?+:~%-]{0,254}\Z")
 GROUPS = {"libpthread.so.0", "libdl.so.2", "librt.so.1", "libresolv.so.2"}
 MAX_DYNSYM_OUTPUT = 16_000_000
+# Unversioned C++/Rust mangled names can exceed the short GNU-versioned ABI bound.
+BARE_SYMBOL = re.compile(r"[A-Za-z_$?][A-Za-z0-9_.$?+:~%-]{0,8191}\Z")
 
 
 def need_indexes(version_text):
@@ -252,7 +254,7 @@ def parse_bare_dynsym(text):
             name = decorated
         else:
             continue  # versioned imports and nondefault exports are separate
-        if not SYMBOL.fullmatch(name):
+        if not BARE_SYMBOL.fullmatch(name):
             raise ValueError("Unsupported bare ELF dynamic symbol name: " + repr(name)[:96])
         if ndx == "UND":
             imported.append((name, bind))
@@ -433,7 +435,8 @@ def selftest():
     offered, imports = parse_bare_dynsym(sample)
     assert offered == {"plain_export", "default_export"}
     assert imports == [("direct_name", "GLOBAL"), ("optional_name", "WEAK")]
-    for malformed in ("!", "/", "bad\\value", "x" * 256):
+    assert parse_bare_dynsym(sample.replace("direct_name", "N" * 512))[1][0][0] == "N" * 512
+    for malformed in ("!", "/", "bad\\value", "x" * 8193):
         try:
             parse_bare_dynsym(sample.replace("direct_name", malformed))
         except ValueError:
