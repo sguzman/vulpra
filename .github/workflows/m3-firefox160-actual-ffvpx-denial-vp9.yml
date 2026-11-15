@@ -1,0 +1,284 @@
+# Original Firefox160 compiled package, real packaged VP9/WebM WebDriver with
+# exact opt-in libmozavcodec.so/libmozavutil.so dlopen-denial interposer.
+# Never modify native original bytes or treat a result as global fallback closure.
+name: M3 Firefox 160 Actual FFVPX Library Denial VP9 Replay (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-actual-ffvpx-denial-vp9.yml
+      - ci/m3-deny-optional-native-providers.c
+      - ci/m3-packaged-ffmpeg-vp9-video.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-real-ffvpx-denial:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      VULPRA_M3_COMPILED_SOURCE_SHA: '0624235fdc956ab18af3c3f310b3588ca72fff61'
+      VULPRA_M3_VP9_DENIAL_GROUP: 'ffvpx'
+    steps:
+      - name: Authenticate exact original Firefox160 native producer, preservation and source-owner contract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name] of [
+              [43138458940,'0624235fdc956ab18af3c3f310b3588ca72fff61',
+                'Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate'],
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)'],
+              [43745057569,'b43a2309f5d6557ac0ba86874563544a7f973574',
+                'M3 Firefox 160 Exact NSS FFVPX Loader Source Ownership']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Untrusted original Firefox160 native/source evidence '+id);
+            }
+            for(const [id,name] of [
+              [43724886827,'firefox160-vulpra-preserved-native-preview-not-approved'],
+              [43724886827,'firefox160-vulpra-preserved-materialized-source-proof'],
+              [43745057569,'firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks']]){
+              const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(a.filter(x=>x.name===name&&!x.expired&&x.size_in_bytes>0 &&
+                  new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Original Firefox160 artifact missing or expired: '+name);
+            }
+      - name: Checkout only existing media harness and minimal C native denial shim
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-packaged-ffmpeg-vp9-video.sh
+            ci/m3-deny-optional-native-providers.c
+      - name: Retrieve original byte-preserving native Firefox160 archive
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native
+      - name: Retrieve verified 28-overlay complete source identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Retrieve exact NSS/FFVPX original source owned provider names
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks
+          repository: sguzman/vulpra
+          run-id: 43745057569
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/owners
+      - name: Verify original source and native bytes before isolated staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
+          owners="$RUNNER_TEMP/owners/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .official_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_candidate_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .original_native_archive_sha256=="530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .original_exact_source_verified_blob_count==10 and
+            .original_source_files_nonoverlaid_by_vulpra==true and
+            .source_routes_crosschecked_with_actual_native_loader_requests==4 and
+            ([.source_candidate_rows[] |
+              select(.id=="ffvpx_codec" or .id=="ffvpx_util") |
+              .candidate_provider]|sort)==["libmozavcodec.so","libmozavutil.so"] and
+            .exact_runtime_loader_caller_source_function_verified==false and
+            .all_conditional_ffi_and_protected_fallbacks_exercised==false and
+            .m3_sixth_gate_closed==false
+          ' "$owners" >/dev/null
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive" | cut -d' ' -f1)" = \
+            '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb'
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp -- "$archive" "$dest/vulpra-local-m3-native-link-ci.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-m3-native-link-ci.tar.xz > \
+            vulpra-local-m3-native-link-ci.tar.xz.sha256)
+      - name: Install existing Linux native video and SHA256-pinned driver dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends ffmpeg jq curl git libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          file="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl -fLsS --retry 3 --max-time 90 -o "$file" \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
+          tar -xzf "$file" -C "$RUNNER_TEMP" geckodriver
+          test -x "$RUNNER_TEMP/geckodriver"
+          bash -n ci/m3-packaged-ffmpeg-vp9-video.sh
+          bash ci/m3-packaged-ffmpeg-vp9-video.sh --self-test
+      - name: Compile narrow FFVPX denial shim and reject wrong-group native fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror \
+            ci/m3-deny-optional-native-providers.c \
+            -o "$RUNNER_TEMP/vulpra-deny-optional-native-providers.so" -ldl
+          cat > "$RUNNER_TEMP/vulpra_ffvpx_probe.c" <<'C'
+          #include <dlfcn.h>
+          int main(void) {
+            const char *names[] = {
+              "libmozavcodec.so", "libmozavutil.so",
+              "libavcodec.so.60", "libnss3.so"
+            };
+            for (unsigned i=0;i<sizeof(names)/sizeof(names[0]);++i) {
+              void *handle=dlopen(names[i], RTLD_LAZY|RTLD_LOCAL);
+              if(handle) dlclose(handle);
+            }
+            return 0;
+          }
+          C
+          cc -std=c11 -Wall -Wextra -Werror "$RUNNER_TEMP/vulpra_ffvpx_probe.c" \
+            -o "$RUNNER_TEMP/vulpra_ffvpx_probe" -ldl
+          log="$RUNNER_TEMP/ffvpx-fixture-private.log"
+          : > "$log"; chmod 0600 "$log"
+          env LD_PRELOAD="$RUNNER_TEMP/vulpra-deny-optional-native-providers.so" \
+            VULPRA_M3_DENY_FIXTURE_EXE=vulpra_ffvpx_probe \
+            VULPRA_M3_DENY_GROUP=ffvpx VULPRA_M3_DENY_LOG="$log" \
+            "$RUNNER_TEMP/vulpra_ffvpx_probe"
+          test "$(grep -Ec '^DENIED (dlopen|dlmopen) ' "$log")" -eq 2
+          grep -Eq '^DENIED dlopen libmozavcodec.so [0-9]+$' "$log"
+          grep -Eq '^DENIED dlopen libmozavutil.so [0-9]+$' "$log"
+          ! grep -Eq '^DENIED .* (libavcodec.so.60|libnss3.so) ' "$log"
+          : > "$log"
+          env LD_PRELOAD="$RUNNER_TEMP/vulpra-deny-optional-native-providers.so" \
+            VULPRA_M3_DENY_FIXTURE_EXE=vulpra_ffvpx_probe \
+            VULPRA_M3_DENY_GROUP=ffmpeg VULPRA_M3_DENY_LOG="$log" \
+            "$RUNNER_TEMP/vulpra_ffvpx_probe"
+          test "$(grep -Ec '^DENIED (dlopen|dlmopen) ' "$log")" -eq 1
+          grep -Eq '^DENIED dlopen libavcodec.so.60 [0-9]+$' "$log"
+          ! grep -Eq '^DENIED .* (libmozavcodec.so|libmozavutil.so) ' "$log"
+          rm -f "$log" "$RUNNER_TEMP/vulpra_ffvpx_probe"
+          echo 'PASS: source-scoped native shim FFVPX denies only both mozav* libraries; FFmpeg group remains separate'
+      - name: Actual original Firefox160 WebDriver video baseline versus bundled FFVPX loader denial
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          bash ci/m3-packaged-ffmpeg-vp9-video.sh \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/vulpra-deny-optional-native-providers.so" \
+            "$RUNNER_TEMP/geckodriver" \
+            "$RUNNER_TEMP/m3-packaged-ffvpx-vp9-video.json"
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz"
+          report="$RUNNER_TEMP/m3-packaged-ffvpx-vp9-video.json"
+          jq -e --arg actual "$GITHUB_SHA" --arg compiled "$VULPRA_M3_COMPILED_SOURCE_SHA" \
+              --arg sha "$(sha256sum "$archive" | cut -d' ' -f1)" '
+            .schema_version==1 and
+            .status=="real_packaged_VP9_WebDriver_video_decode_with_bundled_FFVPX_denial" and
+            .denial_group=="ffvpx" and
+            .source_commit==$compiled and .test_harness_commit==$actual and
+            .normal_packaged_archive_sha256==$sha and
+            .fixture_VP9_codec_validated==true and
+            .baseline_VP9_playback_passed==true and
+            .real_denied_FFVPX_attempt_observed==true and
+            .denied_FFVPX_loader_attempts>0 and
+            .denied_FFmpeg_loader_attempts==null and
+            .real_denied_FFmpeg_attempt_observed==false and
+            .exact_source_private_webdriver_modes_safe==true and
+            (.denied_VP9_outcome|IN("decoded_frames_and_advancing_time","media_error",
+              "no_verified_decoded_frames_or_media_error")) and
+            (.modes|length)==2 and
+            ([.modes[].mode]|sort)==["baseline","denied"] and
+            all(.modes[];
+              .actual_packaged_browser_session==true and
+              .webdriver_browser_responsive==true and
+              .isolated_profile_preserved==true) and
+            .source_owner_direct_machine_caller_proven==false and
+            .FFVPX_missing_provider_source_guard_taken_proven==false and
+            .successful_alternative_decoder_identified==false and
+            .specific_VP9_decoder_implementation_identified==false and
+            .alternative_H264_software_decoder_fallback_proven==false and
+            .VAAPI_Wayland_DMABuf_runtime_fallback_proven==false and
+            .complete_indirect_dynamic_loader_graph_closed==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false and
+            .release_ready==false
+          ' "$report" >/dev/null
+          jq -n \
+            --slurpfile media "$report" \
+            --slurpfile owners "$RUNNER_TEMP/owners/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json" \
+            --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' '
+            ($media[0]) as $m | ($owners[0]) as $s |
+            {
+              schema_version:1,
+              status:"real_firefox160_native_bundled_ffvpx_dlopen_denial_and_vp9_media_outcome",
+              original_upstream_release_commit:$s.official_release_commit,
+              original_vulpra_source_tree:$tree,
+              original_compiled_native_archive_sha256:$m.normal_packaged_archive_sha256,
+              original_source_owner_validation_run:43745057569,
+              original_native_build_run:43138458940,
+              native_browser_unmodified_replayed:true,
+              authentic_pinned_source_owner_rows:10,
+              exact_source_owned_bundled_ffvpx_names:["libmozavcodec.so","libmozavutil.so"],
+              ffvpx_actual_native_denied_dlopen_attempt_count:$m.denied_FFVPX_loader_attempts,
+              ffvpx_denials_during_video_navigation:$m.denial_attempts_after_video_navigation,
+              baseline_vp9_decoded_frames_and_advancing_time:$m.baseline_VP9_playback_passed,
+              with_bundled_ffvpx_denied_vp9_decoded_frames_and_advancing_time:$m.denied_VP9_playback_passed,
+              with_bundled_ffvpx_denied_media_error_observed:$m.denied_VP9_media_error_observed,
+              observed_denied_vp9_outcome:$m.denied_VP9_outcome,
+              browser_and_temporary_profile_preserved_under_both_modes:$m.exact_source_private_webdriver_modes_safe,
+              interposer_actually_attached_to_browser:true,
+              altered_system_library_files:false,
+              raw_dlopen_names_PIDs_or_profiles_archived:false,
+              compiled_machine_caller_of_ffvpx_dlopen_known:false,
+              actual_ffvpx_missing_provider_failure_guard_source_branch_attributed:false,
+              successful_alternative_decoder_identified:false,
+              all_protected_media_features_and_fallbacks_proven:false,
+              target_endeavouros_hyprland_verified:false,
+              source_pruning_authorized:false,
+              security_current:false,
+              release_ready:false,
+              m3_sixth_gate_closed:false
+            }' > "$RUNNER_TEMP/firefox160-actual-bundled-ffvpx-denial-outcome.json"
+          jq -e '.schema_version==1 and
+            .status=="real_firefox160_native_bundled_ffvpx_dlopen_denial_and_vp9_media_outcome" and
+            .ffvpx_actual_native_denied_dlopen_attempt_count>0 and
+            .baseline_vp9_decoded_frames_and_advancing_time==true and
+            .browser_and_temporary_profile_preserved_under_both_modes==true and
+            .compiled_machine_caller_of_ffvpx_dlopen_known==false and
+            .actual_ffvpx_missing_provider_failure_guard_source_branch_attributed==false and
+            .all_protected_media_features_and_fallbacks_proven==false and
+            .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/firefox160-actual-bundled-ffvpx-denial-outcome.json" >/dev/null
+          jq -r '"PASS: actual original Firefox160 FFVPX dlopen denied " +
+            (.ffvpx_actual_native_denied_dlopen_attempt_count|tostring) +
+            " time(s); baseline VP9 decoded; denied VP9 result=" +
+            .observed_denied_vp9_outcome +
+            ". Source guard not machine-attributed."' \
+            "$RUNNER_TEMP/firefox160-actual-bundled-ffvpx-denial-outcome.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded source-pinned actual FFVPX denial outcome only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-original-bundled-ffvpx-denial-real-vp9-not-full-fallback
+          path: ${{ runner.temp }}/firefox160-actual-bundled-ffvpx-denial-outcome.json
+          if-no-files-found: ignore
+          retention-days: 30
