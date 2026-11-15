@@ -1,0 +1,112 @@
+# Preserve the verified, unreleased Firefox 160 CI preview before the original
+# seven-day GitHub artifact expires. This copies bytes, NEVER rebuilds Firefox.
+# The mirror is not a release or a statement of security-current status.
+name: Firefox 160 Verified Native Archive Preservation (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-preserve-native-preview.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preserve-native-proof:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Authenticate pinned native Firefox 160 producer and unexpired artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const run_id = 43138458940;
+            const {data: run} = await github.rest.actions.getWorkflowRun({owner, repo, run_id});
+            if (run.repository?.full_name !== 'sguzman/vulpra' ||
+                run.head_branch !== 'upgrade/firefox-160-overlay-prototype' ||
+                run.head_sha !== '0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+                run.name !== 'Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+                run.status !== 'completed' || run.conclusion !== 'success') {
+              throw Error('Refusing artifacts from an unverified native Firefox 160 build');
+            }
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner, repo, run_id, per_page: 100});
+            for (const name of [
+              'firefox160-vulpra-unreleased-native-preview-not-approved',
+              'firefox160-vulpra-materialized-source-proof'
+            ]) {
+              const found = artifacts.filter(a => a.name === name && !a.expired &&
+                a.size_in_bytes > 0 && new Date(a.expires_at) > new Date());
+              if (found.length !== 1) throw Error('Missing/expired/ambiguous producer artifact: ' + name);
+            }
+            core.info('PASS: exact original build and both source/package artifacts authenticated');
+      - name: Retrieve the original checksum-pinned unpublished package
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-unreleased-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native
+      - name: Retrieve the matching original complete-tree identity proof
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Verify original package bytes and exact Mozilla/Vulpra tree identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          native="$RUNNER_TEMP/native"
+          source="$RUNNER_TEMP/source/materialized-candidate.json"
+          archive="$native/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256" && test -s "$source"
+          (cd "$native" && sha256sum -c "$(basename "$archive").sha256")
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and
+            .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$source" >/dev/null
+          digest="$(sha256sum "$archive" | cut -d' ' -f1)"
+          echo "Authenticated original native package SHA-256: $digest" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Original Firefox 160 candidate; UNRELEASED, not security-current.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No compilation, privilege changes, sandbox policy changes or workstation modifications.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve identical unreleased binary and original checksum for 90 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          path: |
+            ${{ runner.temp }}/native/vulpra-firefox160-native-ci.tar.xz
+            ${{ runner.temp }}/native/vulpra-firefox160-native-ci.tar.xz.sha256
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+      - name: Preserve original source identity proof for 90 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-materialized-source-proof
+          path: ${{ runner.temp }}/source/materialized-candidate.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Verify uploaded preservation artifacts exist and are nonempty
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner, repo, run_id: context.runId, per_page: 100});
+            for (const name of [
+              'firefox160-vulpra-preserved-native-preview-not-approved',
+              'firefox160-vulpra-preserved-materialized-source-proof'
+            ]) {
+              const matching = artifacts.filter(a => a.name === name && !a.expired && a.size_in_bytes > 0);
+              if (matching.length !== 1) throw Error('Preserved artifact missing or ambiguous: ' + name);
+            }
+            core.info('PASS: both preserved source and native archive artifacts visible in this run');
