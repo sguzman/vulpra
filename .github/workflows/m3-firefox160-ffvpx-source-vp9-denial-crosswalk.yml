@@ -1,0 +1,153 @@
+# Independent source-to-real-runtime check using existing native successes:
+# exact FFVPX source owners, initialized NSPR loader requests, and original
+# unmodified browser VP9 playback under denied system FFmpeg. No new browser
+# executable, native source mutation or false claim FFVPX was exact decoder.
+name: M3 Firefox 160 FFVPX Source and Real VP9 Denial Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-ffvpx-source-vp9-denial-crosswalk.yml
+      - ci/m3-firefox160-ffvpx-playback-source-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-ffvpx-candidate-and-media-evidence:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate real source/loader/denied-video producers and immutable artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,path] of [
+              [43745057569,'b43a2309f5d6557ac0ba86874563544a7f973574',
+                'M3 Firefox 160 Exact NSS FFVPX Loader Source Ownership',
+                '.github/workflows/m3-firefox160-exact-nss-ffvpx-source-owners.yml'],
+              [43743231236,'f4a23510f7dcd2b1e7b09723009199922b3d9ed1',
+                'M3 Firefox 160 Actual Initialized Loader Request Edges (No Build)',
+                '.github/workflows/m3-firefox160-native-loader-request-edges.yml'],
+              [43724363730,'dbdb564bcc09cb84810a17a10c46781872595dad',
+                'Firefox 160 Archived VP9/FFmpeg Media Replay (No Browser Build)',
+                '.github/workflows/security-160-archived-vp9-media.yml']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name || r.path!==path ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Unverified original source/loader/VP9 denial producer: '+id);
+            }
+            for(const [id,name] of [
+              [43745057569,'firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks'],
+              [43743231236,'firefox160-actual-initialized-loader-request-edges-not-dlopen-closure'],
+              [43724363730,'firefox160-vulpra-unreleased-vp9-media-proof']]){
+              const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(a.filter(x=>x.name===name&&!x.expired&&x.size_in_bytes>0 &&
+                   new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Missing/expired authentic source/loader/denied-VP9 artifact: '+name);
+            }
+      - name: Checkout exact independent bounded jq crosswalk only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-ffvpx-playback-source-crosswalk.jq
+      - name: Download verified official Firefox160 NSS FFVPX source/runtime candidates
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks
+          repository: sguzman/vulpra
+          run-id: 43745057569
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Download independent actual initialized native loader requests
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-actual-initialized-loader-request-edges-not-dlopen-closure
+          repository: sguzman/vulpra
+          run-id: 43743231236
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/loader
+      - name: Download actual original browser VP9 frames under FFmpeg denial
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-unreleased-vp9-media-proof
+          repository: sguzman/vulpra
+          run-id: 43724363730
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/media
+      - name: Prove exact source/native/functional witnesses with strict negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          source="$RUNNER_TEMP/source/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json"
+          loader="$RUNNER_TEMP/loader/firefox160-actual-loader-request-edges.json"
+          media="$RUNNER_TEMP/media/firefox160-vp9-media-proof.json"
+          verifier="ci/m3-firefox160-ffvpx-playback-source-crosswalk.jq"
+          test -s "$source" && test -s "$loader" && test -s "$media"
+          compare() {
+            jq -n \
+              --arg upstream "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" \
+              --arg tree "42dd7439a27dde92f89ac5eed13f88117a4d7ab5" \
+              --arg archive "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" \
+              --slurpfile source "$1" --slurpfile loader "$2" --slurpfile media "$3" \
+              -f "$verifier"
+          }
+          compare "$source" "$loader" "$media" \
+            > "$RUNNER_TEMP/firefox160-real-ffvpx-candidate-and-protected-vp9.json"
+          jq -e '
+            .schema_version==1 and
+            .verified_original_source_owner_blobs==10 and
+            .original_source_paths_nonoverlaid_by_vulpra==true and
+            .actual_ffmpeg_denied_loader_attempts==14 and
+            .actual_VP9_decoded_under_system_ffmpeg_denial==true and
+            .all_ffmpeg_denial_attempts_before_video_navigation==true and
+            .ffvpx_was_exact_decoder_in_VP9_playback_proven==false and
+            .actual_FFVPX_missing_provider_guard_exercised==false and
+            .system_ffmpeg_denial_equals_ffvpx_denial==false and
+            .same_webdriver_run_for_loader_and_VP9_denial==false and
+            .complete_rust_CXX_ffi_and_dlopen_dependency_graph_proven==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-real-ffvpx-candidate-and-protected-vp9.json" >/dev/null
+
+          jq '.original_native_archive_sha256="wrong"' "$media" > "$RUNNER_TEMP/fake-media-byte.json"
+          jq '.denied_VP9_playback_passed=false' "$media" > "$RUNNER_TEMP/fake-media-playback.json"
+          jq '.denied_FFmpeg_loader_attempts=0' "$media" > "$RUNNER_TEMP/fake-media-denials.json"
+          jq '.denial_attempts_after_video_navigation=1' "$media" > "$RUNNER_TEMP/fake-media-sequence.json"
+          jq '.specific_VP9_decoder_implementation_identified=true' "$media" > "$RUNNER_TEMP/fake-media-decoder.json"
+          jq '.m3_sixth_gate_closed=true' "$media" > "$RUNNER_TEMP/fake-media-gate.json"
+          jq '.source_routes_crosschecked_with_actual_native_loader_requests=3' "$source" > "$RUNNER_TEMP/fake-source-count.json"
+          jq '(.source_candidate_rows[]|select(.id=="ffvpx_codec")|.candidate_provider)="libspoof.so"' "$source" > "$RUNNER_TEMP/fake-source-provider.json"
+          jq '.source_candidate_rows[0].fallback_exercised=true' "$source" > "$RUNNER_TEMP/fake-source-fallback.json"
+          jq '.initialized_dynamic_request_edges|=map(select(.requested_library_basename!="libmozavcodec.so")) | .initialized_dynamic_request_edge_count-=1' "$loader" > "$RUNNER_TEMP/fake-loader-edge.json"
+          for kind in byte playback denials sequence decoder gate; do
+            if compare "$source" "$loader" "$RUNNER_TEMP/fake-media-$kind.json" >/dev/null 2>&1; then
+              echo "Forged media/denial proof accepted: $kind" >&2; exit 1
+            fi
+          done
+          for kind in count provider fallback; do
+            if compare "$RUNNER_TEMP/fake-source-$kind.json" "$loader" "$media" >/dev/null 2>&1; then
+              echo "Forged FFVPX source route accepted: $kind" >&2; exit 1
+            fi
+          done
+          if compare "$source" "$RUNNER_TEMP/fake-loader-edge.json" "$media" >/dev/null 2>&1; then
+            echo 'Forged actual FFVPX runtime initialized edge accepted' >&2; exit 1
+          fi
+          echo 'PASS: original real FFmpeg-denied Firefox160 VP9 playback reconciled with 10 source blobs and observed FFVPX library initialization; 10/10 forged reports rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: no exact decoder attribution, denial requests during navigation, actual FFVPX missing-provider branch, H264, VAAPI, full FFI/loader/host coverage, pruning or release.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve only scoped source/native/real-media crosswalk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-verified-ffvpx-source-and-vp9-denial-crosswalk-not-fallback-proof
+          path: ${{ runner.temp }}/firefox160-real-ffvpx-candidate-and-protected-vp9.json
+          if-no-files-found: warn
+          retention-days: 30
