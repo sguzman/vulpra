@@ -35,7 +35,8 @@ jobs:
               {owner, repo, run_id, per_page: 100});
             for (const name of [
               'firefox160-vulpra-unreleased-native-preview-not-approved',
-              'firefox160-vulpra-materialized-source-proof'
+              'firefox160-vulpra-materialized-source-proof',
+              'firefox160-vulpra-complete-git-tree-candidate'
             ]) {
               const found = artifacts.filter(a => a.name === name && !a.expired &&
                 a.size_in_bytes > 0 && new Date(a.expires_at) > new Date());
@@ -58,6 +59,14 @@ jobs:
           run-id: 43138458940
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/source
+      - name: Retrieve exact 28-overlay full Git-tree ledger from original build
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43138458940
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/ledger
       - name: Verify original package bytes and exact Mozilla/Vulpra tree identity
         shell: bash
         run: |
@@ -74,6 +83,18 @@ jobs:
             .exact_assembly_tree_match==true and
             .upstream_paths_otherwise_preserved==true
           ' "$source" >/dev/null
+          ledger="$RUNNER_TEMP/ledger/candidate-tree-report.json"
+          overlays="$RUNNER_TEMP/ledger/overlay-paths.txt"
+          test -s "$ledger" && test -s "$overlays"
+          jq -e '
+            .firefox160_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_git_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .source_files_modified==26 and .vulpra_source_files_added==2 and
+            .upstream_files_deleted==0 and .all_other_upstream_files_preserved==true and
+            .security_current==false
+          ' "$ledger" >/dev/null
+          test "$(wc -l < "$overlays")" -eq 28
+          test "$(sort -u "$overlays" | wc -l)" -eq 28
           digest="$(sha256sum "$archive" | cut -d' ' -f1)"
           echo "Authenticated original native package SHA-256: $digest" >> "$GITHUB_STEP_SUMMARY"
           echo 'Original Firefox 160 candidate; UNRELEASED, not security-current.' >> "$GITHUB_STEP_SUMMARY"
@@ -95,6 +116,15 @@ jobs:
           path: ${{ runner.temp }}/source/materialized-candidate.json
           if-no-files-found: error
           retention-days: 90
+      - name: Preserve original verified 28-overlay source ledger for 90 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-complete-git-tree-candidate
+          path: |
+            ${{ runner.temp }}/ledger/candidate-tree-report.json
+            ${{ runner.temp }}/ledger/overlay-paths.txt
+          if-no-files-found: error
+          retention-days: 90
       - name: Verify uploaded preservation artifacts exist and are nonempty
         uses: actions/github-script@v7
         with:
@@ -104,7 +134,8 @@ jobs:
               {owner, repo, run_id: context.runId, per_page: 100});
             for (const name of [
               'firefox160-vulpra-preserved-native-preview-not-approved',
-              'firefox160-vulpra-preserved-materialized-source-proof'
+              'firefox160-vulpra-preserved-materialized-source-proof',
+              'firefox160-vulpra-preserved-complete-git-tree-candidate'
             ]) {
               const matching = artifacts.filter(a => a.name === name && !a.expired && a.size_in_bytes > 0);
               if (matching.length !== 1) throw Error('Preserved artifact missing or ambiguous: ' + name);
