@@ -10,10 +10,10 @@ export class VulpraSeccompProbeChild extends JSWindowActorChild {
         message.data?.token !== "vulpra160-prctl-capbset-read") {
       throw new Error("Unrecognized sandbox test request");
     }
-    const { Services } = ChromeUtils.importESModule(
-      "resource://gre/modules/Services.sys.mjs"
+    const appinfo = Cc["@mozilla.org/xre/app-info;1"].getService(
+      Ci.nsIXULRuntime
     );
-    if (Services.appinfo.processType !== Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT) {
+    if (appinfo.processType !== Ci.nsIXULRuntime.PROCESS_TYPE_CONTENT) {
       throw new Error("Syscall probe was not inside an actual content process");
     }
     const { ctypes } = ChromeUtils.importESModule(
@@ -29,8 +29,8 @@ export class VulpraSeccompProbeChild extends JSWindowActorChild {
       const errno = ctypes.errno;
       return {
         observationKind: "native_prctl_capbset_read_in_real_content",
-        processType: Services.appinfo.processType,
-        processId: Services.appinfo.processID,
+        processType: appinfo.processType,
+        processId: appinfo.processID,
         rv, errno
       };
     } finally {
