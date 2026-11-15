@@ -22,7 +22,6 @@ jobs:
     env:
       VULPRA_M3_COMPILED_SOURCE_SHA: '0624235fdc956ab18af3c3f310b3588ca72fff61'
       VULPRA_M3_VP9_DENIAL_GROUP: 'ffvpx'
-      VULPRA_M3_FFVPX_LOG_OBSERVER: ${{ runner.temp }}/ffvpx-mozlog-observer
     steps:
       - name: Authenticate exact original Firefox160 native producer, preservation and source-owner contract
         uses: actions/github-script@v7
@@ -140,6 +139,8 @@ jobs:
           bash -n ci/m3-packaged-ffmpeg-vp9-video.sh
           bash ci/m3-packaged-ffmpeg-vp9-video.sh --self-test
       - name: Compile narrow FFVPX denial shim and reject wrong-group native fixture
+        env:
+          VULPRA_M3_FFVPX_LOG_OBSERVER: ${{ runner.temp }}/ffvpx-mozlog-observer
         shell: bash
         run: |
           set -euo pipefail
@@ -188,6 +189,8 @@ jobs:
           rm -f "$log" "$RUNNER_TEMP/vulpra_ffvpx_probe"
           echo 'PASS: source-scoped native shim FFVPX denies only both mozav* libraries; FFmpeg group remains separate'
       - name: Actual original Firefox160 WebDriver video baseline versus bundled FFVPX loader denial
+        env:
+          VULPRA_M3_FFVPX_LOG_OBSERVER: ${{ runner.temp }}/ffvpx-mozlog-observer
         shell: bash
         timeout-minutes: 15
         run: |
