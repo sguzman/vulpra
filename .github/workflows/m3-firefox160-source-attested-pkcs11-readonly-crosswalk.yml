@@ -56,7 +56,7 @@ jobs:
           name: firefox160-independent-original-real-trusted-local-nss-TLS-not-release
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/tls
-      - name: Download real source-pinned original NSS PKCS11 slot/SAH256/read-only FIPS API result
+      - name: Download real source-pinned original NSS PKCS11 slot/SHA256/read-only FIPS API result
         uses: actions/download-artifact@v4
         with:
           repository: sguzman/vulpra
@@ -98,7 +98,7 @@ jobs:
             .three_provider_missing_NSS_initializations_fail_without_process_crash==true and
             .actual_trusted_local_RSA_CA_https_webdriver_success_in_separate_real_browser_run==true and
             .cannot_claim_FIPS_mode_test_or_140_certification==true and
-            .no_complete_Rust_CXX_FFI_dlopen_dlsym_dependency_closure==null and
+            .complete_Rust_CXX_FFI_dlopen_dlsym_closure_unproven==true and
             .source_pruning_authorized==false and
             .security_current==false and .release_ready==false and
             .m3_sixth_gate_closed==false
