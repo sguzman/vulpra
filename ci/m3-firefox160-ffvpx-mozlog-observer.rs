@@ -28,6 +28,8 @@ struct Tally {
     media_format_reader_ffmpeg_video_decoder_inits: u64,
     media_format_reader_other_video_decoder_inits: u64,
     source_defined_video_decoder_descriptions: BTreeSet<String>,
+    mediaformatreader_video_update_log_count: u64,
+    resolved_post_frame_video_decoder_descriptions: BTreeSet<String>,
     total_lines: u64,
 }
 // Only code-defined MediaFormatReader GetDescriptionName() strings, not whole
@@ -70,6 +72,27 @@ fn classify(line:&str, t:&mut Tally) {
     // after a decoder's successful Init(), using GetDescriptionName().
     // Only recognize immutable, literal description allowlist strings.
     // Never serialize unknown video names, log lines, or user-provided fields.
+    // MediaFormatReader::Update() prints mDescription after the first video
+    // output sets it from mVideo.mDecoder->GetDescriptionName() again.
+    // Exclude the MediaChangeMonitor "(pending)" wrapper name.
+    if line.contains("MediaFormatReader") &&
+       line.to_ascii_lowercase().contains("update(video)") &&
+       line.contains(" desc:") {
+        t.mediaformatreader_video_update_log_count+=1;
+        if let Some((_,rest))=line.split_once(" desc:") {
+            if let Some((name,_))=rest.split_once(" pending:") {
+                // Reuse the same path/PID/quote-rejecting safety grammar.
+                let encoded=format!("description: \"{name}\"");
+                if !name.contains("(pending)") {
+                    if let Some(clean)=safe_description(&encoded) {
+                        if t.resolved_post_frame_video_decoder_descriptions.len()<8 {
+                            t.resolved_post_frame_video_decoder_descriptions.insert(clean.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
     if line.contains("MediaFormatReader") &&
        line.contains("Decoder init finished for video codec:") {
         t.media_format_reader_video_decoder_init_lines+=1;
@@ -151,6 +174,8 @@ fn json(t:&Tally)->String{
         "\"mediaformatreader_ffmpeg_decoder_initialized_count\":{},",
         "\"mediaformatreader_unclassified_decoder_initialized_count\":{},",
         "\"mediaformatreader_safely_bounded_code_defined_decoder_descriptions\":[{}],",
+        "\"mediaformatreader_video_update_log_count\":{},",
+        "\"mediaformatreader_resolved_post_frame_video_decoder_descriptions\":[{}],",
         "\"actual_FFVPX_NoProvidedLib_source_log_observed\":{},",
         "\"specific_video_decoder_selected_from_these_log_markers\":false,",
         "\"direct_compiled_FFVPX_machine_branch_proven\":false,",
@@ -166,6 +191,9 @@ fn json(t:&Tally)->String{
       t.media_format_reader_ffmpeg_video_decoder_inits,
       t.media_format_reader_other_video_decoder_inits,
       t.source_defined_video_decoder_descriptions.iter()
+        .map(|n|format!("\"{n}\"")).collect::<Vec<_>>().join(","),
+      t.mediaformatreader_video_update_log_count,
+      t.resolved_post_frame_video_decoder_descriptions.iter()
         .map(|n|format!("\"{n}\"")).collect::<Vec<_>>().join(","),
       if t.ffvpx_link_no_provided_lib>0 {"true"} else {"false"})
 }
@@ -194,7 +222,9 @@ mod tests {
             "[RDD 321: Media]: D/PlatformDecoderModule Agnostic decoder supports requested type 'video/vp9'",
             "[RDD 321: Media]: D/FFmpegVideo FFVPX: unable to load library /private/noshow.so",
             "[RDD 321: Media]: D/PlatformDecoderModule FFVPX: Link result: Success",
-            "[RDD 321: Media]: D/MediaFormatReader Decoder init finished for video codec: \"vp9\", description: \"libvpx video decoder\", process: \"RDD\""
+            "[RDD 321: Media]: D/MediaFormatReader Decoder init finished for video codec: \"vp9\", description: \"libvpx video decoder\", process: \"RDD\"",
+            "[RDD 321: Media]: V/MediaFormatReader ::Update: Update(video) ni=1 no=1 in:1 out:2 qs=0 decoding:false flushing:false desc:MediaChangeMonitor decoder (pending) pending:0 waiting:false",
+            "[RDD 321: Media]: V/MediaFormatReader ::Update: Update(video) ni=1 no=1 in:1 out:2 qs=0 decoding:false flushing:false desc:libvpx video decoder pending:0 waiting:false"
         ] {classify(line,&mut t);}
         assert_eq!(t.ffvpx_link_no_provided_lib,1);
         assert_eq!(t.ffvpx_link_success,1);
@@ -204,6 +234,9 @@ mod tests {
         assert_eq!(t.media_format_reader_libvpx_video_decoder_inits,1);
         assert_eq!(t.media_format_reader_ffvpx_video_decoder_inits,0);
         assert_eq!(t.media_format_reader_video_decoder_init_lines,1);
+        assert_eq!(t.mediaformatreader_video_update_log_count,2);
+        assert_eq!(t.resolved_post_frame_video_decoder_descriptions.len(),1);
+        assert!(t.resolved_post_frame_video_decoder_descriptions.contains("libvpx video decoder"));
         assert!(t.source_defined_video_decoder_descriptions.contains("libvpx video decoder"));
         let sanitized=json(&t);
         assert!(sanitized.contains("\"actual_FFVPX_NoProvidedLib_source_log_observed\":true"));
