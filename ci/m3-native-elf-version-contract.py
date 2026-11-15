@@ -288,6 +288,7 @@ Version definition section '.gnu.version_d' contains 2 entries:
 
 
 def main():
+    global SOURCE, ARCHIVE
     parser = argparse.ArgumentParser()
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--output", type=Path)
@@ -295,7 +296,6 @@ def main():
     parser.add_argument("--source-commit",
                         choices=[SOURCE, "2887d9de1f69c0e9776413da80e7ba0d1225dd9b"])
     parser.add_argument("--archive-sha256")
-    global SOURCE, ARCHIVE
     args = parser.parse_args()
     # The historical original workflow still uses the exact built-in SHA
     # and source pin. Firefox 160 opt-in must supply BOTH and its archive
