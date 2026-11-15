@@ -143,6 +143,8 @@ jobs:
               geckodriver --version | grep -Fq "geckodriver 0.37.1"
               python ci/security-160-real-content-prctl.py \
                 /workspace /reports/firefox160-arch-content-prctl-proof.json
+              python ci/security-160-real-content-prctl.py --home-write \
+                /workspace /reports/firefox160-arch-content-home-write-proof.json
             '
           digest="$(sha256sum "$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz" | cut -d' ' -f1)"
           jq -e --arg digest "$digest" '
@@ -159,7 +161,22 @@ jobs:
             .no_sandbox_prefs_or_host_kernel_policy_relaxed==true and
             .security_current==false and .release_ready==false
           ' "$RUNNER_TEMP/firefox160-arch-content-prctl-proof.json" >/dev/null
-          echo 'PASS: authentic Firefox 160 Arch-userland tab worker denied PR_CAPBSET_READ.' >> "$GITHUB_STEP_SUMMARY"
+          jq -e --arg digest "$digest" '
+            .schema_version==1 and .status=="pass" and
+            .native_package_sha256==$digest and
+            .same_browser_parent_home_write_control_succeeded==true and
+            .same_browser_parent_home_write_canary_removed==true and
+            .native_open_create_home_content_worker_denied==true and
+            .actual_chromeutils_tab_role_authenticated==true and
+            .same_tab_pid_has_seccomp_mode_2==true and
+            .same_tab_seccomp_mode_2_at_syscall==true and
+            .same_tab_pid_has_no_new_privileges==true and
+            .filesystem_denial_not_exclusively_attributed_to_seccomp==true and
+            .original_firefox_profile_preserved==true and
+            .raw_pids_or_user_data_archived==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-arch-content-home-write-proof.json" >/dev/null
+          echo 'PASS: authentic Arch-userland Firefox 160 tab denied prctl and disposable HOME create.' >> "$GITHUB_STEP_SUMMARY"
           echo 'LIMIT: disposable Docker userland, NOT target EndeavourOS/Hyprland kernel or GPU.' >> "$GITHUB_STEP_SUMMARY"
       - name: Archive bounded Arch-userland security outcome and image provenance
         if: always()
@@ -168,6 +185,7 @@ jobs:
           name: firefox160-arch-userland-real-content-prctl-not-target-release
           path: |
             ${{ runner.temp }}/firefox160-arch-content-prctl-proof.json
+            ${{ runner.temp }}/firefox160-arch-content-home-write-proof.json
             ${{ runner.temp }}/arch-base-image-digest.txt
           if-no-files-found: warn
           retention-days: 30
