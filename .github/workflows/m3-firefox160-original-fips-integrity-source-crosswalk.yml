@@ -1,0 +1,171 @@
+# Independent immutable original Firefox160 FIPS error vs source and actual
+# file syscall traces: confirm no .chk read occurred before return -8023.
+name: M3 Firefox 160 Original FIPS Device-Error Integrity Trace Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-original-fips-integrity-source-crosswalk.yml
+      - ci/m3-firefox160-fips-integrity-source-trace-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-original-fips-before-chk-abi-proof:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate both original FIPS negative and actual bounded syscall producer runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43767128907,'f97c4a42bf6fb8d11d99248dfc7a9c1f9d81da7e',
+                'M3 Firefox 160 Ephemeral FIPS Request Device-Error Crosswalk',
+                'firefox160-authenticated-original-FIPS-request-device-error-not-validated-FIPS'],
+              [43769978149,'baa726d935d7f5e2c861b34e86a3455a29494585',
+                'M3 Firefox 160 Original NSS FIPS Integrity Filesystem Witness',
+                'firefox160-original-fips-chk-file-access-witness-not-FIPS-success']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Untrusted original Firefox160 real FIPS error/strace producer '+id);
+              const ars=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(ars.filter(a=>a.name===artifact&&!a.expired&&a.size_in_bytes>0 &&
+                  new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Original FIPS error/strace evidence unavailable or ambiguous: '+artifact);
+            }
+      - name: Checkout only strict original source/native FIPS trace crosswalk
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-fips-integrity-source-trace-crosswalk.jq
+      - name: Verify exact official Mozilla source-defined FIPS integrity trace and error flags
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: original-firefox160
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/nss/lib/softoken/fipstokn.c
+            security/nss/lib/softoken/fipstest.c
+            security/nss/lib/freebl/shvfy.c
+            security/nss/lib/freebl/shsign.h
+      - name: Confirm exact FIPS entry-before-POST, checksum name and source code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          up=original-firefox160
+          test "$(git -C "$up" rev-parse HEAD)" = \
+            '2887d9de1f69c0e9776413da80e7ba0d1225dd9b'
+          while read -r sha path; do
+            test "$(git -C "$up" rev-parse "HEAD:$path")" = "$sha"
+            test "$(git -C "$up" hash-object "$path")" = "$sha"
+          done <<'ORIGINAL'
+          4f5a4c9fa639388fd76a1b14a58ebc3c5801e49c security/nss/lib/softoken/fipstokn.c
+          cd444f99b8f85c8a953efd4db08d7570f891b8d4 security/nss/lib/softoken/fipstest.c
+          4743eb46ecb2b296fa7a11c98ab85ce2c7e1ba90 security/nss/lib/freebl/shvfy.c
+          d1a595a3913e851a99e356ca86a49e0d3bb3d88e security/nss/lib/freebl/shsign.h
+          ORIGINAL
+          grep -Fq 'crv = sftk_FIPSEntryOK(rerun);' "$up/security/nss/lib/softoken/fipstokn.c"
+          grep -Fq 'crv = nsc_CommonInitialize(pReserved, PR_TRUE);' "$up/security/nss/lib/softoken/fipstokn.c"
+          grep -Fq 'if (!sftk_self_tests_success)' "$up/security/nss/lib/softoken/fipstest.c"
+          grep -Fq 'if (!BLAPI_SHVerify(libraryName,' "$up/security/nss/lib/softoken/fipstest.c"
+          grep -Fq 'checkFD = PR_Open(checkName, PR_RDONLY, 0);' "$up/security/nss/lib/freebl/shvfy.c"
+          grep -Fq '#define SGN_SUFFIX ".chk"' "$up/security/nss/lib/freebl/shsign.h"
+          echo 'PASS: four independently source-pinned exact upstream Firefox160 FIPS gate/integrity-file definitions' >> "$GITHUB_STEP_SUMMARY"
+      - name: Download previously source-attested original FIPS init device-error
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-authenticated-original-FIPS-request-device-error-not-validated-FIPS
+          repository: sguzman/vulpra
+          run-id: 43767128907
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/prior
+      - name: Download actual original native NSS filesystem trace, bounded counts only
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-original-fips-chk-file-access-witness-not-FIPS-success
+          repository: sguzman/vulpra
+          run-id: 43769978149
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/trace
+      - name: Cross-verify source/native FIPS device error and reject sixteen deliberate false reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          prior="$RUNNER_TEMP/prior/verified-original-firefox160-FIPS-request-device-error.json"
+          actual="$RUNNER_TEMP/trace/actual-original-fips-integrity-access-witness.json"
+          verify=ci/m3-firefox160-fips-integrity-source-trace-crosswalk.jq
+          test -s "$prior" && test -s "$actual"
+          crosswalk() {
+            jq -n --arg source '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile prior "$1" --slurpfile trace "$2" -f "$verify"
+          }
+          crosswalk "$prior" "$actual" > \
+            "$RUNNER_TEMP/source-verified-real-original-FIPS-pre-chk-device-error.json"
+          jq -e '
+            .schema_version==1 and
+            .unchanged_original_compiled_native_archive_sha256==
+              "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .original_FIPS_requested_NSS_Init_returns_PKCS11_device_error==true and
+            .original_native_archive_missing_softoken_and_freebl_chk_files==true and
+            .actual_strace_file_syscalls_observed_in_normal_mode==254 and
+            .actual_strace_file_syscalls_observed_in_FIPS_requested_mode==194 and
+            .actual_libsoftokn3_chk_attempts_in_FIPS_requested_mode==0 and
+            .actual_libfreeblpriv3_chk_attempts_in_FIPS_requested_mode==0 and
+            .FIPS_device_error_directly_caused_by_missing_chk_read_proven==false and
+            .NSS_FIPS_DISABLED_compile_flag_witnessed_in_original_binary==false and
+            .actual_FIPS_selftest_failing_substep_identified==false and
+            .full_Rust_CXX_FFI_dlopen_dlsym_graph_closed==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/source-verified-real-original-FIPS-pre-chk-device-error.json" >/dev/null
+
+          jq '.official_original_mozilla_firefox160_source_commit="forged"' "$prior" > "$RUNNER_TEMP/prior-source.json"
+          jq '.original_compiled_browser_archive_sha256="forged"' "$prior" > "$RUNNER_TEMP/prior-archive.json"
+          jq '.source_defined_PKCS11_DEVICE_ERROR_code=0' "$prior" > "$RUNNER_TEMP/prior-error.json"
+          jq '.original_temporary_FIPS_mode_usable_by_archived_Firefox160_NSS=true' "$prior" > "$RUNNER_TEMP/prior-fips.json"
+          jq '.m3_sixth_gate_closed=true' "$prior" > "$RUNNER_TEMP/prior-gate.json"
+          jq '.original_native_browser_archive_sha256="forged"' "$actual" > "$RUNNER_TEMP/now-archive.json"
+          jq '.original_native_package_contains_libsoftokn3_chk=true' "$actual" > "$RUNNER_TEMP/now-softokenchk.json"
+          jq '.actual_syscall_tracing_executed_and_original_NSS_ELFs_accessed=false' "$actual" > "$RUNNER_TEMP/now-liveness.json"
+          jq '.modes[1].original_packaged_NSS_Init_error_code=0' "$actual" > "$RUNNER_TEMP/now-device.json"
+          jq '.modes[1].actual_softoken_chk_filesystem_attempts=1' "$actual" > "$RUNNER_TEMP/now-softoken-open.json"
+          jq '.modes[1].actual_freebl_chk_ENOENT_missing_events=1' "$actual" > "$RUNNER_TEMP/now-freebl-open.json"
+          jq '.modes[1].actual_file_syscalls_observed_in_source_pinned_original_process=0' "$actual" > "$RUNNER_TEMP/now-syscalls.json"
+          jq '.modes[1].original_softoken_so_file_syscall_mentions=0' "$actual" > "$RUNNER_TEMP/now-elf.json"
+          jq '.missing_chk_was_proven_the_only_possible_fatal_cause=true' "$actual" > "$RUNNER_TEMP/now-cause.json"
+          jq '.original_FIPS_build_flags_completely_recovered=true' "$actual" > "$RUNNER_TEMP/now-build.json"
+          jq '.m3_sixth_gate_closed=true' "$actual" > "$RUNNER_TEMP/now-gate.json"
+          for type in source archive error fips gate; do
+            if crosswalk "$RUNNER_TEMP/prior-$type.json" "$actual" >/dev/null 2>&1; then
+              echo "FAIL: forged previous original FIPS source evidence accepted: $type" >&2; exit 1
+            fi
+          done
+          for type in archive softokenchk liveness device softoken-open freebl-open syscalls elf cause build gate; do
+            if crosswalk "$prior" "$RUNNER_TEMP/now-$type.json" >/dev/null 2>&1; then
+              echo "FAIL: forged original FIPS filesystem/certification evidence accepted: $type" >&2; exit 1
+            fi
+          done
+          echo 'PASS: exact original Firefox160 native FIPS DB device error -8023; 194 actual file syscalls and original library reads but ZERO .chk attempts, regardless of absent package .chk files; 16/16 false original source/runtime claims rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: no identified selftest/compiled FIPS-disable cause, absent .chk files are not proven to explain this early failure; no source removal/security or M3 FFI closure.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve only bounded independent original FIPS source/native no-chk-access result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-original-source-attested-fips-device-error-before-chk-access
+          path: ${{ runner.temp }}/source-verified-real-original-FIPS-pre-chk-device-error.json
+          if-no-files-found: warn
+          retention-days: 30
