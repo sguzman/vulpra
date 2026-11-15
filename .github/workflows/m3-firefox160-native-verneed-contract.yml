@@ -124,7 +124,7 @@ jobs:
           ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
           (cd "$RUNNER_TEMP/native" && sha256sum -c vulpra-firefox160-native-ci.tar.xz.sha256)
           digest="$(sha256sum "$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz" | cut -d' ' -f1)"
-          jq -e --arg digest "$digest" '
+          jq -e --arg digest "$digest" --arg os "${{ matrix.os }}" '
             .schema_version==1 and .archive_sha256==$digest and
             .firefox160_candidate_git_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
             .firefox160_upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
@@ -148,6 +148,10 @@ jobs:
             .schema_version==1 and
             .source_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
             .original_archive_sha256==$digest and
+            .scanned_userspace_id=="ubuntu" and
+            .scanned_userspace_version==($os|ltrimstr("ubuntu-")) and
+            (.host|startswith("Ubuntu "+($os|ltrimstr("ubuntu-"))+" x86-64 CI userspace")) and
+            .target_host_kernel_verified==false and
             .scanned_native_elf_files==28 and
             .native_elf_declared_version_requirements>=300 and
             .native_elf_declared_version_requirements<=900 and
