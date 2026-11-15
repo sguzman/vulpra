@@ -118,7 +118,7 @@ jobs:
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/firefox160-real-ffvpx-candidate-and-protected-vp9.json" >/dev/null
 
-          jq '.original_native_archive_sha256="wrong"' "$media" > "$RUNNER_TEMP/fake-media-byte.json"
+          jq '.normal_packaged_archive_sha256="wrong"' "$media" > "$RUNNER_TEMP/fake-media-byte.json"
           jq '.denied_VP9_playback_passed=false' "$media" > "$RUNNER_TEMP/fake-media-playback.json"
           jq '.denied_FFmpeg_loader_attempts=0' "$media" > "$RUNNER_TEMP/fake-media-denials.json"
           jq '.denial_attempts_after_video_navigation=1' "$media" > "$RUNNER_TEMP/fake-media-sequence.json"
