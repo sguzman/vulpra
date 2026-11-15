@@ -74,19 +74,20 @@ run_case() {
       --argjson free "$free" --argjson total "$total" \
       --argjson attached "$attached" '
       input as $line |
-      if ($line|test("^PKCS11_TEMP_FIPS_V1( [a-z0-9_]+=-?[0-9]{1,4}){16}$")) then
+      if ($line|test("^PKCS11_TEMP_FIPS_V1( [a-z0-9_]+=-?[0-9]{1,6}){17}$")) then
         ($line|split(" ")[1:]|map(split("=")|
           {key:.[0],value:(.[1]|tonumber)})|from_entries) as $p |
         if ($p|keys|sort)==(
           ["original_nss_open","exact_symbols","init","fips","system_fips",
            "internal_slot","internal_key_slot","slot_present",
            "key_slot_present","sha256_mechanism","rng","rng_nonzero",
-           "shutdown","softoken_mapped","freebl_mapped","same_slot"]|sort) then
+           "shutdown","softoken_mapped","freebl_mapped","same_slot","init_error"]|sort) then
           {
             mode:$mode,denial_group:$group,probe_exit:$status,
             original_libnss3_open:$p.original_nss_open,
             original_NSS_symbols_exact_ownership:$p.exact_symbols,
             original_NSS_Init_sql_rc:$p.init,
+            original_NSS_Init_error_code:$p.init_error,
             original_PK11_IsFIPS_mode:$p.fips,
             runner_system_FIPS_indicator_read_only:$p.system_fips,
             internal_slot_obtained:$p.internal_slot,
@@ -117,6 +118,7 @@ run_case() {
   fi
   jq -r '"AUDIT: original NSS SQL "+.mode+
     " NSS_Init="+(.original_NSS_Init_sql_rc|tostring)+
+    " NSS_error="+(.original_NSS_Init_error_code|tostring)+
     " FIPS_mode="+(.original_PK11_IsFIPS_mode|tostring)+
     " same_slot="+(.internal_default_and_key_slot_same_identity|tostring)+
     " sha256="+(.original_CKM_SHA256_mechanism_supported|tostring)+
