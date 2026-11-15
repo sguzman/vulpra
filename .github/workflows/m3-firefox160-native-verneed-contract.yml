@@ -144,7 +144,7 @@ jobs:
             --source-commit 2887d9de1f69c0e9776413da80e7ba0d1225dd9b \
             --archive-sha256 "$digest" --archive "$archive" \
             --output "$RUNNER_TEMP/firefox160-elf-version-contract-${{ matrix.os }}.json"
-          jq -e --arg digest "$digest" '
+          jq -e --arg digest "$digest" --arg os "${{ matrix.os }}" '
             .schema_version==1 and
             .source_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
             .original_archive_sha256==$digest and
