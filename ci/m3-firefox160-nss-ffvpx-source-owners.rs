@@ -61,7 +61,7 @@ const OWNERS:[Owner;10]=[
     },
     Owner{
         path:"security/nss/lib/freebl/manifest.mn",
-        git_blob:"39633d5b46d331f8e7987250c74a29251633461",
+        git_blob:"39633d5b46d331f8e7987250c74a29251633461d",
         tokens:&[
             "FREEBL_LOWHASH = 1",
             "LIBRARY_NAME = freeblpriv",
