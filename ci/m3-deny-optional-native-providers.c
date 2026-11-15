@@ -58,6 +58,11 @@ static bool group_matches(const char *group, const char *name) {
   if (!strcmp(group, "gbm")) return gbm;
   if (!strcmp(group, "vaapi")) return va;
   if (!strcmp(group, "ffmpeg")) return ff;
+  // Opt-in double-provider failure only: both packaged FFVPX native names
+  // and system FFmpeg libavcodec candidates. Preserve single-group semantics.
+  if (!strcmp(group, "ffvpx_ffmpeg"))
+    return ff || !strcmp(base, "libmozavcodec.so") ||
+           !strcmp(base, "libmozavutil.so");
   // Bundled FFVPX is distinct from host FFmpeg. Target only its two
   // actual packaged native SONAMEs, never generic libavcodec libraries.
   if (!strcmp(group, "ffvpx"))
