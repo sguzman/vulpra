@@ -1,0 +1,269 @@
+# Original byte-pinned Firefox160 native NSS API, exercised directly without
+# deleting any shared library or starting a personal browser. Missing
+# softoken/FreeBL and combined failures are observed, not assumed graceful.
+name: M3 Firefox 160 Trusted Local NSS CA HTTPS and Missing-Provider Replay
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-nss-browser-trusted-local-ca.yml
+      - ci/m3-firefox160-browser-nss-local-tls-replay.py
+      - ci/m3-firefox160-original-nss-trusted-local-tls.py
+      - ci/m3-deny-optional-native-providers.c
+      - ci/m3-firefox160-original-nss-api-probe.c
+      - ci/m3-firefox160-nss-guarded-provider-replay.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-native-nss-missing-provider-apis:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Authenticate source-pinned original compiled Firefox160 archive and NSS owner producer
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)',
+                'firefox160-vulpra-preserved-native-preview-not-approved'],
+              [43745057569,'b43a2309f5d6557ac0ba86874563544a7f973574',
+                'M3 Firefox 160 Exact NSS FFVPX Loader Source Ownership',
+                'firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra'||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype'||
+                 r.head_sha!==sha||r.name!==name||
+                 r.status!=='completed'||r.conclusion!=='success')
+                throw Error('Untrusted original NSS browser archive/source producer '+id);
+              const arts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(arts.filter(a=>a.name===artifact&&!a.expired&&a.size_in_bytes>0 &&
+                   new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Missing/expired NSS original source or native artifact '+artifact);
+            }
+      - name: Checkout only native NSS fixture, guarded-denial shim and replay script
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-deny-optional-native-providers.c
+            ci/m3-firefox160-original-nss-api-probe.c
+            ci/m3-firefox160-nss-guarded-provider-replay.sh
+            ci/m3-firefox160-browser-nss-local-tls-replay.py
+            ci/m3-firefox160-original-nss-trusted-local-tls.py
+      - name: Checkout six exact official upstream Firefox160 NSS source/loader files
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: upstream-original-nss
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/nss/lib/pk11wrap/pk11load.c
+            security/nss/lib/softoken/manifest.mn
+            security/nss/lib/freebl/loader.c
+            security/nss/lib/freebl/genload.c
+            security/nss/lib/freebl/blname.c
+            security/nss/lib/freebl/manifest.mn
+      - name: Verify six NSS original Git blob identities and native guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          root=upstream-original-nss
+          test "$(git -C "$root" rev-parse HEAD)" = \
+            '2887d9de1f69c0e9776413da80e7ba0d1225dd9b'
+          while read -r blob path; do
+            test "$(git -C "$root" rev-parse "HEAD:$path")" = "$blob"
+            test "$(git -C "$root" hash-object -- "$path")" = "$blob"
+          done <<'SOURCES'
+          3fb57828311d699b14d26eb213d6029dd11d66dd security/nss/lib/pk11wrap/pk11load.c
+          43ebfd8a6113a5141f4d09ecef73070b78b261a1 security/nss/lib/softoken/manifest.mn
+          bb8fe3a7f9cf16a14154f5eb5b5c1ea376c7c093 security/nss/lib/freebl/loader.c
+          e3231e3e527f463b47148b74cb3d7b39ab31456a security/nss/lib/freebl/genload.c
+          4bad74ada087feb407a03f811b8e52d0856bb163 security/nss/lib/freebl/blname.c
+          39633d5b46d331f8e7987250c74a29251633461d security/nss/lib/freebl/manifest.mn
+          SOURCES
+          grep -Fq 'PORT_LoadLibraryFromOrigin(my_shlib_name,' "$root/security/nss/lib/pk11wrap/pk11load.c"
+          grep -Fq 'PR_CallOnce(&loadSoftokenOnce, &softoken_LoadDSO)' "$root/security/nss/lib/pk11wrap/pk11load.c"
+          grep -Fq 'return SECFailure;' "$root/security/nss/lib/pk11wrap/pk11load.c"
+          grep -Fq 'PR_FindFunctionSymbol(handle, "FREEBL_GetVector")' "$root/security/nss/lib/freebl/loader.c"
+          grep -Fq 'if (!vector && PR_SUCCESS != freebl_RunLoaderOnce())' "$root/security/nss/lib/freebl/loader.c"
+          grep -Fq 'PR_LoadLibraryWithFlags(libSpec, PR_LD_NOW | PR_LD_LOCAL)' "$root/security/nss/lib/freebl/genload.c"
+          grep -Fq 'SHLIB_PREFIX "freeblpriv" SHLIB_VERSION "." SHLIB_SUFFIX' "$root/security/nss/lib/freebl/blname.c"
+          grep -Fq 'LIBRARY_NAME = freeblpriv' "$root/security/nss/lib/freebl/manifest.mn"
+          grep -Fq 'LIBRARY_NAME = softokn' "$root/security/nss/lib/softoken/manifest.mn"
+          echo 'PASS: six official Firefox160 NSS FreeBL/softoken original guarded-loader Git blobs, immutable release' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retrieve exact preserved original Firefox160 compiled browser package
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/original
+      - name: Retrieve independent original four-NSS-FFVPX protected source route proof
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks
+          repository: sguzman/vulpra
+          run-id: 43745057569
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/owners
+      - name: Verify exact original package/source contract and unpack into temporary CI directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          owners="$RUNNER_TEMP/owners/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .official_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_candidate_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .original_native_archive_sha256=="530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .original_exact_source_verified_blob_count==10 and
+            .original_source_files_nonoverlaid_by_vulpra==true and
+            ([.source_candidate_rows[]|
+              select(.id=="nss_softoken" or .id=="nss_freebl")|.candidate_provider]|sort)==
+              ["libfreeblpriv3.so","libsoftokn3.so"] and
+            .exact_runtime_loader_caller_source_function_verified==false and
+            .all_conditional_ffi_and_protected_fallbacks_exercised==false and
+            .m3_sixth_gate_closed==false
+          ' "$owners" >/dev/null
+          archive="$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive"|cut -d' ' -f1)" = \
+            '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb'
+          mkdir -p "$RUNNER_TEMP/nss-original-app"
+          tar -xf "$archive" -C "$RUNNER_TEMP/nss-original-app"
+          find "$RUNNER_TEMP/nss-original-app" -type f -name libnss3.so -print > \
+            "$RUNNER_TEMP/nss-original-candidates.txt"
+          test "$(wc -l < "$RUNNER_TEMP/nss-original-candidates.txt")" -eq 1
+          path="$(cat "$RUNNER_TEMP/nss-original-candidates.txt")"
+          printf 'NSS_ORIGINAL_PATH=%s\n' "$path" >> "$GITHUB_ENV"
+          for name in libnss3.so libsoftokn3.so libfreeblpriv3.so libnspr4.so; do
+            test -s "$(dirname "$path")/$name"
+          done
+      - name: Install original native Firefox160 browser dependencies and SHA-pinned GeckoDriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends openssl jq python3 curl libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libnss3-tools libgbm1
+          file="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl --fail --location --show-error --silent --retry 3 --max-time 90 \
+            -o "$file" 'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
+          tar -xzf "$file" -C "$RUNNER_TEMP" geckodriver
+          test -x "$RUNNER_TEMP/geckodriver"
+          python3 -m py_compile ci/m3-firefox160-browser-nss-local-tls-replay.py
+          python3 ci/m3-firefox160-browser-nss-local-tls-replay.py --self-test
+          python3 -m py_compile ci/m3-firefox160-original-nss-trusted-local-tls.py
+          python3 ci/m3-firefox160-original-nss-trusted-local-tls.py --self-test
+      - name: Compile small native original NSS API probe and provider-denial shim
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            ci/m3-firefox160-original-nss-api-probe.c \
+            -o "$RUNNER_TEMP/vulpra_nss_probe" -ldl
+          cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared \
+            ci/m3-deny-optional-native-providers.c \
+            -o "$RUNNER_TEMP/vulpra-deny-native-nss.so" -ldl
+          bash -n ci/m3-firefox160-nss-guarded-provider-replay.sh
+      - name: Run genuine original NSS init, RNG and independent missing-provider outcomes
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          bash ci/m3-firefox160-nss-guarded-provider-replay.sh \
+            "$NSS_ORIGINAL_PATH" "$RUNNER_TEMP/vulpra-deny-native-nss.so" \
+            "$RUNNER_TEMP/vulpra_nss_probe" \
+            "$RUNNER_TEMP/firefox160-original-nss-guarded-provider-observation.json"
+          jq -e '
+            .schema_version==1 and
+            .baseline_original_NSS_initialized_and_generated_random==true and
+            .genuine_original_packaged_nss3_API_invoked==true and
+            .actual_real_firefox_browser_or_TLS_flow_tested==false and
+            .all_NSS_PKCS11_FIPS_crypto_security_paths_tested==false and
+            .original_NSS_direct_dlopen_machine_callstacks_proven==false and
+            .complete_Rust_CXX_FFI_dlopen_dlsym_graph_closed==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-original-nss-guarded-provider-observation.json" >/dev/null
+          jq -r '"AUDIT: original source-pinned NSS softoken_denied_observed="+
+             (.original_softoken_denial_actually_observed|tostring)+
+             " freebl_denied_observed="+(.original_freebl_denial_actually_observed|tostring)+
+             " both_names_actually_denied_in_combined_mode="+
+             (.combined_mode_both_named_denials_actually_observed|tostring)+
+             " all_denied_processes_graceful="+
+             (.all_missing_provider_tests_completed_without_process_crash_or_timeout|tostring)' \
+             "$RUNNER_TEMP/firefox160-original-nss-guarded-provider-observation.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Real original Firefox160 untrusted then disposable CA-trusted local TLS with NSS denial
+        shell: bash
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          appdir="$(dirname "$NSS_ORIGINAL_PATH")"
+          test -s "$appdir/application.ini"
+          grep -Fxq 'Name=Vulpra' "$appdir/application.ini"
+          python3 ci/m3-firefox160-original-nss-trusted-local-tls.py \
+            "$appdir" "$RUNNER_TEMP/vulpra-deny-native-nss.so" \
+            "$RUNNER_TEMP/geckodriver" \
+            "$RUNNER_TEMP/firefox160-original-real-trusted-local-nss-tls.json"
+          report="$RUNNER_TEMP/firefox160-original-real-trusted-local-nss-tls.json"
+          jq -e --arg head "$GITHUB_SHA" '
+            .schema_version==1 and
+            .status=="firefox160_original_actual_trusted_disposable_NSS_CA_local_HTTPS_browser_and_denial" and
+            .test_harness_commit==$head and
+            .original_official_firefox160_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .original_vulpra_28_overlay_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .original_compiled_browser_archive_sha256=="530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .real_original_Firefox160_native_elf_used==true and
+            .actual_localhost_TLS_server_with_ephemeral_CA_verified_by_host==true and
+            .ephemeral_local_CA_not_trusted_by_default_system_client==true and
+            .temporary_NSS_cert9_key4_database_profile_only==true and
+            .temporary_NSS_database_bytes_unchanged==true and
+            .temporary_CA_profile_encoded_as_geckodriver_base64_ZIP==true and
+            .acceptInsecureCerts_never_enabled==true and
+            .untrusted_original_browser_rejected_same_local_https_server==true and
+            .trusted_original_browser_verified_actual_secure_https_document_and_JS==true and
+            .denied_softoken_actual_named_request_seen==true and
+            .denied_freebl_actual_named_request_seen==true and
+            .all_disposable_profile_sentinels_preserved==true and
+            .system_NSS_trust_store_or_user_profiles_modified==false and
+            .raw_CA_keys_geckodriver_logs_paths_PIDs_profiles_archived==false and
+            .direct_compiled_NSS_dlopen_callsite_or_full_Rust_CXX_FFI_proven==false and
+            .real_external_TLS_or_public_sites_tested==false and
+            .all_NSS_FIPS_PKCS11_browser_security_paths_proven==false and
+            .source_pruning_authorized==false and
+            .security_current==false and
+            .release_ready==false and .m3_sixth_gate_closed==false and
+            ([.modes[].mode]|sort)==["trusted","trusted_both_targeted","trusted_freebl_denied","trusted_softoken_denied","untrusted"] and
+            all(.modes[];
+              .private_profile_sentinel_preserved==true and
+              .unexpected_native_provider_denial_lines==0 and
+              .raw_log_keys_geckodriver_errors_profile_paths_or_pids_archived==false and
+              .accept_insecure_certs!=true)
+          ' "$report" >/dev/null
+          jq -r '"AUDIT: original Firefox160 actual trusted TLS="+
+            (.trusted_original_browser_verified_actual_secure_https_document_and_JS|tostring)+
+            ", untrusted cert blocked="+(.untrusted_original_browser_rejected_same_local_https_server|tostring)+
+            ", softoken blocked="+(.modes[]|select(.mode=="trusted_softoken_denied")|.native_denied_softoken_loads|tostring)+
+            ", FreeBL blocked="+(.modes[]|select(.mode=="trusted_freebl_denied")|.native_denied_freebl_loads|tostring)+
+            ", denied startup outcomes="+([.modes[]|select(.denial_group!="none")|.session_outcome]|join(","))' "$report" >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: ephemeral localhost RSA CA only, no system/user certificate import, public TLS, FIPS/PKCS11 exhaustive gate or release.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive sanitized true local CA-trusted Firefox160 HTTPS/crypto provider evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-original-real-trusted-local-TLS-ephemeral-NSS-CA-not-full-security
+          path: ${{ runner.temp }}/firefox160-original-real-trusted-local-nss-tls.json
+          if-no-files-found: ignore
+          retention-days: 30
