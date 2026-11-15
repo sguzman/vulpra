@@ -169,6 +169,19 @@ jobs:
             .original_firefox_profile_preserved==true and
             .linux_content_sandbox_level>0 and
             .actual_content_worker_count>=1 and
+            .native_chromeutils_process_type_authenticated==true and
+            .procfs_forkserver_argv_not_used_for_process_roles==true and
+            .gecko_content_worker_role_authenticated==true and
+            .all_observed_non_content_child_roles_explicitly_reported==true and
+            .other_gecko_child_role_counts.socket==1 and
+            .other_gecko_child_role_counts.rdd==1 and
+            .other_gecko_child_role_counts.utility==1 and
+            .all_three_gecko_service_process_roles_observed==true and
+            .all_three_gecko_service_processes_seccomp_filtered_no_new_privs==true and
+            .role_specific_kernel_namespace_behavior_matched_source_when_available==true and
+            .service_roles_not_misclassified_as_content==true and
+            .service_role_syscall_denial_actually_tested==false and
+            .complete_service_role_sandbox_policy_audited==false and
             .browser_child_spawning_process_count>=1 and
             .all_worker_processes_descend_from_browser_spawners==true and
             .all_observed_content_workers_have_seccomp_filters==true and
