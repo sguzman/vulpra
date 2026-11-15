@@ -178,6 +178,16 @@ jobs:
             .other_gecko_child_role_counts.utility==1 and
             .all_three_gecko_service_process_roles_observed==true and
             .all_three_gecko_service_processes_seccomp_filtered_no_new_privs==true and
+            .gecko_service_thread_role_groups_observed==3 and
+            .gecko_service_thread_count_observed>=3 and
+            .gecko_service_all_observed_threads_seccomp_filtered==true and
+            .gecko_service_all_observed_threads_no_new_privileges==true and
+            .gecko_service_main_threads_all_included==true and
+            .gecko_service_thread_roles.socket.observed_thread_count>=1 and
+            .gecko_service_thread_roles.rdd.observed_thread_count>=1 and
+            .gecko_service_thread_roles.utility.observed_thread_count>=1 and
+            .gecko_service_transient_future_threads_exhaustively_audited==false and
+            .gecko_service_forbidden_syscall_denial_actually_exercised==false and
             .role_specific_kernel_namespace_behavior_matched_source_when_available==true and
             .service_roles_not_misclassified_as_content==true and
             .service_role_syscall_denial_actually_tested==false and
