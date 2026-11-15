@@ -1,0 +1,145 @@
+# Independent no-browser/no-build reconciliation of source-pinned Firefox160:
+# 28-ELF original archive graph + actual libxul glibc bindings + actual
+# initialized vs non-initialized glibc dynamic loader request relations.
+name: M3 Firefox 160 Real Loader and libxul Binding Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-real-loader-bindings-reconcile.yml
+      - ci/m3-firefox160-real-loader-and-bindings-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-bound-reconcile-three-actual-reports:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate independent real CI producers, source SHA and retained reports
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name] of [
+              [43730900702,'fd4dee8a9999c303ff35e45fbcd619abe230d30e',
+                'M3 Firefox 160 Exact-Source Native ELF Package Graph (No Build)'],
+              [43741731639,'e59439d263681f511a4cace0c8a2b219941fdedd',
+                'M3 Firefox 160 Actual libxul Runtime Symbol Bindings (No Build)'],
+              [43743231236,'f4a23510f7dcd2b1e7b09723009199922b3d9ed1',
+                'M3 Firefox 160 Actual Initialized Loader Request Edges (No Build)']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_sha!==sha || r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.name!==name || r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Unauthenticated original Firefox160 ELF/binding/loader report '+id);
+            }
+            for(const [id,name] of [
+              [43730900702,'firefox160-source-matched-native-elf-package-graph-not-m3-closure'],
+              [43741731639,'firefox160-actual-libxul-default-eager-bindings-not-ffi-closure'],
+              [43743231236,'firefox160-actual-initialized-loader-request-edges-not-dlopen-closure']]){
+              const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(a.filter(x=>x.name===name&&!x.expired&&x.size_in_bytes>0 &&
+                  new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Missing source-pinned actual native/ABI report '+name);
+            }
+      - name: Checkout independent jq comparison only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-real-loader-and-bindings-crosswalk.jq
+      - name: Download exact original source-matched 28-ELF graph
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-source-matched-native-elf-package-graph-not-m3-closure
+          repository: sguzman/vulpra
+          run-id: 43730900702
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/graph
+      - name: Download independent actual native libxul binding report
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-actual-libxul-default-eager-bindings-not-ffi-closure
+          repository: sguzman/vulpra
+          run-id: 43741731639
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/bindings
+      - name: Download separate actual initialized glibc loader request report
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-actual-initialized-loader-request-edges-not-dlopen-closure
+          repository: sguzman/vulpra
+          run-id: 43743231236
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/loader
+      - name: Check source identities, runtime observations and deliberate falsification
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          graph="$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json"
+          binding="$RUNNER_TEMP/bindings/firefox160-libxul-real-binding-comparison.json"
+          loader="$RUNNER_TEMP/loader/firefox160-actual-loader-request-edges.json"
+          verify="ci/m3-firefox160-real-loader-and-bindings-crosswalk.jq"
+          test -s "$graph" && test -s "$binding" && test -s "$loader"
+          compare() {
+            jq -n --arg source "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" \
+              --arg tree "42dd7439a27dde92f89ac5eed13f88117a4d7ab5" \
+              --slurpfile graph "$1" --slurpfile bindings "$2" \
+              --slurpfile loader "$3" -f "$verify"
+          }
+          compare "$graph" "$binding" "$loader" \
+            > "$RUNNER_TEMP/firefox160-reconciled-loader-and-real-bindings.json"
+          jq -e '
+            .schema_version==1 and .verified_original_native_elf_members==28 and
+            .verified_original_direct_needed_edges==268 and
+            .initialized_library_basename_count==94 and
+            .observed_initialized_needed_request_edge_count==80 and
+            .observed_initialized_dynamic_request_edge_count==18 and
+            .observed_dynamic_request_names_without_same_trace_init_confirmation_count==16 and
+            .libxul_binding_provider_basename_count==45 and
+            .real_native_webdriver_workload_passed==true and
+            .missing_same_pid_init_not_equal_failed_dlopen==true and
+            .full_rust_cxx_ffi_and_conditional_dlopen_graph_proven==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-reconciled-loader-and-real-bindings.json" >/dev/null
+
+          jq '.original_native_source_commit="wrong_source"' "$loader" > "$RUNNER_TEMP/bad-source.json"
+          jq '.original_native_archive_sha256="wrong_archive"' "$loader" > "$RUNNER_TEMP/bad-archive.json"
+          jq '.initialized_dynamic_request_edge_count+=1' "$loader" > "$RUNNER_TEMP/bad-count.json"
+          jq '.initialized_dynamic_request_edges[0].requested_library_basename="spoof.so"' "$loader" > "$RUNNER_TEMP/bad-target.json"
+          jq '.dynamically_requested_but_no_same_trace_init_basenames[0]="fake-soname.so"' "$loader" > "$RUNNER_TEMP/bad-unconfirmed.json"
+          jq '.observed_initialized_library_basenames[0]="a-fake.so"' "$loader" > "$RUNNER_TEMP/bad-init.json"
+          jq '.raw_loader_logs_paths_pids_symbols_or_profile_data_exported=true' "$loader" > "$RUNNER_TEMP/bad-privacy.json"
+          jq '.all_conditional_dlopen_and_dlsym_edges_proven=true' "$loader" > "$RUNNER_TEMP/bad-closure.json"
+          jq '.default_libxul_binding_events+=1' "$binding" > "$RUNNER_TEMP/bad-bind-count.json"
+          jq '.default_provider_basenames[0]="fake-provider.so"' "$binding" > "$RUNNER_TEMP/bad-provider.json"
+          jq '.direct_needed_edges+=1' "$graph" > "$RUNNER_TEMP/bad-graph.json"
+          for kind in source archive count target unconfirmed init privacy closure; do
+            if compare "$graph" "$binding" "$RUNNER_TEMP/bad-$kind.json" >/dev/null 2>&1; then
+              echo "Forged real native loader report accepted: $kind" >&2; exit 1
+            fi
+          done
+          for kind in bind-count provider; do
+            if compare "$graph" "$RUNNER_TEMP/bad-$kind.json" "$loader" >/dev/null 2>&1; then
+              echo "Forged actual native binding report accepted: $kind" >&2; exit 1
+            fi
+          done
+          if compare "$RUNNER_TEMP/bad-graph.json" "$binding" "$loader" >/dev/null 2>&1; then
+            echo 'Forged original source-bound native ELF census accepted' >&2; exit 1
+          fi
+          echo 'PASS: independent original Firefox160 loader/binding graph reconciled; 11/11 forged cases rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: glibc requests do not prove direct source callers, future dlopen/dlsym paths, all fallbacks or target EndeavourOS.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sanitized source-matched actual loader/binding evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-real-loader-and-libxul-binding-crosswalk-not-m3-closure
+          path: ${{ runner.temp }}/firefox160-reconciled-loader-and-real-bindings.json
+          if-no-files-found: warn
+          retention-days: 30
