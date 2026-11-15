@@ -45,7 +45,20 @@ jobs:
                 new Date(a.expires_at)>new Date());
               if(matches.length!==1) throw Error('Preserved archive missing/expired/ambiguous: '+name);
             }
-            core.info('PASS: original native producer and verified byte-preserving mirror');
+            const ledgerRun=await github.rest.actions.getWorkflowRun({owner,repo,run_id:43724581614});
+            const l=ledgerRun.data;
+            if (l.repository?.full_name!=='sguzman/vulpra' ||
+                l.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                l.head_sha!=='a143cf143253b2159597573f658e609fd0662411' ||
+                l.name!=='Firefox 160 Verified Native Archive Preservation (No Build)' ||
+                l.status!=='completed' || l.conclusion!=='success')
+              throw Error('Preserved full source Git-tree ledger run is unauthenticated');
+            const ledgerArtifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:43724581614,per_page:100});
+            const ledger=ledgerArtifacts.filter(a=>a.name==='firefox160-vulpra-preserved-complete-git-tree-candidate' &&
+              !a.expired && a.size_in_bytes>0 && new Date(a.expires_at)>new Date());
+            if(ledger.length!==1) throw Error('Preserved complete source ledger absent or expired');
+            core.info('PASS: original build, native mirror and source ledger authenticated');
       - name: Checkout only signed WebExtension WebDriver smoke and helpers
         uses: actions/checkout@v4
         with:
@@ -73,9 +86,9 @@ jobs:
       - name: Download original 28-overlay source ledger
         uses: actions/download-artifact@v4
         with:
-          name: firefox160-vulpra-complete-git-tree-candidate
+          name: firefox160-vulpra-preserved-complete-git-tree-candidate
           repository: sguzman/vulpra
-          run-id: 43724079346
+          run-id: 43724581614
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/candidate-ledger
       - name: Reject falsified extension runtime outcomes and authenticate native source
