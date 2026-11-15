@@ -116,6 +116,9 @@ def verify_chrome_process_roles(proof, browser_pid):
         else:
             raise RuntimeError("Unknown Firefox 160 Gecko WebIDL process type")
         result[pid] = role
+    # WebIDLProcessType is source-authenticated; never publish PID, URLs or
+    # process labels. Counting returned roles is safe and helps diagnose
+    # forkserver/procfs PID reconciliation if processes die mid-snapshot.
     if not {"tab", "forkserver"}.issubset(set(result.values())):
         raise RuntimeError("Native Firefox process census lacks content or forkserver")
     return result
@@ -129,7 +132,7 @@ def read_process(pid):
     argv = raw.rstrip(b"\0").split(b"\0") if raw else []
     # A forkserver's children can retain stale kernel argv strings, so
     # this only confirms the native -contentproc process family.
-    is_child = b"-contentproc" in argv
+    is_child = b"-contentproc" in raw
     exe = os.path.realpath(root / "exe")
     fields = status_fields((root / "status").read_text())
     return {"pid": pid, "exe": exe,
@@ -847,11 +850,18 @@ def run(repo: Path, output: Path):
                     # never copy process command lines, paths or environments.
                     states = [
                         {"direct_child": child["ppid"] == browser_pid,
+                         "gecko_role": child["gecko_process_type"],
                          "seccomp": child["seccomp_mode"],
                          "filters": child["seccomp_filter_count"],
                          "nnp": child["no_new_privileges"]}
                         for child in last
                     ]
+                    mapped_roles = {
+                        role: sum(r == role for r in authoritative_roles.values())
+                        for role in sorted(set(authoritative_roles.values()))
+                    }
+                    print("AUDIT: Firefox privileged PID/type role census=" +
+                          json.dumps(mapped_roles, sort_keys=True), flush=True)
                     print("AUDIT: content-sandbox-pref-level=" + repr(pref_level) +
                           " content-process-states=" + json.dumps(states), flush=True)
                     raise RuntimeError(
