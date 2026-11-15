@@ -70,9 +70,20 @@ def access_witness(path):
     attempts={name:0 for name in ALLOW_CHECKS}
     missing={name:0 for name in ALLOW_CHECKS}
     recognized=0
+    total_file_syscall_lines=0
+    original_softoken_so_syscall_mentions=0
+    original_nss_so_syscall_mentions=0
     # strace -e trace=%file writes one line per syscall; only check literal,
     # not export syscall numbers, raw paths, flags, PIDs or directory names.
     for line in path.read_text(errors="replace").splitlines():
+        # The real source package must cause library file access under strace.
+        # Export only counts, not raw arguments or any per-process identifiers.
+        if re.search(r'^(?:\[pid\s+[0-9]+\]\s+)?(?:open|openat|openat2|newfstatat|stat|statx|access|faccessat|faccessat2|readlink|readlinkat)\(',line):
+            total_file_syscall_lines+=1
+        if "libsoftokn3.so" in line:
+            original_softoken_so_syscall_mentions+=1
+        if "libnss3.so" in line:
+            original_nss_so_syscall_mentions+=1
         if not any(s in line for s in ALLOW_CHECKS):
             continue
         recognized+=1
@@ -87,7 +98,7 @@ def access_witness(path):
             attempts[name]+=1
             if re.search(r"=\s*-1\s+ENOENT(?:\s|$)",line):
                 missing[name]+=1
-    return attempts,missing
+    return attempts,missing,total_file_syscall_lines,original_softoken_so_syscall_mentions,original_nss_so_syscall_mentions
 
 
 def main():
@@ -96,7 +107,7 @@ def main():
         with tempfile.TemporaryDirectory() as d:
             p=Path(d)/"trace"
             p.write_text('openat(AT_FDCWD, "/tmp/pkg/libsoftokn3.chk", O_RDONLY) = -1 ENOENT (No such file or directory)\n')
-            a,m=access_witness(p)
+            a,m,_,_,_=access_witness(p)
             assert a["libsoftokn3.chk"]==1 and m["libsoftokn3.chk"]==1
         print("PASS: bounded original NSS FIPS source-error and checksum-only syscall parser")
         return 0
@@ -155,7 +166,9 @@ def main():
                          str(probe),str(appdir/"libnss3.so"),f"sql:{db}"],
                         env=env,outfile=out)
             parsed=parsed_probe(out)
-            tries,missing=access_witness(trace)
+            tries,missing,syscalls,softoken_so_mentions,nss_so_mentions=access_witness(trace)
+            if syscalls==0 or softoken_so_mentions==0 or nss_so_mentions==0:
+                raise RuntimeError("file syscall tracing inactive or missing original NSS binary loading")
             unchanged=all((db/k).is_file() and
                           hashlib.sha256((db/k).read_bytes()).hexdigest()==v
                           for k,v in originaldb.items())
@@ -167,6 +180,9 @@ def main():
                 "original_PK11_IsFIPS_observed_or_minus2_if_not_attempted":parsed["fips"],
                 "original_packaged_softoken_ELF_mapped":parsed["softoken_mapped"]==1,
                 "original_packaged_freebl_ELF_mapped":parsed["freebl_mapped"]==1,
+                "actual_file_syscalls_observed_in_source_pinned_original_process":syscalls,
+                "original_softoken_so_file_syscall_mentions":softoken_so_mentions,
+                "original_nss_so_file_syscall_mentions":nss_so_mentions,
                 "actual_softoken_chk_filesystem_attempts":tries["libsoftokn3.chk"],
                 "actual_softoken_chk_ENOENT_missing_events":missing["libsoftokn3.chk"],
                 "actual_freebl_chk_filesystem_attempts":tries["libfreeblpriv3.chk"],
@@ -199,6 +215,10 @@ def main():
         "no_original_chk_files_present_in_byte_preserved_archive":not any(package_contains.values()),
         "both_disposable_profile_database_bytes_unchanged":all(
             e["temporary_database_bytes_unchanged"] for e in evidence),
+        "actual_syscall_tracing_executed_and_original_NSS_ELFs_accessed":all(
+            e["actual_file_syscalls_observed_in_source_pinned_original_process"]>0 and
+            e["original_softoken_so_file_syscall_mentions"]>0 and
+            e["original_nss_so_file_syscall_mentions"]>0 for e in evidence),
         "original_NSS_FIPS_mode_worked":False,
         "all_FIPS_selftests_or_integrity_checks_individually_attributed":False,
         "missing_chk_was_proven_the_only_possible_fatal_cause":False,
@@ -220,6 +240,8 @@ def main():
         raise RuntimeError("expected actual original NSS FIPS-device-error regression witness missing")
     if not reportdata["both_disposable_profile_database_bytes_unchanged"]:
         raise RuntimeError("NSS temporary database changed under read-only FIPS evidence")
+    if not reportdata["actual_syscall_tracing_executed_and_original_NSS_ELFs_accessed"]:
+        raise RuntimeError("original NSS FIPS syscall witness was not actually captured")
     print("PASS: original packaged Firefox160 NSS SQL FIPS-mode actual syscall observations bounded and privacy-safe")
     return 0
 
