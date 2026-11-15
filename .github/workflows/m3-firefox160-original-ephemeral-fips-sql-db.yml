@@ -171,7 +171,7 @@ jobs:
             ci/m3-deny-optional-native-providers.c \
             -o "$RUNNER_TEMP/native-nss-deny.so" -ldl
           bash -n ci/m3-firefox160-original-pkcs11-ephemeral-fips-db-replay.sh
-      - name: Compare actual original nonFIPS vs temporary FIPS SQL database and native provider failures
+      - name: Verify original native nonFIPS SQL works but temporary FIPS request returns device error
         shell: bash
         timeout-minutes: 6
         run: |
@@ -186,8 +186,14 @@ jobs:
             .original_native_browser_archive_sha256==
               "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
             .original_plain_SQL_PK11_IsFIPS_witnessed_false==true and
-            .original_NSS_read_only_PK11_IsFIPS_witnessed_true==true and
-            .original_FIPS_SQL_PKCS11_SHA256_mechanism_and_RNG_successful==true and
+            .original_NSS_read_only_PK11_IsFIPS_witnessed_true==false and
+            .original_plain_SQL_NSS_Init_successfully_executed_nonFIPS==true and
+            .original_FIPS_requested_NSS_Init_reported_PKCS11_DEVICE_ERROR==true and
+            .FIPS_requested_mode_could_not_query_PK11_IsFIPS_due_to_init_failure==true and
+            .original_FIPS_request_with_softoken_blocked_reported_load_library_error==true and
+            .FIPS_request_with_only_freebl_deny_did_not_reach_freebl_load==true and
+            .FIPS_request_with_both_deny_stops_at_softoken==true and
+            .original_temporary_NSS_DB_bytes_unchanged_after_all_original_native_probes==true and
             .all_five_probe_processes_terminated_without_crash_or_timeout==true and
             .FIPS_setting_only_changed_inside_temp_SQL_DB_by_system_modutil==true and
             .exact_temp_NSS_SQL_profile_only_no_user_or_system_trust_modification==true and
@@ -198,15 +204,18 @@ jobs:
           jq -r '"AUDIT: actual original NSS_Init mode (normal,FIPS)="+
             ([.modes[]|select(.mode=="normal_sql" or .mode=="temporary_fips_sql")|
               (.original_PK11_IsFIPS_mode|tostring)]|join(","))+
+            " FIPS original NSS_Init error="+
+              ([.modes[]|select(.mode=="temporary_fips_sql")|
+                (.original_NSS_Init_error_code|tostring)][0])+
             " FIPS slot shared="+(.original_FIPS_mode_internal_and_key_slot_shared|tostring)+
             " temp DB unchanged="+(.original_temporary_NSS_DB_bytes_unchanged_after_all_original_native_probes|tostring)' \
             "$report" >> "$GITHUB_STEP_SUMMARY"
-          echo 'LIMIT: FIPS MODE in temporary NSS database is not FIPS 140-3 certification, policy-compliant operation or whole M3 dependency acceptance' >> "$GITHUB_STEP_SUMMARY"
-      - name: Archive bounded original temporary SQL NSS FIPS state and observed provider failures
+          echo 'LIMIT: actual original NSS FIPS-mode initialization FAILED with PKCS11 DEVICE ERROR; no successful FIPS security mode, certification, exact self-test cause or M3 dependency gate closure' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded original Firefox160 temporary SQL FIPS request and actual failure code
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: firefox160-original-temp-nss-sql-fips-enabled-observation-not-FIPS-certified
+          name: firefox160-original-FIPS-requested-NSS-device-error-not-FIPS-success
           path: ${{ runner.temp }}/original-nss-temporary-fips-observation.json
           if-no-files-found: warn
           retention-days: 30
