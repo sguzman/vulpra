@@ -1,0 +1,141 @@
+# Evidence-only source/actual-native reconciliation. Real original Firefox160
+# compiled browser used same package in separate FFVPX-only and FFVPX+FFmpeg
+# denied WebDriver workloads. No source/binary rebuild and no raw traces.
+name: M3 Firefox 160 Actual Combined FFVPX and FFmpeg Denial Libvpx Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-actual-combined-denial-libvpx-crosswalk.yml
+      - ci/m3-firefox160-combined-ffvpx-ffmpeg-libvpx-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-rdd-libvpx-selected-under-double-denial:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate exact source-verified prior decoder and actual combined native-denial browser
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43751456133,'67d88f2427a62e6a096fb41d79342c1d1bb36000',
+                'M3 Firefox 160 Real RDD FFVPX to FFmpeg VP9 Fallback Verification',
+                'firefox160-verified-post-frame-rdd-ffvpx-to-ffmpeg-vp9-not-full-m3-closure'],
+              [43758489134,'9187ef4af33dfb24419d92f44cb3312ec45b3cb0',
+                'M3 Firefox 160 Combined FFVPX and FFmpeg Denial VP9 Replay (No Build)',
+                'firefox160-original-combined-ffvpx-system-ffmpeg-vp9-not-full-fallback']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                r.head_sha!==sha || r.name!==name || r.status!=='completed' ||
+                r.conclusion!=='success')
+                throw Error('Untrusted original source or native FFVPX+FFmpeg media proof: '+id);
+              const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(all.filter(a=>a.name===artifact&&!a.expired&&a.size_in_bytes>0 &&
+                   new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Original source-pinned native media artifact absent/expired/ambiguous: '+artifact);
+            }
+      - name: Checkout only independent bounded reconciliation
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-combined-ffvpx-ffmpeg-libvpx-crosswalk.jq
+      - name: Download exact pinned prior actual RDD FFVPX to FFmpeg decoder selection
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 43751456133
+          name: firefox160-verified-post-frame-rdd-ffvpx-to-ffmpeg-vp9-not-full-m3-closure
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/previous
+      - name: Download actual original Firefox160 simultaneous FFVPX and system FFmpeg denial
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 43758489134
+          name: firefox160-original-combined-ffvpx-system-ffmpeg-vp9-not-full-fallback
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/combined
+      - name: Validate actual original source/media ABI and reject sixteen falsified reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          previous="$RUNNER_TEMP/previous/firefox160-verified-real-rdd-vp9-ffvpx-to-ffmpeg-fallback.json"
+          combined="$RUNNER_TEMP/combined/firefox160-combined-ffvpx-ffmpeg-private-bounded-observation.json"
+          verifier=ci/m3-firefox160-combined-ffvpx-ffmpeg-libvpx-crosswalk.jq
+          test -s "$previous" && test -s "$combined"
+          reconcile() {
+            jq -n --arg upstream '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile previous "$1" --slurpfile combined "$2" -f "$verifier"
+          }
+          reconcile "$previous" "$combined" > \
+            "$RUNNER_TEMP/firefox160-verified-real-rdd-libvpx-under-combined-denial.json"
+          jq -e '
+            .schema_version==1 and
+            .original_compiled_native_archive_sha256==
+              "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .source_verified_original_decoder_and_linker_git_blob_count==10 and
+            .actual_combined_denied_native_loads=={
+              "bundled_ffvpx_codec":1,"bundled_ffvpx_util":1,
+              "system_ffmpeg_libavcodec":14,"total":16
+            } and
+            .both_native_provider_families_actually_observed_denied==true and
+            .observed_VP9_baseline_post_frame_decoder=="ffvpx video decoder (RDD remote)" and
+            .observed_VP9_under_combined_denial_post_frame_decoder=="libvpx video decoder (RDD remote)" and
+            .FFVPX_only_denial_elsewhere_selected_FFmpeg_in_separate_real_browser_run==true and
+            .actual_real_VP9_frames_and_advancing_time_in_both_browser_modes==true and
+            .observed_VP9_media_error_under_combined_denial==false and
+            .browser_sessions_and_private_profiles_preserved==true and
+            .overall_all_possible_FFmpeg_providers_absent_proven==false and
+            .direct_FFVPX_machine_code_callstack_proven==false and
+            .native_Rust_CXX_FFI_dlopen_dlsym_closure_complete==false and
+            .source_pruning_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-verified-real-rdd-libvpx-under-combined-denial.json" >/dev/null
+          jq '.original_mozilla_firefox160_commit="wrong"' "$previous" > "$RUNNER_TEMP/prev-source.json"
+          jq '.original_native_archive_sha256="wrong"' "$previous" > "$RUNNER_TEMP/prev-package.json"
+          jq '.observed_original_VP9_with_bundled_FFVPX_denied_decoder_after_video_samples="libvpx video decoder (RDD remote)"' "$previous" > "$RUNNER_TEMP/prev-decoder.json"
+          jq '.complete_native_Rust_CXX_FFI_dlopen_dlsym_graph_proven=true' "$previous" > "$RUNNER_TEMP/prev-ffi.json"
+          jq '.original_native_package_sha256="wrong"' "$combined" > "$RUNNER_TEMP/cmb-package.json"
+          jq '.actual_combined_denied_ffvpx_codec_loads=0' "$combined" > "$RUNNER_TEMP/cmb-codec.json"
+          jq '.actual_combined_denied_ffvpx_util_loads=0' "$combined" > "$RUNNER_TEMP/cmb-util.json"
+          jq '.actual_combined_denied_system_ffmpeg_loads=0' "$combined" > "$RUNNER_TEMP/cmb-ffmpeg.json"
+          jq '.actual_combined_denials_total=15' "$combined" > "$RUNNER_TEMP/cmb-total.json"
+          jq '.both_provider_families_actually_denied=false' "$combined" > "$RUNNER_TEMP/cmb-families.json"
+          jq '.observed_source_FFVPX_NoProvidedLib=false' "$combined" > "$RUNNER_TEMP/cmb-link.json"
+          jq '.combined_denied_resolved_post_frame_decoders=["ffmpeg video decoder (RDD remote)"]' "$combined" > "$RUNNER_TEMP/cmb-decoder.json"
+          jq '.combined_denied_VP9_decoded_frames_and_time=false' "$combined" > "$RUNNER_TEMP/cmb-video.json"
+          jq '.combined_browser_and_private_profiles_preserved=false' "$combined" > "$RUNNER_TEMP/cmb-profile.json"
+          jq '.all_system_FFmpeg_native_load_paths_denied_proven=true' "$combined" > "$RUNNER_TEMP/cmb-falseclosure.json"
+          jq '.m3_sixth_gate_closed=true' "$combined" > "$RUNNER_TEMP/cmb-gate.json"
+          for kind in source package decoder ffi; do
+            if reconcile "$RUNNER_TEMP/prev-$kind.json" "$combined" >/dev/null 2>&1; then
+              echo "Forged previous RDD decoder report accepted: $kind" >&2; exit 1
+            fi
+          done
+          for kind in package codec util ffmpeg total families link decoder video profile falseclosure gate; do
+            if reconcile "$previous" "$RUNNER_TEMP/cmb-$kind.json" >/dev/null 2>&1; then
+              echo "Forged actual combined FFVPX/FFmpeg denied browser report accepted: $kind" >&2; exit 1
+            fi
+          done
+          echo 'PASS: genuine original Firefox160 RDD VP9 fallback with 16 actually denied FFVPX+FFmpeg native loads and source-reported libvpx selected, both profiles preserved; 16/16 falsified inputs rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: only requested provider names and this VP9 workload; all system FFmpeg paths, Rust/C++ FFI, all media modes, hardware/Wayland, security and M3 closure NOT proven.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve strictly bounded accepted FFVPX-plus-FFmpeg-denial RDD libvpx proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-actual-combined-ffvpx-ffmpeg-libvpx-source-crosswalk-not-full-m3
+          path: ${{ runner.temp }}/firefox160-verified-real-rdd-libvpx-under-combined-denial.json
+          if-no-files-found: warn
+          retention-days: 30
