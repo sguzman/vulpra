@@ -253,7 +253,7 @@ def parse_bare_dynsym(text):
         else:
             continue  # versioned imports and nondefault exports are separate
         if not SYMBOL.fullmatch(name):
-            raise ValueError("Unsupported bare ELF dynamic symbol name")
+            raise ValueError("Unsupported bare ELF dynamic symbol name: " + repr(name)[:96])
         if ndx == "UND":
             imported.append((name, bind))
         else:
