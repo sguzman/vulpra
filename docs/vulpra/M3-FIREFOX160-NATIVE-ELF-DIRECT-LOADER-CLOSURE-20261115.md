@@ -37,3 +37,22 @@ The following are **not** proven by any of these successful checks:
 - No new safe source-pruning approval, no measured marginal compiled-size savings, no Firefox security-current/MFSA/CVE acceptance, no Safe Browsing provider readiness [#8](https://github.com/sguzman/vulpra/issues/8), no closure of role-specific sandbox acceptance [#9](https://github.com/sguzman/vulpra/issues/9), and no merge or release.
 
 **Next dependency-map work:** connect the exact direct-loader maps here with the *current and Firefox160 compiled* source/build owner, Cargo/static archive member and feature activation records; then test specific remaining conditional native provider branches with bounded negative/fallback runtime evidence. This is a narrower evidence advance for the **open M3 sixth gate**, not its completion. **Vulpra overall 61% (previous 61%; Δ +0 pp); M3 83% (5/6)**. [Draft PR #6](https://github.com/sguzman/vulpra/pull/6) remains unmerged. No real workstation/browser-profile change or new Firefox compilation.
+
+
+## Independent three-userspace provider-set reconciliation (2026-11-15, added after the three native checks)
+
+[**Three-userspace provider crosswalk CI 43732118146 — SUCCESS**](https://github.com/sguzman/vulpra/actions/runs/43732118146) authenticated the exact successful source-matched 28-ELF census from `43730900702`, both Ubuntu 22.04/24.04 glibc reports from `43731304463` and the Arch userspace glibc report from `43731540340`. The [strict jq crosswalk](../../ci/m3-firefox160-three-userland-loader-provider-crosswalk.jq) refused any inconsistent original archive SHA, Mozilla source commit, candidate 28-overlay tree, missing/extra ELF member, altered **per-ELF exact DT_NEEDED name list**, changed source/release or no-network claims, or malformed provider basename. **Ten deliberately forged evidence cases were rejected** in the actual run. All accepted data are sanitized basename sets, not raw absolute paths, process IDs, device information or user data.
+
+| Direct-loader provider set | Observed count |
+| --- | ---: |
+| Ubuntu 22.04 distinct provider basenames | **92** |
+| Ubuntu 24.04 distinct provider basenames | **91** |
+| Disposable Arch Linux userland distinct provider basenames | **90** |
+| Names present in **all three** provider sets | **80** |
+| Distinct names across the full three-userland union | **102** |
+
+**Exact Ubuntu 22.04 vs Ubuntu 24.04 difference:** Ubuntu 22.04's provider list additionally contains `libpcre.so.3` and `libuuid.so.1`; Ubuntu 24.04's list additionally contains `libbz2.so.1.0`.
+
+**Exact Ubuntu 24.04 vs Arch userspace difference:** The ten Ubuntu-24-only provider names are `libbsd.so.0`, `libcap.so.2`, `libgcrypt.so.20`, `libgpg-error.so.0`, `libjpeg.so.8`, `liblz4.so.1`, `liblzma.so.5`, `libmd.so.0`, `libselinux.so.1` and `libzstd.so.1`. The nine Arch-only names are `libcloudproviders.so.0`, `libglycin-2.so.0`, `libicudata.so.78`, `libicuuc.so.78`, `libjson-glib-1.0.so.0`, `libseccomp.so.2`, `libsqlite3.so.0`, `libtinysparql-3.0.so.0` and `libxml2.so.16`.
+
+**Interpretation limit:** These are *loader-listed direct-plus-transitive provider basenames for all 28 ELF requesters*, not differences in the 268 required `DT_NEEDED` edges, direct Firefox capabilities, or browser runtime behavior. A library name appearing only on Arch does **not** establish that Firefox needs that library on Ubuntu, nor does Arch's `libseccomp.so.2` entry imply absent sandbox enforcement on Ubuntu. The Arch result remains a container **userland on an Ubuntu host kernel**, not native target EndeavourOS/Hyprland, so it cannot establish target host ABI/version compatibility or GPU integration. This narrower cross-platform platform-map evidence does not authorize pruning or close M3's last gate. **Overall 61% (Δ +0 pp); M3 83% (5/6).**
