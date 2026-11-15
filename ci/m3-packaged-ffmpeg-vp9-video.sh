@@ -148,17 +148,28 @@ run_mode() {
   local sentinel="$(sha256sum "$home/.mozilla/firefox/profiles.ini" | cut -d' ' -f1)"
   local log="$tmp/$mode-denial.log"
   : > "$log"; chmod 0600 "$log"
+  # Only temporary source-grounded Firefox160 decoder logs; never upload raw logs.
+  local -a private_decoder_logging=()
+  if test -n "${VULPRA_M3_FFVPX_LOG_OBSERVER:-}"; then
+    test "$deny_group" = ffvpx && test -x "$VULPRA_M3_FFVPX_LOG_OBSERVER"
+    private_decoder_logging=(
+      MOZ_LOG=PlatformDecoderModule:5,FFmpegVideo:5
+      "MOZ_LOG_FILE=$tmp/$mode-moz"
+    )
+  fi
   port="$(new_port)"
   if test "$mode" = denied; then
     env -u VULPRA_M3_DENY_FIXTURE_EXE \
       LD_PRELOAD="$shim" VULPRA_M3_DENY_GROUP="$deny_group" VULPRA_M3_DENY_LOG="$log" \
       HOME="$home" XDG_DATA_HOME="$home/.local/share" MOZ_HEADLESS=1 \
       NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
+      "${private_decoder_logging[@]}" \
       "$gecko" --host 127.0.0.1 --port "$port" > "$tmp/$mode-geckodriver.log" 2>&1 &
   else
     env -u LD_PRELOAD -u VULPRA_M3_DENY_GROUP -u VULPRA_M3_DENY_LOG \
       HOME="$home" XDG_DATA_HOME="$home/.local/share" MOZ_HEADLESS=1 \
       NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
+      "${private_decoder_logging[@]}" \
       "$gecko" --host 127.0.0.1 --port "$port" > "$tmp/$mode-geckodriver.log" 2>&1 &
   fi
   driver_pid="$!"
@@ -214,11 +225,19 @@ run_mode() {
   if test "$(sha256sum "$home/.mozilla/firefox/profiles.ini" | cut -d' ' -f1)" = "$sentinel"; then
     preserved=true
   fi
+  local mozlog_json=null
+  if test -n "${VULPRA_M3_FFVPX_LOG_OBSERVER:-}"; then
+    # Close browser and geckodriver before reading ephemeral diagnostic files.
+    stop_driver
+    "$VULPRA_M3_FFVPX_LOG_OBSERVER" "$tmp" "$mode-moz" "$tmp/$mode-moz-sanitized.json"
+    mozlog_json="$(cat "$tmp/$mode-moz-sanitized.json")"
+  fi
   jq -nc --arg mode "$mode" --argjson before "$before" --argjson after "$after" \
-    --argjson attached "$attached" --argjson codec "$codec_denials" --argjson util "$util_denials" --argjson decoded "$video_ok" \
+    --argjson attached "$attached" --argjson codec "$codec_denials" --argjson util "$util_denials" --argjson mozlog "$mozlog_json" --argjson decoded "$video_ok" \
     --argjson error "$media_error" --argjson alive "$alive" \
     --argjson preserved "$preserved" --argjson state "$state" '{
     mode:$mode,actual_packaged_browser_session:true,
+    mozilla_ffvpx_private_log_observation:$mozlog,
     browser_interposer_attached:($attached>0),
     ffmpeg_denials_before_video_navigation:$before,
     ffmpeg_denials_after_video_navigation:$after,
@@ -281,6 +300,15 @@ jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive 
     "media_error"
     else "no_verified_decoded_frames_or_media_error" end),
   real_denied_native_provider_load_outcome_proven_only_for_named_group:true,
+  private_mozilla_ffvpx_logs_observed_in_both_modes:
+    (all(.[];.mozilla_ffvpx_private_log_observation!=null and
+       .mozilla_ffvpx_private_log_observation.raw_private_log_files_captured>=1)),
+  observed_FFVPX_NoProvidedLib_source_log_in_denied_mode:
+    ([.[]|select(.mode=="denied")|
+        .mozilla_ffvpx_private_log_observation.actual_FFVPX_NoProvidedLib_source_log_observed][0]//false),
+  FFVPX_NoProvidedLib_source_log_count_in_denied_mode:
+    ([.[]|select(.mode=="denied")|
+        .mozilla_ffvpx_private_log_observation.ffvpx_NoProvidedLib_link_result_markers][0]//0),
   source_owner_direct_machine_caller_proven:false,
   FFVPX_missing_provider_source_guard_taken_proven:false,
   successful_alternative_decoder_identified:false,
