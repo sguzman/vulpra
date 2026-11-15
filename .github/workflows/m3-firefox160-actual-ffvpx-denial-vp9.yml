@@ -201,6 +201,10 @@ jobs:
             .baseline_VP9_playback_passed==true and
             .real_denied_FFVPX_attempt_observed==true and
             .denied_FFVPX_loader_attempts>0 and
+            .denied_FFVPX_libmozavcodec_load_attempts>=1 and
+            .denied_FFVPX_libmozavutil_load_attempts>=1 and
+            (.denied_FFVPX_libmozavcodec_load_attempts+
+             .denied_FFVPX_libmozavutil_load_attempts)==.denied_FFVPX_loader_attempts and
             .denied_FFmpeg_loader_attempts==null and
             .real_denied_FFmpeg_attempt_observed==false and
             .exact_source_private_webdriver_modes_safe==true and
@@ -239,6 +243,8 @@ jobs:
               authentic_pinned_source_owner_rows:10,
               exact_source_owned_bundled_ffvpx_names:["libmozavcodec.so","libmozavutil.so"],
               ffvpx_actual_native_denied_dlopen_attempt_count:$m.denied_FFVPX_loader_attempts,
+              ffvpx_libmozavcodec_denied_dlopen_attempt_count:$m.denied_FFVPX_libmozavcodec_load_attempts,
+              ffvpx_libmozavutil_denied_dlopen_attempt_count:$m.denied_FFVPX_libmozavutil_load_attempts,
               ffvpx_denials_during_video_navigation:$m.denial_attempts_after_video_navigation,
               baseline_vp9_decoded_frames_and_advancing_time:$m.baseline_VP9_playback_passed,
               with_bundled_ffvpx_denied_vp9_decoded_frames_and_advancing_time:$m.denied_VP9_playback_passed,
@@ -261,6 +267,10 @@ jobs:
           jq -e '.schema_version==1 and
             .status=="real_firefox160_native_bundled_ffvpx_dlopen_denial_and_vp9_media_outcome" and
             .ffvpx_actual_native_denied_dlopen_attempt_count>0 and
+            .ffvpx_libmozavcodec_denied_dlopen_attempt_count>=1 and
+            .ffvpx_libmozavutil_denied_dlopen_attempt_count>=1 and
+            (.ffvpx_libmozavcodec_denied_dlopen_attempt_count+
+             .ffvpx_libmozavutil_denied_dlopen_attempt_count)==.ffvpx_actual_native_denied_dlopen_attempt_count and
             .baseline_vp9_decoded_frames_and_advancing_time==true and
             .browser_and_temporary_profile_preserved_under_both_modes==true and
             .compiled_machine_caller_of_ffvpx_dlopen_known==false and
@@ -270,7 +280,9 @@ jobs:
             "$RUNNER_TEMP/firefox160-actual-bundled-ffvpx-denial-outcome.json" >/dev/null
           jq -r '"PASS: actual original Firefox160 FFVPX dlopen denied " +
             (.ffvpx_actual_native_denied_dlopen_attempt_count|tostring) +
-            " time(s); baseline VP9 decoded; denied VP9 result=" +
+            " time(s) (codec="+(.ffvpx_libmozavcodec_denied_dlopen_attempt_count|tostring) +
+            ", util="+(.ffvpx_libmozavutil_denied_dlopen_attempt_count|tostring) +
+            "); baseline VP9 decoded; denied VP9 result=" +
             .observed_denied_vp9_outcome +
             ". Source guard not machine-attributed."' \
             "$RUNNER_TEMP/firefox160-actual-bundled-ffvpx-denial-outcome.json" >> "$GITHUB_STEP_SUMMARY"
