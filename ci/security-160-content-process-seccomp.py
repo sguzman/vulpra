@@ -432,6 +432,75 @@ def evaluate_worker_namespaces(parent_pid, children, parent_namespaces,
     }
 
 
+def capture_other_gecko_role_boundaries(children, browser_pid):
+    """Count real socket/RDD/utility/etc process kernel controls by Gecko role.
+
+    This is an observation of different *role-specific policies*: e.g. a
+    socket process must be able to use networking, unlike most content
+    processes. Never apply the tab sandbox policy to all roles.
+    """
+    other = [p for p in children
+             if p["gecko_process_type"] not in ("tab", "forkserver")]
+    kinds = ("user", "ipc", "net", "mnt", "pid")
+
+    def ns(pid, kind):
+        try:
+            return os.readlink("/proc/" + str(pid) + "/ns/" + kind)
+        except OSError:
+            return None
+
+    def root(pid):
+        try:
+            metadata = os.stat("/proc/" + str(pid) + "/root")
+            return (metadata.st_dev, metadata.st_ino)
+        except OSError:
+            return None
+
+    browser_ns = {kind: ns(browser_pid, kind) for kind in kinds}
+    browser_root = root(browser_pid)
+    results = []
+    for proc in sorted(other, key=lambda p: (p["gecko_process_type"], p["pid"])):
+        pid, role = proc["pid"], proc["gecko_process_type"]
+        worker_ns = {kind: ns(pid, kind) for kind in kinds}
+        worker_root = root(pid)
+        rows = {
+            kind: (worker_ns[kind] != browser_ns[kind]
+                   if worker_ns[kind] is not None and
+                   browser_ns[kind] is not None else None)
+            for kind in kinds
+        }
+        results.append({
+            "gecko_role": role,
+            "seccomp_mode": proc["seccomp_mode"],
+            "seccomp_filter_count": proc["seccomp_filter_count"],
+            "no_new_privileges": proc["no_new_privileges"],
+            "namespace_differs_from_browser_parent": rows,
+            "root_differs_from_browser_parent":
+                (worker_root != browser_root
+                 if worker_root is not None and browser_root is not None
+                 else None),
+        })
+    counts = {role: sum(p["gecko_role"] == role for p in results)
+              for role in sorted({p["gecko_role"] for p in results})}
+    verified = {
+        role: sum(
+            p["gecko_role"] == role and p["seccomp_mode"] == 2 and
+            p["seccomp_filter_count"] >= 1 and p["no_new_privileges"] == 1
+            for p in results)
+        for role in counts
+    }
+    if any(verified[role] > count for role, count in counts.items()):
+        raise RuntimeError("Impossible per-Gecko-role seccomp census")
+    return {
+        "other_gecko_role_security_observation_counts": counts,
+        "other_gecko_role_seccomp_filtered_and_no_new_privs_counts": verified,
+        "other_gecko_role_kernel_observations": results,
+        "other_gecko_role_sandbox_policy_uniformity_assumed": False,
+        "other_gecko_role_specific_security_accepted": False,
+        "actual_forbidden_gecko_child_syscall_denial_tested": False,
+    }
+
+
 def reconcile_user_namespace_support(observation, cached, level,
                                      disabled, permissive, force_pref):
     """Do not call missing namespaces proof of an active isolated namespace.
@@ -873,6 +942,8 @@ def run(repo: Path, output: Path):
                 # from the same authenticated Firefox content workers.
                 thread_evidence = capture_worker_thread_seccomp(last, browser_pid)
                 namespace_evidence = capture_worker_namespaces(last, browser_pid)
+                other_role_evidence = capture_other_gecko_role_boundaries(
+                    last, browser_pid)
                 namespace_capability = reconcile_user_namespace_support(
                     namespace_evidence,
                     runtime_security.get("cachedUserNamespaceProbe"),
@@ -892,6 +963,7 @@ def run(repo: Path, output: Path):
                     **evidence,
                     **thread_evidence,
                     **namespace_evidence,
+                    **other_role_evidence,
                     **namespace_capability,
                     "mozilla_gecko_process_type_source_reviewed": True,
                     "native_chromeutils_process_type_authenticated": True,
@@ -909,6 +981,7 @@ def run(repo: Path, output: Path):
                         "Some user/network/IPC namespaces are conditional on kernel/graphics support; no semantics or blocked-syscall audit",
                         "Web content versus socket, RDD, utility and forkserver roles derived from privileged Firefox ChromeUtils PID/type; /proc argv may be stale after forkserver",
                         "Other Gecko process roles have DIFFERENT sandbox policies and are reported, not counted as web content workers",
+                        "Socket/RDD/utility roles have bounded kernel namespace/filter observations only; no role-specific enforcement semantics or syscall denial accepted",
                         "No proof each filter is the expected Mozilla sandbox policy",
                         "Not a full Safe Browsing or external-network egress test",
                         "Not a VAAPI/DMABuf or other platform security audit",
@@ -919,7 +992,13 @@ def run(repo: Path, output: Path):
                 output.write_text(json.dumps(report, indent=2) + "\n")
                 print("PASS: authentic Gecko 'tab' content workers and live threads have seccomp/NoNewPrivs; non-content roles separately classified", flush=True)
                 print("AUDIT: role-authenticated tab workers=" + str(evidence["actual_content_worker_count"]) +
-                      " other-Gecko-roles=" + json.dumps(evidence["other_gecko_child_role_counts"], sort_keys=True), flush=True)
+                      " other-Gecko-roles=" + json.dumps(evidence["other_gecko_child_role_counts"], sort_keys=True) +
+                      " other-roles-seccomp-filtered-and-NNP=" +
+                      json.dumps(other_role_evidence["other_gecko_role_seccomp_filtered_and_no_new_privs_counts"], sort_keys=True) +
+                      " other-roles-parent-namespace-diff=" +
+                      json.dumps({p["gecko_role"]: p["namespace_differs_from_browser_parent"]
+                                  for p in other_role_evidence["other_gecko_role_kernel_observations"]}, sort_keys=True),
+                      flush=True)
                 print("AUDIT: worker namespace distinct-from-parent counts=" +
                       json.dumps(namespace_evidence["content_worker_distinct_namespace_counts_by_kind"], sort_keys=True) +
                       " unreadable=" + json.dumps(namespace_evidence["content_worker_unreadable_namespace_counts_by_kind"], sort_keys=True) +
