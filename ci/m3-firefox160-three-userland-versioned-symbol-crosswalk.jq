@@ -98,10 +98,11 @@ check(
 check($s22==$s24 and $s22==$sa and ($s22|length)==4592;
   "Mismatch in exact Firefox160 symbol@version candidates or classifications") |
 (triple($v)) as $allowed |
-check(all($u22.versioned_import_candidate_details[];
-   [.requester_basename,.declared_provider_basename,.required_version_name] as $t |
-   ($allowed|index($t))!=null);
-  "Versioned undefined symbol was absent from independent original VERNEED metadata") |
+([$u22.versioned_import_candidate_details[] |
+  [.requester_basename,.declared_provider_basename,.required_version_name]] |
+  unique | sort) as $used |
+check(($allowed|length)==521 and ($used|length)==521 and $used==$allowed;
+  "Versioned undefined symbol triples differ from exact independent VERNEED metadata") |
 ([ $s22[]|.[1] ]|unique|sort) as $provider_names |
 ([ $s22[]|.[0] ]|unique|sort) as $requesters |
 check(($requesters|length)==28 and ($provider_names|length)==17;
