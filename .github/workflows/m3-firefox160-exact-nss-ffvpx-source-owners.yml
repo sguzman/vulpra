@@ -1,0 +1,252 @@
+# Read-only Firefox160 official release sources: exact 10 SHA-pinned NSS
+# and FFVPX conditional loader/build ownership paths, checked against
+# preserved Vulpra 28-overlay exclusion and real glibc load observations.
+name: M3 Firefox 160 Exact NSS FFVPX Loader Source Ownership
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-exact-nss-ffvpx-source-owners.yml
+      - ci/m3-firefox160-nss-ffvpx-source-owners.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-source-owners-with-real-loader-witness:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Authenticate immutable original Firefox160 build, overlay tree and actual loader trace
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name] of [
+              [43138458940,'0624235fdc956ab18af3c3f310b3588ca72fff61',
+                'Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate'],
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)'],
+              [43743231236,'f4a23510f7dcd2b1e7b09723009199922b3d9ed1',
+                'M3 Firefox 160 Actual Initialized Loader Request Edges (No Build)']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Original Firefox160 source/native/loader run not authentic '+id);
+            }
+            for(const [id,name] of [
+              [43724886827,'firefox160-vulpra-preserved-materialized-source-proof'],
+              [43724886827,'firefox160-vulpra-preserved-complete-git-tree-candidate'],
+              [43743231236,'firefox160-actual-initialized-loader-request-edges-not-dlopen-closure']]){
+              const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(a.filter(x=>x.name===name&&!x.expired&&x.size_in_bytes>0 &&
+                  new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Authenticated source/native runtime artifact absent '+name);
+            }
+      - name: Checkout only new Rust source verifier
+        uses: actions/checkout@v4
+        with:
+          path: verifier
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-nss-ffvpx-source-owners.rs
+      - name: Checkout ten exact official Firefox160 source owner files (NO Vulpra working source changes)
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: firefox160-official
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/nss/lib/pk11wrap/pk11load.c
+            security/nss/lib/softoken/manifest.mn
+            security/nss/lib/freebl/loader.c
+            security/nss/lib/freebl/genload.c
+            security/nss/lib/freebl/blname.c
+            security/nss/lib/freebl/manifest.mn
+            dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp
+            dom/media/platforms/PDMFactory.cpp
+            media/ffvpx/libavcodec/moz.build
+            media/ffvpx/libavutil/moz.build
+      - name: Download preserved complete 28-overlay source ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/ledger
+      - name: Download preserved exact candidate source tree proof
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Download actual original native dynamic loader requests and init traces report
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-actual-initialized-loader-request-edges-not-dlopen-closure
+          repository: sguzman/vulpra
+          run-id: 43743231236
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/loader
+      - name: Test Rust source-owner observer and validate original ten source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C verifier rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C firefox160-official rev-parse HEAD)" = \
+            2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          rustc --edition=2021 --test verifier/ci/m3-firefox160-nss-ffvpx-source-owners.rs \
+            -o "$RUNNER_TEMP/source-owner-tests"
+          "$RUNNER_TEMP/source-owner-tests"
+          rustc --edition=2021 -O verifier/ci/m3-firefox160-nss-ffvpx-source-owners.rs \
+            -o "$RUNNER_TEMP/source-owner-inspector"
+          "$RUNNER_TEMP/source-owner-inspector" --verify firefox160-official \
+            "$RUNNER_TEMP/firefox160-exact-nss-ffvpx-owners.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="firefox160_exact_release_nss_ffvpx_conditional_source_owner_candidates" and
+            .official_upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_vulpra_candidate_tree_authenticated_separately=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .original_compiled_native_archive_sha256_authenticated_separately=="530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .verified_exact_original_unmodified_source_paths==10 and
+            (.exact_source_owner_rows|length)==10 and
+            .source_candidate_routes_count==4 and
+            ([.source_candidate_routes[].id]|sort)==["ffvpx_codec","ffvpx_util","nss_freebl","nss_softoken"] and
+            all(.source_candidate_routes[];
+              .source_load_failure_guard_present==true and
+              .observed_native_glibc_request_direct_callsite_attributed==false) and
+            .source_owner_matches_exact_runtime_caller_machine_instructions==false and
+            .source_fallback_arms_actually_exercised==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-exact-nss-ffvpx-owners.json" >/dev/null
+          if "$RUNNER_TEMP/source-owner-inspector" --verify verifier \
+            "$RUNNER_TEMP/forged-owner-report.json" >/dev/null 2>&1; then
+            echo 'FAIL: non-official release checkout accepted as source ownership' >&2
+            exit 1
+          fi
+      - name: Prove selected source owners were NOT any of the original 28 overlays
+        shell: bash
+        run: |
+          set -euo pipefail
+          ledger="$RUNNER_TEMP/ledger/candidate-tree-report.json"
+          overlays="$RUNNER_TEMP/ledger/overlay-paths.txt"
+          source="$RUNNER_TEMP/source/materialized-candidate.json"
+          owners="$RUNNER_TEMP/firefox160-exact-nss-ffvpx-owners.json"
+          test -s "$ledger" && test -s "$overlays" && test -s "$source"
+          jq -e '
+            .firefox160_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_git_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .source_files_modified==26 and
+            .vulpra_source_files_added==2 and
+            .upstream_files_deleted==0 and
+            .all_other_upstream_files_preserved==true
+          ' "$ledger" >/dev/null
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$source" >/dev/null
+          test "$(wc -l < "$overlays")" -eq 28
+          test "$(sort -u "$overlays" | wc -l)" -eq 28
+          jq -r '.exact_source_owner_rows[].source_path' "$owners" |
+            LC_ALL=C sort -u > "$RUNNER_TEMP/ten-owner-paths.txt"
+          test "$(wc -l < "$RUNNER_TEMP/ten-owner-paths.txt")" -eq 10
+          if grep -Fx -f "$RUNNER_TEMP/ten-owner-paths.txt" "$overlays"; then
+            echo 'FAIL: original Firefox160 source owner path appears in Vulpra overlays' >&2
+            exit 1
+          fi
+          echo 'PASS: all 10 source files are exact upstream blobs and untouched by the 28 verified Vulpra overlays.'
+      - name: Join actual loader observation with candidate source ownership without pretending to prove callstack
+        shell: bash
+        run: |
+          set -euo pipefail
+          owners="$RUNNER_TEMP/firefox160-exact-nss-ffvpx-owners.json"
+          loader="$RUNNER_TEMP/loader/firefox160-actual-loader-request-edges.json"
+          jq -n \
+            --slurpfile src "$owners" --slurpfile runtime "$loader" '
+            ($src[0]) as $s | ($runtime[0]) as $r |
+            ($s.source_candidate_routes|map(.candidate_provider)|sort) as $candidates |
+            ([ $r.initialized_dynamic_request_edges[] |
+               select(.requester_basename=="libnspr4.so") |
+               .requested_library_basename ]|unique|sort) as $targets |
+            if $r.schema_version==1 and
+              $r.original_native_source_commit==$s.official_upstream_release_commit and
+              $r.original_native_archive_sha256==$s.original_compiled_native_archive_sha256_authenticated_separately and
+              $r.status=="firefox160_real_browser_native_glibc_initialized_loader_request_edges" and
+              $r.browser_pid_traces_with_actual_libxul_initialization==2 and
+              $r.observed_initialized_library_basename_count==94 and
+              $r.initialized_dynamic_request_edge_count==18 and
+              ($candidates - $targets)==[] and
+              $r.only_same_browser_pid_trace_initialized_targets_classified_as_initialized==true and
+              $r.glibc_reported_request_relationships_not_proven_callstacks==true and
+              $r.all_conditional_dlopen_and_dlsym_edges_proven==false and
+              $r.raw_loader_logs_paths_pids_symbols_or_profile_data_exported==false and
+              $s.source_owner_matches_exact_runtime_caller_machine_instructions==false and
+              $s.source_fallback_arms_actually_exercised==false and
+              $s.m3_sixth_gate_closed==false
+            then {
+              schema_version:1,
+              status:"firefox160_exact_upstream_nss_ffvpx_source_candidates_crosschecked_with_actual_loader_requests",
+              official_release_commit:$s.official_upstream_release_commit,
+              assembled_candidate_source_tree:$s.assembled_vulpra_candidate_tree_authenticated_separately,
+              original_native_archive_sha256:$r.original_native_archive_sha256,
+              original_native_runtime_observation_run:43743231236,
+              original_exact_source_verified_blob_count:10,
+              original_source_files_nonoverlaid_by_vulpra:true,
+              source_candidate_rows:[$s.source_candidate_routes[] | . + {
+                actual_glibc_initialized_dynamic_request_seen_from_libnspr4:true,
+                compiled_direct_loader_caller_function_proven:false,
+                fallback_exercised:false
+              }],
+              source_routes_crosschecked_with_actual_native_loader_requests:4,
+              exact_runtime_loader_caller_source_function_verified:false,
+              exact_machine_dlopen_symbol_arguments_verified:false,
+              all_conditional_ffi_and_protected_fallbacks_exercised:false,
+              target_endeavouros_hyprland_verified:false,
+              source_pruning_authorized:false,
+              security_current:false,
+              release_ready:false,
+              m3_sixth_gate_closed:false
+            } else error("Untrusted Firefox160 exact-source or real initialized-loader candidate pairing") end
+            ' > "$RUNNER_TEMP/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json"
+          jq -e '
+            .source_routes_crosschecked_with_actual_native_loader_requests==4 and
+            .original_exact_source_verified_blob_count==10 and
+            .original_source_files_nonoverlaid_by_vulpra==true and
+            all(.source_candidate_rows[];
+              .actual_glibc_initialized_dynamic_request_seen_from_libnspr4==true and
+              .compiled_direct_loader_caller_function_proven==false and
+              .fallback_exercised==false) and
+            .exact_runtime_loader_caller_source_function_verified==false and
+            .all_conditional_ffi_and_protected_fallbacks_exercised==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json" >/dev/null
+          jq '.source_routes_crosschecked_with_actual_native_loader_requests=5' \
+            "$RUNNER_TEMP/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json" \
+            > "$RUNNER_TEMP/forged-completion.json"
+          if jq -e '
+            .source_routes_crosschecked_with_actual_native_loader_requests==4 and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/forged-completion.json" >/dev/null 2>&1; then
+            echo 'FAIL: fabricated source/runtime record count accepted' >&2; exit 1
+          fi
+          echo 'PASS: four actual initialized Firefox160 NSS/FFVPX native loader requests map to unchanged official source/build candidate owners; no direct caller/callstack or fallback closure claim.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve bounded exact source and actual runtime candidate crosswalk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks
+          path: ${{ runner.temp }}/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json
+          if-no-files-found: warn
+          retention-days: 30
