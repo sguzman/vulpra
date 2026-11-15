@@ -49,12 +49,47 @@ def status_fields(raw: str) -> dict:
     }
 
 
+# From pinned Firefox 160:
+# xpcom/geckoprocesstypes_generator/geckoprocesstypes/__init__.py
+# ipc/glue/GeckoChildProcessHost.cpp appends ChildProcessType() last.
+# The -contentproc executable switch is COMMON TO MANY Gecko child types.
+# In particular, "tab" is actual web content, and "socket" / "rdd" / etc
+# have DIFFERENT sandbox policies. Do not infer content from process ancestry.
+GECKO_CHILD_TYPES = frozenset((
+    "tab", "forkserver", "socket", "rdd", "utility", "gpu",
+    "vr", "gmplugin", "ipdlunittest",
+))
+
+
+def gecko_type_from_argv(argv):
+    if not isinstance(argv, (list, tuple)) or not all(
+            isinstance(item, bytes) for item in argv):
+        raise RuntimeError("Invalid process argv framing")
+    if b"-contentproc" not in argv:
+        return "browser"
+    if not argv or len(argv) < 3:
+        raise RuntimeError("Gecko child process argv missing process type")
+    try:
+        kind = argv[-1].decode("ascii")
+    except UnicodeDecodeError as error:
+        raise RuntimeError("Non-ASCII Gecko process-type identifier") from error
+    if kind not in GECKO_CHILD_TYPES:
+        raise RuntimeError("Unknown Gecko child process type; refuse to misclassify")
+    return kind
+
+
 def read_process(pid):
     root = Path("/proc") / str(pid)
-    cmd = (root / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+    # Preserve the real argument boundaries for the upstream last-argument
+    # Gecko role discriminator, but never archive command lines or user data.
+    raw = (root / "cmdline").read_bytes()
+    argv = raw.rstrip(b"\0").split(b"\0") if raw else []
+    gecko_type = gecko_type_from_argv(argv)
+    cmd = raw.replace(b"\0", b" ").decode(errors="replace")
     exe = os.path.realpath(root / "exe")
     fields = status_fields((root / "status").read_text())
-    return {"pid": pid, "exe": exe, "cmdline": cmd, **fields}
+    return {"pid": pid, "exe": exe, "cmdline": cmd,
+            "gecko_process_type": gecko_type, **fields}
 
 
 def content_processes(browser_binary, parent_pid):
@@ -67,7 +102,7 @@ def content_processes(browser_binary, parent_pid):
             process = read_process(int(item.name))
             if process["exe"] != target:
                 continue
-            if "-contentproc" not in process["cmdline"]:
+            if process["gecko_process_type"] == "browser":
                 continue
             if process["pid"] == parent_pid:
                 continue
@@ -92,20 +127,33 @@ def evaluate_sandbox(parent, children, pref_level):
     pids = {p["pid"] for p in children}
     if len(pids) != len(children) or parent["pid"] in pids:
         raise RuntimeError("Duplicate or fabricated native process identities")
-    spawning = [p for p in children if p["ppid"] == parent["pid"]]
+    # Authenticate each process ROLE using the official Mozilla command
+    # line's final type token, NOT its common -contentproc executable switch.
+    if any(p.get("gecko_process_type") not in GECKO_CHILD_TYPES for p in children):
+        raise RuntimeError("Unclassified Gecko process: cannot assert content sandbox")
+    spawning = [p for p in children
+                if p["gecko_process_type"] == "forkserver" and
+                p["ppid"] == parent["pid"]]
     if not spawning:
-        raise RuntimeError("No directly parented browser spawning process found")
+        raise RuntimeError("No correctly typed browser forkserver process observed")
     spawner_pids = {p["pid"] for p in spawning}
-    workers = [p for p in children if p["pid"] not in spawner_pids]
+    workers = [p for p in children if p["gecko_process_type"] == "tab"]
+    other_children = [p for p in children
+                      if p["gecko_process_type"] not in ("tab", "forkserver")]
     if not workers:
-        raise RuntimeError("No separate content worker descendants found")
-    # Require every spawner to have a worker, and every worker to be linked
-    # to one of the browser's observed native child spawning processes.
-    worker_ppids = {p["ppid"] for p in workers}
-    if any(p["pid"] not in worker_ppids for p in spawning):
-        raise RuntimeError("Unexplained direct browser content-process child")
+        raise RuntimeError("No authentic Gecko 'tab' content worker observed")
+    if any(p["gecko_process_type"] == "forkserver" and
+           p["pid"] not in spawner_pids for p in children):
+        raise RuntimeError("Unexplained or forked forkserver process")
     if any(p["ppid"] not in spawner_pids for p in workers):
-        raise RuntimeError("Content-process worker parent not authenticated")
+        raise RuntimeError("Actual tab content worker parent not authenticated")
+    if any(p["ppid"] not in spawner_pids for p in other_children):
+        raise RuntimeError("Other Gecko process is not child of authenticated forkserver")
+    # Some forkservers may only spawn socket/utility processes; no role is
+    # silently counted as content merely because its parent is a forkserver.
+    if any(p["pid"] not in {x["ppid"] for x in workers + other_children}
+           for p in spawning):
+        raise RuntimeError("Forkserver without an observed child")
     if any(p["seccomp_mode"] != 2 or p["seccomp_filter_count"] < 1 or
            p["no_new_privileges"] != 1 for p in workers):
         raise RuntimeError("A live content worker lacked seccomp/NoNewPrivs enforcement")
@@ -115,6 +163,15 @@ def evaluate_sandbox(parent, children, pref_level):
         "linux_content_sandbox_level": pref_level,
         "observed_native_content_process_count": len(children),
         "actual_content_worker_count": len(workers),
+        "gecko_content_worker_role_authenticated": True,
+        "other_gecko_child_count_not_misclassified_as_web_content":
+            len(other_children),
+        "other_gecko_child_role_counts": {
+            role: sum(p["gecko_process_type"] == role for p in other_children)
+            for role in sorted(GECKO_CHILD_TYPES - {"tab", "forkserver"})
+            if any(p["gecko_process_type"] == role for p in other_children)
+        },
+        "all_observed_non_content_child_roles_explicitly_reported": True,
         "browser_child_spawning_process_count": len(spawning),
         "browser_child_unfiltered_spawning_process_count": len(unfiltered),
         "all_worker_processes_descend_from_browser_spawners": True,
@@ -131,10 +188,19 @@ def evaluate_sandbox(parent, children, pref_level):
         ],
         "content_worker_statuses": [
             {
+                "gecko_process_type": "tab",
                 "seccomp_mode": p["seccomp_mode"],
                 "seccomp_filter_count": p["seccomp_filter_count"],
                 "no_new_privileges": p["no_new_privileges"],
             } for p in workers
+        ],
+        "other_gecko_child_statuses": [
+            {
+                "gecko_process_type": p["gecko_process_type"],
+                "seccomp_mode": p["seccomp_mode"],
+                "seccomp_filter_count": p["seccomp_filter_count"],
+                "no_new_privileges": p["no_new_privileges"],
+            } for p in other_children
         ],
         "parent_process_seccomp_mode": parent["seccomp_mode"],
         "parent_process_filter_count": parent["seccomp_filter_count"],
@@ -151,8 +217,7 @@ def evaluate_worker_thread_seccomp(children, parent_pid, samples_by_pid):
     live Firefox worker thread groups only, NOT the unfiltered forkserver/
     spawning processes explicitly reported by evaluate_sandbox().
     """
-    spawners = {p["pid"] for p in children if p["ppid"] == parent_pid}
-    workers = [p for p in children if p["pid"] not in spawners]
+    workers = [p for p in children if p["gecko_process_type"] == "tab"]
     required = {p["pid"] for p in workers}
     if not required or set(samples_by_pid) != required:
         raise RuntimeError("Content-worker thread group missing or spoofed")
@@ -206,8 +271,7 @@ def capture_worker_thread_seccomp(children, parent_pid):
     disappearance and a worker with no live tasks are hard failures. This is
     one bounded observation, not a perpetual thread-creation guarantee.
     """
-    spawners = {p["pid"] for p in children if p["ppid"] == parent_pid}
-    workers = [p for p in children if p["pid"] not in spawners]
+    workers = [p for p in children if p["gecko_process_type"] == "tab"]
     observed = {}
     for worker in workers:
         pid = worker["pid"]
@@ -245,8 +309,8 @@ def evaluate_worker_namespaces(parent_pid, children, parent_namespaces,
     A matching namespace is reported honestly and is NOT treated as
     unfiltered seccomp or an automatically failed namespace promise.
     """
-    spawners = {x["pid"] for x in children if x["ppid"] == parent_pid}
-    workers = {x["pid"] for x in children if x["pid"] not in spawners}
+    workers = {x["pid"] for x in children
+               if x["gecko_process_type"] == "tab"}
     if not workers or set(worker_namespaces) != workers or set(worker_roots) != workers:
         raise RuntimeError("Missing/forged authenticated worker namespace groups")
     if set(parent_namespaces) != set(NAMESPACE_KINDS):
@@ -368,8 +432,7 @@ def reconcile_user_namespace_support(observation, cached, level,
 
 def capture_worker_namespaces(children, browser_pid):
     """Read /proc symlinks and root metadata only; do not attach or ptrace."""
-    spawners = {x["pid"] for x in children if x["ppid"] == browser_pid}
-    workers = [x for x in children if x["pid"] not in spawners]
+    workers = [x for x in children if x["gecko_process_type"] == "tab"]
 
     def namespace(pid, kind):
         try:
@@ -400,9 +463,41 @@ def capture_worker_namespaces(children, browser_pid):
 def self_test():
     raw = "Name:\tvulpra\nPPid:\t400\nSeccomp:\t2\nSeccomp_filters:\t3\nNoNewPrivs:\t1\n"
     browser = {"pid": 327, "seccomp_mode": 0, "seccomp_filter_count": 0}
-    spawner = {"pid": 400, "ppid": 327, "seccomp_mode": 0,
-               "seccomp_filter_count": 0, "no_new_privileges": 0}
-    worker = {"pid": 401, **status_fields(raw)}
+    spawner = {"pid": 400, "ppid": 327, "gecko_process_type": "forkserver",
+               "seccomp_mode": 0, "seccomp_filter_count": 0,
+               "no_new_privileges": 0}
+    worker = {"pid": 401, "gecko_process_type": "tab", **status_fields(raw)}
+    # Source-derived role markers: GeckoChildProcessHost appends the actual
+    # process type last; -contentproc alone does not mean a web content role.
+    assert gecko_type_from_argv(
+        (b"/bin/vulpra", b"-contentproc", b"1", b"tab")) == "tab"
+    assert gecko_type_from_argv(
+        (b"/bin/vulpra", b"-contentproc", b"2", b"socket")) == "socket"
+    assert gecko_type_from_argv(
+        (b"/bin/vulpra", b"-contentproc", b"3", b"forkserver")) == "forkserver"
+    assert gecko_type_from_argv((b"/bin/vulpra", b"-headless")) == "browser"
+    for bad_argv in [
+        (b"/bin/vulpra", b"-contentproc", b"99", b"bad"),
+        (b"/bin/vulpra", b"-contentproc", b"5", b"tab-socket"),
+        (b"/bin/vulpra", b"-contentproc", b"3", b""),
+        (b"/bin/vulpra", b"-contentproc"),
+        ("not bytes", b"-contentproc", b"tab"),
+        (b"/bin/vulpra", b"-contentproc", b"1", b"\xff"),
+    ]:
+        try:
+            gecko_type_from_argv(bad_argv)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Forged Gecko child process type accepted")
+    socket = {"pid": 402, "ppid": 400,
+              "gecko_process_type": "socket",
+              "seccomp_mode": 0, "seccomp_filter_count": 0,
+              "no_new_privileges": 0}
+    mixed = evaluate_sandbox(browser, [spawner, worker, socket], 6)
+    assert mixed["actual_content_worker_count"] == 1
+    assert mixed["other_gecko_child_role_counts"] == {"socket": 1}
+    assert mixed["all_observed_non_content_child_roles_explicitly_reported"]
     observed = evaluate_sandbox(browser, [spawner, worker], 6)
     assert observed["all_observed_content_workers_have_seccomp_filters"]
     assert observed["browser_child_unfiltered_spawning_process_count"] == 1
@@ -416,13 +511,16 @@ def self_test():
         ([spawner, worker, {**spawner, "pid": 402}], 6),
         ([], 6),
         ([spawner, worker], 0),
+        ([spawner, {**worker, "gecko_process_type": "socket"}], 6),
+        ([spawner, {**worker, "gecko_process_type": "unknown"}], 6),
+        ([{**spawner, "gecko_process_type": "tab"}, worker], 6),
     ]:
         try:
             evaluate_sandbox(browser, invalid, level)
         except RuntimeError:
             continue
         raise AssertionError("Forged, missing, orphaned or unfiltered worker accepted")
-    print("PASS: topology-aware seccomp parser and nine negative process/sandbox cases")
+    print("PASS: role-authenticated seccomp parser and twelve negative process/sandbox cases")
     main = {"tid": 401, "seccomp_mode": 2,
             "seccomp_filter_count": 3, "no_new_privileges": 1}
     secondary = {**main, "tid": 402}
@@ -682,6 +780,9 @@ def run(repo: Path, output: Path):
                     **thread_evidence,
                     **namespace_evidence,
                     **namespace_capability,
+                    "mozilla_gecko_process_type_source_reviewed": True,
+                    "all_gecko_content_workers_verified_as_tab_role": True,
+                    "non_content_child_processes_not_assumed_content_sandboxed": True,
                     "release_ready": False,
                     "security_current": False,
                     "limits": [
@@ -690,6 +791,8 @@ def run(repo: Path, output: Path):
                         "Namespace identities are compared with browser parent; matching or unreadable namespace never mislabeled as isolated",
                         "User namespaces are conditioned on Firefox's capability probe and kernel/LSM; content namespaces absent on CI are not claimed enabled",
                         "Some user/network/IPC namespaces are conditional on kernel/graphics support; no semantics or blocked-syscall audit",
+                        "Gecko tab workers distinguished from forkserver/socket/RDD/utility and other process roles using final original command-line process-type token",
+                        "Other Gecko process roles have DIFFERENT sandbox policies and are reported, not counted as web content workers",
                         "No proof each filter is the expected Mozilla sandbox policy",
                         "Not a full Safe Browsing or external-network egress test",
                         "Not a VAAPI/DMABuf or other platform security audit",
@@ -698,7 +801,9 @@ def run(repo: Path, output: Path):
                 if output.exists():
                     raise RuntimeError("Refusing to replace existing sandbox proof")
                 output.write_text(json.dumps(report, indent=2) + "\n")
-                print("PASS: real Firefox 160 content workers and live threads have seccomp/NoNewPrivs; namespace comparisons recorded read-only", flush=True)
+                print("PASS: authentic Gecko 'tab' content workers and live threads have seccomp/NoNewPrivs; non-content roles separately classified", flush=True)
+                print("AUDIT: role-authenticated tab workers=" + str(evidence["actual_content_worker_count"]) +
+                      " other-Gecko-roles=" + json.dumps(evidence["other_gecko_child_role_counts"], sort_keys=True), flush=True)
                 print("AUDIT: worker namespace distinct-from-parent counts=" +
                       json.dumps(namespace_evidence["content_worker_distinct_namespace_counts_by_kind"], sort_keys=True) +
                       " unreadable=" + json.dumps(namespace_evidence["content_worker_unreadable_namespace_counts_by_kind"], sort_keys=True) +
