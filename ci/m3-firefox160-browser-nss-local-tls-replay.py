@@ -304,17 +304,17 @@ def main():
                         "-addext", "subjectAltName=IP:127.0.0.1",
                         "-out", str(crt), "-keyout", str(key)], check=True,
                        timeout=20, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        http = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Page)
-        https = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Page)
+        http_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Page)
+        https_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Page)
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(str(crt), str(key))
-        https.socket = tls.wrap_socket(https.socket, server_side=True)
+        https_server.socket = tls.wrap_socket(https_server.socket, server_side=True)
         threads = [Thread(target=server.serve_forever, daemon=True)
-                   for server in (http, https)]
+                   for server in (http_server, https_server)]
         for thread in threads:
             thread.start()
-        http_url = f"http://127.0.0.1:{http.server_port}/page"
-        https_url = f"https://127.0.0.1:{https.server_port}/page"
+        http_url = f"http://127.0.0.1:{http_server.server_port}/page"
+        https_url = f"https://127.0.0.1:{https_server.server_port}/page"
         try:
             with OPENER.open(urllib.request.Request(http_url), timeout=8) as r:
                 if r.status != 200 or b"Vulpra NSS localhost test" not in r.read(4096):
@@ -334,7 +334,7 @@ def main():
             modes = [session_run(name, group, browser, shim, gecko, tmp, http_url, https_url)
                      for name, group in GROUPS]
         finally:
-            for server in (http, https):
+            for server in (http_server, https_server):
                 server.shutdown()
                 server.server_close()
     baseline = modes[0]
