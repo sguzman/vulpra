@@ -132,7 +132,7 @@ jobs:
             --cap-drop ALL --cap-add CHOWN \
             --security-opt no-new-privileges \
             --pids-limit 512 --memory 4g --shm-size 256m \
-            --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=2048m \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,mode=1777,size=2048m \
             -v "$GITHUB_WORKSPACE:/workspace:ro" \
             -v "$RUNNER_TEMP:/reports:rw" \
             --workdir /workspace \
