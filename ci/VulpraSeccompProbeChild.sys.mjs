@@ -6,9 +6,20 @@
 "use strict";
 export class VulpraSeccompProbeChild extends JSWindowActorChild {
   receiveMessage(message) {
-    if (message.name !== "VulpraTestBlockedPrctl" ||
-        message.data?.token !== "vulpra160-prctl-capbset-read") {
+    const isHomeWrite =
+      message.name === "VulpraTestDeniedHomeWrite" &&
+      message.data?.token === "vulpra160-denied-home-write";
+    const isPrctl =
+      message.name === "VulpraTestBlockedPrctl" &&
+      message.data?.token === "vulpra160-prctl-capbset-read";
+    if (!isHomeWrite && !isPrctl) {
       throw new Error("Unrecognized sandbox test request");
+    }
+    if (isHomeWrite &&
+        (typeof message.data?.canaryPath !== "string" ||
+         !/^\\/tmp\\/vulpra160-real-prctl-[^/]+\\/home\\/vulpra-write-canary$/.test(
+           message.data.canaryPath))) {
+      throw new Error("Home-write probe path outside disposable test HOME");
     }
     const appinfo = Cc["@mozilla.org/xre/app-info;1"].getService(
       Ci.nsIXULRuntime
@@ -38,6 +49,26 @@ export class VulpraSeccompProbeChild extends JSWindowActorChild {
       const modeAtInvocation = prctl(21, 0, 0, 0, 0);
       if (modeAtInvocation !== 2) {
         throw new Error("Native content actor has no active seccomp filter");
+      }
+      if (isHomeWrite) {
+        // Mirrors the separate upstream browser_content_sandbox_syscalls.js
+        // home-write negative test. This cannot modify the user's HOME:
+        // only a canary in the disposable browser-test HOME is accepted.
+        const open = libc.declare("open", ctypes.default_abi, ctypes.int,
+          ctypes.char.ptr, ctypes.int, ctypes.int);
+        const close = libc.declare("close", ctypes.default_abi, ctypes.int,
+          ctypes.int);
+        const rv = open(message.data.canaryPath,
+          0xC1, 384); // O_CREAT|O_EXCL|O_WRONLY, mode 0600
+        const errno = ctypes.errno;
+        if (rv >= 0) {
+          close(rv);
+        }
+        return {
+          observationKind: "native_open_create_home_denial_in_real_content",
+          processType: appinfo.processType,
+          processId: appinfo.processID, modeAtInvocation, rv, errno
+        };
       }
       const rv = prctl(23, 0, 0, 0, 0); // PR_CAPBSET_READ, CAP_CHOWN
       const errno = ctypes.errno;
