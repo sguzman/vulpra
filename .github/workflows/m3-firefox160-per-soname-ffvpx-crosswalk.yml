@@ -1,0 +1,129 @@
+# Independent evidence-only check of actual two separate libmozav* dlopen
+# denial counts, original compiled Firefox160 archive, video playback, and
+# previous 4-producer exact-source/real-media reconciliation.
+name: M3 Firefox 160 Exact Per-SONAME FFVPX Denial Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-per-soname-ffvpx-crosswalk.yml
+      - ci/m3-firefox160-per-soname-ffvpx-denial-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-original-per-name-ffvpx-denial:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate immutable original 4-producer proof and new actual per-name browser run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43747660588,'f9935afb16da34f928dd2ae479c41ef50717f0b7',
+                'M3 Firefox 160 Real FFVPX vs FFmpeg Denial Evidence Crosswalk',
+                'firefox160-actual-bundled-ffvpx-vs-system-ffmpeg-denial-not-decoder-proof'],
+              [43748031202,'8b5e0a367a4b7ceaeb0fd3253dcb62c5d730e3a8',
+                'M3 Firefox 160 Actual FFVPX Library Denial VP9 Replay (No Build)',
+                'firefox160-original-bundled-ffvpx-denial-real-vp9-not-full-fallback']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Unauthenticated original Firefox160 source or FFVPX runtime '+id);
+              const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(artifacts.filter(x=>x.name===artifact&&!x.expired&&x.size_in_bytes>0 &&
+                   new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Exact FFVPX runtime/source report absent or ambiguous '+artifact);
+            }
+      - name: Checkout strict source/ABI/runtime comparison only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-per-soname-ffvpx-denial-crosswalk.jq
+      - name: Download independently verified Firefox160 native source/FFmpeg/FFVPX report
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-actual-bundled-ffvpx-vs-system-ffmpeg-denial-not-decoder-proof
+          repository: sguzman/vulpra
+          run-id: 43747660588
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/old
+      - name: Download actual Firefox160 compiled browser separate FFVPX SONAME denials
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-original-bundled-ffvpx-denial-real-vp9-not-full-fallback
+          repository: sguzman/vulpra
+          run-id: 43748031202
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/specific
+      - name: Assert source/native/VP9/denied-name identity and reject twelve fabricated claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          old="$RUNNER_TEMP/old/firefox160-actual-ffvpx-ffmpeg-denial-source-crosswalk.json"
+          specific="$RUNNER_TEMP/specific/firefox160-actual-bundled-ffvpx-denial-outcome.json"
+          verifier=ci/m3-firefox160-per-soname-ffvpx-denial-crosswalk.jq
+          test -s "$old" && test -s "$specific"
+          compare() {
+            jq -n --arg upstream '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile old "$1" --slurpfile specific "$2" -f "$verifier"
+          }
+          compare "$old" "$specific" > "$RUNNER_TEMP/firefox160-exact-per-name-ffvpx-denial-proof.json"
+          jq -e '.schema_version==1 and
+            .source_owner_original_Git_blobs_verified==10 and
+            .total_ffvpx_native_dlopen_denials==2 and
+            .two_separately_denied_native_FFVPX_names==[
+              {"name":"libmozavcodec.so","actual_dlopen_denial_count":1},
+              {"name":"libmozavutil.so","actual_dlopen_denial_count":1}] and
+            .ffvpx_denials_during_video_navigation==0 and
+            .actual_vp9_video_decoded_in_baseline_and_bundled_FFVPX_denied_browser==true and
+            .actual_vp9_video_decoded_in_separate_system_FFmpeg_denied_browser==true and
+            .both_real_denied_VP9_browser_workloads_remained_responsive==true and
+            .exact_decoder_or_successful_fallback_implementation_identified==false and
+            .FFVPX_source_level_failure_guard_actual_machine_branch_proven==false and
+            .all_future_dlopen_dlsym_and_Rust_CXX_FFI_proven==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/firefox160-exact-per-name-ffvpx-denial-proof.json" >/dev/null
+          jq '.original_upstream_source_commit="fake"' "$old" > "$RUNNER_TEMP/old-fake-source.json"
+          jq '.system_ffmpeg_denied_load_attempts=0' "$old" > "$RUNNER_TEMP/old-fake-ffmpeg.json"
+          jq '.bundled_ffvpx_denied_load_attempts=0' "$old" > "$RUNNER_TEMP/old-fake-ffvpx.json"
+          jq '.source_pruning_authorized=true' "$old" > "$RUNNER_TEMP/old-fake-pruning.json"
+          jq '.original_compiled_native_archive_sha256="fake"' "$specific" > "$RUNNER_TEMP/specific-fake-sha.json"
+          jq '.ffvpx_actual_native_denied_dlopen_attempt_count=3' "$specific" > "$RUNNER_TEMP/specific-fake-total.json"
+          jq '.ffvpx_libmozavcodec_denied_dlopen_attempt_count=0' "$specific" > "$RUNNER_TEMP/specific-fake-codec.json"
+          jq '.ffvpx_libmozavutil_denied_dlopen_attempt_count=0' "$specific" > "$RUNNER_TEMP/specific-fake-util.json"
+          jq '.with_bundled_ffvpx_denied_vp9_decoded_frames_and_advancing_time=false' "$specific" > "$RUNNER_TEMP/specific-fake-media.json"
+          jq '.browser_and_temporary_profile_preserved_under_both_modes=false' "$specific" > "$RUNNER_TEMP/specific-fake-profile.json"
+          jq '.actual_ffvpx_missing_provider_failure_guard_source_branch_attributed=true' "$specific" > "$RUNNER_TEMP/specific-fake-source-guard.json"
+          jq '.m3_sixth_gate_closed=true' "$specific" > "$RUNNER_TEMP/specific-fake-gate.json"
+          for case in source ffmpeg ffvpx pruning; do
+            if compare "$RUNNER_TEMP/old-fake-$case.json" "$specific" >/dev/null 2>&1; then
+              echo "Forged old source/media state accepted: $case" >&2; exit 1
+            fi
+          done
+          for case in sha total codec util media profile source-guard gate; do
+            if compare "$old" "$RUNNER_TEMP/specific-fake-$case.json" >/dev/null 2>&1; then
+              echo "Forged actual per-FFVPX-denial state accepted: $case" >&2; exit 1
+            fi
+          done
+          echo 'PASS: actual Firefox160 libmozavcodec.so denied once and libmozavutil.so denied once, VP9 decoded in both modes; previous independent real source/media crosswalk reconciled; 12/12 forgeries rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: no actual decoder identification, source machine-code failure guard attribution, Arch/Hyprland hardware or native FFI/loader closure.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive exact per-SONAME FFVPX real-browser verification, not release approval
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-per-soname-ffvpx-real-denial-crosswalk-not-decoder-proof
+          path: ${{ runner.temp }}/firefox160-exact-per-name-ffvpx-denial-proof.json
+          if-no-files-found: warn
+          retention-days: 30
