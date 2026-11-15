@@ -366,6 +366,8 @@ def run(repo, output, home_write=False):
                     **accepted,
                     "tested_syscall": ("open(O_CREAT|O_EXCL|O_WRONLY,HOME canary)"
                                        if home_write else "prctl(PR_CAPBSET_READ,CAP_CHOWN)"),
+                    "expected_upstream_seccomp_result": (
+                        None if home_write else "EINVAL"),
                     "expected_upstream_denial": ("native HOME write refused"
                                                  if home_write else "EINVAL"),
                     "actual_errno": actor_result["errno"],
