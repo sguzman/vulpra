@@ -60,9 +60,12 @@ fn count_logs(root:&Path, prefix:&str)->Result<Tally,String>{
         let Some(n)=n.to_str() else {continue};
         if !(n==prefix || n.starts_with(&format!("{prefix}."))) {continue;}
         let meta=fs::symlink_metadata(entry.path()).map_err(|_|"bad MOZ_LOG metadata")?;
-        if !meta.file_type().is_file() || meta.len()==0 || meta.len()>MAX_FILE_BYTES {
-            return Err("missing, symlinked or oversized MOZ_LOG file".into());
+        if !meta.file_type().is_file() || meta.len()>MAX_FILE_BYTES {
+            return Err("symlinked, nonregular or oversized MOZ_LOG file".into());
         }
+        // The launcher or geckodriver can create empty per-process log files;
+        // only nonempty logs can witness an actual native source diagnostic.
+        if meta.len()==0 {continue;}
         bytes=bytes.checked_add(meta.len()).ok_or("MOZ_LOG byte overflow")?;
         if bytes>MAX_TOTAL_BYTES {return Err("MOZ_LOG aggregate exceeds cap".into());}
         entries.push(entry.path());
