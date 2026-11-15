@@ -15,6 +15,7 @@
 #include <string.h>
 
 typedef int (*NSSInit)(const char*);
+typedef int (*GetNSSError)(void);
 typedef int (*Shutdown)(void);
 typedef int (*IsFIPS)(void);
 typedef void *(*GetSlot)(void);
@@ -75,10 +76,11 @@ int main(int argc,char**argv){
     const char* db=argv[2];
     void* lib=dlopen(orig,RTLD_NOW|RTLD_LOCAL);
     if(!lib){
-        puts("PKCS11_TEMP_FIPS_V1 original_nss_open=0 exact_symbols=0 init=-2 fips=-2 system_fips=-2 internal_slot=-2 internal_key_slot=-2 slot_present=-2 key_slot_present=-2 sha256_mechanism=-2 rng=-2 rng_nonzero=0 shutdown=-2 softoken_mapped=0 freebl_mapped=0 same_slot=-2");
+        puts("PKCS11_TEMP_FIPS_V1 original_nss_open=0 exact_symbols=0 init=-2 fips=-2 system_fips=-2 internal_slot=-2 internal_key_slot=-2 slot_present=-2 key_slot_present=-2 sha256_mechanism=-2 rng=-2 rng_nonzero=0 shutdown=-2 softoken_mapped=0 freebl_mapped=0 same_slot=-2 init_error=-2");
         return 0;
     }
     NSSInit init=(NSSInit)dlsym(lib,"NSS_Init");
+    GetNSSError error=(GetNSSError)dlsym(lib,"PORT_GetError");
     Shutdown shutdown=(Shutdown)dlsym(lib,"NSS_Shutdown");
     IsFIPS isfips=(IsFIPS)dlsym(lib,"PK11_IsFIPS");
     SystemFIPS sysfips=(SystemFIPS)dlsym(lib,"SECMOD_GetSystemFIPSEnabled");
@@ -88,7 +90,7 @@ int main(int argc,char**argv){
     IsPresent present=(IsPresent)dlsym(lib,"PK11_IsPresent");
     DoesMechanism mechanism=(DoesMechanism)dlsym(lib,"PK11_DoesMechanism");
     GenerateRandom random=(GenerateRandom)dlsym(lib,"PK11_GenerateRandom");
-    void* ptrs[]={(void*)init,(void*)shutdown,(void*)isfips,(void*)sysfips,
+    void* ptrs[]={(void*)init,(void*)error,(void*)shutdown,(void*)isfips,(void*)sysfips,
         (void*)slot,(void*)keyslot,(void*)freeslot,(void*)present,
         (void*)mechanism,(void*)random};
     bool exact=true;
@@ -96,10 +98,13 @@ int main(int argc,char**argv){
         if(!original_symbol(ptrs[i],orig)){exact=false;break;}
     }
     if(!exact){
-        puts("PKCS11_TEMP_FIPS_V1 original_nss_open=1 exact_symbols=0 init=-2 fips=-2 system_fips=-2 internal_slot=-2 internal_key_slot=-2 slot_present=-2 key_slot_present=-2 sha256_mechanism=-2 rng=-2 rng_nonzero=0 shutdown=-2 softoken_mapped=0 freebl_mapped=0 same_slot=-2");
+        puts("PKCS11_TEMP_FIPS_V1 original_nss_open=1 exact_symbols=0 init=-2 fips=-2 system_fips=-2 internal_slot=-2 internal_key_slot=-2 slot_present=-2 key_slot_present=-2 sha256_mechanism=-2 rng=-2 rng_nonzero=0 shutdown=-2 softoken_mapped=0 freebl_mapped=0 same_slot=-2 init_error=-2");
         dlclose(lib);return 0;
     }
     int initrc=init(db);
+    // Record only the bounded original numeric PORT_GetError immediately
+    // after init, never a raw NSS debug string, module path or token label.
+    int initerror=initrc==0 ? 0 : error();
     int fips=-2,system=-2,intern=-2,key=-2,there=-2,keythere=-2,sha=-2,rng=-2,shut=-2,same=-2;
     bool nonzero=false;
     char path[PATH_MAX];
@@ -135,9 +140,9 @@ int main(int argc,char**argv){
     // Snapshot before shutdown unloads providers; do not export paths.
     dl_iterate_phdr(original_mappings,&mapped);
     if(initrc==0)shut=shutdown();
-    printf("PKCS11_TEMP_FIPS_V1 original_nss_open=1 exact_symbols=1 init=%d fips=%d system_fips=%d internal_slot=%d internal_key_slot=%d slot_present=%d key_slot_present=%d sha256_mechanism=%d rng=%d rng_nonzero=%d shutdown=%d softoken_mapped=%d freebl_mapped=%d same_slot=%d\n",
+    printf("PKCS11_TEMP_FIPS_V1 original_nss_open=1 exact_symbols=1 init=%d fips=%d system_fips=%d internal_slot=%d internal_key_slot=%d slot_present=%d key_slot_present=%d sha256_mechanism=%d rng=%d rng_nonzero=%d shutdown=%d softoken_mapped=%d freebl_mapped=%d same_slot=%d init_error=%d\n",
         initrc,fips,system,intern,key,there,keythere,sha,rng,(int)nonzero,shut,
-        (int)mapped.softoken,(int)mapped.freebl,same);
+        (int)mapped.softoken,(int)mapped.freebl,same,initerror);
     dlclose(lib);
     return 0;
 }
