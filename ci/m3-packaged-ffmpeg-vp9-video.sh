@@ -153,7 +153,7 @@ run_mode() {
   if test -n "${VULPRA_M3_FFVPX_LOG_OBSERVER:-}"; then
     test "$deny_group" = ffvpx && test -x "$VULPRA_M3_FFVPX_LOG_OBSERVER"
     private_decoder_logging=(
-      MOZ_LOG=PlatformDecoderModule:5,FFmpegVideo:5
+      MOZ_LOG=PlatformDecoderModule:5,FFmpegVideo:5,MediaFormatReader:5
       "MOZ_LOG_FILE=$tmp/$mode-moz"
     )
   fi
