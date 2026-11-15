@@ -1,0 +1,143 @@
+# Pure evidence-only independent verification of pinned original Firefox160
+# NSS PKCS11/FIPS-status (read-only) against CA-trusted local TLS evidence.
+# No FIPS mode switches, writes to user tokens, browser rebuild or source prune.
+name: M3 Firefox 160 Original NSS PKCS11 FIPS Readonly Source Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-source-attested-pkcs11-readonly-crosswalk.yml
+      - ci/m3-firefox160-pkcs11-readonly-vs-trusted-tls-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-nss-pkcs11-readonly-source-attested:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate actual prior trusted Firefox160 TLS and original NSS PKCS11 producer runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43763693842,'82c11fa9c532ba8504df4dbbb53ca0fac8bb722c',
+                'M3 Firefox 160 Actual Trusted Local TLS NSS Evidence Crosswalk',
+                'firefox160-independent-original-real-trusted-local-nss-TLS-not-release'],
+              [43765136534,'66599cc889a854de41bf5912159ee8056cc981ef',
+                'M3 Firefox 160 Original NSS PKCS11 SHA256 FIPS Readonly Probe',
+                'firefox160-original-native-pkcs11-sha256-fips-readonly-not-certified']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Untrusted original Firefox160 NSS source/API/baseline TLS producer: '+id);
+              const arts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(arts.filter(a=>a.name===artifact&&!a.expired&&a.size_in_bytes>0 &&
+                new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Original NSS/TLS immutable evidence missing/expired/ambiguous: '+artifact);
+            }
+      - name: Checkout exact independent NSS PKCS11 status crosswalk only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-pkcs11-readonly-vs-trusted-tls-crosswalk.jq
+      - name: Download independently verified original Firefox160 native/source and trusted local TLS baseline
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 43763693842
+          name: firefox160-independent-original-real-trusted-local-nss-TLS-not-release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/tls
+      - name: Download real source-pinned original NSS PKCS11 slot/SAH256/read-only FIPS API result
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 43765136534
+          name: firefox160-original-native-pkcs11-sha256-fips-readonly-not-certified
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/pkcs11
+      - name: Independently verify original PKCS11 APIs, real loader denials and sixteen negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          tls="$RUNNER_TEMP/tls/firefox160-real-source-attested-trusted-local-TLS.json"
+          pkcs="$RUNNER_TEMP/pkcs11/original-pkcs11-readonly-report.json"
+          verifier=ci/m3-firefox160-pkcs11-readonly-vs-trusted-tls-crosswalk.jq
+          test -s "$tls" && test -s "$pkcs"
+          verify() {
+            jq -n --arg source '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile tls "$1" --slurpfile pkcs11 "$2" -f "$verifier"
+          }
+          verify "$tls" "$pkcs" > "$RUNNER_TEMP/source-verified-original-nss-pkcs11-fips-readonly.json"
+          jq -e '
+            .schema_version==1 and
+            .original_compiled_Firefox160_native_archive_sha256==
+              "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .ten_exact_original_upstream_NSS_source_blobs_verified_in_native_run==true and
+            .source_paths_outside_all_28_Vulpra_overlays_verified==true and
+            .baseline_internal_PKCS11_slot_and_keyslot_present==true and
+            .original_PKCS11_CKM_SHA256_mechanism_available==true and
+            .baseline_original_RNG_and_NSS_shutdown_success==true and
+            .actual_PK11_IsFIPS_readonly_result==0 and
+            .actual_system_FIPS_indicator_readonly_result==0 and
+            .actual_individual_softoken_loader_denials==2 and
+            .actual_individual_freebl_loader_denials==3 and
+            .actual_combined_softoken_denials==2 and
+            .actual_combined_freebl_requests==0 and
+            .three_provider_missing_NSS_initializations_fail_without_process_crash==true and
+            .actual_trusted_local_RSA_CA_https_webdriver_success_in_separate_real_browser_run==true and
+            .cannot_claim_FIPS_mode_test_or_140_certification==true and
+            .no_complete_Rust_CXX_FFI_dlopen_dlsym_dependency_closure==null and
+            .source_pruning_authorized==false and
+            .security_current==false and .release_ready==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/source-verified-original-nss-pkcs11-fips-readonly.json" >/dev/null
+
+          jq '.official_original_firefox160_source_commit="forged"' "$tls" > "$RUNNER_TEMP/tls-source.json"
+          jq '.unchanged_original_native_browser_archive_sha256="forged"' "$tls" > "$RUNNER_TEMP/tls-archive.json"
+          jq '.trusted_original_browser_succeeded_actual_local_TLS_secure_document_and_JavaScript=false' "$tls" > "$RUNNER_TEMP/tls-trust.json"
+          jq '.actual_original_browser_NSS_softoken_denied_loads=0' "$tls" > "$RUNNER_TEMP/tls-softoken.json"
+          jq '.no_full_FIPS_PKCS11_NSS_and_Gecko_security_coverage=false' "$tls" > "$RUNNER_TEMP/tls-overclaim.json"
+
+          jq '.original_module_FIPS_mode_readonly=1' "$pkcs" > "$RUNNER_TEMP/pkcs-fips.json"
+          jq '.unchanged_original_native_archive_sha256="forged"' "$pkcs" > "$RUNNER_TEMP/pkcs-sha.json"
+          jq '.modes[0].internal_slot_present=0' "$pkcs" > "$RUNNER_TEMP/pkcs-slot.json"
+          jq '.modes[0].SHA256_PKCS11_mechanism_available=0' "$pkcs" > "$RUNNER_TEMP/pkcs-sha256.json"
+          jq '.modes[0].original_RNG_rc=-1' "$pkcs" > "$RUNNER_TEMP/pkcs-rng.json"
+          jq '.modes[0].original_freebl_ELF_mapped=false' "$pkcs" > "$RUNNER_TEMP/pkcs-mapping.json"
+          jq '.modes[1].actual_softoken_native_denials=0' "$pkcs" > "$RUNNER_TEMP/pkcs-softoken.json"
+          jq '.modes[2].actual_freebl_native_denials=0' "$pkcs" > "$RUNNER_TEMP/pkcs-freebl.json"
+          jq '.modes[3].actual_freebl_native_denials=3' "$pkcs" > "$RUNNER_TEMP/pkcs-combined.json"
+          jq '.FIPS_enabled_or_FIPS_security_compliance_tested=true' "$pkcs" > "$RUNNER_TEMP/pkcs-fipsclaim.json"
+          jq '.m3_sixth_gate_closed=true' "$pkcs" > "$RUNNER_TEMP/pkcs-gate.json"
+          for kind in source archive trust softoken overclaim; do
+            if verify "$RUNNER_TEMP/tls-$kind.json" "$pkcs" >/dev/null 2>&1; then
+              echo "FAIL: forged original trusted HTTPS accepted: $kind" >&2; exit 1
+            fi
+          done
+          for kind in fips sha slot sha256 rng mapping softoken freebl combined fipsclaim gate; do
+            if verify "$tls" "$RUNNER_TEMP/pkcs-$kind.json" >/dev/null 2>&1; then
+              echo "FAIL: forged real PKCS11/FIPS/crypto provider accepted: $kind" >&2; exit 1
+            fi
+          done
+          echo 'PASS: source-pinned original Firefox160 PKCS11 internal slots+SHA256 mechanism; FIPS disabled/read-only, real 2/3 provider-load failures, trusted local TLS baseline independently crosschecked; 16/16 forged reports rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: NSS FIPS mode NOT enabled or certified, no key/PIN/HSM tests, complete Rust/C++ FFI and all library dependency closure still OPEN.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded original NSS PKCS11 read-only/FIPS and independent TLS crosswalk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-source-attested-original-pkcs11-sha256-fips-readonly-not-FIPS-certified
+          path: ${{ runner.temp }}/source-verified-original-nss-pkcs11-fips-readonly.json
+          if-no-files-found: warn
+          retention-days: 30
