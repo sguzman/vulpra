@@ -149,6 +149,7 @@ def inspect_original(archive):
 
 
 def analyze(archive):
+    userspace_id, userspace_version, userspace_label = BASE.recorded_userspace()
     imported, packaged_exports, source = inspect_original(archive)
     host_cache = BASE.host_library_paths()
     candidates = dict(packaged_exports)
@@ -199,7 +200,10 @@ def analyze(archive):
         "schema_version": 1,
         "original_native_source_commit": BASE.SOURCE,
         "original_archive_sha256": BASE.ARCHIVE,
-        "host": "Ubuntu 24.04 x86_64 CI metadata candidates, not Arch",
+        "host": userspace_label,
+        "scanned_userspace_id": userspace_id,
+        "scanned_userspace_version": userspace_version,
+        "target_host_kernel_verified": False,
         "original_native_elf_members": len(source),
         "versioned_undefined_dynamic_symbol_imports": len(findings),
         "declared_provider_candidate_export_name_matches": counts[
@@ -258,7 +262,16 @@ def main():
     p.add_argument("--archive", type=Path)
     p.add_argument("--output", type=Path)
     p.add_argument("--self-test", action="store_true")
+    p.add_argument("--source-commit",
+                   choices=["2887d9de1f69c0e9776413da80e7ba0d1225dd9b"])
+    p.add_argument("--archive-sha256")
     args = p.parse_args()
+    if (args.source_commit is None) != (args.archive_sha256 is None):
+        p.error("Opt-in Firefox160 source and native archive SHA must be paired")
+    if args.source_commit is not None:
+        if not re.fullmatch(r"[0-9a-f]{64}", args.archive_sha256):
+            p.error("Invalid exact Firefox160 package SHA-256")
+        BASE.SOURCE, BASE.ARCHIVE = args.source_commit, args.archive_sha256
     if args.self_test:
         print("PASS:", selftest(), "spoofed version index/provider fixtures")
         if args.archive is None:
