@@ -68,6 +68,49 @@ def verify_evidence(parent, child, roles, process):
     }
 
 
+def verify_home_write_evidence(parent, child, roles, process):
+    """Prove genuine content worker cannot create a disposable HOME canary.
+
+    This is filesystem isolation/broker denial, not proof that seccomp alone
+    (rather than namespaces/broker) caused the open failure.
+    """
+    if (not isinstance(parent, dict) or type(parent.get("rv")) is not int or
+            parent["rv"] != 1 or not isinstance(parent.get("writeControl"), dict) or
+            parent["writeControl"].get("openSucceeded") is not True or
+            parent["writeControl"].get("unlinked") is not True):
+        raise RuntimeError("Real browser parent could not open/close/unlink HOME canary")
+    if (not isinstance(child, dict) or
+            child.get("observationKind") !=
+            "native_open_create_home_denial_in_real_content" or
+            type(child.get("processType")) is not int or
+            child["processType"] != 2 or
+            type(child.get("modeAtInvocation")) is not int or
+            child["modeAtInvocation"] != 2 or
+            type(child.get("processId")) is not int or
+            child["processId"] <= 1 or
+            type(child.get("rv")) is not int or child["rv"] != -1 or
+            type(child.get("errno")) is not int or
+            child["errno"] not in (1, 2, 13, 30)):
+        raise RuntimeError("No native content-worker HOME file-create denial")
+    pid = child["processId"]
+    if (not isinstance(roles, dict) or roles.get(pid) != "tab" or
+            not isinstance(process, dict) or process.get("pid") != pid or
+            process.get("seccomp_mode") != 2 or
+            process.get("seccomp_filter_count", 0) < 1 or
+            process.get("no_new_privileges") != 1):
+        raise RuntimeError("Actual filtered native Gecko tab PID or role missing")
+    return {
+        "same_browser_parent_home_write_control_succeeded": True,
+        "same_browser_parent_home_write_canary_removed": True,
+        "native_open_create_home_content_worker_denied": True,
+        "actual_chromeutils_tab_role_authenticated": True,
+        "same_tab_pid_has_seccomp_mode_2": True,
+        "same_tab_seccomp_mode_2_at_syscall": True,
+        "same_tab_pid_has_no_new_privileges": True,
+        "filesystem_denial_not_exclusively_attributed_to_seccomp": True,
+    }
+
+
 def self_test():
     parent = {"rv": 1, "errno": 0}
     child = {"observationKind": "native_prctl_capbset_read_in_real_content",
@@ -104,8 +147,39 @@ def self_test():
             raise AssertionError("Counterfeit seccomp-denial result accepted")
     print("PASS: seventeen forged parent/child/PID/role/filter/errno controls rejected")
 
+    control = {"rv": 1, "writeControl":
+               {"openSucceeded": True, "unlinked": True}}
+    attempt = {"observationKind": "native_open_create_home_denial_in_real_content",
+               "processType": 2, "processId": 8001,
+               "modeAtInvocation": 2, "rv": -1, "errno": 13}
+    assert verify_home_write_evidence(control, attempt, {8001: "tab"}, proc)[
+        "native_open_create_home_content_worker_denied"] is True
+    for forged in [
+        ({**control, "writeControl": {"openSucceeded": False,
+                                     "unlinked": True}}, attempt, {8001: "tab"}, proc),
+        ({**control, "writeControl": {"openSucceeded": True,
+                                     "unlinked": False}}, attempt, {8001: "tab"}, proc),
+        (control, {**attempt, "rv": 0}, {8001: "tab"}, proc),
+        (control, {**attempt, "errno": 0}, {8001: "tab"}, proc),
+        (control, {**attempt, "errno": True}, {8001: "tab"}, proc),
+        (control, {**attempt, "processType": 0}, {8001: "tab"}, proc),
+        (control, {**attempt, "modeAtInvocation": 0}, {8001: "tab"}, proc),
+        (control, {**attempt, "processId": 8002}, {8001: "tab"}, proc),
+        (control, attempt, {8001: "socket"}, proc),
+        (control, attempt, {8001: "tab"}, {**proc, "seccomp_filter_count": 0}),
+        (control, attempt, {8001: "tab"}, {**proc, "no_new_privileges": 0}),
+    ]:
+        try:
+            verify_home_write_evidence(*forged)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("Counterfeit HOME-write denial accepted")
+    print("PASS: eleven forged native HOME-write controls rejected")
 
-def run(repo, output):
+
+
+def run(repo, output, home_write=False):
     if output.exists():
         raise RuntimeError("Refusing to overwrite any existing sandbox evidence")
     archive = wd.verified_archive(repo)
@@ -137,6 +211,9 @@ def run(repo, output):
         original.parent.mkdir(parents=True)
         sentinel = b"Must preserve pre-existing Firefox profile in syscall test\n"
         original.write_bytes(sentinel)
+        canary_path = home / "vulpra-write-canary"
+        if canary_path.exists():
+            raise RuntimeError("HOME canary unexpectedly exists before test")
         profile = work / "isolated-profile"
         profile.mkdir()
         env = os.environ.copy()
@@ -183,7 +260,7 @@ def run(repo, output):
                 module_uri = module_dir.as_uri() + "/"
                 result = wd.request(port, "POST", base + "/execute/sync", {
                     "script": """
-                        const [directory] = arguments;
+                        const [directory, canary, homeWrite] = arguments;
                         const protocol = Services.io.getProtocolHandler("resource")
                             .QueryInterface(Ci.nsIResProtocolHandler);
                         protocol.setSubstitution("vulpra-seccomp-probe",
@@ -207,9 +284,27 @@ def run(repo, output):
                             ctypes.unsigned_long, ctypes.unsigned_long,
                             ctypes.unsigned_long, ctypes.unsigned_long);
                           const rv = prctl(23, 0, 0, 0, 0);
-                          return {rv, errno:ctypes.errno};
+                          const errno = ctypes.errno;
+                          if (!homeWrite) {
+                            return {rv, errno};
+                          }
+                          const open = libc.declare("open", ctypes.default_abi,
+                            ctypes.int, ctypes.char.ptr, ctypes.int,
+                            ctypes.unsigned_int);
+                          const close = libc.declare("close", ctypes.default_abi,
+                            ctypes.int, ctypes.int);
+                          const unlink = libc.declare("unlink", ctypes.default_abi,
+                            ctypes.int, ctypes.char.ptr);
+                          const fd = open(canary, 193, 384);
+                          const openSucceeded = fd >= 0;
+                          let unlinked = false;
+                          if (openSucceeded) {
+                            unlinked = close(fd) === 0 && unlink(canary) === 0;
+                          }
+                          return {rv, errno,
+                            writeControl:{openSucceeded, unlinked}};
                         } finally { libc.close(); }
-                    """, "args": [module_uri]
+                    """, "args": [module_uri, str(canary_path), home_write]
                 })
                 if (not isinstance(result, dict) or
                         type(result.get("rv")) is not int or result["rv"] != 1):
@@ -224,13 +319,18 @@ def run(repo, output):
                 actor_result = wd.request(port, "POST", base + "/execute/async", {
                     "script": """
                         const done = arguments[arguments.length-1];
+                        const [canary, homeWrite] = arguments;
                         (async () => {
                           const actor = gBrowser.selectedBrowser.browsingContext
                             .currentWindowGlobal.getActor("VulpraSeccompProbe");
-                          return await actor.sendQuery("VulpraTestBlockedPrctl",
-                            {token:"vulpra160-prctl-capbset-read"});
+                          return await actor.sendQuery(
+                            homeWrite ? "VulpraTestDeniedHomeWrite" :
+                              "VulpraTestBlockedPrctl",
+                            {token:homeWrite ? "vulpra160-denied-home-write" :
+                              "vulpra160-prctl-capbset-read",
+                             canaryPath:canary});
                         })().then(done, e=>done({probeError:String(e?.name||"actor-failed")+" "+String(e?.message||"").replace(/file:\/\/[^ ]+/g,"[redacted-file-uri]").slice(0,150)}));
-                    """, "args": []
+                    """, "args": [str(canary_path), home_write]
                 }, timeout_seconds=45)
                 census = wd.request(port, "POST", base + "/execute/async", {
                     "script": """
@@ -250,7 +350,10 @@ def run(repo, output):
                         kind = "invalid-error-kind"
                     raise RuntimeError("No native content-side actor process ID: " + kind)
                 proc = obs.read_process(pid)
-                accepted = verify_evidence(result, actor_result, roles, proc)
+                accepted = (verify_home_write_evidence(result, actor_result, roles, proc)
+                            if home_write else verify_evidence(result, actor_result, roles, proc))
+                if canary_path.exists():
+                    raise RuntimeError("HOME write canary unexpectedly remains after test")
                 if original.read_bytes() != sentinel:
                     raise RuntimeError("Existing Firefox profile marker altered")
                 proof = {
@@ -261,14 +364,17 @@ def run(repo, output):
                     "linux_content_sandbox_enabled": True,
                     "no_sandbox_prefs_or_host_kernel_policy_relaxed": True,
                     **accepted,
-                    "tested_syscall": "prctl(PR_CAPBSET_READ,CAP_CHOWN)",
-                    "expected_upstream_seccomp_result": "EINVAL",
-                    "actual_errno": 22,
+                    "tested_syscall": ("open(O_CREAT|O_EXCL|O_WRONLY,HOME canary)"
+                                       if home_write else "prctl(PR_CAPBSET_READ,CAP_CHOWN)"),
+                    "expected_upstream_denial": ("native HOME write refused"
+                                                 if home_write else "EINVAL"),
+                    "actual_errno": actor_result["errno"],
                     "raw_pids_or_user_data_archived": False,
                     "security_current": False, "release_ready": False
                 }
                 output.write_text(json.dumps(proof, indent=2)+"\n")
-                print("PASS: genuine Firefox 160 Gecko-tab syscall returned EINVAL; same PID has seccomp/NoNewPrivs")
+                print("PASS: genuine Firefox 160 tab HOME-create denied" if home_write
+                      else "PASS: genuine Firefox 160 tab prctl returned EINVAL")
         finally:
             if session_id:
                 try:
@@ -292,6 +398,9 @@ if __name__ == "__main__":
     try:
         if sys.argv[1:] == ["--self-test"]:
             self_test()
+        elif len(sys.argv) == 4 and sys.argv[1] == "--home-write":
+            run(Path(sys.argv[2]).resolve(), Path(sys.argv[3]).resolve(),
+                home_write=True)
         elif len(sys.argv) == 3:
             run(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve())
         else:
