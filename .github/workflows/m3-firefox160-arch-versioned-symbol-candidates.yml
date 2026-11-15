@@ -16,7 +16,7 @@ jobs:
   arch-native-versioned-imports:
     if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
     runs-on: ubuntu-24.04
-    timeout-minutes: 27
+    timeout-minutes: 40
     steps:
       - name: Authenticate exact original native Firefox160 producer and preserved version contracts
         uses: actions/github-script@v7
@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test "$(git hash-object ci/m3-native-elf-version-contract.py)" = "4239b4851966fdb796e02f38fcd0f9db161293e2"
-          test "$(git hash-object ci/m3-native-elf-symbol-provider-candidates.py)" = "6cdeb8429fc4ca7dec26fa648bf04328fbde8d9d"
+          test "$(git hash-object ci/m3-native-elf-symbol-provider-candidates.py)" = "8af90376a8ea598b0e17e728ae00b18977774c93"
           python3 -m py_compile ci/m3-native-elf-version-contract.py ci/m3-native-elf-symbol-provider-candidates.py
           python3 ci/m3-native-elf-version-contract.py --self-test
           python3 ci/m3-native-elf-symbol-provider-candidates.py --self-test
@@ -175,6 +175,12 @@ jobs:
                 --archive-sha256 "'$digest'" \
                 --archive /native/vulpra-firefox160-native-ci.tar.xz \
                 --output /results/firefox160-arch-versioned-symbol-candidates.json
+              python /scanners/m3-native-elf-symbol-provider-candidates.py \
+                --mode unversioned \
+                --source-commit 2887d9de1f69c0e9776413da80e7ba0d1225dd9b \
+                --archive-sha256 "'$digest'" \
+                --archive /native/vulpra-firefox160-native-ci.tar.xz \
+                --output /results/firefox160-arch-unversioned-symbol-candidates.json
             '
           jq -e --arg digest "$digest" '
             .schema_version==1 and
@@ -201,6 +207,29 @@ jobs:
             .new_source_removal_authorized==false and
             .m3_sixth_gate_closed==false
           ' "$RUNNER_TEMP/results/firefox160-arch-versioned-symbol-candidates.json" >/dev/null
+          jq -e --arg digest "$digest" '
+            .schema_version==1 and
+            .original_native_source_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .original_archive_sha256==$digest and
+            .scanned_userspace_id=="arch" and
+            .scanned_userspace_version==null and
+            .original_native_elf_members==28 and
+            (.unversioned_undefined_dynamic_symbol_imports>0) and
+            .unversioned_undefined_dynamic_symbol_imports==(.unversioned_import_candidate_details|length) and
+            .unversioned_undefined_dynamic_symbol_imports==
+              (.direct_needed_export_name_candidates+
+               .weak_imports_without_direct_candidate+
+               .strong_imports_without_direct_candidate) and
+            .unversioned_imports_examined==true and
+            .all_unversioned_imports_loader_resolved==false and
+            .actual_elf_symbol_bindings_resolved==false and
+            .transitive_preload_and_dynamic_scope_complete==false and
+            .runtime_dlopen_or_feature_coverage_complete==false and
+            .target_arch_hyprland_symbol_abi_proven==false and
+            .browser_or_host_elf_executed==false and
+            .new_source_removal_authorized==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/results/firefox160-arch-unversioned-symbol-candidates.json" >/dev/null
           echo 'PASS: source-authenticated Firefox160 indexed versioned symbol candidate export names available in isolated Arch userspace.' >> "$GITHUB_STEP_SUMMARY"
           echo 'LIMIT: native Arch userspace only; Ubuntu host kernel, no target Arch hardware, dynamic loader/FFI or live symbol bindings.' >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve Arch candidate-name outcomes and immutable image provenance
@@ -210,6 +239,7 @@ jobs:
           name: firefox160-arch-versioned-symbol-candidates-not-target-abi-release
           path: |
             ${{ runner.temp }}/results/firefox160-arch-versioned-symbol-candidates.json
+            ${{ runner.temp }}/results/firefox160-arch-unversioned-symbol-candidates.json
             ${{ runner.temp }}/results/arch-base-image-digest.txt
           if-no-files-found: warn
           retention-days: 30
