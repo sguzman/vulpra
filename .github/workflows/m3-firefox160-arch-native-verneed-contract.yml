@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git hash-object ci/m3-native-elf-version-contract.py)" = "5c54fdb1a6d1b41617d5719a3203472b41e0a573"
+          test "$(git hash-object ci/m3-native-elf-version-contract.py)" = "4239b4851966fdb796e02f38fcd0f9db161293e2"
           python3 -m py_compile ci/m3-native-elf-version-contract.py
           python3 ci/m3-native-elf-version-contract.py --self-test
           if python3 ci/m3-native-elf-version-contract.py --source-commit 2887d9de1f69c0e9776413da80e7ba0d1225dd9b --self-test >/dev/null 2>&1; then
@@ -158,6 +158,10 @@ jobs:
             .native_elf_declared_version_requirements==521 and
             .native_elf_declared_version_requirements==(.requirements|length) and
             .candidate_version_name_present_count==521 and
+            .scanned_userspace_id=="arch" and
+            .scanned_userspace_version==null and
+            .host=="Arch Linux x86-64 CI userspace metadata candidates" and
+            .target_host_kernel_verified==false and
             .candidate_version_name_absent_count==0 and
             .candidate_version_name_unavailable_count==0 and
             .native_binaries_executed==false and
