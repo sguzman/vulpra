@@ -61,6 +61,46 @@ jobs:
             ci/m3-packaged-ffmpeg-vp9-video.sh
             ci/m3-deny-optional-native-providers.c
             ci/m3-firefox160-ffvpx-mozlog-observer.rs
+      - name: Checkout only exact official Firefox160 decoder logging/description sources
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: firefox160-log-sources
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/media/MediaFormatReader.cpp
+            dom/media/platforms/agnostic/VPXDecoder.h
+            dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
+            dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp
+            dom/media/platforms/ffmpeg/FFmpegLog.h
+            dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp
+      - name: Verify six exact original Firefox160 Git blob source-log anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=firefox160-log-sources
+          test "$(git -C "$root" rev-parse HEAD)" =             2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          while IFS=' ' read -r sha path; do
+            test "$(git -C "$root" rev-parse "HEAD:$path")" = "$sha"
+            test "$(git -C "$root" hash-object -- "$path")" = "$sha"
+          done <<'SOURCES'
+          aed68a10525c0116574726307809b0da4b7e17f0 dom/media/MediaFormatReader.cpp
+          719c3d65e92074f1955c7ae3272e003368516e8a dom/media/platforms/agnostic/VPXDecoder.h
+          a3373fb915a56b5fdc31af28703985b0f1df72eb dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
+          ee24d18570d146d70252f5237810729c3319fcee dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp
+          80347b5586afe49e5f32c8631c3c6e3e0c1bb160 dom/media/platforms/ffmpeg/FFmpegLog.h
+          4d3eaf7529a534008f9150c2a16a04e5ef211566 dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp
+          SOURCES
+          grep -Fq 'Decoder init finished for ' "$root/dom/media/MediaFormatReader.cpp"
+          grep -Fq 'description: \"{}\"' "$root/dom/media/MediaFormatReader.cpp"
+          grep -Fq 'return "libvpx video decoder"_ns;' "$root/dom/media/platforms/agnostic/VPXDecoder.h"
+          grep -Fq 'return "ffvpx video decoder"_ns;' "$root/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h"
+          grep -Fq 'return "ffmpeg video decoder"_ns;' "$root/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h"
+          grep -Fq 'return LinkResult::NoProvidedLib;' "$root/dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp"
+          grep -Fq 'FFMPEGP_LOG("Link result: {}",' "$root/dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp"
+          echo 'PASS: six exact official Firefox160 decoder identity/failure logging source files, no source edits'
       - name: Retrieve original byte-preserving native Firefox160 archive
         uses: actions/download-artifact@v4
         with:
@@ -264,6 +304,27 @@ jobs:
               ffvpx_real_NoProvidedLib_link_failure_log_count:$m.FFVPX_NoProvidedLib_source_log_count_in_denied_mode,
               ffvpx_denied_pdm_log_lines:([$m.modes[]|select(.mode=="denied")|
                 .mozilla_ffvpx_private_log_observation.platform_decoder_module_log_lines][0]//0),
+              exact_original_Firefox160_decoder_log_source_blobs_verified:6,
+              baseline_mediaformatreader_video_decoder_init_logs:([$m.modes[]|select(.mode=="baseline")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_video_decoder_initialized_log_count][0]//0),
+              denied_mediaformatreader_video_decoder_init_logs:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_video_decoder_initialized_log_count][0]//0),
+              baseline_mediaformatreader_libvpx_video_decoder_init_logs:([$m.modes[]|select(.mode=="baseline")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_libvpx_decoder_initialized_count][0]//0),
+              denied_mediaformatreader_libvpx_video_decoder_init_logs:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_libvpx_decoder_initialized_count][0]//0),
+              baseline_mediaformatreader_ffvpx_video_decoder_init_logs:([$m.modes[]|select(.mode=="baseline")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_ffvpx_decoder_initialized_count][0]//0),
+              denied_mediaformatreader_ffvpx_video_decoder_init_logs:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_ffvpx_decoder_initialized_count][0]//0),
+              baseline_mediaformatreader_ffmpeg_video_decoder_init_logs:([$m.modes[]|select(.mode=="baseline")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_ffmpeg_decoder_initialized_count][0]//0),
+              denied_mediaformatreader_ffmpeg_video_decoder_init_logs:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_ffmpeg_decoder_initialized_count][0]//0),
+              baseline_mediaformatreader_unclassified_video_decoder_init_logs:([$m.modes[]|select(.mode=="baseline")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_unclassified_decoder_initialized_count][0]//0),
+              denied_mediaformatreader_unclassified_video_decoder_init_logs:([$m.modes[]|select(.mode=="denied")|
+                .mozilla_ffvpx_private_log_observation.mediaformatreader_unclassified_decoder_initialized_count][0]//0),
               ffvpx_denied_rdd_pdm_order_log_count:([$m.modes[]|select(.mode=="denied")|
                 .mozilla_ffvpx_private_log_observation.rdd_pdm_order_markers][0]//0),
               ffvpx_denied_agnostic_decoder_support_log_count:([$m.modes[]|select(.mode=="denied")|
@@ -296,6 +357,11 @@ jobs:
             .ffvpx_real_NoProvidedLib_link_failure_logged==true and
             .ffvpx_real_NoProvidedLib_link_failure_log_count>=1 and
             .ffvpx_denied_pdm_log_lines>=1 and
+            .exact_original_Firefox160_decoder_log_source_blobs_verified==6 and
+            .baseline_mediaformatreader_video_decoder_init_logs>=0 and
+            .denied_mediaformatreader_video_decoder_init_logs>=0 and
+            .baseline_mediaformatreader_libvpx_video_decoder_init_logs>=0 and
+            .denied_mediaformatreader_libvpx_video_decoder_init_logs>=0 and
             (.ffvpx_libmozavcodec_denied_dlopen_attempt_count+
              .ffvpx_libmozavutil_denied_dlopen_attempt_count)==.ffvpx_actual_native_denied_dlopen_attempt_count and
             .baseline_vp9_decoded_frames_and_advancing_time==true and
