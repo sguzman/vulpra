@@ -44,7 +44,7 @@ run_case() {
       --argjson soft "$soft" --argjson free "$free" --argjson total "$total" \
       --argjson attached "$attached" '
       input as $line |
-      if ($line|test("^PKCS11_READONLY_V1( [a-z_]+=-?[0-9]{1,4}){15}$")) then
+      if ($line|test("^PKCS11_READONLY_V1( [a-z0-9_]+=-?[0-9]{1,4}){15}$")) then
         ($line|split(" ")[1:]|map(split("=")|
           {key:.[0],value:(.[1]|tonumber)})|from_entries) as $p |
         if ($p|keys|sort)==(
