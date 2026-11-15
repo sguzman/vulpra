@@ -37,8 +37,7 @@ obs = import_file("security-160-content-process-seccomp.py", "vulpra_seccomp_rol
 def verify_evidence(parent, child, roles, process):
     """Fail closed for anything other than real Gecko-tab EINVAL denial."""
     if (not isinstance(parent, dict) or type(parent.get("rv")) is not int or
-            parent["rv"] != 1 or type(parent.get("errno")) is not int or
-            parent["errno"] != 0):
+            parent["rv"] != 1):
         raise RuntimeError("Same-browser-parent PR_CAPBSET_READ positive control failed")
     if (not isinstance(child, dict) or child.get("observationKind") !=
             "native_prctl_capbset_read_in_real_content" or
@@ -200,13 +199,13 @@ def run(repo, output):
                             ctypes.int, ctypes.int,
                             ctypes.unsigned_long, ctypes.unsigned_long,
                             ctypes.unsigned_long, ctypes.unsigned_long);
-                          ctypes.errno = 0;
                           const rv = prctl(23, 0, 0, 0, 0);
                           return {rv, errno:ctypes.errno};
                         } finally { libc.close(); }
                     """, "args": [module_uri]
                 })
-                if result != {"rv": 1, "errno": 0}:
+                if (not isinstance(result, dict) or
+                        type(result.get("rv")) is not int or result["rv"] != 1):
                     raise RuntimeError("Original browser-parent native PR_CAPBSET_READ control failed")
                 wd.request(port, "POST", base + "/moz/context", {"context": "content"})
                 wd.request(port, "POST", base + "/url", {

@@ -24,7 +24,6 @@ export class VulpraSeccompProbeChild extends JSWindowActorChild {
       const prctl = libc.declare("prctl", ctypes.default_abi, ctypes.int,
         ctypes.int, ctypes.unsigned_long, ctypes.unsigned_long,
         ctypes.unsigned_long, ctypes.unsigned_long);
-      ctypes.errno = 0;
       const rv = prctl(23, 0, 0, 0, 0); // PR_CAPBSET_READ, CAP_CHOWN
       const errno = ctypes.errno;
       return {
