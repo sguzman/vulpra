@@ -223,7 +223,11 @@ def run(repo, output):
                 roles = obs.verify_chrome_process_roles(census, browser_pid)
                 pid = actor_result.get("processId") if isinstance(actor_result, dict) else None
                 if type(pid) is not int:
-                    raise RuntimeError("No native content-side actor process ID")
+                    kind = actor_result.get("probeError", "missing-result") if isinstance(
+                        actor_result, dict) else "unstructured-result"
+                    if not isinstance(kind, str) or len(kind) > 80:
+                        kind = "invalid-error-kind"
+                    raise RuntimeError("No native content-side actor process ID: " + kind)
                 proc = obs.read_process(pid)
                 accepted = verify_evidence(result, actor_result, roles, proc)
                 if original.read_bytes() != sentinel:
