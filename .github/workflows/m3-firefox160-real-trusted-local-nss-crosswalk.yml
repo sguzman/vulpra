@@ -1,0 +1,144 @@
+# Immutable source/native/browser evidence reconciliation for a real
+# CA-trusted local HTTPS connection using a disposable Firefox160 NSS profile.
+# No browser recompilation, no original library deletion or global trust edits.
+name: M3 Firefox 160 Actual Trusted Local TLS NSS Evidence Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-real-trusted-local-nss-crosswalk.yml
+      - ci/m3-firefox160-real-trusted-local-nss-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-attested-original-native-browser-trusted-local-tls:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate independently tested original NSS source/browser and CA-trusted TLS producers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43762347874,'b71c581483e139a47cf40d6a3e1fcb22c96ff63f',
+                'M3 Firefox 160 Real NSS Browser Startup and HTTPS Crosswalk',
+                'firefox160-source-attested-real-nss-browser-startup-https-failures-not-full-TLS'],
+              [43763326904,'658df46706b76ed984111566477d418acf40d709',
+                'M3 Firefox 160 Trusted Local NSS CA HTTPS and Missing-Provider Replay',
+                'firefox160-original-real-trusted-local-TLS-ephemeral-NSS-CA-not-full-security']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Untrusted original source, NSS or TLS browser producer '+id);
+              const arts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(arts.filter(x=>x.name===artifact&&!x.expired&&x.size_in_bytes>0 &&
+                   new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Original source/NSS/trusted local TLS artifact unavailable '+artifact);
+            }
+      - name: Checkout strict original NSS and trusted TLS reconciliation only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-real-trusted-local-nss-crosswalk.jq
+      - name: Download original source-attested actual native NSS browser startup proof
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-source-attested-real-nss-browser-startup-https-failures-not-full-TLS
+          repository: sguzman/vulpra
+          run-id: 43762347874
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/prior
+      - name: Download actual unchanged Firefox160 browser CA-trusted localhost TLS outcome
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-original-real-trusted-local-TLS-ephemeral-NSS-CA-not-full-security
+          repository: sguzman/vulpra
+          run-id: 43763326904
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/actual
+      - name: Independently verify real secure HTTPS and all five NSS modes; reject sixteen forgeries
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          prior="$RUNNER_TEMP/prior/firefox160-actual-nss-browser-local-https-source-crosswalk.json"
+          actual="$RUNNER_TEMP/actual/firefox160-original-real-trusted-local-nss-tls.json"
+          verify=ci/m3-firefox160-real-trusted-local-nss-crosswalk.jq
+          test -s "$prior" && test -s "$actual"
+          reconcile() {
+            jq -n --arg source '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile prior "$1" --slurpfile actual "$2" -f "$verify"
+          }
+          reconcile "$prior" "$actual" > \
+            "$RUNNER_TEMP/firefox160-real-source-attested-trusted-local-TLS.json"
+          jq -e '
+            .schema_version==1 and
+            .unchanged_original_native_browser_archive_sha256==
+              "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .original_compiled_native_browser_run==43138458940 and
+            .untrusted_control_same_local_https_server_strictly_rejected==true and
+            .trusted_original_browser_succeeded_actual_local_TLS_secure_document_and_JavaScript==true and
+            .ephemeral_CA_exists_only_in_disposable_profile==true and
+            .ephemeral_localhost_CA_absent_from_system_trust==true and
+            .browser_tls_certificate_verification_enabled_for_all_real_sessions==true and
+            .trusted_profile_certs_NSS_DB_original_copy_unchanged==true and
+            .actual_original_browser_NSS_softoken_denied_loads==2 and
+            .actual_original_browser_NSS_freebl_denied_loads==3 and
+            .combined_target_NSS_softoken_denials==2 and
+            .combined_target_NSS_freebl_denials==0 and
+            .combined_mode_generic_error_not_misclassified_as_session_not_created==true and
+            .all_denied_provider_modes_rejected_before_HTTPS_navigation==true and
+            .all_temp_browser_profiles_preserved==true and
+            .no_system_trust_or_personal_browser_profile_modifications==true and
+            .no_external_TLS_or_public_network_tests==true and
+            .no_complete_Rust_CXX_FFI_dlopen_dlsym_dependency_closure==true and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-real-source-attested-trusted-local-TLS.json" >/dev/null
+
+          jq '.exact_official_mozilla_firefox160_source_commit="forged"' "$prior" > "$RUNNER_TEMP/prev-source.json"
+          jq '.original_unmodified_compiled_native_archive_sha256="forged"' "$prior" > "$RUNNER_TEMP/prev-package.json"
+          jq '.browser_baseline_strict_self_signed_local_HTTPS_certificate_rejected=false' "$prior" > "$RUNNER_TEMP/prev-reject.json"
+          jq '.browser_softoken_denied_actual_attempts=0' "$prior" > "$RUNNER_TEMP/prev-softoken.json"
+          jq '.m3_sixth_gate_closed=true' "$prior" > "$RUNNER_TEMP/prev-gate.json"
+
+          jq '.original_compiled_browser_archive_sha256="forged"' "$actual" > "$RUNNER_TEMP/now-sha.json"
+          jq '.ephemeral_local_CA_not_trusted_by_default_system_client=false' "$actual" > "$RUNNER_TEMP/now-defaulttrust.json"
+          jq '.temporary_NSS_database_bytes_unchanged=false' "$actual" > "$RUNNER_TEMP/now-db.json"
+          jq '.acceptInsecureCerts_never_enabled=false' "$actual" > "$RUNNER_TEMP/now-insecure.json"
+          jq '.modes[0].local_https_outcome="navigation_accepted"' "$actual" > "$RUNNER_TEMP/now-untrusted.json"
+          jq '.modes[1].actual_trusted_https_secure_document_title_and_javascript=false' "$actual" > "$RUNNER_TEMP/now-secure.json"
+          jq '.modes[1].browser_is_secure_context=false' "$actual" > "$RUNNER_TEMP/now-context.json"
+          jq '.modes[2].native_denied_softoken_loads=0' "$actual" > "$RUNNER_TEMP/now-softoken.json"
+          jq '.modes[3].native_denied_freebl_loads=0' "$actual" > "$RUNNER_TEMP/now-freebl.json"
+          jq '.modes[4].session_error_class="session not created"' "$actual" > "$RUNNER_TEMP/now-combined.json"
+          jq '.real_external_TLS_or_public_sites_tested=true' "$actual" > "$RUNNER_TEMP/now-overclaim.json"
+          for kind in source package reject softoken gate; do
+            if reconcile "$RUNNER_TEMP/prev-$kind.json" "$actual" >/dev/null 2>&1; then
+              echo "FAIL: forged original NSS source/browser accepted: $kind" >&2; exit 1
+            fi
+          done
+          for kind in sha defaulttrust db insecure untrusted secure context softoken freebl combined overclaim; do
+            if reconcile "$prior" "$RUNNER_TEMP/now-$kind.json" >/dev/null 2>&1; then
+              echo "FAIL: forged actual original trusted NSS browser report accepted: $kind" >&2; exit 1
+            fi
+          done
+          echo 'PASS: unchanged original Firefox160 trusted localhost TLS via disposable NSS CA and JS/secure context; same server strictly rejected without CA; actual softoken/FreeBL denial session failures; 16/16 forgeries rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: no original/user trust changes; local test CA only, no public TLS, all PKCS11/FIPS, FFI or M3 gate closure.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive sanitized source-attested real original Firefox160 trusted localhost TLS result only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-independent-original-real-trusted-local-nss-TLS-not-release
+          path: ${{ runner.temp }}/firefox160-real-source-attested-trusted-local-TLS.json
+          if-no-files-found: warn
+          retention-days: 30
