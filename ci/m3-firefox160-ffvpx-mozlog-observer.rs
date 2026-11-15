@@ -21,6 +21,11 @@ struct Tally {
     ffvpx_link_success: u64,
     ffvpx_unable_to_load_lib: u64,
     ffmpeg_video_lines: u64,
+    media_format_reader_video_decoder_init_lines: u64,
+    media_format_reader_libvpx_video_decoder_inits: u64,
+    media_format_reader_ffvpx_video_decoder_inits: u64,
+    media_format_reader_ffmpeg_video_decoder_inits: u64,
+    media_format_reader_other_video_decoder_inits: u64,
     total_lines: u64,
 }
 fn classify(line:&str, t:&mut Tally) {
@@ -44,6 +49,23 @@ fn classify(line:&str, t:&mut Tally) {
         t.ffmpeg_video_lines+=1;
         if line.contains("FFVPX: unable to load library ") {
             t.ffvpx_unable_to_load_lib+=1;
+        }
+    }
+    // The exact Firefox160 MediaFormatReader.cpp source logs this string
+    // after a decoder's successful Init(), using GetDescriptionName().
+    // Only recognize immutable, literal description allowlist strings.
+    // Never serialize unknown video names, log lines, or user-provided fields.
+    if line.contains("MediaFormatReader") &&
+       line.contains("Decoder init finished for video codec:") {
+        t.media_format_reader_video_decoder_init_lines+=1;
+        if line.contains("description: \"libvpx video decoder\"") {
+            t.media_format_reader_libvpx_video_decoder_inits+=1;
+        } else if line.contains("description: \"ffvpx video decoder\"") {
+            t.media_format_reader_ffvpx_video_decoder_inits+=1;
+        } else if line.contains("description: \"ffmpeg video decoder\"") {
+            t.media_format_reader_ffmpeg_video_decoder_inits+=1;
+        } else {
+            t.media_format_reader_other_video_decoder_inits+=1;
         }
     }
 }
@@ -103,6 +125,11 @@ fn json(t:&Tally)->String{
         "\"ffvpx_Success_link_result_markers\":{},",
         "\"ffvpx_unable_to_load_library_markers\":{},",
         "\"ffmpeg_video_log_lines\":{},",
+        "\"mediaformatreader_video_decoder_initialized_log_count\":{},",
+        "\"mediaformatreader_libvpx_decoder_initialized_count\":{},",
+        "\"mediaformatreader_ffvpx_decoder_initialized_count\":{},",
+        "\"mediaformatreader_ffmpeg_decoder_initialized_count\":{},",
+        "\"mediaformatreader_unclassified_decoder_initialized_count\":{},",
         "\"actual_FFVPX_NoProvidedLib_source_log_observed\":{},",
         "\"specific_video_decoder_selected_from_these_log_markers\":false,",
         "\"direct_compiled_FFVPX_machine_branch_proven\":false,",
@@ -112,6 +139,11 @@ fn json(t:&Tally)->String{
     ),t.log_files,t.total_lines,t.pdm_any,t.pdm_rdd_order,
       t.pdm_agnostic_vpx_support,t.ffvpx_link_no_provided_lib,t.ffvpx_link_success,
       t.ffvpx_unable_to_load_lib,t.ffmpeg_video_lines,
+      t.media_format_reader_video_decoder_init_lines,
+      t.media_format_reader_libvpx_video_decoder_inits,
+      t.media_format_reader_ffvpx_video_decoder_inits,
+      t.media_format_reader_ffmpeg_video_decoder_inits,
+      t.media_format_reader_other_video_decoder_inits,
       if t.ffvpx_link_no_provided_lib>0 {"true"} else {"false"})
 }
 fn run()->Result<(),String>{
@@ -138,16 +170,21 @@ mod tests {
             "[RDD 321: Media]: D/PlatformDecoderModule PDMInitializer, RDD PDM order:",
             "[RDD 321: Media]: D/PlatformDecoderModule Agnostic decoder supports requested type 'video/vp9'",
             "[RDD 321: Media]: D/FFmpegVideo FFVPX: unable to load library /private/noshow.so",
-            "[RDD 321: Media]: D/PlatformDecoderModule FFVPX: Link result: Success"
+            "[RDD 321: Media]: D/PlatformDecoderModule FFVPX: Link result: Success",
+            "[RDD 321: Media]: D/MediaFormatReader Decoder init finished for video codec: \"vp9\", description: \"libvpx video decoder\", process: \"RDD\""
         ] {classify(line,&mut t);}
         assert_eq!(t.ffvpx_link_no_provided_lib,1);
         assert_eq!(t.ffvpx_link_success,1);
         assert_eq!(t.pdm_rdd_order,1);
         assert_eq!(t.pdm_agnostic_vpx_support,1);
         assert_eq!(t.ffvpx_unable_to_load_lib,1);
+        assert_eq!(t.media_format_reader_libvpx_video_decoder_inits,1);
+        assert_eq!(t.media_format_reader_ffvpx_video_decoder_inits,0);
+        assert_eq!(t.media_format_reader_video_decoder_init_lines,1);
         let sanitized=json(&t);
         assert!(sanitized.contains("\"actual_FFVPX_NoProvidedLib_source_log_observed\":true"));
         assert!(!sanitized.contains("/private/"));
+        assert!(sanitized.contains("\"mediaformatreader_libvpx_decoder_initialized_count\":1"));
     }
     #[test] fn ignore_fake_markers_outside_expected_log_category(){
         let mut t=Tally::default();
@@ -155,6 +192,8 @@ mod tests {
         classify("untrusted random log FFVPX: unable to load library private",&mut t);
         assert_eq!(t.ffvpx_link_no_provided_lib,0);
         assert_eq!(t.ffvpx_unable_to_load_lib,0);
+        classify("D/MediaFormatReader Decoder init finished for video codec: \"vp9\", description: \"untrusted-private-decoder\"", &mut t);
+        assert_eq!(t.media_format_reader_other_video_decoder_inits,1);
         assert!(count_logs(Path::new("/tmp"),"unknown").is_err());
     }
 }
