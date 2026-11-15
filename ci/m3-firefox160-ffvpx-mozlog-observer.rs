@@ -2,6 +2,7 @@
 // FFVPX link-failure and platform decoder diagnostic witnesses.
 // Report counts only; do not export log lines, paths, PIDs, profiles, or log
 // filenames. No browser build or source edits. Rust std-only.
+use std::collections::BTreeSet;
 use std::env;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
@@ -26,7 +27,21 @@ struct Tally {
     media_format_reader_ffvpx_video_decoder_inits: u64,
     media_format_reader_ffmpeg_video_decoder_inits: u64,
     media_format_reader_other_video_decoder_inits: u64,
+    source_defined_video_decoder_descriptions: BTreeSet<String>,
     total_lines: u64,
+}
+// Only code-defined MediaFormatReader GetDescriptionName() strings, not whole
+// logs. Deliberately reject quotes, slashes, backslashes, control chars and
+// long values that could contain private log metadata or local filesystem paths.
+fn safe_description(line:&str)->Option<&str>{
+    let (_,tail)=line.split_once("description: \"")?;
+    let (desc,_)=tail.split_once('"')?;
+    if desc.len()<3 || desc.len()>72 ||
+       !desc.bytes().all(|b| b.is_ascii_alphanumeric() ||
+         b" ._()+-".contains(&b)) {
+        return None;
+    }
+    Some(desc)
 }
 fn classify(line:&str, t:&mut Tally) {
     t.total_lines+=1;
@@ -58,6 +73,11 @@ fn classify(line:&str, t:&mut Tally) {
     if line.contains("MediaFormatReader") &&
        line.contains("Decoder init finished for video codec:") {
         t.media_format_reader_video_decoder_init_lines+=1;
+        if let Some(desc)=safe_description(line){
+            if t.source_defined_video_decoder_descriptions.len()<8 {
+                t.source_defined_video_decoder_descriptions.insert(desc.to_string());
+            }
+        }
         if line.contains("description: \"libvpx video decoder\"") {
             t.media_format_reader_libvpx_video_decoder_inits+=1;
         } else if line.contains("description: \"ffvpx video decoder\"") {
@@ -130,6 +150,7 @@ fn json(t:&Tally)->String{
         "\"mediaformatreader_ffvpx_decoder_initialized_count\":{},",
         "\"mediaformatreader_ffmpeg_decoder_initialized_count\":{},",
         "\"mediaformatreader_unclassified_decoder_initialized_count\":{},",
+        "\"mediaformatreader_safely_bounded_code_defined_decoder_descriptions\":[{}],",
         "\"actual_FFVPX_NoProvidedLib_source_log_observed\":{},",
         "\"specific_video_decoder_selected_from_these_log_markers\":false,",
         "\"direct_compiled_FFVPX_machine_branch_proven\":false,",
@@ -144,6 +165,8 @@ fn json(t:&Tally)->String{
       t.media_format_reader_ffvpx_video_decoder_inits,
       t.media_format_reader_ffmpeg_video_decoder_inits,
       t.media_format_reader_other_video_decoder_inits,
+      t.source_defined_video_decoder_descriptions.iter()
+        .map(|n|format!("\"{n}\"")).collect::<Vec<_>>().join(","),
       if t.ffvpx_link_no_provided_lib>0 {"true"} else {"false"})
 }
 fn run()->Result<(),String>{
@@ -181,6 +204,7 @@ mod tests {
         assert_eq!(t.media_format_reader_libvpx_video_decoder_inits,1);
         assert_eq!(t.media_format_reader_ffvpx_video_decoder_inits,0);
         assert_eq!(t.media_format_reader_video_decoder_init_lines,1);
+        assert!(t.source_defined_video_decoder_descriptions.contains("libvpx video decoder"));
         let sanitized=json(&t);
         assert!(sanitized.contains("\"actual_FFVPX_NoProvidedLib_source_log_observed\":true"));
         assert!(!sanitized.contains("/private/"));
@@ -194,6 +218,10 @@ mod tests {
         assert_eq!(t.ffvpx_unable_to_load_lib,0);
         classify("D/MediaFormatReader Decoder init finished for video codec: \"vp9\", description: \"untrusted-private-decoder\"", &mut t);
         assert_eq!(t.media_format_reader_other_video_decoder_inits,1);
+        assert!(t.source_defined_video_decoder_descriptions.contains("untrusted-private-decoder"));
+        assert!(safe_description("description: \"/private/location\"").is_none());
+        assert!(safe_description("description: \"raw\nnewline\"").is_none());
+        assert!(safe_description("description: \"example@host\"").is_none());
         assert!(count_logs(Path::new("/tmp"),"unknown").is_err());
     }
 }
