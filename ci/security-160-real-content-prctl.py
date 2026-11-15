@@ -118,6 +118,14 @@ def run(repo, output):
         if len(inis) != 1 or "Name=Vulpra" not in inis[0].read_text().splitlines():
             raise RuntimeError("Not original native Vulpra browser")
         binary = wd.select_binary(inis[0].parent)
+        # Only modify the disposable extraction: place test actors beside the
+        # browser binary and bind them to a resource:// trusted module scheme.
+        # Never modify the authenticated source/archive or sandbox preferences.
+        module_dir = inis[0].parent / "vulpra-seccomp-test-only"
+        module_dir.mkdir()
+        for name in ("VulpraSeccompProbeChild.sys.mjs",
+                     "VulpraSeccompProbeParent.sys.mjs"):
+            shutil.copyfile(HERE / name, module_dir / name)
         home = work / "home"
         original = home / ".mozilla/firefox/profiles.ini"
         original.parent.mkdir(parents=True)
@@ -166,16 +174,23 @@ def run(repo, output):
                     raise RuntimeError("Native browser PID missing")
                 base = "/session/" + session_id
                 wd.request(port, "POST", base + "/moz/context", {"context": "chrome"})
-                child_uri = (HERE / "VulpraSeccompProbeChild.sys.mjs").as_uri()
-                parent_uri = (HERE / "VulpraSeccompProbeParent.sys.mjs").as_uri()
+                module_uri = module_dir.as_uri() + "/"
                 result = wd.request(port, "POST", base + "/execute/sync", {
                     "script": """
-                        const [child, parent] = arguments;
+                        const [directory] = arguments;
+                        const protocol = Services.io.getProtocolHandler("resource")
+                            .QueryInterface(Ci.nsIResProtocolHandler);
+                        protocol.setSubstitution("vulpra-seccomp-probe",
+                            Services.io.newURI(directory));
                         ChromeUtils.registerWindowActor("VulpraSeccompProbe", {
                           allFrames: false,
                           safeForUntrustedWebProcess: true,
-                          parent: { esModuleURI: parent },
-                          child: { esModuleURI: child }
+                          parent: {
+                            esModuleURI: "resource://vulpra-seccomp-probe/VulpraSeccompProbeParent.sys.mjs"
+                          },
+                          child: {
+                            esModuleURI: "resource://vulpra-seccomp-probe/VulpraSeccompProbeChild.sys.mjs"
+                          }
                         });
                         const {ctypes} = ChromeUtils.importESModule(
                             "resource://gre/modules/ctypes.sys.mjs");
@@ -189,7 +204,7 @@ def run(repo, output):
                           const rv = prctl(23, 0, 0, 0, 0);
                           return {rv, errno:ctypes.errno};
                         } finally { libc.close(); }
-                    """, "args": [child_uri, parent_uri]
+                    """, "args": [module_uri]
                 })
                 if result != {"rv": 1, "errno": 0}:
                     raise RuntimeError("Original browser-parent native PR_CAPBSET_READ control failed")
