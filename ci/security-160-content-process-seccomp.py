@@ -501,6 +501,71 @@ def capture_other_gecko_role_boundaries(children, browser_pid):
     }
 
 
+# Source-bound role-specific sandbox-launch expectations for this narrow
+# Linux testcase, from Firefox 160 SandboxLaunch.cpp (official release
+# 2887d9de...). Socket intentionally shares the parent *network* namespace
+# because it performs networking; RDD intentionally shares parent IPC due
+# to Intel media driver compatibility; Utility uses both isolated net+IPC.
+SERVICE_NAMESPACE_SHAPE = {
+    "socket": {"user": True, "net": False, "ipc": True},
+    "rdd": {"user": True, "net": True, "ipc": False},
+    "utility": {"user": True, "net": True, "ipc": True},
+}
+
+
+def verify_service_role_security(evidence, namespace_capability):
+    """Bounded live process-level controls; NOT a syscall-denial proof."""
+    if not isinstance(evidence, dict) or not isinstance(namespace_capability, dict):
+        raise RuntimeError("Gecko service role evidence absent")
+    counts = evidence.get("other_gecko_role_security_observation_counts")
+    filtered = evidence.get("other_gecko_role_seccomp_filtered_and_no_new_privs_counts")
+    rows = evidence.get("other_gecko_role_kernel_observations")
+    if not isinstance(counts, dict) or not isinstance(filtered, dict) or (
+            not isinstance(rows, list)):
+        raise RuntimeError("Gecko service role census incomplete")
+    if any(counts.get(role) != 1 or filtered.get(role) != 1
+           for role in SERVICE_NAMESPACE_SHAPE):
+        raise RuntimeError("Missing authenticated filtered socket/RDD/utility process")
+    if sum(counts.values()) != len(rows) or len(rows) != len(SERVICE_NAMESPACE_SHAPE):
+        raise RuntimeError("Unexpected or missing Gecko service role census")
+    supported = namespace_capability.get("firefox_parent_cached_user_namespace_probe")
+    if supported not in ("supported", "unavailable"):
+        raise RuntimeError("Unconfirmed Firefox namespace capability state")
+    for row in rows:
+        if not isinstance(row, dict) or row.get("gecko_role") not in SERVICE_NAMESPACE_SHAPE:
+            raise RuntimeError("Unknown service role")
+        if any(type(row.get(key)) is not int for key in (
+                "seccomp_mode", "seccomp_filter_count", "no_new_privileges")):
+            raise RuntimeError("Malformed service kernel status")
+        if not (row["seccomp_mode"] == 2 and row["seccomp_filter_count"] >= 1 and
+                row["no_new_privileges"] == 1):
+            raise RuntimeError("Observed service process lacks seccomp/NoNewPrivs")
+        ns = row.get("namespace_differs_from_browser_parent")
+        if not isinstance(ns, dict) or set(ns) != set(NAMESPACE_KINDS):
+            raise RuntimeError("Missing namespace comparisons for service role")
+        if any(type(value) is not bool for value in ns.values()):
+            raise RuntimeError("Unreadable service namespace identity is not accepted")
+        if type(row.get("root_differs_from_browser_parent")) is not bool:
+            raise RuntimeError("Unreadable service root comparison is not accepted")
+        if supported == "supported":
+            for kind, required in SERVICE_NAMESPACE_SHAPE[row["gecko_role"]].items():
+                if ns[kind] is not required:
+                    raise RuntimeError("Source-derived service namespace role boundary mismatch")
+            if row["root_differs_from_browser_parent"] is not True:
+                raise RuntimeError("Supported service role did not enter separate root")
+        else:
+            if any(ns.values()) or row["root_differs_from_browser_parent"]:
+                raise RuntimeError("Unavailable user namespace reports unexplained isolation")
+    return {
+        "all_three_gecko_service_process_roles_observed": True,
+        "all_three_gecko_service_processes_seccomp_filtered_no_new_privs": True,
+        "role_specific_kernel_namespace_behavior_matched_source_when_available": True,
+        "service_roles_not_misclassified_as_content": True,
+        "service_role_syscall_denial_actually_tested": False,
+        "complete_service_role_sandbox_policy_audited": False,
+    }
+
+
 def reconcile_user_namespace_support(observation, cached, level,
                                      disabled, permissive, force_pref):
     """Do not call missing namespaces proof of an active isolated namespace.
@@ -777,6 +842,84 @@ def self_test():
             raise AssertionError("Forged Firefox namespace capability accepted")
     assert denied == 7
     print("PASS: seven forged/disabled user-namespace capability fixtures rejected")
+    # Socket, RDD and Utility use DIFFERENT upstream namespace policies.
+    source_supported = {
+        "firefox_parent_cached_user_namespace_probe": "supported"}
+    role_samples = {
+        "other_gecko_role_security_observation_counts":
+            {"socket": 1, "rdd": 1, "utility": 1},
+        "other_gecko_role_seccomp_filtered_and_no_new_privs_counts":
+            {"socket": 1, "rdd": 1, "utility": 1},
+        "other_gecko_role_kernel_observations": [
+            {"gecko_role": role, "seccomp_mode": 2,
+             "seccomp_filter_count": 3, "no_new_privileges": 1,
+             "namespace_differs_from_browser_parent":
+                {"user": True, "net": expected["net"],
+                 "ipc": expected["ipc"], "mnt": False, "pid": False},
+             "root_differs_from_browser_parent": True}
+            for role, expected in SERVICE_NAMESPACE_SHAPE.items()
+        ],
+    }
+    assert verify_service_role_security(role_samples, source_supported)[
+        "all_three_gecko_service_processes_seccomp_filtered_no_new_privs"]
+    unsupported_samples = {
+        **role_samples, "other_gecko_role_kernel_observations": [
+            {**row,
+             "namespace_differs_from_browser_parent":
+                {key: False for key in NAMESPACE_KINDS},
+             "root_differs_from_browser_parent": False}
+            for row in role_samples["other_gecko_role_kernel_observations"]
+        ]
+    }
+    assert verify_service_role_security(
+        unsupported_samples,
+        {"firefox_parent_cached_user_namespace_probe": "unavailable"})[
+        "role_specific_kernel_namespace_behavior_matched_source_when_available"]
+    failures = [
+        {**role_samples, "other_gecko_role_security_observation_counts":
+            {"socket": 0, "rdd": 1, "utility": 1}},
+        {**role_samples, "other_gecko_role_seccomp_filtered_and_no_new_privs_counts":
+            {"socket": 0, "rdd": 1, "utility": 1}},
+        {**role_samples, "other_gecko_role_kernel_observations":
+            role_samples["other_gecko_role_kernel_observations"][:2]},
+        {**role_samples, "other_gecko_role_kernel_observations": [
+            {**row, "seccomp_mode": 0} if row["gecko_role"] == "rdd" else row
+            for row in role_samples["other_gecko_role_kernel_observations"]]},
+        {**role_samples, "other_gecko_role_kernel_observations": [
+            {**row, "no_new_privileges": False}
+            if row["gecko_role"] == "utility" else row
+            for row in role_samples["other_gecko_role_kernel_observations"]]},
+        {**role_samples, "other_gecko_role_kernel_observations": [
+            {**row, "namespace_differs_from_browser_parent":
+                {**row["namespace_differs_from_browser_parent"], "net": True}}
+            if row["gecko_role"] == "socket" else row
+            for row in role_samples["other_gecko_role_kernel_observations"]]},
+        {**role_samples, "other_gecko_role_kernel_observations": [
+            {**row, "namespace_differs_from_browser_parent":
+                {**row["namespace_differs_from_browser_parent"], "net": False}}
+            if row["gecko_role"] == "rdd" else row
+            for row in role_samples["other_gecko_role_kernel_observations"]]},
+        {**role_samples, "other_gecko_role_kernel_observations": [
+            {**row, "namespace_differs_from_browser_parent":
+                {**row["namespace_differs_from_browser_parent"], "ipc": False}}
+            if row["gecko_role"] == "utility" else row
+            for row in role_samples["other_gecko_role_kernel_observations"]]},
+        {**role_samples, "other_gecko_role_kernel_observations": [
+            {**row, "root_differs_from_browser_parent": False}
+            if row["gecko_role"] == "socket" else row
+            for row in role_samples["other_gecko_role_kernel_observations"]]},
+        {**role_samples, "other_gecko_role_kernel_observations": [
+            {**row, "gecko_role": "unknown"}
+            if row["gecko_role"] == "socket" else row
+            for row in role_samples["other_gecko_role_kernel_observations"]]},
+    ]
+    for forged in failures:
+        try:
+            verify_service_role_security(forged, source_supported)
+        except RuntimeError:
+            continue
+        raise AssertionError("Forged Gecko service role protections accepted")
+    print("PASS: ten falsified socket/RDD/utility role-specific sandbox fixtures rejected")
 
 
 def run(repo: Path, output: Path):
@@ -951,6 +1094,8 @@ def run(repo: Path, output: Path):
                     runtime_security.get("disabled"),
                     runtime_security.get("permissive"),
                     runtime_security.get("forceNamespace"))
+                other_role_validation = verify_service_role_security(
+                    other_role_evidence, namespace_capability)
                 if original.read_bytes() != sentinel:
                     raise RuntimeError("Existing Firefox profile was altered")
                 report = {
@@ -964,6 +1109,7 @@ def run(repo: Path, output: Path):
                     **thread_evidence,
                     **namespace_evidence,
                     **other_role_evidence,
+                    **other_role_validation,
                     **namespace_capability,
                     "mozilla_gecko_process_type_source_reviewed": True,
                     "native_chromeutils_process_type_authenticated": True,
