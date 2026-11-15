@@ -1,0 +1,170 @@
+# Independently authenticate and reconcile Firefox160 exact source package GNU
+# version requirements across two Ubuntu and Arch Linux userspace witnesses.
+name: M3 Firefox 160 Three-Userland Exact GNU VERNEED Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-three-userland-verneed-crosswalk.yml
+      - ci/m3-firefox160-three-userland-verneed-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  version-tuple-parity:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Verify independent source, archive, Ubuntu and Arch GNU version witnesses
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name] of [
+              [43730900702,'fd4dee8a9999c303ff35e45fbcd619abe230d30e',
+                'M3 Firefox 160 Exact-Source Native ELF Package Graph (No Build)'],
+              [43733171548,'2e1ca98e8ef500cad2666d7b25d4dc54674d6d02',
+                'M3 Firefox 160 Native GNU Version-Name Contract (No Build)'],
+              [43733061688,'1408af56f4435db8c730be94b67cbc44a110c772',
+                'M3 Firefox 160 Arch Userland GNU Version-Name Contract (No Build)']]){
+              const {data:run}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(run.repository?.full_name!=='sguzman/vulpra' ||
+                 run.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 run.head_sha!==sha || run.name!==name ||
+                 run.status!=='completed' || run.conclusion!=='success')
+                throw Error('Unverified pinned 521-name source/package witness: '+id);
+            }
+            for(const [runId,name] of [
+              [43730900702,'firefox160-source-matched-native-elf-package-graph-not-m3-closure'],
+              [43733171548,'firefox160-native-elf-gnu-version-contract-ubuntu-22.04-not-m3-closure'],
+              [43733171548,'firefox160-native-elf-gnu-version-contract-ubuntu-24.04-not-m3-closure'],
+              [43733061688,'firefox160-arch-native-verneed-names-not-target-m3-approval']]){
+              const xs=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:runId,per_page:100});
+              if(xs.filter(x=>x.name===name&&!x.expired&&x.size_in_bytes>0&&
+                new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Missing source/ABI version contract artifact '+name);
+            }
+      - name: Checkout strict small jq native-version witness crosswalk only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-three-userland-verneed-crosswalk.jq
+      - name: Restore authenticated source-matched package 28-ELF identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-source-matched-native-elf-package-graph-not-m3-closure
+          repository: sguzman/vulpra
+          run-id: 43730900702
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/graph
+      - name: Restore source-pinned Ubuntu 22.04 native version-name witness
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-native-elf-gnu-version-contract-ubuntu-22.04-not-m3-closure
+          repository: sguzman/vulpra
+          run-id: 43733171548
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/ubuntu22
+      - name: Restore source-pinned Ubuntu 24.04 native version-name witness
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-native-elf-gnu-version-contract-ubuntu-24.04-not-m3-closure
+          repository: sguzman/vulpra
+          run-id: 43733171548
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/ubuntu24
+      - name: Restore source-pinned Arch Linux userspace native version-name witness
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-arch-native-verneed-names-not-target-m3-approval
+          repository: sguzman/vulpra
+          run-id: 43733061688
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/arch
+      - name: Require exact 521 ELF/provider/version names in every CI userspace and reject forgeries
+        shell: bash
+        env:
+          SOURCE_SHA: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          SOURCE_TREE: 42dd7439a27dde92f89ac5eed13f88117a4d7ab5
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          graph="$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json"
+          ubuntu22="$RUNNER_TEMP/ubuntu22/firefox160-elf-version-contract-ubuntu-22.04.json"
+          ubuntu24="$RUNNER_TEMP/ubuntu24/firefox160-elf-version-contract-ubuntu-24.04.json"
+          arch="$RUNNER_TEMP/arch/firefox160-arch-native-verneed.json"
+          test -s "$graph" && test -s "$ubuntu22" && test -s "$ubuntu24" && test -s "$arch"
+          reconcile() {
+            jq -n --arg src "$SOURCE_SHA" --arg tree "$SOURCE_TREE" \
+              --slurpfile graph "$1" \
+              --slurpfile ubuntu22 "$2" \
+              --slurpfile ubuntu24 "$3" \
+              --slurpfile arch "$4" \
+              -f ci/m3-firefox160-three-userland-verneed-crosswalk.jq
+          }
+          reconcile "$graph" "$ubuntu22" "$ubuntu24" "$arch" \
+            > "$RUNNER_TEMP/firefox160-gnu-verneed-three-userspace.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="firefox160_three_userspace_exact_gnu_verneed_tuple_parity" and
+            .verified_overlays==28 and
+            .packaged_native_elf_files==28 and
+            .all_direct_needed_elf_edges==268 and
+            .exact_unique_elf_provider_version_tuples_common_to_three==521 and
+            .packaged_elf_candidate_version_names_present>0 and
+            .host_ldconfig_candidate_version_names_present>0 and
+            (.packaged_elf_candidate_version_names_present+
+              .host_ldconfig_candidate_version_names_present)==521 and
+            .exact_tuple_parity_across_three_userspaces==true and
+            .all_three_requirements_present_in_candidates==true and
+            .arched_userspace_not_target_kernel==true and
+            .actual_dynamic_provider_selection_proven==false and
+            .actual_symbol_bindings_or_relocations_proven==false and
+            .conditional_dlopen_ffi_feature_graph_complete==false and
+            .target_endeavouros_hyprland_hardware_verified==false and
+            .raw_paths_pids_or_user_data_exported==false and
+            .source_pruning_authorized==false and
+            .security_current==false and .release_ready==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-gnu-verneed-three-userspace.json" >/dev/null
+          for mutation in \
+            '.source_commit="forged"' \
+            '.original_archive_sha256="0000000000000000000000000000000000000000000000000000000000000000"' \
+            '.scanned_userspace_id="arch"' \
+            '.target_host_kernel_verified=true' \
+            '.candidate_version_name_present_count=520' \
+            '.requirements[0].version_name="FAKE_0"' \
+            '.requirements[0].version_name_present_in_candidate=false' \
+            '.requirements[0].provider_basename="../../secrets"' \
+            '.requirements[0]=.requirements[1]' \
+            '.m3_sixth_gate_closed=true'; do
+            jq "$mutation" "$ubuntu22" > "$RUNNER_TEMP/forged-u22.json"
+            if reconcile "$graph" "$RUNNER_TEMP/forged-u22.json" "$ubuntu24" "$arch" >/dev/null 2>&1; then
+              echo "FAIL: forged Ubuntu source/version claim was accepted: $mutation" >&2
+              exit 1
+            fi
+          done
+          jq '.firefox160_candidate_git_tree="forged"' "$graph" > "$RUNNER_TEMP/forged-graph.json"
+          if reconcile "$RUNNER_TEMP/forged-graph.json" "$ubuntu22" "$ubuntu24" "$arch" >/dev/null 2>&1; then
+            echo 'FAIL: forged Firefox160 candidate Git tree accepted' >&2; exit 1
+          fi
+          jq '.scanned_userspace_id="ubuntu"' "$arch" > "$RUNNER_TEMP/forged-arch.json"
+          if reconcile "$graph" "$ubuntu22" "$ubuntu24" "$RUNNER_TEMP/forged-arch.json" >/dev/null 2>&1; then
+            echo 'FAIL: forged Arch userspace identity accepted' >&2; exit 1
+          fi
+          echo 'PASS: 521 exact Firefox160 source-matched GNU version names are identical across Ubuntu22, Ubuntu24 and Arch userspace.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'PASS: 12 forged identity/requirements/provider/sandbox/closure reports rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: version-name candidates, not actual ELF symbol binding, optional dlopen/FFI graph, target workstation or safe pruning.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded three-userspace GNU version-name parity proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-three-userland-521-version-name-reconciliation-not-m3-closure
+          path: ${{ runner.temp }}/firefox160-gnu-verneed-three-userspace.json
+          if-no-files-found: warn
+          retention-days: 30
