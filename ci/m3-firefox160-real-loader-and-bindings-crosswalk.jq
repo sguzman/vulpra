@@ -10,7 +10,9 @@ def names_ok($xs;$expected):
   ($xs|type)=="array" and ($xs|length)==$expected and
   $xs==($xs|unique|sort) and all($xs[];basename_safe);
 def edges_ok($xs;$names):
-  ($xs|type)=="array" and $xs==($xs|unique|sort) and
+  ($xs|type)=="array" and
+  ($xs|length)==($xs|unique|length) and
+  $xs==($xs|sort_by(.requester_basename,.requested_library_basename)) and
   all($xs[];
     (.requester_basename|basename_safe) and
     (.requested_library_basename|basename_safe) and
