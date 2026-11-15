@@ -134,6 +134,7 @@ jobs:
             .native_prctl_capbset_read_tab_returned_einval==true and
             .actual_chromeutils_tab_role_authenticated==true and
             .same_tab_pid_has_seccomp_mode_2==true and
+            .same_tab_seccomp_mode_2_at_syscall==true and
             .same_tab_pid_has_no_new_privileges==true and
             .forbidden_content_worker_syscall_denial_verified==true and
             .raw_pids_or_user_data_archived==false and

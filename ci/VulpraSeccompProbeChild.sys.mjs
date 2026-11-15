@@ -24,13 +24,19 @@ export class VulpraSeccompProbeChild extends JSWindowActorChild {
       const prctl = libc.declare("prctl", ctypes.default_abi, ctypes.int,
         ctypes.int, ctypes.unsigned_long, ctypes.unsigned_long,
         ctypes.unsigned_long, ctypes.unsigned_long);
+      // Same thread, immediately before the denied operation:
+      // PR_GET_SECCOMP is source-allowed by Mozilla's PrctlPolicy.
+      const modeAtInvocation = prctl(21, 0, 0, 0, 0);
+      if (modeAtInvocation !== 2) {
+        throw new Error("Native content actor has no active seccomp filter");
+      }
       const rv = prctl(23, 0, 0, 0, 0); // PR_CAPBSET_READ, CAP_CHOWN
       const errno = ctypes.errno;
       return {
         observationKind: "native_prctl_capbset_read_in_real_content",
         processType: appinfo.processType,
         processId: appinfo.processID,
-        rv, errno
+        modeAtInvocation, rv, errno
       };
     } finally {
       libc.close();

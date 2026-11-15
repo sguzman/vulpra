@@ -43,6 +43,8 @@ def verify_evidence(parent, child, roles, process):
             "native_prctl_capbset_read_in_real_content" or
             type(child.get("processType")) is not int or
             child["processType"] != 2 or
+            type(child.get("modeAtInvocation")) is not int or
+            child["modeAtInvocation"] != 2 or
             type(child.get("processId")) is not int or
             child["processId"] <= 1 or
             type(child.get("rv")) is not int or child["rv"] != -1 or
@@ -60,6 +62,7 @@ def verify_evidence(parent, child, roles, process):
         "native_prctl_capbset_read_tab_returned_einval": True,
         "actual_chromeutils_tab_role_authenticated": True,
         "same_tab_pid_has_seccomp_mode_2": True,
+        "same_tab_seccomp_mode_2_at_syscall": True,
         "same_tab_pid_has_no_new_privileges": True,
         "forbidden_content_worker_syscall_denial_verified": True,
     }
@@ -68,7 +71,8 @@ def verify_evidence(parent, child, roles, process):
 def self_test():
     parent = {"rv": 1, "errno": 0}
     child = {"observationKind": "native_prctl_capbset_read_in_real_content",
-             "processType": 2, "processId": 8001, "rv": -1, "errno": 22}
+             "processType": 2, "processId": 8001, "modeAtInvocation": 2,
+             "rv": -1, "errno": 22}
     proc = {"pid": 8001, "seccomp_mode": 2,
             "seccomp_filter_count": 1, "no_new_privileges": 1}
     accepted = verify_evidence(parent, child, {8001: "tab"}, proc)
@@ -78,6 +82,9 @@ def self_test():
         (parent, {**child, "rv": 0}, {8001: "tab"}, proc),
         (parent, {**child, "errno": 1}, {8001: "tab"}, proc),
         (parent, {**child, "errno": 38}, {8001: "tab"}, proc),
+        (parent, {**child, "modeAtInvocation": 0}, {8001: "tab"}, proc),
+        (parent, {**child, "modeAtInvocation": 1}, {8001: "tab"}, proc),
+        (parent, {**child, "modeAtInvocation": True}, {8001: "tab"}, proc),
         (parent, {**child, "processType": 0}, {8001: "tab"}, proc),
         (parent, {**child, "processId": 8002}, {8001: "tab"}, proc),
         (parent, child, {8001: "rdd"}, proc),
@@ -95,7 +102,7 @@ def self_test():
             pass
         else:
             raise AssertionError("Counterfeit seccomp-denial result accepted")
-    print("PASS: fourteen forged parent/child/PID/role/filter/errno controls rejected")
+    print("PASS: seventeen forged parent/child/PID/role/filter/errno controls rejected")
 
 
 def run(repo, output):
