@@ -32,6 +32,7 @@
         ninja
         autoconf
         clang
+        sccache
         llvmPackages.lld
         llvmPackages.llvm
         bintools
