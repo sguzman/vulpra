@@ -23,6 +23,7 @@ jobs:
             nix/flake.nix
             nix/flake.lock
             nix/vulpra-dev.sh
+            nix/verify-preserved-browser.sh
             nix/README.md
             AGENTS.md
             mach
