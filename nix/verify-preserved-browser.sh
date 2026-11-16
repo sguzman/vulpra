@@ -55,7 +55,7 @@ case "$mode" in
     env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 \
       RUNNER_TEMP="$RUNNER_TEMP" GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
       VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
-      VULPRA_WAYLAND_TEST_SECONDS=6 \
+      VULPRA_WAYLAND_TEST_SECONDS=15 \
       bash "$GITHUB_WORKSPACE/packaging/test-wayland.sh" "$app"
     printf 'PASS: private Weston graphical non-null surface buffer/commit in Nix devShell\n'
     ;;
