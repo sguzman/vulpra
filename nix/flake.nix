@@ -43,7 +43,7 @@
         rust-cbindgen
         nasm
         yasm
-        nodejs
+        nodejs-slim
         python3
         zip
         unzip
