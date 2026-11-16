@@ -1,0 +1,142 @@
+name: Vulpra Nix Archived Firefox160 Runtime Replay (No Browser Build)
+on:
+  push:
+    branches: [main]
+    paths:
+      - nix/**
+      - .github/workflows/nix-firefox160-preserved-runtime.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preserved-native-browser-under-nix:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out only small toolchain and existing private Wayland test
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            nix/flake.nix
+            nix/flake.lock
+            nix/vulpra-dev.sh
+            packaging/test-wayland.sh
+      - name: Authenticate previously preserved native Firefox160 build
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const id=43724886827;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.head_sha!=='54728803f058c3edf54d2e8d3f6e0a7d2af0aec6' ||
+               r.name!=='Firefox 160 Verified Native Archive Preservation (No Build)' ||
+               r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Untrusted original native browser run');
+            const arts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            if(arts.filter(a=>
+              a.name==='firefox160-vulpra-preserved-native-preview-not-approved' &&
+              !a.expired && a.size_in_bytes>0 && new Date(a.expires_at)>new Date()
+            ).length!==1)
+              throw Error('Original compiled browser artifact unavailable or expired');
+      - name: Download exact original compiled archive without rebuilding
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/original
+      - name: Install Nix only on disposable CI runner
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = false
+      - name: Authenticate immutable native archive and extract into runner temp
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive" | cut -d' ' -f1)" = \
+            530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb
+          mkdir -p "$RUNNER_TEMP/compiled"
+          tar -xf "$archive" -C "$RUNNER_TEMP/compiled"
+          app="$RUNNER_TEMP/compiled/vulpra"
+          test -x "$app/vulpra" && test -x "$app/vulpra-launch"
+          test "$(od -An -tx1 -N4 "$app/vulpra" | tr -d ' \n')" = 7f454c46
+          grep -Fxq 'Name=Vulpra' "$app/application.ini"
+          echo 'PASS: byte-preserved original Firefox160 Vulpra archive, private launcher and native ELF' >> "$GITHUB_STEP_SUMMARY"
+      - name: Exercise actual packaged Vulpra headless within realized Nix developer environment
+        shell: bash
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          nix develop ./nix --no-write-lock-file --command bash -c '
+            set -euo pipefail
+            test "$VULPRA_NIX_DEV" = 1
+            app="$RUNNER_TEMP/compiled/vulpra"
+            work="$(mktemp -d "$RUNNER_TEMP/vulpra-nix-runtime.XXXXXXXX")"
+            trap '\''rm -rf -- "$work"'\'' EXIT
+            mkdir -p "$work/home/.mozilla/firefox"
+            printf "preserve Firefox profile\n" > "$work/home/.mozilla/firefox/profiles.ini"
+            before="$(sha256sum "$work/home/.mozilla/firefox/profiles.ini" | cut -d" " -f1)"
+            printf "%s\n" "<!doctype html><title>Vulpra Nix runtime test</title><h1>Firefox 160 preserved native package</h1>" > "$work/test.html"
+            env HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
+              XRE_START_OFFLINE=1 MOZ_HEADLESS=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+              timeout 120 "$app/vulpra-launch" --headless \
+                --screenshot "$work/browser.png" "file://$work/test.html"
+            test -s "$work/browser.png"
+            test "$(od -An -tx1 -N8 "$work/browser.png" | tr -d " \n")" = 89504e470d0a1a0a
+            after="$(sha256sum "$work/home/.mozilla/firefox/profiles.ini" | cut -d" " -f1)"
+            test "$before" = "$after"
+            printf "PASS: actual preserved Firefox160 headless screenshot in Nix devShell, existing Firefox sentinel unchanged\n"
+          '
+      - name: Real private Wayland buffer/commit smoke while under Nix tooling
+        shell: bash
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          nix develop ./nix --no-write-lock-file --command bash -c '
+            set -euo pipefail
+            test "$VULPRA_NIX_DEV" = 1
+            VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+              VULPRA_WAYLAND_TEST_SECONDS=6 \
+              bash "$GITHUB_WORKSPACE/packaging/test-wayland.sh" "$RUNNER_TEMP/compiled/vulpra"
+          '
+          echo 'PASS: original compiled browser submitted actual buffers to private Weston while Nix shell was active' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: original archive native compilation happened previously under Ubuntu; this does not prove Nix-supplied compiler/host ABI, mixed GPU, user Hyprland, or release security.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded Nix-shell preserved native runtime result
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n '{
+            schema_version:1,
+            original_firefox160_source:"2887d9de1f69c0e9776413da80e7ba0d1225dd9b",
+            original_compiled_archive_sha256:"530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb",
+            preserved_original_native_build_run:43138458940,
+            original_browser_rebuilt_under_Nix:false,
+            original_archive_not_modified:true,
+            actual_packaged_browser_started_inside_Nix_shell:true,
+            private_headless_PNG_screenshot:true,
+            real_private_Wayland_frame_smoke:true,
+            original_firefox_profile_sentinel_unchanged:true,
+            actual_target_Arch_Hyprland_GPU_parity_verified:false,
+            Nix_native_configure_build_package_verified:false,
+            full_release_security_acceptance:false
+          }' > "$RUNNER_TEMP/vulpra-nix-preserved-browser-runtime.json"
+      - name: Upload sanitized evidence only (no browser, profiles, paths, screenshot)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-nix-preserved-firefox160-runtime-not-native-build
+          path: ${{ runner.temp }}/vulpra-nix-preserved-browser-runtime.json
+          if-no-files-found: error
+          retention-days: 14
