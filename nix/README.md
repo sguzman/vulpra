@@ -14,14 +14,16 @@ reconfigures the existing `obj-vulpra-linux` build directory.
 Nix/Lix is installed separately on the workstation. Enable `nix-command` and
 `flakes` once in `~/.config/nix/nix.conf`; see https://nix.dev/concepts/flakes.
 
-**Preferred route:** install [Nix Output Monitor](https://github.com/maralorn/nix-output-monitor)
-once as an ordinary user-profile program, from **this project's pinned nixpkgs**:
+**Preferred route:** run the versioned nom-first Vulpra launcher from a
+complete checkout. The launcher uses a `nom` already on PATH or automatically
+obtains the pinned `./nix#nom` via `nix shell` if missing; no user-profile
+installation is required. Only the very first `nom` bootstrap necessarily
+uses Nix's default output.
 
-```fish
-nix profile install ./nix#nom
-```
+To make `nom` available outside Vulpra as well, you **may optionally** install
+it once into your user profile with `nix profile install ./nix#nom`.
 
-Then run the versioned nom-first Vulpra launcher from a complete checkout:
+Run:
 
 ```fish
 ./nix/vulpra doctor
@@ -46,8 +48,8 @@ ordinary native build log and one-build-per-workspace locking.
 **Do not interrupt an active Nix realization or Firefox build just to switch
 to the launcher.** The launcher takes effect on the next invocation and does
 not change any global shell aliases or overwrite personal Nix configuration.
-The plain `nix develop ./nix --command fish` route also remains available if
-`nom` is not installed.
+The plain `nix develop ./nix --command fish` route remains available if
+you want to bypass `nom` entirely.
 
 `nix run ./nix#vulpra-dev -- help` remains available as well, but mutating
 native workflows refuse to execute unless `VULPRA_NIX_DEV=1` was set by the
