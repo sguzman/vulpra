@@ -78,6 +78,7 @@ jobs:
         shell: bash
         timeout-minutes: 20
         run: |
+          # shellcheck disable=SC2016
           set -euo pipefail
           nix develop ./nix --no-write-lock-file --command bash -c '
             set -euo pipefail
@@ -103,6 +104,7 @@ jobs:
         shell: bash
         timeout-minutes: 12
         run: |
+          # shellcheck disable=SC2016
           set -euo pipefail
           nix develop ./nix --no-write-lock-file --command bash -c '
             set -euo pipefail
