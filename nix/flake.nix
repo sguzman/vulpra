@@ -142,15 +142,16 @@
     in
     {
       devShells.${system}.default = toolingShell;
-      packages.${system}.default = devCli;
-      packages.${system}.vulpra-dev = devCli;
-      apps.${system}.default = {
-        type = "app";
-        program = "${devCli}/bin/vulpra-dev";
-      };
-      apps.${system}.vulpra-dev = {
-        type = "app";
-        program = "${devCli}/bin/vulpra-dev";
+      packages.${system} = { default = devCli; vulpra-dev = devCli; };
+      apps.${system} = {
+        default = {
+          type = "app";
+          program = "${devCli}/bin/vulpra-dev";
+        };
+        vulpra-dev = {
+          type = "app";
+          program = "${devCli}/bin/vulpra-dev";
+        };
       };
       formatter.${system} = pkgs.nixfmt;
 
