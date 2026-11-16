@@ -38,6 +38,7 @@ The `upstream-base` branch contains the original release source snapshot with Mo
 ## Project records
 
 - [Stewardship rules](AGENTS.md)
+- [Known bugs and QA follow-ups](https://github.com/sguzman/vulpra/issues), including [Hyprland frame and typing lag](https://github.com/sguzman/vulpra/issues/7)
 - [Roadmap and acceptance gates](docs/vulpra/ROADMAP.md)
 - [Resumable source download and first local build](docs/vulpra/LOCAL-BUILD.md)
 - [Nix Linux development toolchain and guarded terminal workflows](nix/README.md) — opt-in, pinned, with CI verification; native browser acceptance separately tracked in [issue #10](https://github.com/sguzman/vulpra/issues/10)
