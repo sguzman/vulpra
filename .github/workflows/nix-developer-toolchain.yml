@@ -22,6 +22,8 @@ jobs:
           sparse-checkout: |
             nix/flake.nix
             nix/flake.lock
+            nix/vulpra
+            nix/test-vulpra-launcher.sh
             nix/vulpra-dev.sh
             nix/verify-preserved-browser.sh
             nix/README.md
