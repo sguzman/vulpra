@@ -64,7 +64,7 @@ case "$command_name" in
       printf 'NOTE: no local MOZCONFIG at this path; native configure/build is not ready\n'
     fi
     missing=0
-    for tool in bash git clang rustc cargo cbindgen nasm node python3 pkg-config jq xz; do
+    for tool in bash git clang rustc cargo cbindgen nasm node python3 pkg-config jq xz sccache; do
       if command -v "$tool" >/dev/null 2>&1; then
         printf 'OK: %-13s %s\n' "$tool" "$(command -v "$tool")"
       else
