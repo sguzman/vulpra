@@ -40,7 +40,7 @@
         rustfmt
         clippy
         rust-analyzer
-        cbindgen
+        rust-cbindgen
         nasm
         yasm
         nodejs
