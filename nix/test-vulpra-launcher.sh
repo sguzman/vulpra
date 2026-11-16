@@ -12,12 +12,12 @@ cp "$launcher" "$repo/nix/vulpra"
 : > "$repo/nix/flake.nix"
 : > "$repo/nix/flake.lock"
 
-cat > "$tmp/nix" <<'EOF'
-#!/usr/bin/env bash
+printf '#!%s\n' "$(command -v bash)" > "$tmp/nix"
+cat >> "$tmp/nix" <<'EOF'
 exit 0
 EOF
-cat > "$tmp/nom" <<'EOF'
-#!/usr/bin/env bash
+printf '#!%s\n' "$(command -v bash)" > "$tmp/nom"
+cat >> "$tmp/nom" <<'EOF'
 printf '%s\n' "$PWD" > "$NOM_TEST_PWD"
 printf '%s\n' "$@" > "$NOM_TEST_ARGS"
 exit "${NOM_TEST_EXIT:-0}"
