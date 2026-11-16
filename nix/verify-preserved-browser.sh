@@ -49,8 +49,11 @@ case "$mode" in
     # Nix-built plugins into a host-linked GTK binary, causing a crash.
     # This is scoped to this specific archived external binary in disposable
     # CI, not a fix for a native Nix-built Firefox or user's machine.
-    env -u GDK_PIXBUF_MODULE_FILE -u GDK_PIXBUF_MODULEDIR \
-      -u GIO_EXTRA_MODULES -u GTK_PATH \
+    # Reconstruct only documented CI inputs so Nix setup-hook GTK, GIO,
+    # pixbuf and theme variables cannot enter the external host-built ELF.
+    # Keep the Nix-provided developer PATH (Weston, wayland-info, tools).
+    env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 \
+      RUNNER_TEMP="$RUNNER_TEMP" GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
       VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
       VULPRA_WAYLAND_TEST_SECONDS=6 \
       bash "$GITHUB_WORKSPACE/packaging/test-wayland.sh" "$app"
