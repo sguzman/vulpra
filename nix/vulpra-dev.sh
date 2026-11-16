@@ -102,12 +102,20 @@ case "$command_name" in
   *)
     [[ "${VULPRA_NIX_DEV:-}" == 1 ]] ||
       error "enter 'nix develop ./nix' before running '$command_name'; refusing host-toolchain fallback"
-    [[ -f "$local_mozconfig" ]] ||
-      error "local MOZCONFIG missing: $local_mozconfig; existing workstation configuration is never overwritten"
+    case "$command_name" in
+      configure|build|package|mach)
+        [[ -f "$local_mozconfig" ]] ||
+          error "local MOZCONFIG missing: $local_mozconfig; existing workstation configuration is never overwritten"
+        ;;
+    esac
     cd "$root"
     case "$command_name" in
       configure) exec ./mach configure "$@" ;;
-      build) exec bash "$root/ci/build-local.sh" "$root" "$@" ;;
+      build)
+        (($# == 0)) ||
+          error "build accepts no extra arguments; use 'vulpra-dev mach build' for custom mach flags"
+        exec bash "$root/ci/build-local.sh" "$root"
+        ;;
       package) exec bash "$root/ci/package-smoke-local.sh" "$@" ;;
       smoke) exec bash "$root/ci/smoke-native-local.sh" "$@" ;;
       wayland) exec bash "$root/ci/smoke-wayland-package-local.sh" "$@" ;;
