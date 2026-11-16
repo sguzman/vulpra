@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # Contract tests for the nom-first Vulpra launcher; no Nix evaluation or build.
 set -euo pipefail
-repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+launcher="${1:-$(dirname -- "${BASH_SOURCE[0]}")/vulpra}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+# Run against a tiny fake checkout: works both in a Nix sandbox (where each
+# flake input path is copied separately) and directly from Git.
+repo="$tmp/checkout"
+mkdir -p "$repo/nix"
+cp "$launcher" "$repo/nix/vulpra"
+: > "$repo/nix/flake.nix"
+: > "$repo/nix/flake.lock"
 
 cat > "$tmp/nix" <<'EOF'
 #!/usr/bin/env bash
