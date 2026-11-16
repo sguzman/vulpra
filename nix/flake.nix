@@ -162,6 +162,8 @@
         ''
           bash -n ${./vulpra-dev.sh}
           shellcheck -S warning ${./vulpra-dev.sh}
+          bash -n ${./verify-preserved-browser.sh}
+          shellcheck -S warning ${./verify-preserved-browser.sh}
           grep -Fq 'VULPRA_NIX_DEV' ${./vulpra-dev.sh}
           grep -Fq 'ci/build-local.sh' ${./vulpra-dev.sh}
           mkdir -p "$out"
