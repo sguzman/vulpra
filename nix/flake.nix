@@ -30,7 +30,7 @@
         pkg-config
         cmake
         ninja
-        autoconf213
+        autoconf
         clang
         llvmPackages.lld
         llvmPackages.llvm
