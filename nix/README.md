@@ -92,3 +92,16 @@ offline dependency, sandbox and runtime boundaries are demonstrated.
 No `npm`, system FIPS change, Flatpak, new desktop profile or source
 pruning is introduced by this tooling. Native work remains serial per
 workspace through the existing build wrapper.
+
+### Archived browser versus Nix-built browser
+
+The archived Firefox 160 package was originally compiled against the hosted
+Ubuntu runtime, **not** built by Nix. Testing it from a Nix devShell is an
+integration/replay test, not evidence that its ELF dependencies were built
+by Nix. GTK can load plugins from `GDK_PIXBUF_MODULE_FILE`; a Nix-supplied
+loader cache can be ABI-incompatible with host-built GTK. The separate
+artifact-only Wayland replay therefore strips Nix GTK/GdkPixbuf plugin
+cache variables **only for that disposable host-built browser test**. This
+does not change the global shell, user's GTK configuration, or any profile.
+A future truly Nix-built browser requires its own native configure, linker,
+package and Wayland acceptance rather than relying on this workaround.
