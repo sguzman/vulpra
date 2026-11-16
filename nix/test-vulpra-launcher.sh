@@ -63,7 +63,7 @@ set -e
 unset NOM_TEST_EXIT
 rm "$tmp/nom"
 bash "$repo/nix/vulpra" source
-printf '%s\\n' shell ./nix#nom --no-write-lock-file --command nom develop ./nix --no-write-lock-file --command vulpra-dev source > "$tmp/expected"
+printf '%s\n' shell ./nix#nom --no-write-lock-file --command nom develop ./nix --no-write-lock-file --command vulpra-dev source > "$tmp/expected"
 cmp "$tmp/expected" "$tmp/nix-args"
 [[ "$(cat "$tmp/nix-pwd")" == "$repo" ]]
 
