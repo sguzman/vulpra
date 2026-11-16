@@ -9,31 +9,49 @@ An ordinary `nix develop ./nix` therefore does **not** copy the enormous
 Firefox source tree into the Nix store. No Nix operation here deletes or
 reconfigures the existing `obj-vulpra-linux` build directory.
 
-## Enter the toolchain
+## Enter the toolchain with Nix Output Monitor
 
-Nix is installed separately on the developer workstation; this repository
-does not install Nix, require NixOS, modify system configuration or reboot.
+Nix/Lix is installed separately on the workstation. Enable `nix-command` and
+`flakes` once in `~/.config/nix/nix.conf`; see https://nix.dev/concepts/flakes.
 
-Enable the `nix-command` and `flakes` experimental features for the command
-if they are not already configured (see https://nix.dev/concepts/flakes).
-
-From a complete Vulpra checkout, in the user's Fish shell:
+**Preferred route:** install [Nix Output Monitor](https://github.com/maralorn/nix-output-monitor)
+once as an ordinary user-profile program, from **this project's pinned nixpkgs**:
 
 ```fish
-nix --extra-experimental-features 'nix-command flakes' develop ./nix --command fish
-vulpra-dev doctor
-vulpra-dev check
+nix profile install ./nix#nom
 ```
 
-To issue a one-shot read-only check:
+Then run the versioned nom-first Vulpra launcher from a complete checkout:
 
 ```fish
-nix --extra-experimental-features 'nix-command flakes' develop ./nix --command vulpra-dev doctor
+./nix/vulpra doctor
+./nix/vulpra shell
 ```
 
-`nix run ./nix#vulpra-dev -- help` is also available, but mutating/native
-workflows refuse to execute unless `VULPRA_NIX_DEV=1` has been set by the
-Nix devShell. Do not set that variable by hand to bypass the guard.
+Within the shell, `vulpra-dev doctor`, `vulpra-dev check`, etc. work as before.
+To perform a native build directly through the launcher:
+
+```fish
+./nix/vulpra source
+./nix/vulpra build
+```
+
+The launcher delegates to `nom develop ./nix --command ...`, monitors Nix's
+dependency realization, preserves Nix error codes, and forwards native tasks
+to the guarded `vulpra-dev` CLI. `nom develop` can evaluate the Nix shell
+twice; it does **not** execute the native command twice. It cannot monitor
+`mach build`'s C++/Rust compiler steps as Nix derivations: those retain the
+ordinary native build log and one-build-per-workspace locking.
+
+**Do not interrupt an active Nix realization or Firefox build just to switch
+to the launcher.** The launcher takes effect on the next invocation and does
+not change any global shell aliases or overwrite personal Nix configuration.
+The plain `nix develop ./nix --command fish` route also remains available if
+`nom` is not installed.
+
+`nix run ./nix#vulpra-dev -- help` remains available as well, but mutating
+native workflows refuse to execute unless `VULPRA_NIX_DEV=1` was set by the
+developer shell. Do not set it manually to bypass the guard.
 
 ### Native development commands
 
