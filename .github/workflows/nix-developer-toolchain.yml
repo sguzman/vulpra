@@ -1,0 +1,85 @@
+name: Vulpra Nix Developer Toolchain (No Browser Build)
+on:
+  push:
+    branches: [main]
+    paths:
+      - nix/**
+      - .github/workflows/nix-developer-toolchain.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  nix-toolchain-linux:
+    if: github.repository == 'sguzman/vulpra'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout only small Nix tooling and existing guarded scripts
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            nix/flake.nix
+            nix/flake.lock
+            nix/vulpra-dev.sh
+            nix/README.md
+            AGENTS.md
+            mach
+            ci/mozconfig-linux
+            ci/build-local.sh
+            ci/package-smoke-local.sh
+            ci/smoke-native-local.sh
+            ci/smoke-wayland-package-local.sh
+            ci/accept-native-package-local.py
+            ci/smoke-webextension-package-local.py
+            packaging/stage.sh
+      - name: Install Nix in the disposable runner only
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = false
+      - name: Generate or verify lock without changing source or browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix --version
+          nix flake lock ./nix
+          test -s nix/flake.lock
+          # Newly generated lock must be staged locally to participate in
+          # Git-based flake evaluation; no Git push/commit from CI.
+          git add nix/flake.lock
+          if git cat-file -e HEAD:nix/flake.lock 2>/dev/null; then
+            git diff --cached --exit-code -- nix/flake.lock
+          else
+            echo 'First run: generated lock is available as a CI artifact; must be committed before declaring pinning complete' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Actual Nix flake output evaluation and lightweight build checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix flake show ./nix --no-write-lock-file
+          nix flake check ./nix --no-write-lock-file --show-trace
+      - name: Realize developer shell and run read-only environment and code checks
+        shell: bash
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          nix develop ./nix --no-write-lock-file --command vulpra-dev doctor
+          nix develop ./nix --no-write-lock-file --command vulpra-dev check
+          nix run ./nix#vulpra-dev --no-write-lock-file -- help
+          if nix run ./nix#vulpra-dev --no-write-lock-file -- build; then
+            echo 'Unexpected unguarded native build outside Nix devShell' >&2
+            exit 1
+          fi
+          echo 'PASS: Nix shell and read-only developer commands; unsafe host-toolchain build fallback refused' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: no complete Firefox source, mach configure/build, browser runtime, workstation or FIPS acceptance in this workflow' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload generated lock for explicit pinning review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-nix-toolchain-lock-review
+          path: nix/flake.lock
+          if-no-files-found: warn
+          retention-days: 7
