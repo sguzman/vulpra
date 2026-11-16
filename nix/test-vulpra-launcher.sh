@@ -14,7 +14,9 @@ cp "$launcher" "$repo/nix/vulpra"
 
 printf '#!%s\n' "$(command -v bash)" > "$tmp/nix"
 cat >> "$tmp/nix" <<'EOF'
-exit 0
+printf '%s\n' "$PWD" > "$NIX_TEST_PWD"
+printf '%s\n' "$@" > "$NIX_TEST_ARGS"
+exit "${NIX_TEST_EXIT:-0}"
 EOF
 printf '#!%s\n' "$(command -v bash)" > "$tmp/nom"
 cat >> "$tmp/nom" <<'EOF'
@@ -25,6 +27,7 @@ EOF
 chmod +x "$tmp/nix" "$tmp/nom"
 export PATH="$tmp:$PATH"
 export NOM_TEST_PWD="$tmp/pwd" NOM_TEST_ARGS="$tmp/args"
+export NIX_TEST_PWD="$tmp/nix-pwd" NIX_TEST_ARGS="$tmp/nix-args"
 
 bash "$repo/nix/vulpra" doctor
 printf '%s\n' develop ./nix --no-write-lock-file --command vulpra-dev doctor > "$tmp/expected"
@@ -57,4 +60,21 @@ set -e
   echo "ERROR: nom exit status not propagated: $result" >&2
   exit 1
 }
-echo 'PASS: nom-first launcher argument forwarding, cwd, guards and exit status'
+unset NOM_TEST_EXIT
+rm "$tmp/nom"
+bash "$repo/nix/vulpra" source
+printf '%s\\n' shell ./nix#nom --no-write-lock-file --command nom develop ./nix --no-write-lock-file --command vulpra-dev source > "$tmp/expected"
+cmp "$tmp/expected" "$tmp/nix-args"
+[[ "$(cat "$tmp/nix-pwd")" == "$repo" ]]
+
+export NIX_TEST_EXIT=23
+set +e
+bash "$repo/nix/vulpra" source
+result=$?
+set -e
+[[ "$result" -eq 23 ]] || {
+  echo "ERROR: nix bootstrap exit status not propagated: $result" >&2
+  exit 1
+}
+
+echo 'PASS: nom-first launcher, auto-bootstrap fallback, forwarding, cwd, guards and exit statuses'
