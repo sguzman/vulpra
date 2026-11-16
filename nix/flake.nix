@@ -175,7 +175,7 @@
           shellcheck -S warning ${./vulpra}
           bash -n ${./test-vulpra-launcher.sh}
           shellcheck -S warning ${./test-vulpra-launcher.sh}
-          bash ${./test-vulpra-launcher.sh}
+          bash ${./test-vulpra-launcher.sh} ${./vulpra}
           grep -Fq 'VULPRA_NIX_DEV' ${./vulpra-dev.sh}
           grep -Fq 'ci/build-local.sh' ${./vulpra-dev.sh}
           mkdir -p "$out"
