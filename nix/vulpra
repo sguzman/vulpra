@@ -17,8 +17,9 @@ Vulpra Nix launcher (Nix Output Monitor)
   ./nix/vulpra mach ARGS       Delegate mach commands inside the devShell
   ./nix/vulpra help            Show this message
 
-Install nom once using the pinned Vulpra Nix flake:
-  nix profile install ./nix#nom
+The launcher uses an existing nom from PATH, or obtains a pinned nom
+with 'nix shell ./nix#nom' when missing (no profile installation required).
+The first bootstrap of nom itself still uses Nix's native output.
 
 The launcher uses nom to monitor Nix's dependency/download/build phase.
 The native Firefox/Gecko 'mach build' phase prints ordinary compiler logs,
@@ -46,9 +47,6 @@ esac
 
 command -v nix >/dev/null 2>&1 ||
   error "Nix/Lix is not on PATH"
-command -v nom >/dev/null 2>&1 ||
-  error "nom not found. Install it once with: nix profile install ./nix#nom"
-
 # Resolve relative to this script, not the caller's current directory.
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 [[ -f "$repo/nix/flake.nix" && -f "$repo/nix/flake.lock" ]] ||
@@ -57,4 +55,11 @@ cd "$repo"
 
 # nom's develop shim forwards the interactive/native command once and
 # monitors the Nix realization separately. No piped process status is lost.
-exec nom develop ./nix --no-write-lock-file --command "${command_args[@]}"
+if command -v nom >/dev/null 2>&1; then
+  exec nom develop ./nix --no-write-lock-file --command "${command_args[@]}"
+fi
+
+printf 'Vulpra: nom is not on PATH; obtaining pinned nom from ./nix#nom without installing it into your user profile.\n' >&2
+# The very first nom bootstrap is necessarily displayed by Nix itself.
+# Once realized, nom monitors the developer shell's dependencies as normal.
+exec nix shell ./nix#nom --no-write-lock-file --command nom develop ./nix --no-write-lock-file --command "${command_args[@]}"
