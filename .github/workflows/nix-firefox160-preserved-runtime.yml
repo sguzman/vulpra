@@ -93,7 +93,7 @@ jobs:
         run: |
           set -euo pipefail
           VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
-            VULPRA_WAYLAND_TEST_SECONDS=6 \
+            VULPRA_WAYLAND_TEST_SECONDS=15 \
             bash "$GITHUB_WORKSPACE/packaging/test-wayland.sh" "$RUNNER_TEMP/compiled/vulpra"
           echo 'PASS: same archived native browser under plain Ubuntu host/Weston control' >> "$GITHUB_STEP_SUMMARY"
       - name: Exercise actual packaged Vulpra headless within realized Nix developer environment
