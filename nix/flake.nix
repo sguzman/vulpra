@@ -142,7 +142,14 @@
     in
     {
       devShells.${system}.default = toolingShell;
-      packages.${system} = { default = devCli; vulpra-dev = devCli; };
+      packages.${system} = {
+        default = devCli;
+        vulpra-dev = devCli;
+        # Opt-in host-level nom, pinned to the same nixpkgs as this toolchain.
+        # Not in devShell packages: the outer nom executable must start
+        # *before* nix develop realizes the shell closure.
+        nom = pkgs.nix-output-monitor;
+      };
       apps.${system} = {
         default = {
           type = "app";
@@ -164,6 +171,11 @@
           shellcheck -S warning ${./vulpra-dev.sh}
           bash -n ${./verify-preserved-browser.sh}
           shellcheck -S warning ${./verify-preserved-browser.sh}
+          bash -n ${./vulpra}
+          shellcheck -S warning ${./vulpra}
+          bash -n ${./test-vulpra-launcher.sh}
+          shellcheck -S warning ${./test-vulpra-launcher.sh}
+          bash ${./test-vulpra-launcher.sh}
           grep -Fq 'VULPRA_NIX_DEV' ${./vulpra-dev.sh}
           grep -Fq 'ci/build-local.sh' ${./vulpra-dev.sh}
           mkdir -p "$out"
