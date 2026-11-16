@@ -109,7 +109,13 @@ jobs:
           nix develop ./nix --no-write-lock-file --command bash -c '
             set -euo pipefail
             test "$VULPRA_NIX_DEV" = 1
-            VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            # The archived ELF uses host-built GTK/GdkPixbuf, not Nix-built
+            # GTK modules. Prevent Nix setup hooks from injecting an ABI-
+            # incompatible image-loader cache into that external browser.
+            # This override is scoped to this disposable runtime smoke only.
+            env -u GDK_PIXBUF_MODULE_FILE -u GDK_PIXBUF_MODULEDIR \
+              -u GIO_EXTRA_MODULES -u GTK_PATH \
+              VULPRA_WAYLAND_TEST_OFFLINE=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
               VULPRA_WAYLAND_TEST_SECONDS=6 \
               bash "$GITHUB_WORKSPACE/packaging/test-wayland.sh" "$RUNNER_TEMP/compiled/vulpra"
           '
