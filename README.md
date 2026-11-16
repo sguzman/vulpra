@@ -40,6 +40,7 @@ The `upstream-base` branch contains the original release source snapshot with Mo
 - [Stewardship rules](AGENTS.md)
 - [Roadmap and acceptance gates](docs/vulpra/ROADMAP.md)
 - [Resumable source download and first local build](docs/vulpra/LOCAL-BUILD.md)
+- [Nix Linux development toolchain and guarded terminal workflows](nix/README.md) — opt-in, pinned, with CI verification; native browser acceptance separately tracked in [issue #10](https://github.com/sguzman/vulpra/issues/10)
 - [Progress ledger](docs/vulpra/PROGRESS.json)
 - [M3 debloat candidates and measurement rules](docs/vulpra/DEBLOAT.md)
 - [Upstream provenance and license handling](docs/vulpra/UPSTREAM.md)
