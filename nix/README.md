@@ -98,6 +98,26 @@ The Nix devShell also exports `LIBCLANG_PATH` for Rust binding generators.
 not just the `clang++` executable. A successful configure is still not a
 successful browser compilation.
 
+### Native assembler driver selection
+
+Mozilla's `build/moz.configure/toolchain.configure` uses the **C compiler
+driver**, not standalone GNU `as`, to compile native assembly in GCC/Clang
+builds. The pinned Nix development shell previously inherited
+`clang-wrapper/bin/as` as `AS`, but Mozilla's `config/rules.mk` passes
+compiler-driver options including `-Wa,--noexecstack`, `-fPIC`, `-include`
+and `-gdwarf-4`. A workstation `mach build` therefore failed at
+`config/external/nspr/pr/os_Linux_x86_64.o` with
+`Fatal error: invalid listing option ','`.
+
+The Vulpra-only Nix devShell now exports `AS` as the **same pinned native
+GCC compiler driver** used by `mach configure`. It does not alter a
+system-wide environment, the personal mozconfig, the installed browser,
+or built outputs; re-running `./nix/vulpra configure` is necessary to
+regenerate the native object-directory makefiles with the corrected
+assembler. `test-native-assembler.sh` runs a native assembly smoke with
+the actual failed flags in CI before another full browser build is attempted.
+This is an isolated assembler check, **not full browser-build acceptance**.
+
 ### WASM cross-compiler isolation
 
 The workstation's preserved `--with-wasi-sysroot=/usr/share/wasi-sysroot`

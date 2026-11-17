@@ -147,6 +147,12 @@
           # Rust bindgen uses LIBCLANG_PATH; both target LLVM 21 from this pin.
           export VULPRA_NIX_LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
           export LIBCLANG_PATH="$VULPRA_NIX_LIBCLANG_PATH"
+          # Gecko runs assembler sources through a C compiler driver so
+          # -Wa,--noexecstack, -fPIC and -include are interpreted correctly.
+          # Nix otherwise exposes clang-wrapper/bin/as, which is a *raw*
+          # assembler and fails with 'invalid listing option ,'.
+          # Match the Nix native GCC C compiler selected by mach configure.
+          export AS="${pkgs.stdenv.cc}/bin/gcc"
           # Mozilla checks WASM_CC/WASM_CXX separately from native CC/CXX.
           # Target-aware compiler-rt is supplied by the pinned WASI cross CC.
           # Preserve explicit user overrides and the existing host WASI sysroot.
@@ -203,6 +209,8 @@
           shellcheck -S warning ${./test-mozconfig-overlay.sh}
           bash -n ${./test-wasm-compiler.sh}
           shellcheck -S warning ${./test-wasm-compiler.sh}
+          bash -n ${./test-native-assembler.sh}
+          shellcheck -S warning ${./test-native-assembler.sh}
           bash ${./test-mozconfig-overlay.sh} ${./mozconfig-overlay.sh}
           bash ${./test-vulpra-launcher.sh} ${./vulpra}
           grep -Fq 'VULPRA_NIX_DEV' ${./vulpra-dev.sh}
