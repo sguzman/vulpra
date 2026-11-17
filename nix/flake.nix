@@ -11,6 +11,13 @@
       # WASI cross Clang includes target compiler-rt builtins missing from
       # host unwrapped Clang. Use this for WebAssembly only.
       wasiCc = pkgs.pkgsCross.wasi32.stdenv.cc;
+      # The cross C++ libraries used by Mozilla's WASI probes belong only
+      # on the wasm32 linker search path, never in native NIX_LDFLAGS.
+      wasiLibcxx = pkgs.pkgsCross.wasi32.llvmPackages.libcxx;
+      wasiCxx = pkgs.writeShellScript "vulpra-wasi-cxx" ''
+        exec "${wasiCc}/bin/${wasiCc.targetPrefix}clang++" \
+          -L"${wasiLibcxx}/lib" "$@"
+      '';
 
       # Keep this flake in nix/, not the ~3GB Firefox root. The source and
       # existing obj-vulpra-linux directory never enter the Nix store.
@@ -156,13 +163,15 @@
           # Match the Nix native GCC C compiler selected by mach configure.
           export AS="${pkgs.stdenv.cc}/bin/gcc"
           # Mozilla checks WASM_CC/WASM_CXX separately from native CC/CXX.
-          # Target-aware compiler-rt is supplied by the pinned WASI cross CC.
+          # Target-aware compiler-rt comes from the pinned WASI cross CC.
+          # Its C++ standard libraries are provided to WASM_CXX *only* via
+          # the isolated wrapper above, not native linker setup hooks.
           # Preserve explicit user overrides and the existing host WASI sysroot.
           if [ -z "''${WASM_CC:-}" ]; then
             export WASM_CC="${wasiCc}/bin/${wasiCc.targetPrefix}clang"
           fi
           if [ -z "''${WASM_CXX:-}" ]; then
-            export WASM_CXX="${wasiCc}/bin/${wasiCc.targetPrefix}clang++"
+            export WASM_CXX="${wasiCxx}"
           fi
           export VULPRA_NIX_DEV=1
           export VULPRA_TOOLCHAIN_SYSTEM="x86_64-linux"

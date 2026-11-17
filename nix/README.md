@@ -219,3 +219,25 @@ and `test-native-linker.sh` (native x86-64 shared link requiring
 full Firefox native build: the workstation must re-enter its Nix shell,
 reconfigure, and retry the exact SQLite link target, preserving the
 existing object directory.
+
+### WASI C++ linker isolation and the first CI regression
+
+The first native/cross isolation change (`1af06795`) deliberately removed
+the WASI compiler from native `mkShell.packages` to prevent native
+`libgcc.a` linker collisions. Its initial CI run correctly caught a
+secondary problem: the standalone WASI `clang++` compiler then could not
+find target `-lc++` or `-lc++abi`, even though C linking worked.
+
+The corrected default `WASM_CXX` is a small, dedicated shell-script
+wrapper that invokes the same pinned cross `clang++` with a
+target-specific `-L` pointing at
+`pkgs.pkgsCross.wasi32.llvmPackages.libcxx`. Nixpkgs' own Mozilla build
+also supplies the WASI C++ libraries from that target package. The
+cross-compiled archive is **never** placed in native `NIX_LDFLAGS`.
+The C compiler remains the original cross wrapper. Users' explicit
+`WASM_CC` and `WASM_CXX` overrides remain respected.
+
+Both real WASI C/C++ link tests **and** the native x86-64 shared link
+regression must pass in CI before the workstation is asked to pull. The
+workstation's independent mozconfig, build cache and object directory
+remain unchanged.
