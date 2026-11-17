@@ -7,6 +7,8 @@ on:
       - ci/test-m3-localhost-smoke.py
       - ci/smoke-m3-localhost-package.py
       - ci/smoke-webextension-package-local.py
+      - ci/diagnose-remote-settings-local.sh
+      - ci/test-remote-settings-diagnostic.sh
       - .github/workflows/qa-m3-runtime-harness.yml
   workflow_dispatch:
 
@@ -37,3 +39,9 @@ jobs:
           set -euo pipefail
           python3 ci/test-m3-localhost-smoke.py
           echo "QA fixture only: native Firefox compilation/browser behavior are NOT tested here."
+      - name: Validate live versus shutdown-only Remote Settings diagnostics with mock package
+        run: |
+          set -euo pipefail
+          bash -n ci/diagnose-remote-settings-local.sh ci/test-remote-settings-diagnostic.sh
+          bash ci/test-remote-settings-diagnostic.sh
+          echo "QA fixture only: no real browser or remote Settings endpoint is used here."
