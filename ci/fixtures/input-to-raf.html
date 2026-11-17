@@ -24,14 +24,19 @@
   const cap = 300;
 
   function frame(time) {
-    if (lastFrame !== null && frameIntervalsMs.length < cap) {
-      frameIntervalsMs.push(Math.max(0, time - lastFrame));
+    if (lastFrame !== null) {
+      const interval = Math.max(0, time - lastFrame);
+      // Retain the most recent frames, not just initial startup frames:
+      // slow WebDriver key dispatches may outlast a fixed 300-frame loop.
+      if (frameIntervalsMs.length < cap) {
+        frameIntervalsMs.push(interval);
+      } else {
+        frameIntervalsMs[frameCount % cap] = interval;
+      }
+      frameCount += 1;
     }
     lastFrame = time;
-    frameCount += 1;
-    if (frameCount <= cap) {
-      requestAnimationFrame(frame);
-    }
+    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
