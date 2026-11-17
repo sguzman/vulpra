@@ -170,7 +170,7 @@
           # standard <dir> and 50-user.conf includes. Never edit /etc/fonts.
           # Respect users who explicitly provide a FONTCONFIG_FILE override.
           if [ -z "''${FONTCONFIG_FILE:-}" ]; then
-            export FONTCONFIG_FILE="${pkgs.fontconfig}/etc/fonts/fonts.conf"
+            export FONTCONFIG_FILE="${pkgs.fontconfig.out}/etc/fonts/fonts.conf"
           fi
           # Mozilla checks WASM_CC/WASM_CXX separately from native CC/CXX.
           # Target-aware compiler-rt comes from the pinned WASI cross CC.

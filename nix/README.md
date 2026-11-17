@@ -283,3 +283,13 @@ declaring the fix fully accepted.
 
 The sparse CI job checks readable pinned config, sans-serif lookup, and
 the absence of XML parse errors, without running a full browser build.
+
+#### Nix multi-output path correction
+
+The initial CI run [44160856394](https://github.com/sguzman/vulpra/actions/runs/44160856394)
+correctly rejected a `FONTCONFIG_FILE` that pointed to the
+`fontconfig-2.17.1-bin` output (which has no `etc/fonts/fonts.conf`).
+Nixpkgs Fontconfig is a multi-output package. The configuration belongs
+to `pkgs.fontconfig.out`; the shellHook now points there explicitly.
+This was caught before a workstation pull or release. Never downgrade
+or edit host Fontconfig to work around the path.
