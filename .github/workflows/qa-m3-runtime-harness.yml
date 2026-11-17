@@ -14,6 +14,9 @@ on:
       - ci/build-local.sh
       - ci/package-smoke-local.sh
       - ci/test-build-lock-inheritance.sh
+      - ci/measure-input-frame-local.sh
+      - ci/test-input-frame-local.sh
+      - ci/fixtures/input-to-raf.html
       - .github/workflows/qa-m3-runtime-harness.yml
   workflow_dispatch:
 
@@ -62,3 +65,9 @@ jobs:
           bash -n ci/build-local.sh ci/package-smoke-local.sh ci/test-build-lock-inheritance.sh
           bash ci/test-build-lock-inheritance.sh
           echo "QA fixture only: mock browser and build tool; no native Gecko compilation."
+      - name: Validate isolated synthetic typing and event-to-frame metrics via mock WebDriver
+        run: |
+          set -euo pipefail
+          bash -n ci/measure-input-frame-local.sh ci/test-input-frame-local.sh
+          bash ci/test-input-frame-local.sh
+          echo "QA fixture only: no native Firefox, GPU or physical input timing measured."
