@@ -52,7 +52,7 @@ session=""
 port=""
 cleanup() {
   if [[ -n "$session" && -n "$port" ]]; then
-    curl -fsS --max-time 3 -X DELETE "http://127.0.0.1:$port/session/$session" \
+    curl --noproxy 127.0.0.1 -fsS --max-time 3 -X DELETE "http://127.0.0.1:$port/session/$session" \
       >/dev/null 2>&1 || true
   fi
   if [[ -n "$driver_pid" ]]; then
@@ -92,7 +92,7 @@ driver_pid=$!
 ready=0
 for ((i=0; i<100; ++i)); do
   if ! kill -0 "$driver_pid" 2>/dev/null; then break; fi
-  if curl -fsS --max-time 1 "http://127.0.0.1:$port/status" 2>/dev/null |
+  if curl --noproxy 127.0.0.1 -fsS --max-time 1 "http://127.0.0.1:$port/status" 2>/dev/null |
      jq -e '.value.ready == true' >/dev/null 2>&1; then ready=1; break; fi
   sleep 0.2
 done
@@ -102,10 +102,10 @@ done
 webdriver() {
   local method="$1" route="$2" payload="${3:-}"
   if [[ -n "$payload" ]]; then
-    curl -fsS --max-time 20 -X "$method" -H 'Content-Type: application/json' \
+    curl --noproxy 127.0.0.1 -fsS --max-time 20 -X "$method" -H 'Content-Type: application/json' \
       --data "$payload" "http://127.0.0.1:$port$route" > "$work/response.json"
   else
-    curl -fsS --max-time 20 -X "$method" \
+    curl --noproxy 127.0.0.1 -fsS --max-time 20 -X "$method" \
       "http://127.0.0.1:$port$route" > "$work/response.json"
   fi
   jq -e 'has("value") and ((.value | type) != "object" or (.value | has("error") | not))' \
