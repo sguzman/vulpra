@@ -31,7 +31,9 @@ LOG="$LOGDIR/package-smoke-$STAMP.log"
 printf 'Native executable: %s/%s\n' "$BIN" "$BROWSER" | tee -a "$LOG"
 # Native compile artifacts are preserved by Mozilla's incremental packaging.
 set +e
-./mach package 2>&1 | tee -a "$LOG"
+# Keep FD 9 only in the script coordinating this package. Helpers that
+# outlive mach must not keep the build lock after packaging exits.
+./mach package 9>&- 2>&1 | tee -a "$LOG" 9>&-
 result=("${PIPESTATUS[@]}")
 set -e
 ((result[1] == 0)) || { echo 'ERROR: Packaging log could not be written.' >&2; exit 6; }
@@ -98,7 +100,7 @@ HTML
 set +e
 HOME="$WORK/home" XDG_DATA_HOME="$WORK/home/.local/share" MOZ_HEADLESS=1 \
   timeout "${VULPRA_HEADLESS_TIMEOUT:-120}" "$APPDIR/vulpra-launch" \
-  --headless --screenshot "$WORK/test/smoke.png" "file://$WORK/test/smoke.html" 2>&1 | tee -a "$LOG"
+  --headless --screenshot "$WORK/test/smoke.png" "file://$WORK/test/smoke.html" 9>&- 2>&1 | tee -a "$LOG" 9>&-
 result=("${PIPESTATUS[@]}")
 set -e
 ((result[1] == 0)) || { echo 'ERROR: Smoke log not written.' >&2; exit 6; }
