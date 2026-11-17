@@ -241,3 +241,22 @@ Both real WASI C/C++ link tests **and** the native x86-64 shared link
 regression must pass in CI before the workstation is asked to pull. The
 workstation's independent mozconfig, build cache and object directory
 remain unchanged.
+
+
+### Nixpkgs Xorg attribute deprecation cleanup (2026-11-17)
+
+The native browser acceptance log showed the same 12 Nixpkgs `xorg.*`
+deprecation warnings twice during flake evaluation. The pinned nixpkgs
+release supplies the equivalent root-level attributes (`libx11`,
+`libxext`, `libxrender`, `libxcomposite`, `libxdamage`, `libxt`,
+`libxi`, `libxrandr`, `libxcursor`, `libxfixes`,
+`libxinerama`, `libxcb`). The toolchain shell now uses those
+attributes and its CI script contract rejects reintroduction of
+`xorg.lib*` names. This changes the Nix declarations only, not
+Firefox source, profiles, native object files, or host Xorg/Wayland setup.
+
+Other warnings have different owners: the fontconfig parse errors from
+`/etc/fonts/conf.d/` must be diagnosed in the isolated runtime versus
+host fontconfig, Remote Settings network startup errors require an online
+security-service verification, and the completed build's compiler warnings
+require separate source-level triage; do not suppress these globally.

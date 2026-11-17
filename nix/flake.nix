@@ -109,18 +109,18 @@
         wayland
         wayland-protocols
         libxkbcommon
-        xorg.libX11
-        xorg.libXext
-        xorg.libXrender
-        xorg.libXcomposite
-        xorg.libXdamage
-        xorg.libXt
-        xorg.libXi
-        xorg.libXrandr
-        xorg.libXcursor
-        xorg.libXfixes
-        xorg.libXinerama
-        xorg.libxcb
+        libx11
+        libxext
+        libxrender
+        libxcomposite
+        libxdamage
+        libxt
+        libxi
+        libxrandr
+        libxcursor
+        libxfixes
+        libxinerama
+        libxcb
       ];
 
       qaTools = with pkgs; [
@@ -226,6 +226,11 @@
           shellcheck -S warning ${./test-native-linker.sh}
           bash -n ${./test-xsum-warning-flags.sh}
           shellcheck -S warning ${./test-xsum-warning-flags.sh}
+          # No deprecated xorg.* compatibility aliases in our pinned shell.
+          if grep -Eq 'xorg[.]lib' ${./flake.nix}; then
+            echo 'ERROR: deprecated xorg.* Nixpkgs attributes remain in nix/flake.nix' >&2
+            exit 1
+          fi
           bash ${./test-mozconfig-overlay.sh} ${./mozconfig-overlay.sh}
           bash ${./test-vulpra-launcher.sh} ${./vulpra}
           grep -Fq 'VULPRA_NIX_DEV' ${./vulpra-dev.sh}
