@@ -34,7 +34,7 @@ monitors="$(hyprctl -j monitors | jq -ec '
   # from the normal active-monitor view. Never persist unfiltered JSON.
   if all_monitors="$(hyprctl -j monitors all 2>/dev/null | jq -ec '
     if type != "array" then error("not monitor array") else
-    [.[] | {connector: .name, disabled: (.disabled // null),
+    [.[] | {connector: .name, disabled: (if has("disabled") then .disabled else null end),
            width: .width, height: .height, refresh_hz: .refreshRate,
            dpms: .dpmsStatus}]
     end
