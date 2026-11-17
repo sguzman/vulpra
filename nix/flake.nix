@@ -146,10 +146,10 @@
           # Mozilla checks WASM_CC and WASM_CXX independently of host CC/CXX.
           # LLVM 21's raw compiler does not inject x86-only hardening flags.
           # Keep user-defined compiler selections authoritative if supplied.
-          if [ -z "${WASM_CC:-}" ]; then
+          if [ -z "''${WASM_CC:-}" ]; then
             export WASM_CC="${pkgs.llvmPackages.clang-unwrapped}/bin/clang"
           fi
-          if [ -z "${WASM_CXX:-}" ]; then
+          if [ -z "''${WASM_CXX:-}" ]; then
             export WASM_CXX="${pkgs.llvmPackages.clang-unwrapped}/bin/clang++"
           fi
           export VULPRA_NIX_DEV=1
