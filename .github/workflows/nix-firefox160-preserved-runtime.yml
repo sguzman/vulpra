@@ -24,6 +24,8 @@ jobs:
             nix/flake.lock
             nix/vulpra
             nix/test-vulpra-launcher.sh
+            nix/mozconfig-overlay.sh
+            nix/test-mozconfig-overlay.sh
             nix/vulpra-dev.sh
             nix/verify-preserved-browser.sh
             packaging/test-wayland.sh
