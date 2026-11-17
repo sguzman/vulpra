@@ -67,7 +67,9 @@ printf 'Installed Firefox and its profile are not used or modified by this scrip
 
 start=$(date +%s)
 set +e
-./mach build 2>&1 | tee "$BUILD_LOG"
+# Keep FD 9 exclusively in this coordinator. Child compiler/helper processes
+# must not inherit the lock: they can outlive mach after a successful build.
+./mach build 9>&- 2>&1 | tee "$BUILD_LOG" 9>&-
 pipe_status=("${PIPESTATUS[@]}")
 set -e
 result=${pipe_status[0]}
