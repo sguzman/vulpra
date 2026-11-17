@@ -13,7 +13,7 @@ Vulpra Nix launcher (Nix Output Monitor)
   ./nix/vulpra configure       Run the native mach configure
   ./nix/vulpra build           Run the guarded native mach build
   ./nix/vulpra package         Package and privately smoke the native binary
-  ./nix/vulpra smoke|wayland|accept|webext
+  ./nix/vulpra smoke|wayland|accept|webext|input
   ./nix/vulpra mach ARGS       Delegate mach commands inside the devShell
   ./nix/vulpra help            Show this message
 
@@ -39,7 +39,7 @@ case "$action" in
     (($# == 0)) || error "'shell' takes no extra arguments"
     command_args=(fish)
     ;;
-  doctor|source|check|configure|build|package|smoke|wayland|accept|webext|mach)
+  doctor|source|check|configure|build|package|smoke|wayland|accept|webext|input|mach)
     command_args=(vulpra-dev "$action" "$@")
     ;;
   *) error "unknown action '$action'; use ./nix/vulpra help" ;;
