@@ -4453,7 +4453,11 @@ void gfxFont::SanitizeMetrics(bool aIsBadUnderlineFont) {
   // However, for layout and others, we should return the metrics of zero size
   // font.
   if (mStyle.AdjustedSizeMustBeZero()) {
-    memset(&mMetrics, 0, sizeof(mMetrics));
+    mMetrics = Metrics{};
+    // Zero-size fonts use all-zero metrics, including the two width fields
+    // whose normal unavailable-glyph sentinel is -1.
+    mMetrics.zeroWidth = 0.0;
+    mMetrics.ideographicWidth = 0.0;
     return;
   }
 
