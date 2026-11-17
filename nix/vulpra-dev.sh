@@ -32,6 +32,14 @@ HELP
 
 error() { printf 'Vulpra: %s\n' "$*" >&2; exit 2; }
 
+has_shared_libclang() {
+  local candidate
+  for candidate in "$1"/libclang.so*; do
+    [[ -f "$candidate" ]] && return 0
+  done
+  return 1
+}
+
 command_name="${1:-help}"
 if (($#)); then shift; fi
 
@@ -78,7 +86,7 @@ case "$command_name" in
       libclang_dir="${VULPRA_NIX_LIBCLANG_PATH:-}"
       [[ -n "$libclang_dir" && -d "$libclang_dir" ]] ||
         error "Nix devShell did not provide a usable libclang directory"
-      compgen -G "$libclang_dir/libclang.so*" >/dev/null ||
+      has_shared_libclang "$libclang_dir" ||
         error "Nix libclang directory lacks a shared libclang.so: $libclang_dir"
       printf 'OK: libclang       %s\n' "$libclang_dir"
     fi
@@ -126,7 +134,7 @@ case "$command_name" in
         libclang_dir="${VULPRA_NIX_LIBCLANG_PATH:-}"
         [[ -n "$libclang_dir" && -d "$libclang_dir" ]] ||
           error "no Nix-provided libclang directory; refusing host-toolchain fallback"
-        compgen -G "$libclang_dir/libclang.so*" >/dev/null ||
+        has_shared_libclang "$libclang_dir" ||
           error "missing libclang.so in Nix directory: $libclang_dir"
         [[ -f "$root/nix/mozconfig-overlay.sh" ]] ||
           error "missing tracked Nix mozconfig shim"
