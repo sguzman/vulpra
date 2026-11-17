@@ -105,11 +105,15 @@ is still authoritative. Mozilla selects its WebAssembly C/C++ compilers via
 `WASM_CC`/`WASM_CXX`, separately from native `CC`/`CXX`. Nix's ordinary
 `clang` is a host cc-wrapper that injects x86-only hardening flags (including
 `-fzero-call-used-regs=used-gpr`), which LLVM rejects when targeting
-`wasm32-wasi`. The Nix shell now defaults those **WASM-only** variables to
-pinned LLVM 21 **unwrapped** `clang`/`clang++`, while retaining native
-compiler wrappers, the existing `sccache` configuration, and explicit user
-overrides. The `test-wasm-compiler.sh` CI gate actually preprocesses C and
-C++ with `--target=wasm32-wasi`. This is a focused check, not a successful
+`wasm32-wasi`. A subsequent workstation configure exposed the missing `wasm32-wasi`
+`libclang_rt.builtins.a` archive in the **host** unwrapped LLVM resource
+directory. The Nix shell now defaults those **WASM-only** variables to
+the pinned `pkgsCross.wasi32.stdenv.cc` cross-compiler wrapper, supplying
+WASI-targeted compiler-rt while retaining native compilers, the existing
+`sccache` configuration, the original workstation WASI sysroot and
+explicit user overrides. The `test-wasm-compiler.sh` CI gate now actually
+**preprocesses and links** C and C++ programs with `--target=wasm32-wasi`.
+This is focused toolchain evidence, not a successful workstation
 `mach configure` or entire Firefox build.
 
 

@@ -8,6 +8,9 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       lib = pkgs.lib;
+      # WASI cross Clang includes target compiler-rt builtins missing from
+      # host unwrapped Clang. Use this for WebAssembly only.
+      wasiCc = pkgs.pkgsCross.wasi32.stdenv.cc;
 
       # Keep this flake in nix/, not the ~3GB Firefox root. The source and
       # existing obj-vulpra-linux directory never enter the Nix store.
@@ -37,6 +40,7 @@
         llvmPackages.clang-unwrapped
         # Gecko bindgen needs the *shared* libclang, not just clang++.
         llvmPackages.libclang.lib
+        wasiCc
         sccache
         llvmPackages.lld
         llvmPackages.llvm
@@ -143,14 +147,14 @@
           # Rust bindgen uses LIBCLANG_PATH; both target LLVM 21 from this pin.
           export VULPRA_NIX_LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
           export LIBCLANG_PATH="$VULPRA_NIX_LIBCLANG_PATH"
-          # Mozilla checks WASM_CC and WASM_CXX independently of host CC/CXX.
-          # LLVM 21's raw compiler does not inject x86-only hardening flags.
-          # Keep user-defined compiler selections authoritative if supplied.
+          # Mozilla checks WASM_CC/WASM_CXX separately from native CC/CXX.
+          # Target-aware compiler-rt is supplied by the pinned WASI cross CC.
+          # Preserve explicit user overrides and the existing host WASI sysroot.
           if [ -z "''${WASM_CC:-}" ]; then
-            export WASM_CC="${pkgs.llvmPackages.clang-unwrapped}/bin/clang"
+            export WASM_CC="${wasiCc}/bin/${wasiCc.targetPrefix}clang"
           fi
           if [ -z "''${WASM_CXX:-}" ]; then
-            export WASM_CXX="${pkgs.llvmPackages.clang-unwrapped}/bin/clang++"
+            export WASM_CXX="${wasiCc}/bin/${wasiCc.targetPrefix}clang++"
           fi
           export VULPRA_NIX_DEV=1
           export VULPRA_TOOLCHAIN_SYSTEM="x86_64-linux"

@@ -22,4 +22,18 @@ cat > "$scratch/target.cpp" <<'SRC'
 SRC
 "$WASM_CC" --target=wasm32-wasi -E -o /dev/null "$scratch/target.c"
 "$WASM_CXX" --target=wasm32-wasi -E -o /dev/null "$scratch/target.cpp"
-printf 'PASS: LLVM WASM C/C++ compilers preprocess wasm32-wasi without Nix host flags\n'
+# The previous preprocess-only test missed the absent compiler-rt archive.
+# Exercise real WASI links, as Mozilla's configure requires.
+cat > "$scratch/link.c" <<'SRC'
+int main(void) { return 0; }
+SRC
+cat > "$scratch/link.cpp" <<'SRC'
+int main() { return 0; }
+SRC
+"$WASM_CC" --target=wasm32-wasi "$scratch/link.c" -o "$scratch/link-c.wasm"
+"$WASM_CXX" --target=wasm32-wasi "$scratch/link.cpp" -o "$scratch/link-cxx.wasm"
+[[ -s "$scratch/link-c.wasm" && -s "$scratch/link-cxx.wasm" ]] || {
+  printf 'ERROR: wasm32-wasi link outputs missing\n' >&2
+  exit 1
+}
+printf 'PASS: WASM C/C++ preprocess and link wasm32-wasi with compiler-rt\n'
