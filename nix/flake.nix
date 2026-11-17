@@ -32,6 +32,9 @@
         ninja
         autoconf
         clang
+        # Mozilla's WebAssembly configure probes must bypass Nix's host
+        # cc-wrapper (its hardening flags are invalid for wasm32-wasi).
+        llvmPackages.clang-unwrapped
         # Gecko bindgen needs the *shared* libclang, not just clang++.
         llvmPackages.libclang.lib
         sccache
@@ -140,6 +143,15 @@
           # Rust bindgen uses LIBCLANG_PATH; both target LLVM 21 from this pin.
           export VULPRA_NIX_LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
           export LIBCLANG_PATH="$VULPRA_NIX_LIBCLANG_PATH"
+          # Mozilla checks WASM_CC and WASM_CXX independently of host CC/CXX.
+          # LLVM 21's raw compiler does not inject x86-only hardening flags.
+          # Keep user-defined compiler selections authoritative if supplied.
+          if [ -z "${WASM_CC:-}" ]; then
+            export WASM_CC="${pkgs.llvmPackages.clang-unwrapped}/bin/clang"
+          fi
+          if [ -z "${WASM_CXX:-}" ]; then
+            export WASM_CXX="${pkgs.llvmPackages.clang-unwrapped}/bin/clang++"
+          fi
           export VULPRA_NIX_DEV=1
           export VULPRA_TOOLCHAIN_SYSTEM="x86_64-linux"
           printf 'Vulpra Nix toolchain active (Linux x86_64); use vulpra-dev help.\n'
@@ -185,6 +197,8 @@
           sh -n ${./mozconfig-overlay.sh}
           bash -n ${./test-mozconfig-overlay.sh}
           shellcheck -S warning ${./test-mozconfig-overlay.sh}
+          bash -n ${./test-wasm-compiler.sh}
+          shellcheck -S warning ${./test-wasm-compiler.sh}
           bash ${./test-mozconfig-overlay.sh} ${./mozconfig-overlay.sh}
           bash ${./test-vulpra-launcher.sh} ${./vulpra}
           grep -Fq 'VULPRA_NIX_DEV' ${./vulpra-dev.sh}
