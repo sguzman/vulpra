@@ -36,7 +36,17 @@ case "$mode" in
     env HOME="$work/home" XDG_DATA_HOME="$work/home/.local/share" \
       XRE_START_OFFLINE=1 MOZ_HEADLESS=1 MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
       timeout 120 "$app/vulpra-launch" --headless \
-        --screenshot "$work/browser.png" "file://$work/test.html"
+        --screenshot "$work/browser.png" "file://$work/test.html" 2>&1 |
+      tee "$work/browser.log"
+    # The Fontconfig devShell probe alone cannot guarantee that the real
+    # packaged browser inherits the same XML compatibility isolation.
+    # Keep stderr visible in Actions and fail on parser/runtime warnings.
+    # This CI replay is intentionally offline and makes no claim about
+    # Remote Settings endpoint or TLS reachability.
+    if grep -Eq 'Fontconfig (warning|error):' "$work/browser.log"; then
+      printf 'ERROR: packaged browser emitted Fontconfig warnings under Nix\n' >&2
+      exit 1
+    fi
     [[ -s "$work/browser.png" ]]
     [[ "$(od -An -tx1 -N8 "$work/browser.png" | tr -d ' \n')" == 89504e470d0a1a0a ]]
     after="$(sha256sum "$work/home/.mozilla/firefox/profiles.ini" | cut -d' ' -f1)"
