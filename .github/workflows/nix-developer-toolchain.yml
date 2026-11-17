@@ -26,6 +26,7 @@ jobs:
             nix/test-vulpra-launcher.sh
             nix/mozconfig-overlay.sh
             nix/test-mozconfig-overlay.sh
+            nix/test-wasm-compiler.sh
             nix/vulpra-dev.sh
             nix/verify-preserved-browser.sh
             nix/README.md
@@ -72,6 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           nix develop ./nix --no-write-lock-file --command vulpra-dev doctor
+          nix develop ./nix --no-write-lock-file --command bash nix/test-wasm-compiler.sh
           nix develop ./nix --no-write-lock-file --command vulpra-dev check
           nix run ./nix#vulpra-dev --no-write-lock-file -- help
           if nix run ./nix#vulpra-dev --no-write-lock-file -- build; then
