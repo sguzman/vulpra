@@ -76,11 +76,27 @@ its profile. The environment contains GCC/Clang-related tooling, Rust, the
 Gecko Python build prerequisites, JS runtime (not a request to use npm),
 assembler, developer instrumentation, graphics headers, Weston and WebDriver.
 
-**Local mozconfig is intentionally not replaced.** Your existing
+**Local mozconfig is intentionally not overwritten.** Your existing
 `~/.mozbuild/vulpra-local.mozconfig` includes a workstation-specific WASI
 sysroot override. `ci/mozconfig-linux` is a different CI configuration, and
-the Nix shell will **not** silently substitute it. A failed doctor/console
-check is safer than a long broken browser rebuild.
+the Nix shell will **not** substitute it.
+
+When you invoke `./nix/vulpra configure` or `./nix/vulpra build`, the guarded
+CLI sets `MOZCONFIG` **only for that command** to the tracked
+`nix/mozconfig-overlay.sh`. That shell script **sources the unchanged original
+mozconfig** (or your explicit pre-existing `MOZCONFIG`) and adds exactly one
+`--with-libclang-path` option pointing at the Nix-provided LLVM 21 shared
+library. `VULPRA_MOZCONFIG_SOURCE` records the original path for that command.
+Nothing edits the source mozconfig or deletes the existing object directory,
+but a normal Gecko configure/build may update its own generated object files.
+
+This shim is needed because Mozilla's
+`build/moz.configure/bindgen.configure` doesn't automatically discover
+Nix's split shared-libclang output by searching generic `LIBCLANG_PATH`.
+The Nix devShell also exports `LIBCLANG_PATH` for Rust binding generators.
+`vulpra-dev doctor` now checks that an actual `libclang.so*` is available,
+not just the `clang++` executable. A successful configure is still not a
+successful browser compilation.
 
 ## Reproducibility boundary and verification
 
