@@ -293,3 +293,30 @@ Nixpkgs Fontconfig is a multi-output package. The configuration belongs
 to `pkgs.fontconfig.out`; the shellHook now points there explicitly.
 This was caught before a workstation pull or release. Never downgrade
 or edit host Fontconfig to work around the path.
+
+
+#### Why the first config-path-only fix passed Ubuntu but failed on Arch
+
+Workstation `fc-match` with [`169b0688`](https://github.com/sguzman/vulpra/commit/169b06888b31b3cdcd4ab74afb324aa5b01a7fbd)
+still selected Noto Sans **and emitted the same XML warnings**. The exact
+reason is in the pinned Nixpkgs 2.17.1 package definition:
+`pkgs/development/libraries/fontconfig/default.nix` invokes
+`make-fonts-conf.xsl` with `--stringparam includes /etc/fonts/conf.d`.
+That explicitly imports Arch's system rule files even from a
+`FONTCONFIG_FILE` inside the Nix store. The earlier CI checked only
+font resolution and warnings on Ubuntu, where those host rules were
+compatible: it didn't check which system rule files were loaded.
+
+Vulpra now builds a tiny version-matched **configuration-only** Nix
+derivation. It copies the packaged fonts.conf, substitutes the one
+`/etc/fonts/conf.d` import with the pinned Nix Fontconfig rule
+directory, and adds `/usr/share/fonts` and `/usr/local/share/fonts`
+as **font directories** (not config directories). It keeps XDG user
+fonts and explicit `FONTCONFIG_FILE` overrides. No native browser
+sources or compiled objects are rebuilt.
+
+The CI test now runs `fc-conflist` and rejects actual loading of
+host `/etc/fonts/conf.d` rules, in addition to requiring successful
+sans-serif matching without parser warnings. This is the missing
+cross-distribution regression check. Local parity is still required to
+confirm the EndeavourOS host's Noto Sans match is unchanged.

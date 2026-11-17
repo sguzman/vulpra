@@ -19,6 +19,27 @@
           -L"${wasiLibcxx}/lib" "$@"
       '';
 
+      # Fontconfig's *Nixpkgs-generated* fonts.conf explicitly includes
+      # /etc/fonts/conf.d even when FONTCONFIG_FILE points into the store.
+      # On newer Arch, this imports XML unsupported by pinned Fontconfig
+      # 2.17 (xsi:nil and new family constants). Create a private config
+      # that uses the matching pinned rule set, but still indexes physical
+      # system fonts and XDG user fonts. No /etc/fonts edits.
+      fontconfigConfig = pkgs.runCommand "vulpra-fontconfig-config" { } ''
+        mkdir -p "$out/etc/fonts"
+        cp "${pkgs.fontconfig.out}/etc/fonts/fonts.conf" "$out/etc/fonts/fonts.conf"
+        substituteInPlace "$out/etc/fonts/fonts.conf" \
+          --replace-fail "/etc/fonts/conf.d" "${pkgs.fontconfig.out}/etc/fonts/conf.d"
+        # Nix's upstream config otherwise scans only bundled DejaVu
+        # and XDG fonts. Keep fonts installed by Arch visible without
+        # importing Arch's newer rule XML.
+        substituteInPlace "$out/etc/fonts/fonts.conf" \
+          --replace-fail "</fontconfig>" \
+          "<dir>/usr/share/fonts</dir>
+           <dir>/usr/local/share/fonts</dir>
+           </fontconfig>"
+      '';
+
       # Keep this flake in nix/, not the ~3GB Firefox root. The source and
       # existing obj-vulpra-linux directory never enter the Nix store.
       coreTools = with pkgs; [
@@ -162,15 +183,13 @@
           # assembler and fails with 'invalid listing option ,'.
           # Match the Nix native GCC C compiler selected by mach configure.
           export AS="${pkgs.stdenv.cc}/bin/gcc"
-          # On Arch, host Fontconfig 2.18's /etc/fonts/conf.d uses new XML
-          # constructs (xsi:nil/generic family constants). The pinned Nix
-          # libfontconfig can be older and cannot parse them. Give Nix-linked
-          # tools their own version-matched configuration from the same Nix
-          # package, while keeping system and per-user fonts visible via its
-          # standard <dir> and 50-user.conf includes. Never edit /etc/fonts.
-          # Respect users who explicitly provide a FONTCONFIG_FILE override.
+          # The Nixpkgs fonts.conf explicitly imports /etc/fonts/conf.d,
+          # even when used by absolute path! Use our pinned, version-matched
+          # overlay that replaces that import with Nix Fontconfig rules and
+          # includes host font directories, not host rule XML.
+          # Respect an explicit user FONTCONFIG_FILE override.
           if [ -z "''${FONTCONFIG_FILE:-}" ]; then
-            export FONTCONFIG_FILE="${pkgs.fontconfig.out}/etc/fonts/fonts.conf"
+            export FONTCONFIG_FILE="${fontconfigConfig}/etc/fonts/fonts.conf"
           fi
           # Mozilla checks WASM_CC/WASM_CXX separately from native CC/CXX.
           # Target-aware compiler-rt comes from the pinned WASI cross CC.

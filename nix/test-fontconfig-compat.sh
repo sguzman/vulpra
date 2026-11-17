@@ -8,17 +8,31 @@ set -euo pipefail
 [[ -r "${FONTCONFIG_FILE:-}" ]] || {
   echo "ERROR: FONTCONFIG_FILE is not readable: ${FONTCONFIG_FILE:-<unset>}" >&2; exit 1;
 }
+# The Nixpkgs config has a real absolute /etc/fonts/conf.d import by default.
+# Reject it, even when the master path itself lives inside /nix/store.
+if grep -Eq '<include[^>]*>[[:space:]]*/etc/fonts/conf[.]d[[:space:]]*</include>' "$FONTCONFIG_FILE"; then
+  echo 'ERROR: isolated config still explicitly loads host Fontconfig XML' >&2
+  exit 1
+fi
 case "$FONTCONFIG_FILE" in
   /nix/store/*/etc/fonts/fonts.conf) ;;
   *) echo "ERROR: unexpected Fontconfig configuration path: $FONTCONFIG_FILE" >&2; exit 1 ;;
 esac
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
+fc-conflist > "$scratch/configs.out" 2> "$scratch/configs.err"
+[[ -s "$scratch/configs.out" ]] || {
+  echo 'ERROR: no Fontconfig rule files loaded' >&2; exit 1;
+}
+if grep -E '(^|[[:space:]])/etc/fonts/(conf[.]d/|fonts[.]conf)' "$scratch/configs.out" >&2; then
+  echo 'ERROR: Nix Fontconfig loaded host system rules from /etc/fonts' >&2
+  exit 1
+fi
 fc-match -f '%{family}\n' sans-serif > "$scratch/match.out" 2> "$scratch/match.err"
 [[ -s "$scratch/match.out" ]] || {
   echo 'ERROR: no sans-serif font match in Nix environment' >&2; exit 1;
 }
-if grep -E 'invalid attribute|invalid constant used|cannot load' "$scratch/match.err" >&2; then
+if grep -E 'invalid attribute|invalid constant used|cannot load' "$scratch/configs.err" "$scratch/match.err" >&2; then
   echo 'ERROR: the pinned Fontconfig still cannot parse its configuration' >&2
   exit 1
 fi
