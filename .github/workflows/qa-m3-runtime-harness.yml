@@ -11,6 +11,9 @@ on:
       - ci/test-remote-settings-diagnostic.sh
       - ci/capture-hyprland-gpu-baseline.sh
       - ci/test-capture-hyprland-gpu-baseline.sh
+      - ci/build-local.sh
+      - ci/package-smoke-local.sh
+      - ci/test-build-lock-inheritance.sh
       - .github/workflows/qa-m3-runtime-harness.yml
   workflow_dispatch:
 
@@ -53,3 +56,9 @@ jobs:
           bash -n ci/capture-hyprland-gpu-baseline.sh ci/test-capture-hyprland-gpu-baseline.sh
           bash ci/test-capture-hyprland-gpu-baseline.sh
           echo "QA fixture only: no real GPUs, compositor or Firefox profiles used in CI."
+      - name: Prevent orphaned mach helpers from retaining build/package lock
+        run: |
+          set -euo pipefail
+          bash -n ci/build-local.sh ci/package-smoke-local.sh ci/test-build-lock-inheritance.sh
+          bash ci/test-build-lock-inheritance.sh
+          echo "QA fixture only: mock browser and build tool; no native Gecko compilation."
