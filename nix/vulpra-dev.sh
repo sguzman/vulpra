@@ -17,6 +17,7 @@ Vulpra Nix developer commands
   vulpra-dev wayland      Private Weston/Wayland packaged smoke
   vulpra-dev accept       Offline localhost JS/redirect/package test
   vulpra-dev webext       Private packaged WebExtension lifecycle test
+  vulpra-dev input        Headless synthetic typing-to-rAF timing; isolated package
   vulpra-dev mach ARGS    Pass arguments to this checkout's ./mach
   vulpra-dev help         Show this help
 
@@ -45,7 +46,7 @@ if (($#)); then shift; fi
 
 case "$command_name" in
   help|-h|--help) usage; exit 0 ;;
-  doctor|source|check|configure|build|package|smoke|wayland|accept|webext|mach) ;;
+  doctor|source|check|configure|build|package|smoke|wayland|accept|webext|input|mach) ;;
   *) error "unknown command '$command_name'; run vulpra-dev help" ;;
 esac
 
@@ -109,6 +110,7 @@ case "$command_name" in
       ci/smoke-native-local.sh \
       ci/package-smoke-local.sh \
       ci/smoke-wayland-package-local.sh \
+      ci/measure-input-frame-local.sh \
       packaging/stage.sh; do
       [[ -f "$root/$relative" ]] || error "missing native workflow $relative"
       bash -n "$root/$relative"
@@ -157,6 +159,7 @@ case "$command_name" in
       wayland) exec bash "$root/ci/smoke-wayland-package-local.sh" "$@" ;;
       accept) exec python3 "$root/ci/accept-native-package-local.py" "$@" ;;
       webext) exec python3 "$root/ci/smoke-webextension-package-local.py" "$@" ;;
+      input) exec bash "$root/ci/measure-input-frame-local.sh" "$root" ;;
       mach) exec ./mach "$@" ;;
     esac
     ;;
