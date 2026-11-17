@@ -40,7 +40,9 @@
         llvmPackages.clang-unwrapped
         # Gecko bindgen needs the *shared* libclang, not just clang++.
         llvmPackages.libclang.lib
-        wasiCc
+        # Do not put the WASI cross CC in mkShell packages: its setup inputs
+        # leak wasm32 libgcc into native x86_64 linker flags. The absolute
+        # WASM_CC/WASM_CXX references in shellHook below keep it realized.
         sccache
         llvmPackages.lld
         llvmPackages.llvm
@@ -211,6 +213,8 @@
           shellcheck -S warning ${./test-wasm-compiler.sh}
           bash -n ${./test-native-assembler.sh}
           shellcheck -S warning ${./test-native-assembler.sh}
+          bash -n ${./test-native-linker.sh}
+          shellcheck -S warning ${./test-native-linker.sh}
           bash -n ${./test-xsum-warning-flags.sh}
           shellcheck -S warning ${./test-xsum-warning-flags.sh}
           bash ${./test-mozconfig-overlay.sh} ${./mozconfig-overlay.sh}

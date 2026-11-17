@@ -196,3 +196,26 @@ The sparse Nix CI workflow now compiles the **real vendored xsum.cpp**
 with the pinned compiler and the hardened format-warning flags. This is
 focused compiler evidence only; the full workstation browser build and
 package/runtime tests remain separate acceptance gates.
+
+### Native linker isolation: keep WASI runtime out of x86-64 linker inputs
+
+On 2026-11-17 the workstation's incremental Firefox build failed while
+linking `config/external/sqlite/libmozsqlite3.so` with
+`ld.bfd: ...compiler-rt-static-wasm32-unknown-wasi.../lib/libgcc.a:
+error adding symbols: file format not recognized`. This was a **target
+architecture collision**, not a SQLite source error.
+
+The initial WASI support put `pkgs.pkgsCross.wasi32.stdenv.cc` directly in
+the native `mkShell.packages`. Its cross-target library search paths could
+then be activated for native GCC links. The WASI compiler is now retained
+through `WASM_CC` and `WASM_CXX` absolute paths from `shellHook` instead
+of including the cross CC in the native shell's package list. Its Nix store
+derivation is still realized through those explicit references, but its
+cross setup inputs are not applied to the native linker environment.
+
+CI runs *both* `test-wasm-compiler.sh` (real WASI C/C++ links)
+and `test-native-linker.sh` (native x86-64 shared link requiring
+`libgcc`, plus environment contamination checks). This does not prove the
+full Firefox native build: the workstation must re-enter its Nix shell,
+reconfigure, and retry the exact SQLite link target, preserving the
+existing object directory.
