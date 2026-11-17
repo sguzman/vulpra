@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths:
       - nix/**
+      - js/src/xsum/moz.build
+      - js/src/xsum/xsum.cpp
+      - js/src/xsum/xsum.h
       - .github/workflows/nix-developer-toolchain.yml
   workflow_dispatch:
 permissions:
@@ -28,6 +31,10 @@ jobs:
             nix/test-mozconfig-overlay.sh
             nix/test-wasm-compiler.sh
             nix/test-native-assembler.sh
+            nix/test-xsum-warning-flags.sh
+            js/src/xsum/moz.build
+            js/src/xsum/xsum.cpp
+            js/src/xsum/xsum.h
             nix/vulpra-dev.sh
             nix/verify-preserved-browser.sh
             nix/README.md
@@ -76,6 +83,7 @@ jobs:
           nix develop ./nix --no-write-lock-file --command vulpra-dev doctor
           nix develop ./nix --no-write-lock-file --command bash nix/test-wasm-compiler.sh
           nix develop ./nix --no-write-lock-file --command bash nix/test-native-assembler.sh
+          nix develop ./nix --no-write-lock-file --command bash nix/test-xsum-warning-flags.sh
           nix develop ./nix --no-write-lock-file --command vulpra-dev check
           nix run ./nix#vulpra-dev --no-write-lock-file -- help
           if nix run ./nix#vulpra-dev --no-write-lock-file -- build; then

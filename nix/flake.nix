@@ -211,6 +211,8 @@
           shellcheck -S warning ${./test-wasm-compiler.sh}
           bash -n ${./test-native-assembler.sh}
           shellcheck -S warning ${./test-native-assembler.sh}
+          bash -n ${./test-xsum-warning-flags.sh}
+          shellcheck -S warning ${./test-xsum-warning-flags.sh}
           bash ${./test-mozconfig-overlay.sh} ${./mozconfig-overlay.sh}
           bash ${./test-vulpra-launcher.sh} ${./vulpra}
           grep -Fq 'VULPRA_NIX_DEV' ${./vulpra-dev.sh}

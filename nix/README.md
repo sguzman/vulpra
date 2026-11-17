@@ -180,3 +180,19 @@ cache variables **only for that disposable host-built browser test**. This
 does not change the global shell, user's GTK configuration, or any profile.
 A future truly Nix-built browser requires its own native configure, linker,
 package and Wayland acceptance rather than relying on this workaround.
+
+### Native xsum format-security warning integration (2026-11-17)
+
+After NSPR assembly was repaired, the incremental workstation browser build
+reached `js/src/xsum/xsum.cpp` and stopped at:
+`cc1plus: error: '-Wformat-security' ignored without '-Wformat'
+[-Werror=format-security]`. The Nix GCC wrapper enforces this hardening,
+but the xsum per-file `moz.build` had explicitly disabled its prerequisite
+warning group with `-Wno-format`. The minimal correction removes **only**
+that per-file suppression. It does not relax `-Wformat-security`,
+`-Werror=format-security`, the native GCC wrapper, or Mozilla hardening.
+
+The sparse Nix CI workflow now compiles the **real vendored xsum.cpp**
+with the pinned compiler and the hardened format-warning flags. This is
+focused compiler evidence only; the full workstation browser build and
+package/runtime tests remain separate acceptance gates.
