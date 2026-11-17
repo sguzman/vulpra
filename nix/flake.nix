@@ -162,6 +162,16 @@
           # assembler and fails with 'invalid listing option ,'.
           # Match the Nix native GCC C compiler selected by mach configure.
           export AS="${pkgs.stdenv.cc}/bin/gcc"
+          # On Arch, host Fontconfig 2.18's /etc/fonts/conf.d uses new XML
+          # constructs (xsi:nil/generic family constants). The pinned Nix
+          # libfontconfig can be older and cannot parse them. Give Nix-linked
+          # tools their own version-matched configuration from the same Nix
+          # package, while keeping system and per-user fonts visible via its
+          # standard <dir> and 50-user.conf includes. Never edit /etc/fonts.
+          # Respect users who explicitly provide a FONTCONFIG_FILE override.
+          if [ -z "''${FONTCONFIG_FILE:-}" ]; then
+            export FONTCONFIG_FILE="${pkgs.fontconfig}/etc/fonts/fonts.conf"
+          fi
           # Mozilla checks WASM_CC/WASM_CXX separately from native CC/CXX.
           # Target-aware compiler-rt comes from the pinned WASI cross CC.
           # Its C++ standard libraries are provided to WASM_CXX *only* via
@@ -224,6 +234,8 @@
           shellcheck -S warning ${./test-native-assembler.sh}
           bash -n ${./test-native-linker.sh}
           shellcheck -S warning ${./test-native-linker.sh}
+          bash -n ${./test-fontconfig-compat.sh}
+          shellcheck -S warning ${./test-fontconfig-compat.sh}
           bash -n ${./test-xsum-warning-flags.sh}
           shellcheck -S warning ${./test-xsum-warning-flags.sh}
           # No deprecated xorg.* compatibility aliases in our pinned shell.

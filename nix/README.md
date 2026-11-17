@@ -260,3 +260,26 @@ Other warnings have different owners: the fontconfig parse errors from
 host fontconfig, Remote Settings network startup errors require an online
 security-service verification, and the completed build's compiler warnings
 require separate source-level triage; do not suppress these globally.
+
+
+### Fontconfig version-matched configuration on Arch hosts (2026-11-17)
+
+On the EndeavourOS workstation, `fc-match sans-serif` outside Nix
+returns `Noto Sans Regular` without any warnings. Inside the pinned
+Vulpra Nix shell, the same command returns the same family but produces
+dozens of XML parser warnings from host `/etc/fonts/conf.d/48-guessfamily.conf`,
+`48-spacing.conf`, and `49-sansserif.conf` (notably `xsi:nil`).
+
+The pinned Nix-linked Fontconfig library may not support the newer Arch
+Fontconfig XML grammar. The devShell therefore defaults `FONTCONFIG_FILE`
+to `${pkgs.fontconfig}/etc/fonts/fonts.conf`, giving the library its
+matching standard configuration rather than the host's newer
+`/etc/fonts/fonts.conf`. This uses the package's own font directories
+and user config include rules, **without changing /etc/fonts or the host
+environment**; callers can override `FONTCONFIG_FILE` explicitly.
+Host/GUI font-family parity still needs a workstation check: check
+`fc-match sans-serif` and compare to the host's Noto Sans result before
+declaring the fix fully accepted.
+
+The sparse CI job checks readable pinned config, sans-serif lookup, and
+the absence of XML parse errors, without running a full browser build.

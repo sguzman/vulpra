@@ -32,6 +32,7 @@ jobs:
             nix/test-wasm-compiler.sh
             nix/test-native-assembler.sh
             nix/test-native-linker.sh
+            nix/test-fontconfig-compat.sh
             nix/test-xsum-warning-flags.sh
             js/src/xsum/moz.build
             js/src/xsum/xsum.cpp
@@ -85,6 +86,7 @@ jobs:
           nix develop ./nix --no-write-lock-file --command bash nix/test-wasm-compiler.sh
           nix develop ./nix --no-write-lock-file --command bash nix/test-native-assembler.sh
           nix develop ./nix --no-write-lock-file --command bash nix/test-native-linker.sh
+          nix develop ./nix --no-write-lock-file --command bash nix/test-fontconfig-compat.sh
           nix develop ./nix --no-write-lock-file --command bash nix/test-xsum-warning-flags.sh
           nix develop ./nix --no-write-lock-file --command vulpra-dev check
           nix run ./nix#vulpra-dev --no-write-lock-file -- help
