@@ -98,6 +98,21 @@ The Nix devShell also exports `LIBCLANG_PATH` for Rust binding generators.
 not just the `clang++` executable. A successful configure is still not a
 successful browser compilation.
 
+### WASM cross-compiler isolation
+
+The workstation's preserved `--with-wasi-sysroot=/usr/share/wasi-sysroot`
+is still authoritative. Mozilla selects its WebAssembly C/C++ compilers via
+`WASM_CC`/`WASM_CXX`, separately from native `CC`/`CXX`. Nix's ordinary
+`clang` is a host cc-wrapper that injects x86-only hardening flags (including
+`-fzero-call-used-regs=used-gpr`), which LLVM rejects when targeting
+`wasm32-wasi`. The Nix shell now defaults those **WASM-only** variables to
+pinned LLVM 21 **unwrapped** `clang`/`clang++`, while retaining native
+compiler wrappers, the existing `sccache` configuration, and explicit user
+overrides. The `test-wasm-compiler.sh` CI gate actually preprocesses C and
+C++ with `--target=wasm32-wasi`. This is a focused check, not a successful
+`mach configure` or entire Firefox build.
+
+
 ## Reproducibility boundary and verification
 
 The versioned `flake.lock` pins nixpkgs for toolchain resolution. It does
