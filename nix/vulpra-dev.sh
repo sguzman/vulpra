@@ -110,7 +110,6 @@ case "$command_name" in
       ci/smoke-native-local.sh \
       ci/package-smoke-local.sh \
       ci/smoke-wayland-package-local.sh \
-      ci/measure-input-frame-local.sh \
       packaging/stage.sh; do
       [[ -f "$root/$relative" ]] || error "missing native workflow $relative"
       bash -n "$root/$relative"
