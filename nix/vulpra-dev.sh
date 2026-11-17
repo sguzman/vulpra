@@ -24,8 +24,9 @@ Use from the repository root:
   nix develop ./nix --command vulpra-dev doctor
   nix develop ./nix --command fish
 
-The native build retains your MOZCONFIG (or your already-existing
-~/.mozbuild/vulpra-local.mozconfig). Nothing here installs Firefox.
+The native build sources your original MOZCONFIG (or your already-existing
+~/.mozbuild/vulpra-local.mozconfig) through the versioned Nix libclang shim.
+The original file is never changed. Nothing here installs Firefox.
 HELP
 }
 
@@ -73,6 +74,14 @@ case "$command_name" in
       fi
     done
     if ((missing)); then error "required developer tools missing"; fi
+    if [[ "${VULPRA_NIX_DEV:-}" == 1 ]]; then
+      libclang_dir="${VULPRA_NIX_LIBCLANG_PATH:-}"
+      [[ -n "$libclang_dir" && -d "$libclang_dir" ]] ||
+        error "Nix devShell did not provide a usable libclang directory"
+      compgen -G "$libclang_dir/libclang.so*" >/dev/null ||
+        error "Nix libclang directory lacks a shared libclang.so: $libclang_dir"
+      printf 'OK: libclang       %s\n' "$libclang_dir"
+    fi
     printf 'PASS: required tool commands are available (not native build verification)\n'
     ;;
   source)
@@ -106,6 +115,25 @@ case "$command_name" in
       configure|build|package|mach)
         [[ -f "$local_mozconfig" ]] ||
           error "local MOZCONFIG missing: $local_mozconfig; existing workstation configuration is never overwritten"
+        ;;
+    esac
+    # Gecko's bindgen.configure recognizes --with-libclang-path in a mozconfig.
+    # It does NOT automatically search Nix's split libclang output. Point
+    # native configure/build/mach at a versioned, additive shim that first
+    # sources the untouched original workstation MOZCONFIG.
+    case "$command_name" in
+      configure|build|mach)
+        libclang_dir="${VULPRA_NIX_LIBCLANG_PATH:-}"
+        [[ -n "$libclang_dir" && -d "$libclang_dir" ]] ||
+          error "no Nix-provided libclang directory; refusing host-toolchain fallback"
+        compgen -G "$libclang_dir/libclang.so*" >/dev/null ||
+          error "missing libclang.so in Nix directory: $libclang_dir"
+        [[ -f "$root/nix/mozconfig-overlay.sh" ]] ||
+          error "missing tracked Nix mozconfig shim"
+        export VULPRA_MOZCONFIG_SOURCE="$local_mozconfig"
+        export MOZCONFIG="$root/nix/mozconfig-overlay.sh"
+        printf 'Nix libclang: %s\n' "$libclang_dir"
+        printf 'Original workstation MOZCONFIG preserved: %s\n' "$VULPRA_MOZCONFIG_SOURCE"
         ;;
     esac
     cd "$root"
