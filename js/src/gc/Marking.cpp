@@ -1795,6 +1795,10 @@ inline bool MarkingTracerT<opts>::processMarkStackTop(SliceBudget& budget) {
       case SlotsOrElementsKind::Unused: {
         MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE("Unused SlotsOrElementsKind");
       }
+
+      default:
+        // An invalid range kind must never reach the scan with unset bounds.
+        MOZ_CRASH("Invalid SlotsOrElementsKind");
     }
 
     goto scan_value_range;
