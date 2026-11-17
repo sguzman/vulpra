@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Vulpra isolated input-to-animation probe</title>
+<style>
+  body { font-family: system-ui, sans-serif; padding: 24px; }
+  input { font: inherit; padding: 8px; width: 80%; }
+</style>
+<h1>Vulpra input frame probe</h1>
+<label for="typing-probe">Synthetic WebDriver input</label>
+<input id="typing-probe" autocomplete="off" autocapitalize="off" spellcheck="false">
+<script>
+"use strict";
+// These timestamps measure trusted browser input-event dispatch through the
+// next rAF callback, NOT physical key-to-display latency or GPU presentation.
+(() => {
+  const field = document.getElementById("typing-probe");
+  const inputRafMs = [];
+  const frameIntervalsMs = [];
+  let lastFrame = null;
+  let inputEvents = 0;
+  let trustedEvents = 0;
+  let frameCount = 0;
+  const cap = 300;
+
+  function frame(time) {
+    if (lastFrame !== null && frameIntervalsMs.length < cap) {
+      frameIntervalsMs.push(Math.max(0, time - lastFrame));
+    }
+    lastFrame = time;
+    frameCount += 1;
+    if (frameCount <= cap) {
+      requestAnimationFrame(frame);
+    }
+  }
+  requestAnimationFrame(frame);
+
+  field.addEventListener("input", (event) => {
+    inputEvents += 1;
+    if (event.isTrusted) trustedEvents += 1;
+    const start = performance.now();
+    // Place a deterministic DOM update on the input path.
+    field.dataset.updated = String(inputEvents);
+    requestAnimationFrame(() => {
+      if (inputRafMs.length < cap) {
+        inputRafMs.push(Math.max(0, performance.now() - start));
+      }
+    });
+  });
+
+  function statistics(values) {
+    const xs = values.filter(Number.isFinite).sort((a, b) => a - b);
+    if (xs.length === 0) return null;
+    const quantile = (fraction) => xs[Math.ceil(fraction * xs.length) - 1];
+    return {
+      count: xs.length,
+      p50: Number(quantile(0.50).toFixed(3)),
+      p95: Number(quantile(0.95).toFixed(3)),
+      max: Number(xs[xs.length - 1].toFixed(3))
+    };
+  }
+
+  window.vulpraProbe = Object.freeze({
+    report: () => ({
+      ready: true,
+      inputEvents,
+      trustedEvents,
+      inputToNextRafMs: statistics(inputRafMs),
+      rafIntervalMs: statistics(frameIntervalsMs),
+      visibility: document.visibilityState,
+      note: "Synthetic WebDriver typing; event to next rAF callback, not actual painted or presented frame."
+    })
+  });
+})();
+</script>
+</html>
