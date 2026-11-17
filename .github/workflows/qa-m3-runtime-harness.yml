@@ -9,6 +9,8 @@ on:
       - ci/smoke-webextension-package-local.py
       - ci/diagnose-remote-settings-local.sh
       - ci/test-remote-settings-diagnostic.sh
+      - ci/capture-hyprland-gpu-baseline.sh
+      - ci/test-capture-hyprland-gpu-baseline.sh
       - .github/workflows/qa-m3-runtime-harness.yml
   workflow_dispatch:
 
@@ -45,3 +47,9 @@ jobs:
           bash -n ci/diagnose-remote-settings-local.sh ci/test-remote-settings-diagnostic.sh
           bash ci/test-remote-settings-diagnostic.sh
           echo "QA fixture only: no real browser or remote Settings endpoint is used here."
+      - name: Validate privacy-filtered Hyprland GPU baseline with mock compositor
+        run: |
+          set -euo pipefail
+          bash -n ci/capture-hyprland-gpu-baseline.sh ci/test-capture-hyprland-gpu-baseline.sh
+          bash ci/test-capture-hyprland-gpu-baseline.sh
+          echo "QA fixture only: no real GPUs, compositor or Firefox profiles used in CI."
