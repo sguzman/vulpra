@@ -804,6 +804,46 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
         server.server_close()
 
 
+def _complete_genuine_bitwarden_first_run_ui(h, port, base):
+    """Navigate real first-install Bitwarden onboarding before independent login.
+
+    Derived from pinned Bitwarden client e2e/src/browser/fixtures.ts
+    reachLoginPage: skip default-password-manager prompt, then click the intro
+    carousel's Log in button. No extension storage or preferences are changed.
+    """
+    deadline = time.monotonic() + 70
+    while time.monotonic() < deadline:
+        state = h.request(port, "POST", base + "/execute/sync", {
+            "script": """
+              const visible = s => {
+                const e=document.querySelector(s);
+                return !!e && !!e.getClientRects().length;
+              };
+              return {
+                login_email: visible("input[data-testid='login-email-input']"),
+                default_manager_prompt: visible(
+                  "#default-password-manager-prompt_button_skip-for-now"),
+                intro_carousel_login: visible(
+                  "app-intro-carousel ~ button[type='button']:last-of-type"),
+                actual_extension: location.protocol === 'moz-extension:'
+              };
+            """,
+            "args": [],
+        }, timeout_seconds=20)
+        if not isinstance(state, dict) or state.get("actual_extension") is not True:
+            raise RuntimeError("Real Bitwarden first-run flow escaped extension origin")
+        if state.get("login_email") is True:
+            return
+        if state.get("default_manager_prompt") is True:
+            _wd_click(h, port, base, "#default-password-manager-prompt_button_skip-for-now")
+        elif state.get("intro_carousel_login") is True:
+            _wd_click(h, port, base,
+                      "app-intro-carousel ~ button[type='button']:last-of-type")
+        else:
+            time.sleep(0.35)
+    raise RuntimeError("Real Bitwarden first-install onboarding never reached login email screen")
+
+
 def sign_in_disposable_account_in_fresh_bitwarden(h, port, base, popup_url, account):
     """Real UI sign-in to a *previously created* Vaultwarden account in a new profile.
 
@@ -817,8 +857,9 @@ def sign_in_disposable_account_in_fresh_bitwarden(h, port, base, popup_url, acco
 
     h.request(port, "POST", base + "/url",
               {"url": popup_url.split("#", 1)[0] + "#/login"}, timeout_seconds=35)
+    _complete_genuine_bitwarden_first_run_ui(h, port, base)
     _await_registration_ui(h, port, base, "input[data-testid='login-email-input']",
-                           "#/login", timeout=55)
+                           "#/login", timeout=20)
 
     pristine = h.request(port, "POST", base + "/execute/sync", {
         "script": """
