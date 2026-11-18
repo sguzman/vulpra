@@ -50,7 +50,9 @@ jobs:
         if: steps.inspect.outputs.ready == 'true'
         uses: actions/checkout@v4
         with:
-          ref: 0624235fdc956ab18af3c3f310b3588ca72fff61
+          # QA harness source only. Archived browser/source identity below
+          # remains pinned to the original exact Firefox 160 build.
+          ref: 9924c53ffc390237b05ea63718d0cc4ed9d47f33
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/smoke-webextension-package-local.py
@@ -114,9 +116,11 @@ jobs:
         shell: bash
         env:
           VULPRA_M3_VERIFY_NIMBUS: "1"
+          VULPRA_VERIFY_UA_COMPAT: "1"
         run: |
           set -euo pipefail
           python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          python3 ci/smoke-webextension-package-local.py --self-test-user-agent-parser
           python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE" 2>&1 | tee "$RUNNER_TEMP/firefox160-replay-webdriver.log"
           report="$(find .git/vulpra-native-build -maxdepth 1 -name 'webextension-smoke-*.json' -type f -print -quit)"
           test -s "$report"
@@ -136,6 +140,11 @@ jobs:
           jq -e --arg sha "$digest" '
             .status == "pass" and
             .javascript_navigation.verified == true and
+            .user_agent_compatibility.verified == true and
+            .user_agent_compatibility.firefox_compat_token == true and
+            .user_agent_compatibility.vulpra_brand_token == true and
+            .user_agent_compatibility.browser_version | startswith("160.") and
+            .user_agent_compatibility.default_profile_with_no_user_agent_override == true and
             .webextension.temporary_unsigned_install == true and
             .webextension.content_scripts == true and
             .webextension.background_messaging == true and
