@@ -1,5 +1,9 @@
 name: Firefox 160 BYOB Exact-Source Native Candidate (Unreleased)
 on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-byob-native-preview.yml
   workflow_dispatch:
 permissions:
   contents: read
