@@ -175,30 +175,35 @@ const safe = {phase:"init"};
   };
   Services.obs.addObserver(observer, "http-on-modify-request");
   safe.phase = "observer_active";
+  let localFetchOk = false;
   try {
     safe.phase = "local_control";
     const response = await fetch(ciUrl, {cache:"no-store", redirect:"error"});
-    const localFetchOk = response.status === 204;
+    localFetchOk = response.status === 204;
     safe.phase = "bounded_observation";
     await new Promise(resolve => setTimeout(resolve, 1800));
-    return done({
-      account_signed_out: signedOut,
-      sync_ui_unconfigured: syncUnconfigured,
-      synthetic_local_fetch_ok: localFetchOk,
-      synthetic_local_request_observed: requested.observed_local_probe,
-      requests_observed: requested.seen,
-      request_category_counts: counts,
-      endpoint_prefs: prefixes,
-      preference_contract: settings,
-      observer_removed_in_finally: true,
-      network_namespace_loopback_only: true,
-      raw_urls_in_report: false,
-      production_request_delivery_verified: false
-    });
   } finally {
+    safe.phase = "observer_cleanup";
     Services.obs.removeObserver(observer, "http-on-modify-request");
     removed = true;
   }
+  safe.phase = "report";
+  // Do not claim cleanup merely because a finally block exists: the callback
+  // fires only AFTER removeObserver has returned successfully.
+  return done({
+    account_signed_out: signedOut,
+    sync_ui_unconfigured: syncUnconfigured,
+    synthetic_local_fetch_ok: localFetchOk,
+    synthetic_local_request_observed: requested.observed_local_probe,
+    requests_observed: requested.seen,
+    request_category_counts: counts,
+    endpoint_prefs: prefixes,
+    preference_contract: settings,
+    observer_removed_in_finally: removed,
+    network_namespace_loopback_only: true,
+    raw_urls_in_report: false,
+    production_request_delivery_verified: false
+  });
 })().catch(err => done({
   audit_failed: true, failed_phase: safe.phase,
   pref_name: safe.pref_name ?? null,
