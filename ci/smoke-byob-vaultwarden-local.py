@@ -393,6 +393,110 @@ class _DisposableLoginForm:
         return server, "http://127.0.0.1:" + str(server.server_port) + "/ci-login"
 
 
+def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
+    """Boolean-only debugging of browser focus and signed extension page analysis.
+
+    This never invokes autofill, reads stored ciphers, exposes credentials,
+    modifies browser prefs, or sends data outside the CI namespace.
+    """
+    report = {
+        "browser_selected_login_tab": False,
+        "extension_can_find_target_tab": False,
+        "extension_target_is_active": False,
+        "content_script_triage_answered": False,
+        "form_detected": False,
+        "username_field_detected": False,
+        "password_field_detected": False,
+    }
+
+    try:
+        h.request(port, "POST", base + "/moz/context", {"context": "chrome"})
+        try:
+            selected = h.request(port, "POST", base + "/execute/sync", {
+                "script": """
+                  const {Services} = ChromeUtils.importESModule(
+                    'resource://gre/modules/Services.sys.mjs');
+                  const win = Services.wm.getMostRecentWindow('navigator:browser');
+                  return !!win?.gBrowser?.selectedBrowser?.currentURI &&
+                         win.gBrowser.selectedBrowser.currentURI.spec === arguments[0];
+                """,
+                "args": [login_url],
+            }, timeout_seconds=15)
+            report["browser_selected_login_tab"] = selected is True
+        finally:
+            h.request(port, "POST", base + "/moz/context", {"context": "content"})
+    except RuntimeError:
+        pass
+
+    original_window = None
+    diagnostic_window = None
+    try:
+        original_window = h.request(port, "GET", base + "/window", timeout_seconds=15)
+        new_tab = h.request(port, "POST", base + "/window/new",
+                            {"type": "tab"}, timeout_seconds=15)
+        if not isinstance(new_tab, dict) or not new_tab.get("handle"):
+            raise RuntimeError("Could not open bounded extension diagnostic tab")
+        diagnostic_window = new_tab["handle"]
+        h.request(port, "POST", base + "/url",
+                  {"url": popup_url.split("#", 1)[0] + "#/tabs/vault"},
+                  timeout_seconds=30)
+        result = h.request(port, "POST", base + "/execute/async", {
+            "script": """
+              const targetUrl=arguments[0];
+              const done=arguments[arguments.length-1];
+              (async()=>{
+                const tabs=await browser.tabs.query({});
+                const target=tabs.find(t=>t.url===targetUrl);
+                const out={
+                  target_found: !!target,
+                  target_active: target?.active === true,
+                  triage_answered:false, form_detected:false,
+                  username_detected:false, password_detected:false
+                };
+                if(target?.id != null){
+                  try{
+                    const t=await browser.tabs.sendMessage(target.id,
+                      {command:'collectAutofillTriage'});
+                    if(t?.pageDetails){
+                      out.triage_answered=true;
+                      out.form_detected=Object.keys(t.pageDetails.forms ?? {}).length>0;
+                      const fields=t.pageDetails.fields ?? [];
+                      out.username_detected=fields.some(f=>
+                        f.htmlID==='ci-user' || f.htmlName==='username');
+                      out.password_detected=fields.some(f=>
+                        f.htmlID==='ci-pass' || f.htmlName==='password');
+                    }
+                  }catch(_err){}
+                }
+                done(out);
+              })().catch(_err=>done(null));
+            """,
+            "args": [login_url],
+        }, timeout_seconds=30)
+        if isinstance(result, dict):
+            report["extension_can_find_target_tab"] = result.get("target_found") is True
+            report["extension_target_is_active"] = result.get("target_active") is True
+            report["content_script_triage_answered"] = result.get("triage_answered") is True
+            report["form_detected"] = result.get("form_detected") is True
+            report["username_field_detected"] = result.get("username_detected") is True
+            report["password_field_detected"] = result.get("password_detected") is True
+    except RuntimeError:
+        pass
+    finally:
+        if diagnostic_window:
+            try:
+                h.request(port, "DELETE", base + "/window", timeout_seconds=15)
+            except RuntimeError:
+                pass
+        if original_window:
+            try:
+                h.request(port, "POST", base + "/window",
+                          {"handle": original_window}, timeout_seconds=15)
+            except RuntimeError:
+                pass
+    return report
+
+
 def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_shortcut,
                                           graphical=False, browser_pid=None):
     """Use official Bitwarden add-cipher form and its real Firefox shortcut.
@@ -585,6 +689,10 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
                     "signed_addon_command_bound": True,
                 }
             time.sleep(0.3)
+        diagnostic = _diagnose_autofill_gap_without_secrets(
+            h, port, base, popup_url, login_url)
+        print("CI_BITWARDEN_AUTOFILL_DIAGNOSTIC=" + json.dumps(
+            diagnostic, sort_keys=True), flush=True)
         raise RuntimeError("Actual Bitwarden Ctrl+Shift+L did not fill both synthetic fields")
     finally:
         server.shutdown()
