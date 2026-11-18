@@ -1,5 +1,9 @@
 name: Firefox 160 BYOB Artifact-Only Runtime Replay (No Browser Build)
 on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-byob-artifact-replay.yml
   workflow_dispatch:
 permissions:
   contents: read
