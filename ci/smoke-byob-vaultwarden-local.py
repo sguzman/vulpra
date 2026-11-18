@@ -805,43 +805,54 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
 
 
 def _complete_genuine_bitwarden_first_run_ui(h, port, base):
-    """Navigate real first-install Bitwarden onboarding before independent login.
-
-    Derived from pinned Bitwarden client e2e/src/browser/fixtures.ts
-    reachLoginPage: skip default-password-manager prompt, then click the intro
-    carousel's Log in button. No extension storage or preferences are changed.
-    """
-    deadline = time.monotonic() + 70
+    """Perform real Bitwarden onboarding clicks; log only route/control booleans."""
+    deadline = time.monotonic() + 35
+    last = None
+    counts = {"skip_default": 0, "carousel_login": 0}
     while time.monotonic() < deadline:
-        state = h.request(port, "POST", base + "/execute/sync", {
+        last = h.request(port, "POST", base + "/execute/sync", {
             "script": """
-              const visible = s => {
-                const e=document.querySelector(s);
-                return !!e && !!e.getClientRects().length;
-              };
+              const visible = e => !!e && !!e.getClientRects().length;
+              const email = document.querySelector("input[data-testid='login-email-input']");
+              const skip = document.querySelector(
+                "#default-password-manager-prompt_button_skip-for-now");
+              const carousel = document.querySelector("app-intro-carousel");
+              const buttons = carousel ?
+                [...carousel.parentElement.querySelectorAll('button[type=button]')] : [];
+              const carouselLogin = buttons.find(b =>
+                b.textContent?.trim().toLowerCase() === 'log in');
               return {
-                login_email: visible("input[data-testid='login-email-input']"),
-                default_manager_prompt: visible(
-                  "#default-password-manager-prompt_button_skip-for-now"),
-                intro_carousel_login: visible(
-                  "app-intro-carousel ~ button[type='button']:last-of-type"),
-                actual_extension: location.protocol === 'moz-extension:'
+                route: location.hash.split('?')[0].slice(0,65),
+                extension: location.protocol === 'moz-extension:',
+                email_exists: !!email,
+                email_visible: visible(email),
+                skip_exists: !!skip,
+                skip_visible: visible(skip),
+                carousel_exists: !!carousel,
+                carousel_login_exists: !!carouselLogin,
+                carousel_login_visible: visible(carouselLogin),
+                any_form: !!document.querySelector('form')
               };
             """,
             "args": [],
         }, timeout_seconds=20)
-        if not isinstance(state, dict) or state.get("actual_extension") is not True:
-            raise RuntimeError("Real Bitwarden first-run flow escaped extension origin")
-        if state.get("login_email") is True:
+        if not isinstance(last, dict) or last.get("extension") is not True:
+            raise RuntimeError("Independent Bitwarden onboarding left the signed extension origin")
+        if last.get("email_visible") is True:
             return
-        if state.get("default_manager_prompt") is True:
+        if last.get("skip_visible") is True:
             _wd_click(h, port, base, "#default-password-manager-prompt_button_skip-for-now")
-        elif state.get("intro_carousel_login") is True:
-            _wd_click(h, port, base,
-                      "app-intro-carousel ~ button[type='button']:last-of-type")
+            counts["skip_default"] += 1
+        elif last.get("carousel_login_visible") is True:
+            # The exact pinned client E2E uses the carousel-scoped Log in
+            # button; CSS :last-of-type did not reliably identify this DOM.
+            _wd_click(h, port, base, "app-intro-carousel ~ button[type='button']")
+            counts["carousel_login"] += 1
         else:
             time.sleep(0.35)
-    raise RuntimeError("Real Bitwarden first-install onboarding never reached login email screen")
+    print("CI_BITWARDEN_NEW_PROFILE_ONBOARDING=" + json.dumps(
+        {"last": last, "click_counts": counts}, sort_keys=True), flush=True)
+    raise RuntimeError("Real Bitwarden new-profile onboarding did not reach the login email form")
 
 
 def sign_in_disposable_account_in_fresh_bitwarden(h, port, base, popup_url, account):
