@@ -363,12 +363,14 @@ class _DisposableLoginForm:
                 content = (b'<!doctype html><html><head><meta charset="utf-8">'
                            b'<title>Disposable Vulpra autofill</title></head>'
                            b'<body><h1>Fake local login</h1>'
-                           b'<form id="ci-local-login" action="javascript:void(0)">'
+                           b'<form id="ci-local-login" action="/ci-submit" method="post">'
+                           b'<label for="ci-user">Username</label>'
                            b'<input id="ci-user" name="username" type="text" '
-                           b'autocomplete="username">'
+                           b'autocomplete="username" required>'
+                           b'<label for="ci-pass">Password</label>'
                            b'<input id="ci-pass" name="password" type="password" '
-                           b'autocomplete="current-password">'
-                           b'<button id="ci-no-submit" type="button">No submission</button>'
+                           b'autocomplete="current-password" required>'
+                           b'<button id="ci-submit" type="submit">Sign in</button>'
                            b'</form></body></html>')
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -376,6 +378,11 @@ class _DisposableLoginForm:
                 self.send_header("Content-Length", str(len(content)))
                 self.end_headers()
                 self.wfile.write(content)
+
+            def do_POST(self):
+                # This form exists solely for fill detection; no login values
+                # are collected, accepted or logged, even if mis-clicked.
+                self.send_error(405, "Disposable CI form never accepts credentials")
 
             def log_message(self, *_args):
                 pass
