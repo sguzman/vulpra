@@ -117,28 +117,36 @@ const safe = {phase:"start", pref_name:null};
     safe.pref_name = name;
     const row = result.prefs[name];
     if (!row?.present || row.kind !== "bool" || row.locked ||
-        row.user_override) {
+        (shortName === "identity" && row.user_override) ||
+        (shortName === "upload" && row.user_override &&
+         row.effective_bool !== false)) {
       result.controls[shortName] = false;
       continue;
     }
-    const oldDefault = branch.getBoolPref(name);
+    // A fresh automation profile can already have a user-level telemetry
+    // upload opt-out. Preserve that exact original state; an enabled
+    // upload state here would be an isolated, no-egress temporary test only.
+    const baseline = p.getBoolPref(name);
+    const hadOverride = p.prefHasUserValue(name);
     let verified = false;
     try {
-      // Mozilla libpref clears the user value when it equals the
-      // default, unless that preference was marked sticky. Only
-      // require prefHasUserValue() for a genuine non-default override.
-      p.setBoolPref(name, !oldDefault);
-      const changed = p.getBoolPref(name) === !oldDefault &&
-                      p.prefHasUserValue(name);
-      p.setBoolPref(name, oldDefault);
-      const reverted = p.getBoolPref(name) === oldDefault;
-      verified = changed && reverted;
+      p.setBoolPref(name, !baseline);
+      const flipped = p.getBoolPref(name) === !baseline;
+      p.setBoolPref(name, baseline);
+      const restored = p.getBoolPref(name) === baseline;
+      verified = flipped && restored;
     } finally {
-      p.clearUserPref(name);
+      // Mozilla libpref may clear a same-as-default user pref. Restore
+      // the original preference state without touching any real profile.
+      if (hadOverride) {
+        p.setBoolPref(name, baseline);
+      } else {
+        p.clearUserPref(name);
+      }
     }
     result.controls[shortName] =
-      verified && !p.prefHasUserValue(name) &&
-      p.getBoolPref(name) === oldDefault;
+      verified && p.prefHasUserValue(name) === hadOverride &&
+      p.getBoolPref(name) === baseline;
   }
   safe.phase = "protected_preference_contract";
   for (const name of arguments[2]) {
@@ -212,9 +220,16 @@ def valid_audit(d):
     upload = prefs.get("datareporting.healthreport.uploadEnabled")
     if (not isinstance(upload, dict) or upload.get("present") is not True
             or upload.get("kind") != "bool" or upload.get("locked") is not False
-            or upload.get("user_override") is not False
             or not isinstance(upload.get("default_bool"), bool)
-            or upload.get("effective_bool") is not upload["default_bool"]):
+            or not isinstance(upload.get("effective_bool"), bool)
+            or not isinstance(upload.get("user_override"), bool)):
+        return False
+    if upload["user_override"]:
+        # CI profile has already opted out: accept and preserve only
+        # the safer effective=false state, never an enabled override.
+        if upload["effective_bool"] is not False:
+            return False
+    elif upload["effective_bool"] is not upload["default_bool"]:
         return False
     if (d.get("controls") != {"identity": True, "upload": True}
             or d.get("account_signed_in") is not False
@@ -257,9 +272,18 @@ def self_test():
         "remote_request_initiated": False,
     }
     assert valid_audit(d)
+    # Verify the actual Firefox 160 observed state: a normal upstream
+    # default of upload=true and an already-present disposable-profile
+    # user override of upload=false. This is NOT default-off branding.
+    upload_name = "datareporting.healthreport.uploadEnabled"
+    safe_optout = {**rows[upload_name], "default_bool": True,
+                   "effective_bool": False, "user_override": True}
+    assert valid_audit({**d, "prefs": {**rows, upload_name: safe_optout}})
     for corrupt in (
         {**d, "account_signed_in": True},
         {**d, "controls": {"identity": True, "upload": False}},
+        {**d, "prefs": {**rows, upload_name:
+                       {**safe_optout, "effective_bool": True}}},
         {**d, "modules": {**d["modules"], "sync_ui_not_configured": False}},
         {**d, "prefs": {**rows, "identity.fxaccounts.enabled":
                        {**rows["identity.fxaccounts.enabled"], "locked": True}}},
@@ -268,7 +292,7 @@ def self_test():
         {**d, "prefixes": {**d["prefixes"], "services.sync.": 0}},
     ):
         assert not valid_audit(corrupt), "Audit negative control unexpectedly passed"
-    print("PASS: account/Sync/telemetry audit contract and six negative fixtures")
+    print("PASS: account/Sync/telemetry audit contract, preserved opt-out fixture and seven negative fixtures")
 
 
 def main(repo: Path):
