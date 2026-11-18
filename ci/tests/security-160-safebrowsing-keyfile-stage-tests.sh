@@ -14,6 +14,10 @@ source_file="$RUNNER_TEMP/input"
 printf '%s' "$secret" > "$source_file"
 chmod 600 "$source_file"
 export VULPRA_SAFEBROWSING_KEY_SOURCE="$source_file"
+# Explicit review attestation is required even by this synthetic fixture:
+# it does not imply that any real provider or distribution was approved.
+export VULPRA_SAFEBROWSING_PROVIDER_USE_REVIEWED=1
+export VULPRA_SAFEBROWSING_BINARY_DISTRIBUTION_REVIEWED=1
 
 bash "$script" "$base" "$RUNNER_TEMP/prepared" > "$root/positive.log" 2>&1
 test -d "$RUNNER_TEMP/prepared"
@@ -38,10 +42,19 @@ reject_case() {
   count=$((count+1))
 }
 reject_case env -u VULPRA_SAFEBROWSING_KEY_SOURCE bash "$script" "$base" "$RUNNER_TEMP/no-source"
+reject_case env -u VULPRA_SAFEBROWSING_PROVIDER_USE_REVIEWED bash "$script" "$base" "$RUNNER_TEMP/no-provider-review"
+reject_case env VULPRA_SAFEBROWSING_PROVIDER_USE_REVIEWED=0 bash "$script" "$base" "$RUNNER_TEMP/bad-provider-review"
+reject_case env -u VULPRA_SAFEBROWSING_BINARY_DISTRIBUTION_REVIEWED bash "$script" "$base" "$RUNNER_TEMP/no-distribution-review"
+reject_case env VULPRA_SAFEBROWSING_BINARY_DISTRIBUTION_REVIEWED=0 bash "$script" "$base" "$RUNNER_TEMP/bad-distribution-review"
 reject_case bash "$script" "$base" "$RUNNER_TEMP/prepared"
 reject_case bash "$script" "$base" "$GITHUB_WORKSPACE/outside"
 ln -s "$source_file" "$RUNNER_TEMP/symlink"
 reject_case env VULPRA_SAFEBROWSING_KEY_SOURCE="$RUNNER_TEMP/symlink" bash "$script" "$base" "$RUNNER_TEMP/symlink-dest"
+# Hardlinked key material is not independent of the external file owner;
+# never use it as the authority for staged binary-embedded credentials.
+ln "$source_file" "$RUNNER_TEMP/key-hardlink"
+reject_case bash "$script" "$base" "$RUNNER_TEMP/hardlinked"
+rm "$RUNNER_TEMP/key-hardlink"
 cp "$source_file" "$GITHUB_WORKSPACE/checked-in-like-key"
 chmod 600 "$GITHUB_WORKSPACE/checked-in-like-key"
 reject_case env VULPRA_SAFEBROWSING_KEY_SOURCE="$GITHUB_WORKSPACE/checked-in-like-key" bash "$script" "$base" "$RUNNER_TEMP/checkout-key"
@@ -55,5 +68,5 @@ reject_case bash "$script" "$base" "$RUNNER_TEMP/multiline"
 printf '%s' "$secret" > "$source_file"
 printf '\nac_add_options --with-google-safebrowsing-api-keyfile=/bad/in-source\n' >> "$base"
 reject_case bash "$script" "$base" "$RUNNER_TEMP/duplicate-key"
-test "$count" -eq 9
-echo 'PASS: synthetic private staging, no key in log/config, nine rejected fixtures'
+test "$count" -eq 14
+echo 'PASS: synthetic private staging, two review attestations, hardlink protection, no key in log/config, fourteen rejected fixtures'
