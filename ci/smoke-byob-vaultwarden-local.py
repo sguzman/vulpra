@@ -400,6 +400,10 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
     modifies browser prefs, or sends data outside the CI namespace.
     """
     report = {
+        "web_driver_page_probe_executed": False,
+        "web_driver_same_url_after_shortcut": False,
+        "web_driver_still_local_page": False,
+        "web_driver_page_focused": False,
         "chrome_probe_executed": False,
         "chrome_browser_window_found": False,
         "chrome_target_tab_present": False,
@@ -407,6 +411,9 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
         "browser_selected_login_tab": False,
         "diagnostic_tab_created": False,
         "extension_probe_executed": False,
+        "extension_query_tab_count": -1,
+        "extension_query_has_any_local_tab": False,
+        "extension_query_has_any_extension_tab": False,
         "extension_can_find_target_tab": False,
         "extension_target_is_active": False,
         "content_script_triage_answered": False,
@@ -414,6 +421,25 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
         "username_field_detected": False,
         "password_field_detected": False,
     }
+
+    try:
+        page_state = h.request(port, "POST", base + "/execute/sync", {
+            "script": """
+              return {
+                same_url: location.href === arguments[0],
+                local_page: location.hostname === '127.0.0.1',
+                focused: document.hasFocus()
+              };
+            """,
+            "args": [login_url],
+        }, timeout_seconds=15)
+        if isinstance(page_state, dict):
+            report["web_driver_page_probe_executed"] = True
+            report["web_driver_same_url_after_shortcut"] = page_state.get("same_url") is True
+            report["web_driver_still_local_page"] = page_state.get("local_page") is True
+            report["web_driver_page_focused"] = page_state.get("focused") is True
+    except RuntimeError:
+        pass
 
     try:
         h.request(port, "POST", base + "/moz/context", {"context": "chrome"})
@@ -470,6 +496,9 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
                 const out={
                   target_found: !!target,
                   target_active: target?.active === true,
+                  tab_count: tabs.length,
+                  has_local: tabs.some(t=>t.url?.startsWith('http://127.0.0.1:')),
+                  has_extension: tabs.some(t=>t.url?.startsWith('moz-extension://')),
                   triage_answered:false, form_detected:false,
                   username_detected:false, password_detected:false
                 };
@@ -495,6 +524,9 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
         }, timeout_seconds=30)
         if isinstance(result, dict):
             report["extension_probe_executed"] = True
+            report["extension_query_tab_count"] = result.get("tab_count", -1)
+            report["extension_query_has_any_local_tab"] = result.get("has_local") is True
+            report["extension_query_has_any_extension_tab"] = result.get("has_extension") is True
             report["extension_can_find_target_tab"] = result.get("target_found") is True
             report["extension_target_is_active"] = result.get("target_active") is True
             report["content_script_triage_answered"] = result.get("triage_answered") is True
