@@ -9,6 +9,14 @@ cleanup() {
   rm -rf -- "$work"
 }
 trap cleanup EXIT
+# Fixture-only diagnostics; work contains no live profile, secrets or browser.
+on_error() {
+  status=$?
+  printf 'FAIL: mock input-frame fixture line %s (exit %s): %s\n' "$1" "$status" "$2" >&2
+  if [[ -f "$work/out" ]]; then tail -n 18 "$work/out" >&2; fi
+  if [[ -f "$work/gui-out" ]]; then tail -n 18 "$work/gui-out" >&2; fi
+}
+trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
 repo="$work/repo"
 bin="$work/bin"
 mkdir -p "$repo/ci/fixtures" "$bin" "$work/pkg/vulpra"
