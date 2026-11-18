@@ -145,6 +145,38 @@ def create_probe_extension(path: Path, token: str) -> None:
         output.writestr("content.js", content)
 
 
+def self_test_synthetic_extension_fixture() -> None:
+    """Check the generated add-on's JavaScript and local-only scope offline."""
+    with tempfile.TemporaryDirectory(prefix="vulpra-ext-fixture-") as tmp:
+        xpi = Path(tmp) / "synthetic-local-only.xpi"
+        create_probe_extension(xpi, "synthetic-test-token-not-a-password")
+        with zipfile.ZipFile(xpi) as package:
+            names = set(package.namelist())
+            if names != {"manifest.json", "background.js", "content.js"}:
+                raise AssertionError("Unexpected extension fixture files")
+            manifest = json.loads(package.read("manifest.json"))
+            if manifest["permissions"] != ["storage", "http://127.0.0.1/*"]:
+                raise AssertionError("Test extension requested external host permission")
+            background = package.read("background.js").decode()
+            content = package.read("content.js").decode()
+            if "vulpra-fixture-not-a-secret" not in content or "https://" in content:
+                raise AssertionError("Synthetic password fill fixture invalid")
+            if "vulpra-fixture-not-a-secret" in background:
+                raise AssertionError("Synthetic form value leaked into extension storage")
+            for js in (background, content):
+                if shutil.which("node") is None:
+                    raise RuntimeError("Node is required for offline generated JavaScript syntax QA")
+                checked = subprocess.run(
+                    ["node", "--check", "-"], input=js, text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    timeout=15, check=False)
+                if checked.returncode != 0:
+                    raise AssertionError(
+                        "Generated extension JavaScript invalid: " +
+                        checked.stderr[:350])
+    print("PASS: local-only synthetic extension fixture has valid JS and no external permissions")
+
+
 class LocalPage(http.server.BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?")[0]
@@ -673,6 +705,9 @@ def main() -> int:
         return 0
     if sys.argv[1:] == ["--self-test-byob-assertions"]:
         self_test_byob_assertions()
+        return 0
+    if sys.argv[1:] == ["--self-test-synthetic-extension-fixture"]:
+        self_test_synthetic_extension_fixture()
         return 0
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Code/Apps/vulpra").resolve()
     gecko = shutil.which("geckodriver")
