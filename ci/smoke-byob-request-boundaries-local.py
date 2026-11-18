@@ -43,7 +43,7 @@ CATEGORIES = (
     "local", "mozilla_account", "mozilla_sync", "mozilla_telemetry",
     "mozilla_other", "google_provider", "other_external",
 )
-URL_CLASSES = (*CATEGORIES, "absent", "empty", "unparseable", "non_http")
+URL_CLASSES = (*CATEGORIES, "absent", "empty", "unparseable", "non_http", "unreadable")
 BYOB = (
     "identity.fxaccounts.enabled", "signon.rememberSignons",
     "signon.autofillForms", "signon.generation.enabled",
@@ -113,11 +113,18 @@ const safe = {phase:"init"};
     if (type === p.PREF_STRING) {
       // Never return the literal value. The hostname (and, critically,
       // its URL path, userInfo and query) do not cross this boundary.
-      const effective = p.getStringPref(name, "");
-      row.effective_class = classify(effective);
-      if (branch.getPrefType(name) === p.PREF_STRING) {
-        row.default_class = classify(branch.getStringPref(name));
-      }
+      const safeClass = (prefBranch, prefName) => {
+        try { return classify(prefBranch.getStringPref(prefName)); }
+        catch (_e) {
+          // Some legacy/complex string preferences reject getStringPref
+          // but permit getCharPref. Never return the actual URL.
+          try { return classify(prefBranch.getCharPref(prefName)); }
+          catch (_ignored) { return "unreadable"; }
+        }
+      };
+      row.effective_class = safeClass(p, name);
+      if (branch.getPrefType(name) === p.PREF_STRING)
+        row.default_class = safeClass(branch, name);
     }
     return row;
   });
@@ -299,6 +306,9 @@ def self_test():
         {**d, "observer_removed_in_finally":False},
         {**d, "raw_urls_in_report":True},
         {**d, "endpoint_prefs":[{**d["endpoint_prefs"][0],
+                                 "default_class":"https://example.invalid"}] +
+                              d["endpoint_prefs"][1:]},
+        {**d, "endpoint_prefs":[{**d["endpoint_prefs"][0],
                                  "url":"https://accounts.firefox.com"}] +
                               d["endpoint_prefs"][1:]},
         {**d, "preference_contract":{**d["preference_contract"],
@@ -308,7 +318,7 @@ def self_test():
     ]
     for candidate in invalid:
         assert not valid(candidate), "A fabricated privacy proof passed validation"
-    print("PASS: bounded request/endpoint audit parser + 7 negative controls")
+    print("PASS: bounded request/endpoint audit parser + 8 negative controls")
 
 
 def helper():
