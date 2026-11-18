@@ -4,6 +4,19 @@
 
 // This file contains branding-specific prefs.
 
+// Vulpra BYOB defaults: browser integration must not own account credentials.
+// Firefox Accounts/Sync is optional upstream infrastructure, not required for
+// Vulpra. The independent Bitwarden-compatible extension and its selected
+// self-hosted Vaultwarden server remain outside this preference boundary.
+//
+// Keep these as DEFAULT prefs (not locks): do not delete existing login data
+// or write a user's profile. Security services such as Safe Browsing, NSS,
+// extensions, WebAuthn and browser network protections remain untouched.
+pref("identity.fxaccounts.enabled", false);
+pref("signon.rememberSignons", false);
+pref("signon.autofillForms", false);
+pref("signon.generation.enabled", false);
+
 pref("startup.homepage_override_url", "");
 pref("startup.homepage_welcome_url", "");
 pref("startup.homepage_welcome_url.additional", "");
