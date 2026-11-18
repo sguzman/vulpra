@@ -386,7 +386,7 @@ class _DisposableLoginForm:
         return server, "http://127.0.0.1:" + str(server.server_port) + "/ci-login"
 
 
-def save_and_autofill_real_bitwarden_login(h, port, base, popup_url):
+def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_shortcut):
     """Use official Bitwarden add-cipher form and its real Firefox shortcut.
 
     No test JavaScript sets field values. The only expected password is typed
@@ -458,6 +458,19 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url):
             time.sleep(0.4)
         if not saved:
             raise RuntimeError("Real Bitwarden login editor did not save a vault cipher")
+
+        if not verify_shortcut:
+            # Standalone storage gate: genuine extension editor produced a
+            # saved-cipher route. Separate keyboard autofill remains OPEN.
+            return {
+                "verified": True,
+                "real_extension_ui_saved_login": True,
+                "real_extension_keyboard_shortcut_filled_form": False,
+                "username_and_password_both_matched": False,
+                "only_disposable_local_form": True,
+                "saved_password_or_vault_token_in_report": False,
+                "no_test_js_value_injection": True,
+            }
 
         h.request(port, "POST", base + "/url", {"url": login_url},
                   timeout_seconds=30)
@@ -607,15 +620,19 @@ def main(repo, xpi, ca):
                 resource = addon_state_and_resource(h, port, base, popup)
                 verify_popup_managed_environment(h, port, base, resource)
                 registered = None
-                autofilled = None
+                saved_item = None
                 if os.environ.get("VULPRA_BYOB_REGISTER_FAKE_ACCOUNT", "0") == "1":
                     registered = register_fake_account_in_real_bitwarden(h, port, base, resource)
                     print("PASS: real Bitwarden registered and authenticated one disposable account in private Vaultwarden")
-                if os.environ.get("VULPRA_BYOB_VERIFY_REAL_AUTOFILL", "0") == "1":
+                if os.environ.get("VULPRA_BYOB_SAVE_FAKE_LOGIN", "0") == "1":
                     if registered is None:
-                        raise RuntimeError("Real autofill requires successfully registered disposable test account")
-                    autofilled = save_and_autofill_real_bitwarden_login(h, port, base, resource)
-                    print("PASS: official Bitwarden saved real synthetic cipher and filled fake localhost form using Firefox keyboard command")
+                        raise RuntimeError("Saved-item test requires successfully registered disposable account")
+                    verify_shortcut = os.environ.get("VULPRA_BYOB_VERIFY_REAL_AUTOFILL", "0") == "1"
+                    saved_item = save_and_autofill_real_bitwarden_login(
+                        h, port, base, resource, verify_shortcut=verify_shortcut)
+                    print("PASS: official Bitwarden created synthetic login cipher using real editor and server")
+                    if verify_shortcut:
+                        print("PASS: actual Firefox Bitwarden shortcut filled both localhost fields")
                 h.verify_byob_defaults(port, base)
                 h.request(port, "POST", base + "/moz/addon/uninstall", {"id": ADDON_ID})
                 installed = False
@@ -632,8 +649,9 @@ def main(repo, xpi, ca):
                     "vaultwarden_account_created": registered is not None and registered["real_bitwarden_client_registration"] is True,
                     "extension_authenticated_to_vaultwarden": registered is not None and registered["extension_authenticated_after_registration"] is True,
                     "disposable_registration": registered,
-                    "disposable_autofill": autofilled,
-                    "record_autofill_verified": autofilled is not None and autofilled["username_and_password_both_matched"] is True,
+                    "disposable_login_record": saved_item,
+                    "record_saved_verified": saved_item is not None and saved_item["real_extension_ui_saved_login"] is True,
+                    "record_autofill_verified": saved_item is not None and saved_item["username_and_password_both_matched"] is True,
                     "network_egress_permitted": False,
                     "native_browser_recompiled": False,
                     "security_current": False, "release_ready": False,
@@ -643,8 +661,10 @@ def main(repo, xpi, ca):
                 print("PASS: trusted HTTPS disposable Vaultwarden and real Bitwarden managed server endpoint in Vulpra")
                 if registered is None:
                     print("LIMIT: no registration, login or vault-record autofill demonstrated")
-                elif autofilled is None:
-                    print("LIMIT: synthetic test account only; stored-record autofill not yet demonstrated")
+                elif saved_item is None:
+                    print("LIMIT: synthetic account only; saved-record/autofill untested")
+                elif saved_item["username_and_password_both_matched"] is False:
+                    print("LIMIT: synthetic cipher saved; manual browser shortcut autofill still unverified")
                 else:
                     print("LIMIT: synthetic localhost fields and isolated ephemeral vault only; production integration not certified")
         finally:
