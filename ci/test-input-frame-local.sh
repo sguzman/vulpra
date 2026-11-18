@@ -111,7 +111,7 @@ PATH="$bin:$PATH" WAYLAND_DISPLAY="$WAYLAND_DISPLAY" XDG_RUNTIME_DIR="$XDG_RUNTI
   cat "$work/gui-out" >&2
   echo 'FAIL: native-Wayland mock WebDriver integration' >&2; exit 1;
 }
-grep -Fq 'Verified native Wayland browser on connector HDMI-A-1, refresh 60 Hz.' "$work/gui-out"
+grep -Fq 'Verified native Wayland browser on connector HDMI-A-1, refresh 60.0 Hz.' "$work/gui-out"
 mapfile -t gui_reports < <(find "$repo/.git/vulpra-native-build" -maxdepth 1 -name 'input-frame-*.json' -type f)
 (("${#gui_reports[@]}" == 2)) || { echo 'FAIL: both timing modes did not report' >&2; exit 1; }
 if grep -rq 'PRIVATE-MONITOR-SERIAL\|PRIVATE-WINDOW-TITLE' "${gui_reports[@]}"; then
