@@ -101,6 +101,8 @@ jobs:
               'id: replay', 'id: proof',
               'VULPRA_VERIFY_BYOB_DEFAULTS: "1"',
               '.byob_default_preferences.verified == true',
+              '.byob_default_preferences.safebrowsing_local_feature_flags_preserved == true',
+              '.byob_default_preferences.safebrowsing_live_provider_readiness_verified == false',
               '.byob_external_extension_synthetic_fill.verified == true',
               '.webextension.temporary_unsigned_install == true',
               '.security.local_untrusted_tls_denial.verified == true',
