@@ -111,7 +111,19 @@ jobs:
               'release_ready: false', 'security_current: false',
           )
           assert all(x in artifact for x in artifact_markers), 'BYOB artifact replay not fail-closed or unpinned'
-          assert '  push:' not in artifact, 'BYOB replay must stay manual-only until verified artifact exists'
+          # Native producer 44350848442 has completed successfully with
+          # a checksum-preserved package. Permit a single path-scoped push
+          # trigger so this independent replay can run now, but never from
+          # unrelated commits/branches or an unverified producer.
+          trigger = (
+              '  push:\\n'
+              '    branches: [upgrade/firefox-160-overlay-prototype]\\n'
+              '    paths:\\n'
+              '      - .github/workflows/security-160-byob-artifact-replay.yml\\n'
+          )
+          assert trigger in artifact, 'BYOB replay missing single-branch, single-file push guard'
+          assert '  workflow_dispatch:' in artifact
+          assert artifact.count('  push:') == 1
           for required in ("id: inspect", "id: replay", "id: proof",
                            "core.setOutput('ready','true')",
                            'Fail closed if authenticated native browser replay did not execute'):
