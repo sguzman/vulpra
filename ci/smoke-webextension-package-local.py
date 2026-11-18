@@ -128,7 +128,7 @@ def create_probe_extension(path: Path, token: str) -> None:
         "browser.runtime.sendMessage({type:'vulpra-probe'}).then(reply => {"
         f"if (reply && reply.proof === {json.dumps(token)}) {{"
         "document.documentElement.dataset.vulpraExtensionProof = reply.proof;"
-        "// Never contact or imitate a real vault: synthetic localhost only."
+        "/* Synthetic localhost fixture only: never contact a real vault. */"
         "const testField = document.querySelector('#vulpra-synthetic-password');"
         "if (testField && location.hostname === '127.0.0.1') {"
         "testField.value = 'vulpra-fixture-not-a-secret';"
