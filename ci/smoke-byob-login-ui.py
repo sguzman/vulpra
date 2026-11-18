@@ -163,18 +163,38 @@ def verify_runtime(h, port, session, server):
         before = server.submitted_count
         h.request(port, "POST", base + "/url",
                   {"url": fixture + "/login-form?case=" + case}, timeout_seconds=30)
-        did_submit = js("""
+        # Firefox's upstream login-manager tests synthesize *user input*
+        # before form.submit(). Plain JS element.value assignment is not
+        # equivalent: LoginManager may ignore fields without input events.
+        # WebDriver element.sendKeys supplies actual synthetic key input and
+        # a real submit-button click, all on the loopback test-owned page.
+        is_local = js("""
             const f = document.querySelector('form#vulpra-local-login');
-            if (!f || location.hostname !== '127.0.0.1' ||
-                f.method.toLowerCase() !== 'post' ||
-                new URL(f.action).pathname !== '/login-accepted') return false;
-            document.querySelector('#vulpra-local-username').value = 'vulpra-ci-fake-user';
-            document.querySelector('#vulpra-local-password').value = 'vulpra-ci-fake-password';
-            f.submit();
-            return true;
+            return !!(f && location.hostname === '127.0.0.1' &&
+                f.method.toLowerCase() === 'post' &&
+                new URL(f.action).pathname === '/login-accepted');
         """)
-        if did_submit is not True:
-            raise RuntimeError("Fake localhost login was not submitted")
+        if is_local is not True:
+            raise RuntimeError("Fake login form is not the permitted localhost fixture")
+
+        def element(selector):
+            found = h.request(port, "POST", base + "/element",
+                              {"using": "css selector", "value": selector})
+            key = "element-6066-11e4-a52e-4f735466cecf"
+            if not isinstance(found, dict) or not isinstance(found.get(key), str):
+                raise RuntimeError("Synthetic fixture element missing: " + selector)
+            return found[key]
+
+        for selector, synthetic in (
+                ("#vulpra-local-username", "vulpra-ci-fake-user"),
+                ("#vulpra-local-password", "vulpra-ci-fake-password")):
+            target = element(selector)
+            h.request(port, "POST", base + "/element/" + target + "/value",
+                      {"text": synthetic, "value": list(synthetic)},
+                      timeout_seconds=20)
+        button = element("button[type=submit]")
+        h.request(port, "POST", base + "/element/" + button + "/click", {},
+                  timeout_seconds=30)
         end = time.monotonic() + 15
         while time.monotonic() < end:
             try:
