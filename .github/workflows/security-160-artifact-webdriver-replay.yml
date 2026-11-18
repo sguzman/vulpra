@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Authenticate original Firefox 160 build and byte-preserving archive
+        id: inspect
         uses: actions/github-script@v7
         with:
           script: |
@@ -44,6 +45,7 @@ jobs:
               if(matches.length!==1) throw Error('Preserved archive missing/expired/ambiguous: '+name);
             }
             core.info('PASS: original native producer and verified byte-preserving mirror');
+            core.setOutput('ready','true');
       - name: Checkout pinned Firefox 160 WebDriver script only
         if: steps.inspect.outputs.ready == 'true'
         uses: actions/checkout@v4
@@ -107,6 +109,7 @@ jobs:
           "$RUNNER_TEMP/verified-driver/geckodriver" --version
           echo "$RUNNER_TEMP/verified-driver" >> "$GITHUB_PATH"
       - name: Run real packaged browser JS, WebExtension, strict TLS and Nimbus tests only
+        id: replay
         if: steps.inspect.outputs.ready == 'true'
         shell: bash
         env:
@@ -149,6 +152,7 @@ jobs:
           echo 'PASS: real Firefox 160 WebDriver runtime replay with no native browser rebuild'
           echo 'LIMIT: no general security-current or release acceptance'
       - name: Upload authenticated Firefox 160 artifact-only runtime proof
+        id: proof
         if: success() && steps.inspect.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -171,3 +175,22 @@ jobs:
           path: ${{ runner.temp }}/firefox160-replay-webdriver-failure-tail.log
           if-no-files-found: ignore
           retention-days: 14
+      # A successful metadata lookup is not a passed browser replay. In
+      # particular, fail if a nonexistent/renamed step ID silently skipped
+      # all tests. The positive gate is enforced even on manual dispatch.
+      - name: Fail closed if authenticated native browser replay did not execute
+        if: always()
+        shell: bash
+        env:
+          INSPECT_STATUS: ${{ steps.inspect.outcome }}
+          INSPECT_READY: ${{ steps.inspect.outputs.ready }}
+          REPLAY_STATUS: ${{ steps.replay.outcome }}
+          PROOF_STATUS: ${{ steps.proof.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$INSPECT_STATUS" != success || "$INSPECT_READY" != true ||
+                "$REPLAY_STATUS" != success || "$PROOF_STATUS" != success ]]; then
+            echo 'FAIL: Firefox 160 replay or authenticated proof was skipped/failed; green metadata-only run forbidden.' >&2
+            exit 1
+          fi
+          echo 'PASS: actual archived native browser replay and proof upload both executed successfully.'
