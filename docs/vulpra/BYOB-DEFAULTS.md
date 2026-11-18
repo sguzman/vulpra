@@ -4,6 +4,23 @@
 **Status (2026-11-18): Firefox 160 BYOB native compile/package, effective defaults, generic extension autofill, built-in login-save prompt suppression, real signed Bitwarden installation, disposable HTTPS Vaultwarden, registration, synthetic saved-login persistence, real X11 keyboard autofill and clean-profile independent master-password sign-in/retrieval PASS; EndeavourOS/Hyprland/Wayland platform, provider-backed browser security and release approval OPEN.**  
 **Scope:** Vulpra-specific defaults only, not a browser-wide extension API change, account migration, or Firefox profile modification.
 
+## Firefox 160 bounded HTTP request and endpoint survey (2026-11-18)
+
+The real, checksum-verified **Firefox 160 BYOB native browser** ran with a disposable `HOME` and profile, in a Linux namespace with **only loopback and no IPv4/IPv6 external routes**. A temporary privileged `http-on-modify-request` observer counted coarse categories for about two seconds **after the browser was already running**. A synthetic local HTTP 204 fetch provided a positive control. No full URLs, hosts, query strings, account IDs, credentials, raw network logs or telemetry ping bodies were stored or uploaded.
+
+Both successful browser runs passed the source/package checks, local positive-control request, four BYOB disabled defaults, three local Safe Browsing enabled defaults, signed-out FxAccounts / unconfigured Sync state, redacted nine-preference inventory, report upload and unconditional fail-closed gate.
+
+| CI run and artifact | Local test requests | Mozilla-other attempts | Account / Sync / telemetry attempts | Notes |
+| --- | ---: | ---: | ---: | --- |
+| [44406228116 PASS](https://github.com/sguzman/vulpra/actions/runs/44406228116), [proof 14474589155](https://github.com/sguzman/vulpra/actions/runs/44406228116/artifacts/14474589155) | 1 | **1** | 0 / 0 / 0 | Initial accepted in-browser HTTP observation |
+| [44406541728 PASS](https://github.com/sguzman/vulpra/actions/runs/44406541728), [proof 14475575604](https://github.com/sguzman/vulpra/actions/runs/44406541728/artifacts/14475575604) | 1 | **0** | 0 / 0 / 0 | Observer is now confirmed removed **before** report callback; cleanup proof truthful |
+
+The two runs' difference shows why **zero observed requests in a brief window does not prove zero networking**. A distinct Mozilla-other attempt occurred in the earlier run; the report intentionally gives no raw hostname, and its purpose is not established. External delivery was impossible in the isolated namespace.
+
+The nine-key preference inventory reported Mozilla-account-classified string endpoints for `identity.fxaccounts.remote.root` and `identity.fxaccounts.remote.profile.uri`, and a Mozilla-telemetry-classified string endpoint for `toolkit.telemetry.server`. Those are **configuration observations, not actual network connections**. The optional `datareporting.healthreport.documentServerURI` default could not be read with either Firefox string accessor and was explicitly categorized `unreadable`; its effective value was categorized `unparseable`, not misidentified as absent. Some optional Sync / Ping Centre preferences were absent in the temporary profile. The effective Normandy endpoint preference was empty with a user override. These findings are not assertions about a fresh personal profile.
+
+**Boundary:** The observer starts after browser launch, covers a deliberately short interval, and only sees `http-on-modify-request` requests. It cannot inventory native non-HTTP sockets, earlier startup networking, all later/conditional connections, actual delivery to remote servers, signed-in Sync, live Safe Browsing provider classification, telemetry upload/deletion policies, or target-host security. **The separate public-release account/Sync/telemetry network acceptance item stays open.** No real user profile or personal Vaultwarden was touched; no source pruning, merge or release is authorized. Formal overall Vulpra progress remains **61% (Δ +0 pp)**.
+
 ## Firefox 160 native account, Sync and telemetry preference audit (2026-11-18)
 
 [**Real packaged-browser CI #44401333423 — PASS**](https://github.com/sguzman/vulpra/actions/runs/44401333423), with [nonsecret proof artifact #14473166365](https://github.com/sguzman/vulpra/actions/runs/44401333423/artifacts/14473166365), verified the exact existing Firefox 160 BYOB source-bound native package in a disposable headless browser and **loopback-only network namespace**. The run passed native preference inspection, reversible account/upload controls and exact baseline restoration, signed-out FxAccounts/Sync module checks, BYOB and local Safe Browsing feature defaults, seven negative fixtures, and unconditional proof-upload gating.
