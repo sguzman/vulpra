@@ -4,6 +4,14 @@
 **Status (2026-11-18): Firefox 160 BYOB native compile/package, effective defaults, generic extension autofill, built-in login-save prompt suppression, real signed Bitwarden installation, disposable HTTPS Vaultwarden, registration, synthetic saved-login persistence, real X11 keyboard autofill and clean-profile independent master-password sign-in/retrieval PASS; EndeavourOS/Hyprland/Wayland platform, provider-backed browser security and release approval OPEN.**  
 **Scope:** Vulpra-specific defaults only, not a browser-wide extension API change, account migration, or Firefox profile modification.
 
+## Firefox 160 native account, Sync and telemetry preference audit (2026-11-18)
+
+[**Real packaged-browser CI #44401333423 — PASS**](https://github.com/sguzman/vulpra/actions/runs/44401333423), with [nonsecret proof artifact #14473166365](https://github.com/sguzman/vulpra/actions/runs/44401333423/artifacts/14473166365), verified the exact existing Firefox 160 BYOB source-bound native package in a disposable headless browser and **loopback-only network namespace**. The run passed native preference inspection, reversible account/upload controls and exact baseline restoration, signed-out FxAccounts/Sync module checks, BYOB and local Safe Browsing feature defaults, seven negative fixtures, and unconditional proof-upload gating.
+
+**Important observed distinction:** `identity.fxaccounts.enabled` had both **packaged default=false** and **effective=false**, unlocked and not overridden. `datareporting.healthreport.uploadEnabled` had **packaged default=true** but **effective=false** in the disposable CI profile, with an existing user override; the audit preserved that original opt-out. This is **not** evidence that telemetry upload is off by default for all users, and the test did not identify what created the disposable-profile override.
+
+This audit deliberately did **not** collect URL preference values, credentials, account identifiers or telemetry payloads, nor test production Mozilla/Google server traffic, remote Sync while signed in, telemetry deletion requests, broader tracking behavior, target-host sandboxing or security-update readiness. It does not close the separate **public-distribution account/sync/telemetry endpoint audit** or release gates; Firefox 160 remains an unmerged draft. Source pruning stays deferred; formal Vulpra completion **61% (Δ +0 pp)**.
+
 ## Decision
 
 Vulpra is a browser and should not implicitly own a user's account/password storage or require Mozilla/Google infrastructure for identity. The user-selected external password manager and sync services own those records. Vaultwarden is a compatible self-hosted Bitwarden server; its browser extension is a separate component that the user configures, not a new proprietary Vulpra account system.
