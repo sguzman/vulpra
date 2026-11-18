@@ -124,13 +124,15 @@ const safe = {phase:"start", pref_name:null};
     const oldDefault = branch.getBoolPref(name);
     let verified = false;
     try {
-      p.setBoolPref(name, false);
-      const down = p.getBoolPref(name) === false &&
-                   p.prefHasUserValue(name);
-      p.setBoolPref(name, true);
-      const up = p.getBoolPref(name) === true &&
-                 p.prefHasUserValue(name);
-      verified = down && up;
+      // Mozilla libpref clears the user value when it equals the
+      // default, unless that preference was marked sticky. Only
+      // require prefHasUserValue() for a genuine non-default override.
+      p.setBoolPref(name, !oldDefault);
+      const changed = p.getBoolPref(name) === !oldDefault &&
+                      p.prefHasUserValue(name);
+      p.setBoolPref(name, oldDefault);
+      const reverted = p.getBoolPref(name) === oldDefault;
+      verified = changed && reverted;
     } finally {
       p.clearUserPref(name);
     }
