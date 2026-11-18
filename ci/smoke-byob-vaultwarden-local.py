@@ -347,6 +347,165 @@ def register_fake_account_in_real_bitwarden(h, port, base, popup_url):
     raise RuntimeError("Real Bitwarden registration did not establish authenticated vault UI")
 
 
+class _DisposableLoginForm:
+    """Intentionally fake local HTTP login origin; never accepts submissions."""
+
+    @staticmethod
+    def start():
+        import http.server
+        from threading import Thread
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path != "/ci-login":
+                    self.send_error(404)
+                    return
+                content = (b'<!doctype html><html><head><meta charset="utf-8">'
+                           b'<title>Disposable Vulpra autofill</title></head>'
+                           b'<body><h1>Fake local login</h1>'
+                           b'<form id="ci-local-login" action="javascript:void(0)">'
+                           b'<input id="ci-user" name="username" type="text" '
+                           b'autocomplete="username">'
+                           b'<input id="ci-pass" name="password" type="password" '
+                           b'autocomplete="current-password">'
+                           b'<button id="ci-no-submit" type="button">No submission</button>'
+                           b'</form></body></html>')
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+
+            def log_message(self, *_args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return server, "http://127.0.0.1:" + str(server.server_port) + "/ci-login"
+
+
+def save_and_autofill_real_bitwarden_login(h, port, base, popup_url):
+    """Use official Bitwarden add-cipher form and its real Firefox shortcut.
+
+    No test JavaScript sets field values. The only expected password is typed
+    into the actual Bitwarden editor and later compared read-only as a boolean.
+    Any vault data exists only inside the throwaway CI network/container.
+    """
+    import secrets
+
+    if not popup_url.startswith("moz-extension://"):
+        raise RuntimeError("Official extension origin required for synthetic vault item")
+    fake_user = "vulpra-ci-synthetic-user"
+    fake_password = "CI-Only-" + secrets.token_urlsafe(26) + "A9!"
+    server, login_url = _DisposableLoginForm.start()
+    try:
+        editor = popup_url.split("#", 1)[0] + "#/add-cipher?type=1"
+        h.request(port, "POST", base + "/url", {"url": editor}, timeout_seconds=35)
+        _await_registration_ui(h, port, base,
+                               "vault-item-details-section input[formcontrolname='name']",
+                               "#/add-cipher", timeout=55)
+        _wd_type(h, port, base,
+                 "vault-item-details-section input[formcontrolname='name']",
+                 "Disposable CI Login")
+        _wd_type(h, port, base,
+                 "vault-login-details-section input[formcontrolname='username']",
+                 fake_user)
+        _wd_type(h, port, base,
+                 "vault-login-details-section input[formcontrolname='password']",
+                 fake_password)
+        _wd_type(h, port, base,
+                 "vault-autofill-uri-option input[formcontrolname='uri']",
+                 login_url)
+        _wd_click(h, port, base,
+                  "popup-footer button[form='cipherForm'][type='submit']")
+
+        saved = False
+        deadline = time.monotonic() + 65
+        while time.monotonic() < deadline:
+            try:
+                value = h.request(port, "POST", base + "/execute/sync", {
+                    "script": """
+                      return location.protocol === 'moz-extension:' &&
+                        location.hash.startsWith('#/view-cipher?cipherId=');
+                    """,
+                    "args": [],
+                }, timeout_seconds=15)
+                if value is True:
+                    saved = True
+                    break
+            except RuntimeError:
+                pass
+            time.sleep(0.4)
+        if not saved:
+            raise RuntimeError("Real Bitwarden login editor did not save a vault cipher")
+
+        h.request(port, "POST", base + "/url", {"url": login_url},
+                  timeout_seconds=30)
+        before = h.request(port, "POST", base + "/execute/sync", {
+            "script": """
+              const u=document.querySelector('#ci-user');
+              const p=document.querySelector('#ci-pass');
+              return {
+                local: location.hostname === '127.0.0.1',
+                fake_form: !!document.querySelector('form#ci-local-login'),
+                initially_empty: !!u && !!p && u.value === '' && p.value === ''
+              };
+            """,
+            "args": [],
+        })
+        if not isinstance(before, dict) or not all(
+                before.get(k) is True for k in ("local", "fake_form", "initially_empty")):
+            raise RuntimeError("Fake localhost login was not empty before actual Bitwarden autofill")
+
+        # Official Bitwarden Firefox manifest browser-v2026.10.2 defines
+        # the autofill_login command as Ctrl+Shift+L. Send actual W3C
+        # WebDriver key actions on the active localhost content page.
+        h.request(port, "POST", base + "/actions", {
+            "actions": [{"type": "key", "id": "vulpra-test-keyboard",
+                         "actions": [
+                             {"type": "keyDown", "value": "\ue009"},
+                             {"type": "keyDown", "value": "\ue008"},
+                             {"type": "keyDown", "value": "l"},
+                             {"type": "keyUp", "value": "l"},
+                             {"type": "keyUp", "value": "\ue008"},
+                             {"type": "keyUp", "value": "\ue009"},
+                         ]}]
+        }, timeout_seconds=20)
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            state = h.request(port, "POST", base + "/execute/sync", {
+                "script": """
+                  const u=document.querySelector('#ci-user');
+                  const p=document.querySelector('#ci-pass');
+                  return {
+                    local: location.hostname === '127.0.0.1' &&
+                           location.pathname === '/ci-login',
+                    matched_username: !!u && u.value === arguments[0],
+                    matched_password: !!p && p.value === arguments[1]
+                  };
+                """,
+                "args": [fake_user, fake_password],
+            }, timeout_seconds=15)
+            if isinstance(state, dict) and all(state.get(k) is True for k in (
+                    "local", "matched_username", "matched_password")):
+                return {
+                    "verified": True,
+                    "real_extension_ui_saved_login": True,
+                    "real_extension_keyboard_shortcut_filled_form": True,
+                    "username_and_password_both_matched": True,
+                    "only_disposable_local_form": True,
+                    "saved_password_or_vault_token_in_report": False,
+                    "no_test_js_value_injection": True,
+                }
+            time.sleep(0.3)
+        raise RuntimeError("Actual Bitwarden Ctrl+Shift+L did not fill both synthetic fields")
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def main(repo, xpi, ca):
     popup = official_xpi(xpi)
     check_real_https(ca)
@@ -430,9 +589,15 @@ def main(repo, xpi, ca):
                 resource = addon_state_and_resource(h, port, base, popup)
                 verify_popup_managed_environment(h, port, base, resource)
                 registered = None
+                autofilled = None
                 if os.environ.get("VULPRA_BYOB_REGISTER_FAKE_ACCOUNT", "0") == "1":
                     registered = register_fake_account_in_real_bitwarden(h, port, base, resource)
                     print("PASS: real Bitwarden registered and authenticated one disposable account in private Vaultwarden")
+                if os.environ.get("VULPRA_BYOB_VERIFY_REAL_AUTOFILL", "0") == "1":
+                    if registered is None:
+                        raise RuntimeError("Real autofill requires successfully registered disposable test account")
+                    autofilled = save_and_autofill_real_bitwarden_login(h, port, base, resource)
+                    print("PASS: official Bitwarden saved real synthetic cipher and filled fake localhost form using Firefox keyboard command")
                 h.verify_byob_defaults(port, base)
                 h.request(port, "POST", base + "/moz/addon/uninstall", {"id": ADDON_ID})
                 installed = False
@@ -449,7 +614,8 @@ def main(repo, xpi, ca):
                     "vaultwarden_account_created": registered is not None and registered["real_bitwarden_client_registration"] is True,
                     "extension_authenticated_to_vaultwarden": registered is not None and registered["extension_authenticated_after_registration"] is True,
                     "disposable_registration": registered,
-                    "record_autofill_verified": False,
+                    "disposable_autofill": autofilled,
+                    "record_autofill_verified": autofilled is not None and autofilled["username_and_password_both_matched"] is True,
                     "network_egress_permitted": False,
                     "native_browser_recompiled": False,
                     "security_current": False, "release_ready": False,
@@ -459,8 +625,10 @@ def main(repo, xpi, ca):
                 print("PASS: trusted HTTPS disposable Vaultwarden and real Bitwarden managed server endpoint in Vulpra")
                 if registered is None:
                     print("LIMIT: no registration, login or vault-record autofill demonstrated")
-                else:
+                elif autofilled is None:
                     print("LIMIT: synthetic test account only; stored-record autofill not yet demonstrated")
+                else:
+                    print("LIMIT: synthetic localhost fields and isolated ephemeral vault only; production integration not certified")
         finally:
             if session:
                 if installed:
