@@ -655,8 +655,56 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
         if shortcuts != [{"enabled": True, "expected": True}]:
             raise RuntimeError("Real Bitwarden Firefox autofill keyboard command not bound to Ctrl+Shift+L")
 
-        h.request(port, "POST", base + "/url", {"url": login_url},
-                  timeout_seconds=30)
+        if graphical:
+            # A Marionette-navigated window was not visible to the extension
+            # (diagnostic: WebDriver URL matched, but browser.tabs.query had
+            # no localhost URL). Create the page through *Bitwarden's real*
+            # Firefox extension API, then attach WebDriver to that page.
+            # Do not use JS to fill any form data or directly invoke autofill.
+            created = h.request(port, "POST", base + "/execute/async", {
+                "script": """
+                  const url=arguments[0], done=arguments[arguments.length-1];
+                  (async()=>{
+                    const tab=await browser.tabs.create({url,active:true});
+                    if(!Number.isInteger(tab?.id) || !Number.isInteger(tab?.windowId))
+                      throw Error('No real browser tab created');
+                    await browser.windows.update(tab.windowId,{focused:true});
+                    const found=await browser.tabs.get(tab.id);
+                    done({created:!!found,
+                          correct_url:found?.url===url,
+                          active:found?.active===true});
+                  })().catch(e=>done({error:String(e).slice(0,110)}));
+                """,
+                "args": [login_url],
+            }, timeout_seconds=30)
+            if not isinstance(created, dict) or created.get("created") is not True:
+                raise RuntimeError("Signed Bitwarden extension could not create real localhost tab: "
+                                   + repr(created)[:180])
+            deadline = time.monotonic() + 20
+            attached = False
+            while time.monotonic() < deadline and not attached:
+                handles = h.request(port, "GET", base + "/window/handles",
+                                    timeout_seconds=15)
+                if not isinstance(handles, list):
+                    raise RuntimeError("WebDriver did not return browser tab handles")
+                for handle in handles:
+                    try:
+                        h.request(port, "POST", base + "/window",
+                                  {"handle": handle}, timeout_seconds=15)
+                        current = h.request(port, "GET", base + "/url",
+                                            timeout_seconds=15)
+                        if current == login_url:
+                            attached = True
+                            break
+                    except RuntimeError:
+                        continue
+                if not attached:
+                    time.sleep(0.25)
+            if not attached:
+                raise RuntimeError("WebDriver could not attach to Bitwarden-created localhost tab")
+        else:
+            h.request(port, "POST", base + "/url", {"url": login_url},
+                      timeout_seconds=30)
         before = h.request(port, "POST", base + "/execute/sync", {
             "script": """
               const u=document.querySelector('#ci-user');
