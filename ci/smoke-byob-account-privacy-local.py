@@ -41,6 +41,9 @@ PROTECTED = (
 # entire pref tree: URL strings and profile identifiers are never collected.
 PREFS = [
     "identity.fxaccounts.enabled",
+    "signon.rememberSignons",
+    "signon.autofillForms",
+    "signon.generation.enabled",
     "identity.fxaccounts.autoconfig.uri",
     "services.sync.enabled",
     "services.sync.autoconnect",
