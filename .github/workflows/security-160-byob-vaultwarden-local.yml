@@ -1,4 +1,4 @@
-name: Firefox 160 BYOB HTTPS Vaultwarden Managed Endpoint (Unreleased)
+name: Firefox 160 BYOB Disposable Vaultwarden Account Registration (Unreleased)
 on:
   push:
     branches: [upgrade/firefox-160-overlay-prototype]
@@ -176,6 +176,8 @@ jobs:
         id: test
         if: steps.identity.outputs.ready == 'true' && steps.server.outcome == 'success'
         shell: bash
+        env:
+          VULPRA_BYOB_REGISTER_FAKE_ACCOUNT: "1"
         run: |
           set -euo pipefail
           pid="$(docker inspect -f '{{.State.Pid}}' vulpra-byob-vaultwarden-ci)"
@@ -194,21 +196,27 @@ jobs:
             .real_bitwarden_popup_managed_server_url == true and
             .byob_defaults_preserved == true and
             .original_browser_profile_preserved == true and
-            .vaultwarden_account_created == false and
-            .extension_authenticated_to_vaultwarden == false and
+            .vaultwarden_account_created == true and
+            .extension_authenticated_to_vaultwarden == true and
+            .disposable_registration.verified == true and
+            .disposable_registration.real_bitwarden_client_registration == true and
+            .disposable_registration.webdriver_typed_both_registration_forms == true and
+            .disposable_registration.disposable_invalid_tld_email_only == true and
+            .disposable_registration.master_password_in_proof_or_logs == false and
+            .disposable_registration.external_breach_lookup_enabled == false and
             .record_autofill_verified == false and
             .network_egress_permitted == false and
             .native_browser_recompiled == false and
             .security_current == false and .release_ready == false
           ' "$report" >/dev/null
-          echo 'PASS: signed Bitwarden in real browser configured for actual isolated HTTPS Vaultwarden'
-          echo 'LIMIT: no fake-account login or password record autofill yet'
+          echo 'PASS: signed Bitwarden registered and authenticated disposable Vaultwarden user in real browser'
+          echo 'LIMIT: registration and authenticated UI only, no saved-record autofill yet'
       - name: Upload bounded signed-extension acceptance report
         id: proof
         if: success() && steps.identity.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: firefox160-byob-vaultwarden-local-https-origin-proof
+          name: firefox160-byob-vaultwarden-real-account-registration-proof
           path: .git/vulpra-native-build/byob-local-vaultwarden-proof.json
           if-no-files-found: error
           retention-days: 30

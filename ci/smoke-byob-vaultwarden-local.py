@@ -205,6 +205,148 @@ def test_browser_server_and_extension(h, port, base):
         raise RuntimeError("Packaged Vulpra did not accept private-CA-trusted Vaultwarden HTTPS")
 
 
+def _wd_element(h, port, base, selector):
+    found = h.request(port, "POST", base + "/element",
+                      {"using": "css selector", "value": selector},
+                      timeout_seconds=20)
+    key = "element-6066-11e4-a52e-4f735466cecf"
+    if not isinstance(found, dict) or not isinstance(found.get(key), str):
+        raise RuntimeError("Disposable registration control missing: " + selector)
+    return found[key]
+
+
+def _wd_type(h, port, base, selector, value):
+    ident = _wd_element(h, port, base, selector)
+    h.request(port, "POST", base + "/element/" + ident + "/value",
+              {"text": value, "value": list(value)}, timeout_seconds=30)
+
+
+def _wd_click(h, port, base, selector):
+    ident = _wd_element(h, port, base, selector)
+    h.request(port, "POST", base + "/element/" + ident + "/click", {},
+              timeout_seconds=30)
+
+
+def _await_registration_ui(h, port, base, selector, route, timeout=60):
+    """Wait for the real Angular route and control; never return token/credential data."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            observed = h.request(port, "POST", base + "/execute/sync", {
+                "script": """
+                  const element = document.querySelector(arguments[0]);
+                  return {
+                    right_route: location.protocol === 'moz-extension:' &&
+                                 location.hash.startsWith(arguments[1]),
+                    control_present: !!(element && element.isConnected &&
+                       element.getClientRects().length > 0)
+                  };
+                """,
+                "args": [selector, route],
+            }, timeout_seconds=15)
+            if (isinstance(observed, dict) and
+                    observed.get("right_route") is True and
+                    observed.get("control_present") is True):
+                return
+        except RuntimeError:
+            pass  # Real Angular navigation may destroy a just-observed document.
+        time.sleep(0.35)
+    raise RuntimeError("Timed out waiting for expected isolated signed-extension registration UI")
+
+
+def register_fake_account_in_real_bitwarden(h, port, base, popup_url):
+    """Real WebDriver user input, genuine extension registration/API and auto-login.
+
+    Random fake credentials stay only in this short-lived, egress-isolated
+    test process and Vaultwarden's intentionally volatile Docker filesystem.
+    No email/password/registration token is included in a proof, log or artifact.
+    """
+    import secrets
+
+    if not isinstance(popup_url, str) or not popup_url.startswith("moz-extension://"):
+        raise RuntimeError("Cannot register outside active official extension origin")
+    email = "vulpra-ci-" + secrets.token_hex(10) + "@example.invalid"
+    password = "Vulpra-CI-" + secrets.token_urlsafe(32) + "!9Aa"
+    signup = popup_url.split("#", 1)[0] + "#/signup"
+    h.request(port, "POST", base + "/url", {"url": signup}, timeout_seconds=35)
+    _await_registration_ui(h, port, base, "#register-start_form_input_email",
+                           "#/signup", timeout=55)
+    _wd_type(h, port, base, "#register-start_form_input_email", email)
+    _wd_type(h, port, base, "#register-start_form_input_name", "Disposable Vulpra CI")
+    _wd_click(h, port, base, "auth-registration-start form button[type='submit']")
+    # The isolated Vaultwarden image runs without SMTP. Bitwarden receives
+    # a one-use local verification token directly, as its official client
+    # implements when server email verification is disabled.
+    _await_registration_ui(h, port, base, "#input-password-form_new-password",
+                           "#/finish-signup", timeout=70)
+    _wd_type(h, port, base, "#input-password-form_new-password", password)
+    _wd_type(h, port, base, "#input-password-form_new-password-confirm", password)
+
+    # No breached-password lookups are authorized in this network-isolated QA.
+    # Disable the optional UI checkbox by its actual WebDriver element click.
+    disabled_leak_check = h.request(port, "POST", base + "/execute/sync", {
+        "script": """
+           const cb = document.querySelector('#input-password-form_check-for-breaches');
+           return cb ? {present:true,checked:cb.checked} : {present:false};
+        """,
+        "args": [],
+    })
+    if not isinstance(disabled_leak_check, dict) or disabled_leak_check.get("present") is not True:
+        raise RuntimeError("Cannot verify optional network password breach check")
+    if disabled_leak_check.get("checked") is True:
+        _wd_click(h, port, base, "#input-password-form_check-for-breaches")
+    no_breach_lookup = h.request(port, "POST", base + "/execute/sync", {
+        "script": """
+          const cb = document.querySelector('#input-password-form_check-for-breaches');
+          return !!cb && cb.checked === false;
+        """,
+        "args": [],
+    })
+    if no_breach_lookup is not True:
+        raise RuntimeError("Optional breached-password lookup was not disabled")
+
+    _wd_click(h, port, base, "auth-input-password form button[type='submit']")
+
+    # RegistrationFinishComponent creates a real account, authenticates with
+    # PasswordLoginCredentials and navigates through an auth-required vault route.
+    # A login redirect, signup error, or unauthenticated landing must fail.
+    deadline = time.monotonic() + 100
+    while time.monotonic() < deadline:
+        try:
+            observed = h.request(port, "POST", base + "/execute/sync", {
+                "script": """
+                  return {
+                    actual_extension: location.protocol === 'moz-extension:',
+                    authenticated_vault_route:
+                      location.hash.startsWith('#/tabs/vault') ||
+                      location.hash.startsWith('#/tabs/current') ||
+                      location.hash.startsWith('#/vault'),
+                    login_route: location.hash.startsWith('#/login')
+                  };
+                """,
+                "args": [],
+            }, timeout_seconds=20)
+            if isinstance(observed, dict) and (
+                    observed.get("actual_extension") is True and
+                    observed.get("authenticated_vault_route") is True):
+                return {
+                    "verified": True,
+                    "real_bitwarden_client_registration": True,
+                    "extension_authenticated_after_registration": True,
+                    "webdriver_typed_both_registration_forms": True,
+                    "disposable_invalid_tld_email_only": True,
+                    "master_password_in_proof_or_logs": False,
+                    "external_breach_lookup_enabled": False,
+                }
+            if isinstance(observed, dict) and observed.get("login_route") is True:
+                raise RuntimeError("Actual Bitwarden account flow redirected to login instead of authenticated vault")
+        except RuntimeError as exc:
+            if "redirected to login" in str(exc):
+                raise
+        time.sleep(0.5)
+    raise RuntimeError("Real Bitwarden registration did not establish authenticated vault UI")
+
+
 def main(repo, xpi, ca):
     popup = official_xpi(xpi)
     check_real_https(ca)
@@ -287,6 +429,10 @@ def main(repo, xpi, ca):
                     raise RuntimeError("Official signed Bitwarden install ID mismatch")
                 resource = addon_state_and_resource(h, port, base, popup)
                 verify_popup_managed_environment(h, port, base, resource)
+                registered = None
+                if os.environ.get("VULPRA_BYOB_REGISTER_FAKE_ACCOUNT", "0") == "1":
+                    registered = register_fake_account_in_real_bitwarden(h, port, base, resource)
+                    print("PASS: real Bitwarden registered and authenticated one disposable account in private Vaultwarden")
                 h.verify_byob_defaults(port, base)
                 h.request(port, "POST", base + "/moz/addon/uninstall", {"id": ADDON_ID})
                 installed = False
@@ -300,8 +446,9 @@ def main(repo, xpi, ca):
                     "real_bitwarden_popup_managed_server_url": True,
                     "byob_defaults_preserved": True,
                     "original_browser_profile_preserved": True,
-                    "vaultwarden_account_created": False,
-                    "extension_authenticated_to_vaultwarden": False,
+                    "vaultwarden_account_created": registered is not None and registered["real_bitwarden_client_registration"] is True,
+                    "extension_authenticated_to_vaultwarden": registered is not None and registered["extension_authenticated_after_registration"] is True,
+                    "disposable_registration": registered,
                     "record_autofill_verified": False,
                     "network_egress_permitted": False,
                     "native_browser_recompiled": False,
@@ -310,7 +457,10 @@ def main(repo, xpi, ca):
                 (root / "byob-local-vaultwarden-proof.json").write_text(
                     json.dumps(proof, indent=2) + "\n")
                 print("PASS: trusted HTTPS disposable Vaultwarden and real Bitwarden managed server endpoint in Vulpra")
-                print("LIMIT: no registration, login or vault-record autofill demonstrated")
+                if registered is None:
+                    print("LIMIT: no registration, login or vault-record autofill demonstrated")
+                else:
+                    print("LIMIT: synthetic test account only; stored-record autofill not yet demonstrated")
         finally:
             if session:
                 if installed:
