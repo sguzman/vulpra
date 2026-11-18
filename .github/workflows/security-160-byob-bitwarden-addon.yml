@@ -102,6 +102,7 @@ jobs:
           curl --fail --location --show-error --silent --retry 3 --max-time 120 \
             'https://addons.mozilla.org/firefox/downloads/file/5198653/bitwarden_password_manager-2026.10.2.xpi' \
             -o "$RUNNER_TEMP/bitwarden-2026.10.2.xpi"
+          printf '%s  %s\n' 'abf9d7273dd55ac0583ecc6997f7f7ae3d29de11e2ad0a4838b80e2b941daa73' "$RUNNER_TEMP/bitwarden-2026.10.2.xpi" | sha256sum -c -
           python3 ci/smoke-byob-bitwarden-addon.py --self-test
           echo 'Official Bitwarden XPI fetched; not redistributed as an artifact'
       - name: Install and activate real Bitwarden in loopback-only network namespace
@@ -121,7 +122,7 @@ jobs:
             .status == "pass" and
             .extension.official_amo_version == "2026.10.2" and
             .extension.gecko_id_matches == true and
-            (.extension.xpi_sha256 | test("^[a-f0-9]{64}$")) and
+            .extension.xpi_sha256 == "abf9d7273dd55ac0583ecc6997f7f7ae3d29de11e2ad0a4838b80e2b941daa73" and
             .extension.real_signed_permanent_install == true and
             .extension.active_and_enabled == true and
             .extension.uninstall_verified == true and
