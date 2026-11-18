@@ -418,8 +418,26 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url):
         _wd_type(h, port, base,
                  "vault-autofill-uri-option input[formcontrolname='uri']",
                  login_url)
-        _wd_click(h, port, base,
-                  "popup-footer button[form='cipherForm'][type='submit']")
+        # The editor's footer Save button exists outside the scrolling form.
+        # Firefox headless can mark that footer as non-interactable. Send a
+        # *real WebDriver Enter keystroke* to the URI input instead, triggering
+        # the same Angular bitSubmit path without any JS click/submit bypass.
+        save_ready = h.request(port, "POST", base + "/execute/sync", {
+            "script": """
+              const f=document.querySelector('form#cipherForm');
+              const b=document.querySelector("popup-footer button[form='cipherForm'][type='submit']");
+              return !!f && !!b && b.disabled === false &&
+                !!f.querySelector("vault-autofill-uri-option input[formcontrolname='uri']");
+            """,
+            "args": [],
+        })
+        if save_ready is not True:
+            raise RuntimeError("Bitwarden synthetic cipher form not ready for real submit")
+        uri_input = _wd_element(
+            h, port, base, "vault-autofill-uri-option input[formcontrolname='uri']")
+        h.request(port, "POST", base + "/element/" + uri_input + "/value",
+                  {"text": "\ue007", "value": ["\ue007"]},
+                  timeout_seconds=25)
 
         saved = False
         deadline = time.monotonic() + 65
