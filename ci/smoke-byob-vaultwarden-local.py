@@ -337,7 +337,7 @@ def register_fake_account_in_real_bitwarden(h, port, base, popup_url):
                     "disposable_invalid_tld_email_only": True,
                     "master_password_in_proof_or_logs": False,
                     "external_breach_lookup_enabled": False,
-                }
+                }, {"email": email, "master_password": password}
             if isinstance(observed, dict) and observed.get("login_route") is True:
                 raise RuntimeError("Actual Bitwarden account flow redirected to login instead of authenticated vault")
         except RuntimeError as exc:
@@ -804,6 +804,105 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
         server.server_close()
 
 
+def sign_in_disposable_account_in_fresh_bitwarden(h, port, base, popup_url, account):
+    """Real UI sign-in to a *previously created* Vaultwarden account in a new profile.
+
+    The fake email/password stay in memory. No credential/token or vault DB goes
+    to the report. This test never creates a new account in the second session.
+    """
+    if not isinstance(popup_url, str) or not popup_url.startswith("moz-extension://"):
+        raise RuntimeError("Independent login requires the signed Bitwarden popup origin")
+    if not isinstance(account, dict) or not account.get("email") or not account.get("master_password"):
+        raise RuntimeError("Synthetic registration credentials unavailable for independent login")
+
+    h.request(port, "POST", base + "/url",
+              {"url": popup_url.split("#", 1)[0] + "#/login"}, timeout_seconds=35)
+    _await_registration_ui(h, port, base, "input[data-testid='login-email-input']",
+                           "#/login", timeout=55)
+
+    pristine = h.request(port, "POST", base + "/execute/sync", {
+        "script": """
+          const field = document.querySelector("input[data-testid='login-email-input']");
+          return location.hash.startsWith('#/login') &&
+            !!field && field.value === '' &&
+            document.querySelectorAll("[data-testid='item-name']").length === 0;
+        """,
+        "args": [],
+    }, timeout_seconds=15)
+    if pristine is not True:
+        raise RuntimeError("Independent Bitwarden browser was not an unregistered/login-only profile")
+
+    _wd_type(h, port, base, "input[data-testid='login-email-input']", account["email"])
+    _wd_click(h, port, base, "button[data-testid='login-continue-button']")
+    _await_registration_ui(h, port, base, "input[data-testid='login-master-password-input']",
+                           "#/login", timeout=60)
+    _wd_type(h, port, base, "input[data-testid='login-master-password-input']",
+             account["master_password"])
+    _wd_click(h, port, base, "button[data-testid='login-submit-button']")
+
+    deadline = time.monotonic() + 100
+    authenticated = False
+    while time.monotonic() < deadline:
+        try:
+            result = h.request(port, "POST", base + "/execute/sync", {
+                "script": """
+                  return location.protocol === 'moz-extension:' &&
+                    (location.hash.startsWith('#/tabs/vault') ||
+                     location.hash.startsWith('#/tabs/current') ||
+                     location.hash.startsWith('#/vault'));
+                """,
+                "args": [],
+            }, timeout_seconds=15)
+            if result is True:
+                authenticated = True
+                break
+        except RuntimeError:
+            pass  # Angular may swap route while authenticated.
+        time.sleep(0.4)
+    if not authenticated:
+        raise RuntimeError("Fresh signed Bitwarden extension never reached authenticated vault")
+
+    h.request(port, "POST", base + "/url",
+              {"url": popup_url.split("#", 1)[0] + "#/tabs/vault"},
+              timeout_seconds=30)
+    previous_record_visible = False
+    deadline = time.monotonic() + 80
+    while time.monotonic() < deadline:
+        try:
+            state = h.request(port, "POST", base + "/execute/sync", {
+                "script": """
+                  const items = [...document.querySelectorAll(
+                    '[data-testid="item-name"]')];
+                  return {
+                    authenticated_route:
+                      location.hash.startsWith('#/tabs/vault'),
+                    original_record_visible:
+                      items.some(n => n.textContent.trim() === 'Disposable CI Login')
+                  };
+                """,
+                "args": [],
+            }, timeout_seconds=15)
+            if (isinstance(state, dict) and state.get("authenticated_route") is True
+                    and state.get("original_record_visible") is True):
+                previous_record_visible = True
+                break
+        except RuntimeError:
+            pass
+        time.sleep(0.4)
+    if not previous_record_visible:
+        raise RuntimeError("Independent Bitwarden sign-in did not display previously saved Vaultwarden cipher")
+
+    return {
+        "verified": True,
+        "real_extension_master_password_sign_in": True,
+        "real_browser_route_authenticated": True,
+        "previous_saved_cipher_visible": True,
+        "previous_account_reused_without_registration": True,
+        "no_real_user_credentials": True,
+        "no_secrets_logged_or_uploaded": True,
+    }
+
+
 def main(repo, xpi, ca):
     popup = official_xpi(xpi)
     check_real_https(ca)
@@ -865,7 +964,7 @@ def main(repo, xpi, ca):
                     stdout=log, stderr=subprocess.STDOUT,
                     start_new_session=True)
                 h.wait_ready(port, proc)
-                value = h.request(port, "POST", "/session", {
+                session_request = {
                     "capabilities": {"alwaysMatch": {
                         "browserName": "firefox", "acceptInsecureCerts": False,
                         "moz:firefoxOptions": {
@@ -880,7 +979,9 @@ def main(repo, xpi, ca):
                             },
                         },
                     }}
-                }, timeout_seconds=60)
+                }
+                value = h.request(port, "POST", "/session", session_request,
+                                  timeout_seconds=60)
                 if not isinstance(value, dict) or not value.get("sessionId") or (
                         value.get("capabilities", {}).get("acceptInsecureCerts") is not False):
                     raise RuntimeError("Packaged Vulpra disposable profile rejected")
@@ -896,9 +997,12 @@ def main(repo, xpi, ca):
                 resource = addon_state_and_resource(h, port, base, popup)
                 verify_popup_managed_environment(h, port, base, resource)
                 registered = None
+                account = None
                 saved_item = None
+                fresh_login = None
                 if os.environ.get("VULPRA_BYOB_REGISTER_FAKE_ACCOUNT", "0") == "1":
-                    registered = register_fake_account_in_real_bitwarden(h, port, base, resource)
+                    registered, account = register_fake_account_in_real_bitwarden(
+                        h, port, base, resource)
                     print("PASS: real Bitwarden registered and authenticated one disposable account in private Vaultwarden")
                 if os.environ.get("VULPRA_BYOB_SAVE_FAKE_LOGIN", "0") == "1":
                     if registered is None:
@@ -912,6 +1016,47 @@ def main(repo, xpi, ca):
                     if verify_shortcut:
                         print("PASS: actual Firefox Bitwarden shortcut filled both localhost fields")
                 h.verify_byob_defaults(port, base)
+
+                if os.environ.get("VULPRA_BYOB_VERIFY_FRESH_LOGIN", "0") == "1":
+                    if registered is None or saved_item is None or account is None:
+                        raise RuntimeError("Independent fresh login requires a real saved record")
+                    first_profile = value.get("capabilities", {}).get("moz:profile")
+                    first_pid = value.get("capabilities", {}).get("moz:processID")
+                    if not isinstance(first_profile, str) or not isinstance(first_pid, int):
+                        raise RuntimeError("Original signed browser did not expose profile and PID")
+                    # Close the entire original browser. No Firefox, extension
+                    # storage, unlock state or session is reused for sign-in.
+                    h.request(port, "DELETE", base, timeout_seconds=35)
+                    session = None
+                    installed = False
+
+                    new_session = h.request(port, "POST", "/session",
+                                            session_request, timeout_seconds=70)
+                    if (not isinstance(new_session, dict) or not new_session.get("sessionId")
+                            or new_session.get("capabilities", {}).get("acceptInsecureCerts") is not False):
+                        raise RuntimeError("Fresh independent Vulpra browser session rejected")
+                    session = str(new_session["sessionId"])
+                    base = "/session/" + session
+                    fresh_profile = new_session.get("capabilities", {}).get("moz:profile")
+                    fresh_pid = new_session.get("capabilities", {}).get("moz:processID")
+                    if (not isinstance(fresh_profile, str) or not isinstance(fresh_pid, int)
+                            or first_profile == fresh_profile or first_pid == fresh_pid):
+                        raise RuntimeError("New Vulpra session reused original browser/profile")
+                    h.verify_byob_defaults(port, base)
+                    test_browser_server_and_extension(h, port, base)
+                    aid = h.request(port, "POST", base + "/moz/addon/install",
+                                    {"path": str(xpi), "temporary": False}, timeout_seconds=60)
+                    installed = aid == ADDON_ID
+                    if not installed:
+                        raise RuntimeError("Signed Bitwarden add-on not installed in new profile")
+                    fresh_resource = addon_state_and_resource(h, port, base, popup)
+                    verify_popup_managed_environment(h, port, base, fresh_resource)
+                    fresh_login = sign_in_disposable_account_in_fresh_bitwarden(
+                        h, port, base, fresh_resource, account)
+                    fresh_login["independent_browser_process_and_profile"] = True
+                    h.verify_byob_defaults(port, base)
+                    print("PASS: independent new Vulpra browser/profile signed into existing disposable Vaultwarden and displayed saved cipher")
+
                 h.request(port, "POST", base + "/moz/addon/uninstall", {"id": ADDON_ID})
                 installed = False
                 if sentinel.read_bytes() != old:
@@ -928,6 +1073,8 @@ def main(repo, xpi, ca):
                     "extension_authenticated_to_vaultwarden": registered is not None and registered["extension_authenticated_after_registration"] is True,
                     "disposable_registration": registered,
                     "disposable_login_record": saved_item,
+                    "disposable_fresh_login": fresh_login,
+                    "fresh_login_verified": fresh_login is not None and fresh_login["previous_saved_cipher_visible"] is True,
                     "record_saved_verified": saved_item is not None and saved_item["real_extension_ui_saved_login"] is True,
                     "record_autofill_verified": saved_item is not None and saved_item["username_and_password_both_matched"] is True,
                     "network_egress_permitted": False,

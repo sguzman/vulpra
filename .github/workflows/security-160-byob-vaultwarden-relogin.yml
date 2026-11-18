@@ -1,0 +1,280 @@
+name: Firefox 160 BYOB Independent Bitwarden Vaultwarden Sign-in (Unreleased)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths: [ci/smoke-byob-vaultwarden-local.py, .github/workflows/security-160-byob-vaultwarden-relogin.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  fresh-profile-relogin:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Authenticate native BYOB producer
+        id: identity
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const r=(await github.rest.actions.getWorkflowRun({owner,repo,run_id:44350848442})).data;
+            if (r.repository?.full_name!=='sguzman/vulpra' ||
+                r.head_sha!=='ffec2b1bfcc816385f72301cce2e71fa0f1ac337' ||
+                r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                r.status!=='completed' || r.conclusion!=='success')
+              throw Error('BYOB native producer not authenticated');
+            const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:44350848442,per_page:100});
+            for(const name of ['firefox160-byob-vulpra-unreleased-native-preview-not-approved',
+                               'firefox160-byob-vulpra-materialized-source-proof']) {
+              if(a.filter(x=>x.name===name && !x.expired && x.size_in_bytes>0).length!==1)
+                throw Error('Missing or expired verified source/native package: '+name);
+            }
+            core.setOutput('ready','true');
+      - name: Checkout only BYOB test harness
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/smoke-byob-vaultwarden-local.py
+            ci/smoke-webextension-package-local.py
+      - name: Retrieve original compiled BYOB package
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 44350848442
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: firefox160-byob-vulpra-unreleased-native-preview-not-approved
+          path: ${{ runner.temp }}/producer
+      - name: Retrieve original BYOB source identity
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 44350848442
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: firefox160-byob-vulpra-materialized-source-proof
+          path: ${{ runner.temp }}/source
+      - name: Verify source identity and native package checksum
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .upstream_release_commit == "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree == "c17d957eb58741df2855dc9b6c577be192315410" and
+            .verified_overlays == 28 and .exact_assembly_tree_match == true and
+            .byob_source_variant_verified == true and
+            .byob_branding_blob == "ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e"
+          ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
+          archive="$RUNNER_TEMP/producer/vulpra-firefox160-byob-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$(dirname "$archive")" && sha256sum -c "$(basename "$archive").sha256")
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp "$archive" "$dest/vulpra-local-firefox160-bitwarden-qa.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-bitwarden-qa.tar.xz > vulpra-local-firefox160-bitwarden-qa.tar.xz.sha256)
+      - name: Install test dependencies and verified geckodriver
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 jq curl iproute2 util-linux libnss3-tools openssl libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          curl --fail --location --show-error --silent --retry 3 --max-time 90 \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz' \
+            -o "$RUNNER_TEMP/geckodriver.tar.gz"
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$RUNNER_TEMP/geckodriver.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP/bin" geckodriver
+          "$RUNNER_TEMP/bin/geckodriver" --version
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Fetch official exact-version Mozilla Bitwarden signed XPI
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 120 \
+            'https://addons.mozilla.org/firefox/downloads/file/5198653/bitwarden_password_manager-2026.10.2.xpi' \
+            -o "$RUNNER_TEMP/bitwarden-2026.10.2.xpi"
+          printf '%s  %s\n' 'abf9d7273dd55ac0583ecc6997f7f7ae3d29de11e2ad0a4838b80e2b941daa73' "$RUNNER_TEMP/bitwarden-2026.10.2.xpi" | sha256sum -c -
+          python3 ci/smoke-byob-vaultwarden-local.py --self-test
+          echo 'Official Bitwarden XPI fetched; not redistributed as an artifact'
+      - name: Generate disposable 1-day local CA and server leaf
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tls="$RUNNER_TEMP/vulpra-vaultwarden-tls"
+          mkdir -p "$tls"
+          openssl req -new -x509 -nodes -newkey rsa:2048 -days 1 -sha256 \
+            -subj '/CN=Vulpra Disposable CI Root' \
+            -addext 'basicConstraints=critical,CA:TRUE' \
+            -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+            -keyout "$tls/ca.key" -out "$tls/ca.crt" >/dev/null 2>&1
+          openssl req -new -nodes -newkey rsa:2048 -sha256 \
+            -subj '/CN=127.0.0.1' -keyout "$tls/leaf.key" \
+            -out "$tls/leaf.csr" >/dev/null 2>&1
+          printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=IP:127.0.0.1\n' > "$tls/leaf.ext"
+          openssl x509 -req -in "$tls/leaf.csr" -CA "$tls/ca.crt" \
+            -CAkey "$tls/ca.key" -CAcreateserial -days 1 -sha256 \
+            -extfile "$tls/leaf.ext" -out "$tls/leaf.crt" >/dev/null 2>&1
+          openssl verify -CAfile "$tls/ca.crt" "$tls/leaf.crt" >/dev/null
+          chmod 755 "$tls"
+          chmod 644 "$tls/leaf.crt" "$tls/leaf.key" "$tls/ca.crt"
+          echo 'PASS: private one-day localhost CA and server certificate created in runner temp'
+      - name: Launch disposable Vaultwarden with no network egress
+        id: server
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull vaultwarden/server@sha256:efb3cde962015fcc036b2ea625242248611943b27212ebf4392841fb30fad055
+          docker run -d --name vulpra-byob-vaultwarden-ci \
+            --network none --cap-drop ALL --security-opt no-new-privileges \
+            --mount "type=bind,src=$RUNNER_TEMP/vulpra-vaultwarden-tls,dst=/tls,readonly" \
+            -e 'DOMAIN=https://127.0.0.1:8443' \
+            -e 'ROCKET_PORT=8443' \
+            -e 'ROCKET_TLS={certs="/tls/leaf.crt",key="/tls/leaf.key"}' \
+            -e 'I_REALLY_WANT_VOLATILE_STORAGE=true' \
+            -e 'SIGNUPS_ALLOWED=true' \
+            -e 'INVITATIONS_ALLOWED=false' \
+            -e 'WEB_VAULT_ENABLED=false' \
+            vaultwarden/server@sha256:efb3cde962015fcc036b2ea625242248611943b27212ebf4392841fb30fad055 >/dev/null
+          sleep 2
+          if test "$(docker inspect -f '{{.State.Running}}' vulpra-byob-vaultwarden-ci)" != true; then
+            echo 'FAIL: disposable container exited before local HTTPS startup' >&2
+            docker logs --tail 100 vulpra-byob-vaultwarden-ci 2>&1 | tail -100
+            exit 1
+          fi
+          pid="$(docker inspect -f '{{.State.Pid}}' vulpra-byob-vaultwarden-ci)"
+          [[ "$pid" =~ ^[0-9]+$ ]] && test "$pid" -gt 1
+          sudo nsenter -t "$pid" -n -- ip link set lo up
+          ready=0
+          for n in $(seq 1 50); do
+            if sudo nsenter -t "$pid" -n -- curl --fail --silent --show-error --max-time 2 \
+              --cacert "$RUNNER_TEMP/vulpra-vaultwarden-tls/ca.crt" \
+              'https://127.0.0.1:8443/alive' > /dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if test "$ready" -ne 1; then
+            docker logs --tail 80 vulpra-byob-vaultwarden-ci 2>&1 | sed -E 's#(/home/runner/[^ ]+)#[redacted-path]#g'
+            echo 'FAIL: no real local HTTPS Vaultwarden service in isolated container' >&2
+            exit 1
+          fi
+          echo 'PASS: real Vaultwarden TLS service in Docker network none; no public port'
+          echo "container_pid=$pid" >> "$GITHUB_OUTPUT"
+      - name: Run real Firefox 160 and signed Bitwarden against private HTTPS server
+        id: test
+        if: steps.identity.outputs.ready == 'true' && steps.server.outcome == 'success'
+        shell: bash
+        env:
+          VULPRA_BYOB_REGISTER_FAKE_ACCOUNT: "1"
+        run: |
+          set -euo pipefail
+          pid="$(docker inspect -f '{{.State.Pid}}' vulpra-byob-vaultwarden-ci)"
+          [[ "$pid" =~ ^[0-9]+$ ]] && test "$pid" -gt 1
+          sudo nsenter -t "$pid" -n -- runuser -u runner -- env \
+            PATH="$PATH" VULPRA_BYOB_REGISTER_FAKE_ACCOUNT=1 VULPRA_BYOB_SAVE_FAKE_LOGIN=1 VULPRA_BYOB_VERIFY_FRESH_LOGIN=1 \
+            python3 "$GITHUB_WORKSPACE/ci/smoke-byob-vaultwarden-local.py" \
+            "$GITHUB_WORKSPACE" "$RUNNER_TEMP/bitwarden-2026.10.2.xpi" \
+            "$RUNNER_TEMP/vulpra-vaultwarden-tls/ca.crt"
+          report="$GITHUB_WORKSPACE/.git/vulpra-native-build/byob-local-vaultwarden-proof.json"
+          test -s "$report"
+          jq -e '
+            .status == "pass" and
+            .actual_vaultwarden_https_service == true and
+            .real_browser_trusted_temporary_ca == true and
+            .real_bitwarden_signed_extension_installed == true and
+            .real_bitwarden_popup_managed_server_url == true and
+            .byob_defaults_preserved == true and
+            .original_browser_profile_preserved == true and
+            .vaultwarden_account_created == true and
+            .extension_authenticated_to_vaultwarden == true and
+            .disposable_registration.verified == true and
+            .disposable_registration.real_bitwarden_client_registration == true and
+            .disposable_registration.webdriver_typed_both_registration_forms == true and
+            .disposable_registration.disposable_invalid_tld_email_only == true and
+            .disposable_registration.master_password_in_proof_or_logs == false and
+            .disposable_registration.external_breach_lookup_enabled == false and
+            .disposable_login_record.verified == true and
+            .disposable_login_record.real_extension_ui_saved_login == true and
+            .disposable_login_record.real_extension_keyboard_shortcut_filled_form == false and
+            .disposable_login_record.username_and_password_both_matched == false and
+            .disposable_login_record.only_disposable_local_form == true and
+            .disposable_login_record.saved_password_or_vault_token_in_report == false and
+            .disposable_login_record.no_test_js_value_injection == true and
+            .record_saved_verified == true and
+            .record_autofill_verified == false and
+            .fresh_login_verified == true and
+            .disposable_fresh_login.verified == true and
+            .disposable_fresh_login.real_extension_master_password_sign_in == true and
+            .disposable_fresh_login.real_browser_route_authenticated == true and
+            .disposable_fresh_login.previous_saved_cipher_visible == true and
+            .disposable_fresh_login.previous_account_reused_without_registration == true and
+            .disposable_fresh_login.independent_browser_process_and_profile == true and
+            .disposable_fresh_login.no_real_user_credentials == true and
+            .disposable_fresh_login.no_secrets_logged_or_uploaded == true and
+            .network_egress_permitted == false and
+            .native_browser_recompiled == false and
+            .security_current == false and .release_ready == false
+          ' "$report" >/dev/null
+          # Corroborate the actual volatile Vaultwarden SQLite store, without
+          # printing or archiving any synthetic account or password data.
+          dbcopy="$RUNNER_TEMP/vulpra-disposable-db"
+          docker cp vulpra-byob-vaultwarden-ci:/data "$dbcopy"
+          python3 - "$dbcopy" <<'PY'
+          import pathlib, sqlite3, sys
+          folder = pathlib.Path(sys.argv[1])
+          db = folder / "db.sqlite3"
+          if not db.is_file():
+              raise SystemExit("FAIL: disposable real Vaultwarden SQLite database absent")
+          conn = sqlite3.connect("file:" + str(db) + "?mode=ro", uri=True, timeout=10)
+          with conn:
+              users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+              ciphers = conn.execute("SELECT COUNT(*) FROM ciphers").fetchone()[0]
+          conn.close()
+          if users != 1 or ciphers != 1:
+              raise SystemExit("FAIL: expected exactly one fake Vaultwarden user and saved cipher")
+          print("PASS: real disposable Vaultwarden SQLite contains one user and one saved login cipher")
+          PY
+          echo 'PASS: new Firefox 160 profile installed signed Bitwarden, signed into existing test account and retrieved old saved cipher'
+          echo 'LIMIT: new independent browser/profile sign-in proved; separate graphical autofill/host/release gates'
+      - name: Upload bounded signed-extension acceptance report
+        id: proof
+        if: success() && steps.identity.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-byob-vaultwarden-fresh-browser-signin-proof
+          path: .git/vulpra-native-build/byob-local-vaultwarden-proof.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail closed on skipped browser or proof
+        if: always()
+        shell: bash
+        env:
+          ID: ${{ steps.identity.outcome }}
+          READY: ${{ steps.identity.outputs.ready }}
+          TEST: ${{ steps.test.outcome }}
+          PROOF: ${{ steps.proof.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$ID" != success || "$READY" != true || "$TEST" != success || "$PROOF" != success ]]; then
+            echo 'FAIL: local Vaultwarden real-browser test or proof missing/failed' >&2
+            exit 1
+          fi
+          echo 'PASS: real Vaultwarden HTTPS + official signed Bitwarden browser test and proof upload'
+      - name: Always delete disposable Vaultwarden container
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f vulpra-byob-vaultwarden-ci >/dev/null 2>&1 || true
+          echo 'Disposable runner-only Vaultwarden container cleaned up'
