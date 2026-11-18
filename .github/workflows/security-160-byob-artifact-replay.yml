@@ -40,7 +40,7 @@ jobs:
         with:
           # QA harness source only. Archived browser/source identity below
           # remains pinned to the original exact Firefox 160 build.
-          ref: 2dacd9c6332323bc8b3d48f47c2a734152125c28
+          ref: e4747c73e1a0e7a8237f37ad6209483e43dfafa7
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/smoke-webextension-package-local.py
@@ -143,6 +143,8 @@ jobs:
             .byob_default_preferences.preference_names_checked == 4 and
             .byob_default_preferences.no_profile_overrides == true and
             .byob_default_preferences.passwords_read_or_written == false and
+            .byob_default_preferences.safebrowsing_local_feature_flags_preserved == true and
+            .byob_default_preferences.safebrowsing_live_provider_readiness_verified == false and
             .byob_external_extension_synthetic_fill.verified == true and
             .byob_external_extension_synthetic_fill.browser_extension_can_fill_local_fake_password_field == true and
             .byob_external_extension_synthetic_fill.no_real_credentials_or_vault_endpoint == true and
