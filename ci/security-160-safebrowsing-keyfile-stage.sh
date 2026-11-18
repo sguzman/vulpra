@@ -10,7 +10,14 @@ reject() {
 }
 
 [[ $# -eq 2 ]] || reject
-[[ -n "$RUNNER_TEMP" && -n "$GITHUB_WORKSPACE" && -n "$VULPRA_SAFEBROWSING_KEY_SOURCE" ]] || reject
+[[ -n "${RUNNER_TEMP:-}" && -n "${GITHUB_WORKSPACE:-}" && -n "${VULPRA_SAFEBROWSING_KEY_SOURCE:-}" ]] || reject
+
+# Deliberate operator attestations, not evidence of provider permission.
+# Both are required even for an isolated candidate, because a public
+# browser binary can expose a key that CI logs correctly keep private.
+# Never set these flags merely to make a release/build gate green.
+[[ "${VULPRA_SAFEBROWSING_PROVIDER_USE_REVIEWED:-}" == 1 ]] || reject
+[[ "${VULPRA_SAFEBROWSING_BINARY_DISTRIBUTION_REVIEWED:-}" == 1 ]] || reject
 [[ "$RUNNER_TEMP" = /* && "$GITHUB_WORKSPACE" = /* ]] || reject
 
 temp_root=$(realpath -e -- "$RUNNER_TEMP") || reject
@@ -30,6 +37,11 @@ source_file=$(realpath -e -- "$VULPRA_SAFEBROWSING_KEY_SOURCE") || reject
 [[ "$source_file" != "$workspace/"* ]] || reject
 [[ "$source_file" != "$output/"* ]] || reject
 [[ -r "$source_file" && -s "$source_file" ]] || reject
+
+# Reject files that can be altered through a second hardlink and ensure the
+# key material belongs to this disposable runner user, not another account.
+[[ "$(stat -c '%u' -- "$source_file")" == "$(id -u)" ]] || reject
+[[ "$(stat -c '%h' -- "$source_file")" == 1 ]] || reject
 
 mode=$(stat -c '%a' -- "$source_file") || reject
 (( (8#$mode & 077) == 0 )) || reject
