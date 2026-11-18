@@ -817,10 +817,9 @@ def _complete_genuine_bitwarden_first_run_ui(h, port, base):
               const skip = document.querySelector(
                 "#default-password-manager-prompt_button_skip-for-now");
               const carousel = document.querySelector("app-intro-carousel");
-              const buttons = carousel ?
-                [...carousel.parentElement.querySelectorAll('button[type=button]')] : [];
-              const carouselLogin = buttons.find(b =>
-                b.textContent?.trim().toLowerCase() === 'log in');
+              const carouselLogin = carousel ?
+                document.querySelector(
+                  "app-intro-carousel + button[type='button'] + button[type='button']") : null;
               return {
                 route: location.hash.split('?')[0].slice(0,65),
                 extension: location.protocol === 'moz-extension:',
@@ -846,7 +845,8 @@ def _complete_genuine_bitwarden_first_run_ui(h, port, base):
         elif last.get("carousel_login_visible") is True:
             # The exact pinned client E2E uses the carousel-scoped Log in
             # button; CSS :last-of-type did not reliably identify this DOM.
-            _wd_click(h, port, base, "app-intro-carousel ~ button[type='button']")
+            _wd_click(h, port, base,
+                      "app-intro-carousel + button[type='button'] + button[type='button']")
             counts["carousel_login"] += 1
         else:
             time.sleep(0.35)
