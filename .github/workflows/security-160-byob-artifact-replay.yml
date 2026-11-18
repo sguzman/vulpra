@@ -44,7 +44,7 @@ jobs:
         with:
           # QA harness source only. Archived browser/source identity below
           # remains pinned to the original exact Firefox 160 build.
-          ref: a7850ced3a28a8c698f764b167172ad2d5c88888
+          ref: bfede7ad56a727150721bd86f2c29c884f5c9444
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/smoke-webextension-package-local.py
