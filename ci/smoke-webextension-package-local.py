@@ -210,6 +210,59 @@ def verify_js_navigation(port: int, base: str, server: http.server.ThreadingHTTP
             "final_url": last["url"], "final_document_title": last["title"],
             "final_document_text": last["text"]}
 
+def valid_compat_user_agent(user_agent: object, browser_version: object) -> bool:
+    """Require BOTH Firefox and independent Vulpra tokens from a real page.
+
+    This is not a network/site-compatibility test and deliberately never logs
+    the complete string, which can include host-specific platform details.
+    """
+    if not isinstance(user_agent, str) or not isinstance(browser_version, str):
+        return False
+    if not browser_version.startswith("160.") or len(user_agent) > 1024:
+        return False
+    tokens = user_agent.split()
+    expected = ("Firefox/" + browser_version, "Vulpra/" + browser_version)
+    return all(token in tokens for token in expected)
+
+
+def test_compat_user_agent_parser() -> None:
+    good = "Mozilla/5.0 (X11; Linux x86_64; rv:160.0) Gecko/20100101 Firefox/160.0 Vulpra/160.0"
+    assert valid_compat_user_agent(good, "160.0")
+    bad = (good.replace("Firefox/160.0 ", ""),
+           good.replace("Vulpra/160.0", ""),
+           good.replace("Firefox/160.0", "Firefox/159.0"),
+           good.replace("Firefox/160.0", "FakeFirefox/160.0"),
+           good.replace("Vulpra/160.0", "Vulpra/161.0"),
+           "", None, "Firefox/160.0 Vulpra/160.0",)
+    for value in bad[:-1]:
+        assert not valid_compat_user_agent(value, "160.0"), "Invalid UA accepted"
+    assert not valid_compat_user_agent(good, "159.0")
+    assert not valid_compat_user_agent(good, None)
+    assert not valid_compat_user_agent(good, "160.0.1")
+    print("PASS: strict Firefox/Vulpra 160 UA token parser rejects missing/forged/incorrect tokens")
+
+
+def verify_compat_user_agent(port: int, base: str,
+                             browser_version: object) -> dict:
+    """Test unmodified default UA on previously navigated localhost page."""
+    value = request(port, "POST", base + "/execute/sync", {
+        "script": (
+            "return {ua: navigator.userAgent, "
+            "localPage: location.protocol === 'http:' && location.hostname === '127.0.0.1'};"
+        ),
+        "args": [],
+    })
+    if not isinstance(value, dict) or value.get("localPage") is not True or not (
+            valid_compat_user_agent(value.get("ua"), browser_version)):
+        raise RuntimeError("Firefox 160 default UA did not expose both Firefox and Vulpra tokens on the real local page")
+    return {
+        "verified": True, "firefox_compat_token": True,
+        "vulpra_brand_token": True, "browser_version": browser_version,
+        "default_profile_with_no_user_agent_override": True,
+        "local_page": True,
+    }
+
+
 def certificate_denial(status: int, body: object) -> bool:
     """Fail closed: exact W3C HTTP 400 insecure-certificate navigation only.
 
@@ -528,6 +581,9 @@ def main() -> int:
     if sys.argv[1:] == ["--self-test-cert-parser"]:
         test_certificate_denial_parser()
         return 0
+    if sys.argv[1:] == ["--self-test-user-agent-parser"]:
+        test_compat_user_agent_parser()
+        return 0
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Code/Apps/vulpra").resolve()
     gecko = shutil.which("geckodriver")
     if not gecko:
@@ -542,6 +598,7 @@ def main() -> int:
     nimbus_check = os.environ.get("VULPRA_M3_VERIFY_NIMBUS", "0") == "1"
     promo_check = os.environ.get("VULPRA_M3_VERIFY_NO_ASROUTER_PROMOS", "0") == "1"
     adsfeed_check = os.environ.get("VULPRA_M3_VERIFY_NO_NEWTAB_ADSFEED", "0") == "1"
+    ua_check = os.environ.get("VULPRA_VERIFY_UA_COMPAT", "0") == "1"
     archive = verified_archive(repo)
     print(f"PASS: Verified existing archive {archive.name}", flush=True)
     logdir = repo / ".git/vulpra-native-build"
@@ -617,6 +674,12 @@ def main() -> int:
                 base = f"/session/{session_id}"
                 js_result = verify_js_navigation(port, base, server)
                 print("PASS: real WebDriver JS redirect, HTTP 302 and final DOM", flush=True)
+                ua_result = None
+                if ua_check:
+                    ua_result = verify_compat_user_agent(
+                        port, base, reported.get("browserVersion")
+                    )
+                    print("PASS: default browser UA contains both Firefox and Vulpra version tokens", flush=True)
                 tls_result = verify_local_certificate_denial(
                     port, base, work, logdir / f"webextension-tls-failure-{stamp}.json"
                 )
@@ -671,6 +734,7 @@ def main() -> int:
                     "schema_version": 1, "status": "pass",
                     "package": archive.name,
                     "javascript_navigation": js_result,
+                    "user_agent_compatibility": ua_result,
                     "webextension": {"manifest_version": 2, "temporary_unsigned_install": True,
                                      "content_scripts": True, "background_messaging": True,
                                      "storage_local": True, "uninstall": True,
