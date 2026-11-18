@@ -116,10 +116,10 @@ jobs:
           # trigger so this independent replay can run now, but never from
           # unrelated commits/branches or an unverified producer.
           trigger = (
-              '  push:\\n'
-              '    branches: [upgrade/firefox-160-overlay-prototype]\\n'
-              '    paths:\\n'
-              '      - .github/workflows/security-160-byob-artifact-replay.yml\\n'
+              '  push:\n'
+              '    branches: [upgrade/firefox-160-overlay-prototype]\n'
+              '    paths:\n'
+              '      - .github/workflows/security-160-byob-artifact-replay.yml\n'
           )
           assert trigger in artifact, 'BYOB replay missing single-branch, single-file push guard'
           assert '  workflow_dispatch:' in artifact
