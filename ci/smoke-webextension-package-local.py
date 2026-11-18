@@ -263,6 +263,83 @@ def verify_compat_user_agent(port: int, base: str,
     }
 
 
+BYOB_PREF_NAMES = (
+    "identity.fxaccounts.enabled",
+    "signon.rememberSignons",
+    "signon.autofillForms",
+    "signon.generation.enabled",
+)
+
+
+def byob_defaults_verified(record: object) -> bool:
+    """Require four effective AND default false prefs, no user overrides."""
+    if not isinstance(record, dict) or set(record) != set(BYOB_PREF_NAMES):
+        return False
+    return all(
+        isinstance(record[name], dict) and
+        set(record[name]) == {"default", "effective", "user_override"} and
+        record[name]["default"] is False and
+        record[name]["effective"] is False and
+        record[name]["user_override"] is False
+        for name in BYOB_PREF_NAMES
+    )
+
+
+def self_test_byob_assertions() -> None:
+    good = {name: {"default": False, "effective": False,
+                   "user_override": False} for name in BYOB_PREF_NAMES}
+    assert byob_defaults_verified(good)
+    for key in BYOB_PREF_NAMES:
+        for field, bad in (("default", True), ("effective", True),
+                           ("user_override", True), ("default", 0),
+                           ("effective", "false")):
+            forged = {n: dict(v) for n, v in good.items()}
+            forged[key][field] = bad
+            assert not byob_defaults_verified(forged)
+        forged = {n: dict(v) for n, v in good.items() if n != key}
+        assert not byob_defaults_verified(forged)
+    assert not byob_defaults_verified({**good, "security.sandbox": {"default": False}})
+    assert not byob_defaults_verified(None)
+    print("PASS: BYOB strict pref parser rejects absent/true/overridden/malformed values")
+
+
+def verify_byob_defaults(port: int, base: str) -> dict:
+    """Query live effective/default branches in an isolated Gecko profile.
+
+    Never loads or writes stored password databases and never contacts a vault.
+    """
+    request(port, "POST", base + "/moz/context", {"context": "chrome"})
+    try:
+        result = request(port, "POST", base + "/execute/sync", {
+            "script": """
+                const keys = [
+                    'identity.fxaccounts.enabled',
+                    'signon.rememberSignons',
+                    'signon.autofillForms',
+                    'signon.generation.enabled'
+                ];
+                const defaults = Services.prefs.getDefaultBranch('');
+                return Object.fromEntries(keys.map(name => [name, {
+                    default: defaults.getBoolPref(name),
+                    effective: Services.prefs.getBoolPref(name),
+                    user_override: Services.prefs.prefHasUserValue(name)
+                }]));
+            """,
+            "args": [],
+        }, timeout_seconds=25)
+    finally:
+        request(port, "POST", base + "/moz/context", {"context": "content"})
+    if not byob_defaults_verified(result):
+        raise RuntimeError(
+            "Vulpra BYOB native default-pref acceptance failed: "
+            "expected four default/effective false booleans without profile overrides"
+        )
+    return {"verified": True, "account_and_builtin_login_defaults_disabled": True,
+            "preference_names_checked": 4, "no_profile_overrides": True,
+            "passwords_read_or_written": False,
+            "external_extension_or_vault_modified": False}
+
+
 def certificate_denial(status: int, body: object) -> bool:
     """Fail closed: exact W3C HTTP 400 insecure-certificate navigation only.
 
@@ -584,6 +661,9 @@ def main() -> int:
     if sys.argv[1:] == ["--self-test-user-agent-parser"]:
         test_compat_user_agent_parser()
         return 0
+    if sys.argv[1:] == ["--self-test-byob-assertions"]:
+        self_test_byob_assertions()
+        return 0
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Code/Apps/vulpra").resolve()
     gecko = shutil.which("geckodriver")
     if not gecko:
@@ -599,6 +679,7 @@ def main() -> int:
     promo_check = os.environ.get("VULPRA_M3_VERIFY_NO_ASROUTER_PROMOS", "0") == "1"
     adsfeed_check = os.environ.get("VULPRA_M3_VERIFY_NO_NEWTAB_ADSFEED", "0") == "1"
     ua_check = os.environ.get("VULPRA_VERIFY_UA_COMPAT", "0") == "1"
+    byob_check = os.environ.get("VULPRA_VERIFY_BYOB_DEFAULTS", "0") == "1"
     archive = verified_archive(repo)
     print(f"PASS: Verified existing archive {archive.name}", flush=True)
     logdir = repo / ".git/vulpra-native-build"
@@ -644,7 +725,7 @@ def main() -> int:
         try:
             with gecko_log.open("wb") as driver_log:
                 proc = subprocess.Popen([gecko, "--host", "127.0.0.1", "--port", str(port)] +
-                                        (["--allow-system-access"] if nimbus_check or promo_check or adsfeed_check else []),
+                                        (["--allow-system-access"] if nimbus_check or promo_check or adsfeed_check or byob_check else []),
                                         env=env, stdout=driver_log, stderr=subprocess.STDOUT,
                                         start_new_session=True)
                 wait_ready(port, proc)
@@ -657,6 +738,11 @@ def main() -> int:
                             "args": ["-headless", "-no-remote"],
                             "prefs": {
                                 "browser.shell.checkDefaultBrowser": False,
+                                # Automation recommended prefs can disable
+                                # threat protection. Bypass them for this
+                                # opt-in BYOB check, without security prefs.
+                                **({"remote.prefs.recommended": False}
+                                   if byob_check else {}),
                                 "app.update.enabled": False,
                                 "extensions.update.enabled": False,
                             },
@@ -680,6 +766,10 @@ def main() -> int:
                         port, base, reported.get("browserVersion")
                     )
                     print("PASS: default browser UA contains both Firefox and Vulpra version tokens", flush=True)
+                byob_result = None
+                if byob_check:
+                    byob_result = verify_byob_defaults(port, base)
+                    print("PASS: live Vulpra default/effective BYOB prefs off without user overrides", flush=True)
                 tls_result = verify_local_certificate_denial(
                     port, base, work, logdir / f"webextension-tls-failure-{stamp}.json"
                 )
@@ -735,6 +825,7 @@ def main() -> int:
                     "package": archive.name,
                     "javascript_navigation": js_result,
                     "user_agent_compatibility": ua_result,
+                    "byob_default_preferences": byob_result,
                     "webextension": {"manifest_version": 2, "temporary_unsigned_install": True,
                                      "content_scripts": True, "background_messaging": True,
                                      "storage_local": True, "uninstall": True,
