@@ -1,0 +1,90 @@
+name: Firefox 160 BYOB Native Preview Preflight (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-byob-native-preview.yml
+      - .github/workflows/security-160-byob-native-preflight.yml
+      - ci/smoke-webextension-package-local.py
+      - ci/security-160-stage-byob-branding.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-source-and-runtime-contracts:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout BYOB-specific build workflow and source harness only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/security-160-byob-native-preview.yml
+            .github/workflows/security-160-byob-native-preflight.yml
+            ci/smoke-webextension-package-local.py
+            ci/security-160-stage-byob-branding.sh
+      - name: Check YAML and fail-closed BYOB source/build/runtime contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruby -e 'require "yaml"; YAML.load_file(ARGV.fetch(0)); puts "PASS: native preview YAML parsed"' \
+            .github/workflows/security-160-byob-native-preview.yml
+          bash -n ci/security-160-stage-byob-branding.sh
+          python3 -m py_compile ci/smoke-webextension-package-local.py
+          python3 ci/smoke-webextension-package-local.py --self-test-byob-assertions
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          p=Path('.github/workflows/security-160-byob-native-preview.yml')
+          c=p.read_text()
+          markers={
+            "exclusive BYOB variant":"security-160-stage-byob-branding.sh",
+            "exact new candidate tree":"c17d957eb58741df2855dc9b6c577be192315410",
+            "old branding pinned":"9308a1b26f339e0e89d959f0c4559eb7596a0fe6",
+            "new branding pinned":"ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e",
+            "independently pinned main source":"ca4ef5eea3e63b75cc0db0ce8e036dccce1b8511",
+            "preserved base stage":"ci/security-160-stage-overlay.sh",
+            "exact full tree materialization":"Materialize ONLY verified source patches, prove exact complete Git tree",
+            "native compile":"Compile exact materialized Firefox 160 Vulpra candidate",
+            "separate provider-safe runtime QA":"VULPRA_VERIFY_BYOB_DEFAULTS:",
+            "user-agent QA":"VULPRA_VERIFY_UA_COMPAT:",
+            "privileged Gecko default-pref test":".byob_default_preferences.verified==true",
+            "extension still works":".webextension.temporary_unsigned_install==true",
+            "strict HTTPS denial":".security.local_untrusted_tls_denial.verified==true",
+            "no approved security currency":"security_current:false",
+            "no release approval":"release_ready:false",
+            "no automatic user profile modification":"original_firefox_profile_preserved:true",
+            "independent archive":"firefox160-byob-vulpra-unreleased-native-preview-not-approved",
+          }
+          for name,value in markers.items():
+            assert value in c, f'Native BYOB candidate missing {name}'
+          assert not re.search(r'^\s+release_ready\s*:\s*true',c,re.M)
+          assert not re.search(r'^\s+security_current\s*:\s*true',c,re.M)
+          assert 'VULPRA_SAFEBROWSING_KEY_SOURCE' not in c, 'Unexpected external provider key dependency'
+          assert '--enable-official-branding' not in c, 'Unexpected Mozilla official branding'
+          scripts=[]
+          lines=c.splitlines()
+          for i,line in enumerate(lines):
+            m=re.match(r'^(\s+)run: \|\s*$',line)
+            if not m: continue
+            base=len(m.group(1))
+            arr=[]
+            for nxt in lines[i+1:]:
+              if not nxt.strip():
+                arr.append('')
+                continue
+              ind=len(nxt)-len(nxt.lstrip())
+              if ind<=base: break
+              arr.append(nxt[base+2:])
+            assert arr, f'Empty shell block line {i+1}'
+            scripts.append('\n'.join(arr)+'\n')
+          assert len(scripts)>=13, f'Expected native smoke/build scripts, got {len(scripts)}'
+          for i,script in enumerate(scripts):
+            ret=subprocess.run(['bash','-n'],input=script,text=True,capture_output=True)
+            assert ret.returncode==0, f'Bash block {i+1} syntax failed: {ret.stderr}'
+          print(f'PASS: {len(markers)} BYOB native source and runtime contracts; {len(scripts)} shell scripts')
+          print('LIMIT: static preflight; no Firefox source compiled or rebuilt in this job')
+          PY
