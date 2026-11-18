@@ -127,12 +127,17 @@ jobs:
             .audit.synthetic_local_fetch_ok == true and
             .audit.synthetic_local_request_observed == true and
             .audit.request_category_counts.local >= 1 and
+            .audit.observer_phase_counts.positive_control.local >= 1 and
+            (.audit.observer_phase_counts | keys | length) == 3 and
+            (.audit.mozilla_other_family_counts | keys | length) == 9 and
+            .audit.configured_observation_ms.early_idle == 1800 and
+            .audit.configured_observation_ms.late_idle == 8000 and
             .audit.observer_removed_in_finally == true and
             .audit.raw_urls_in_report == false and
             .audit.production_request_delivery_verified == false and
             (.audit.endpoint_prefs | length) == 9
           ' "$report" >/dev/null
-          echo "PASS: actual native HTTP observer saw local positive control and redacted endpoint classes"
+          echo "PASS: real native 3-phase HTTP observer, source-supported Mozilla-family categories, and redacted proof"
           echo "LIMIT: short no-egress interval, not production transport or privacy certification"
       - name: Upload bounded request and endpoint-class proof
         id: proof

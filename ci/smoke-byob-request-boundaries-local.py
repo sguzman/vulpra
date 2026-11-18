@@ -43,6 +43,15 @@ CATEGORIES = (
     "local", "mozilla_account", "mozilla_sync", "mozilla_telemetry",
     "mozilla_other", "google_provider", "other_external",
 )
+# Source-supported host families from current repository browser/app/profile/
+# firefox.js and modules/libpref/init/all.js. These are hypothesis classes,
+# NOT confirmed network consumers or a source match against the compiled 160.
+OTHER_FAMILIES = (
+    "webextension_storage_sync", "remote_settings", "addon_services",
+    "normandy", "merino", "safebrowsing_lookup", "region_connectivity",
+    "push_notifications", "mozilla_other_unresolved",
+)
+PHASES = ("positive_control", "early_idle", "late_idle")
 URL_CLASSES = (*CATEGORIES, "absent", "empty", "unparseable", "non_http", "unreadable")
 BYOB = (
     "identity.fxaccounts.enabled", "signon.rememberSignons",
@@ -70,6 +79,47 @@ const safe = {phase:"init"};
   ];
   const counts = Object.fromEntries(categories.map(x => [x, 0]));
   const requested = {seen:0, observed_local_probe:false};
+  const phaseNames = ["positive_control", "early_idle", "late_idle"];
+  const phaseCounts = Object.fromEntries(phaseNames.map(x => [
+    x, Object.fromEntries(categories.map(c => [c, 0]))
+  ]));
+  const otherFamilies = [
+    "webextension_storage_sync", "remote_settings", "addon_services",
+    "normandy", "merino", "safebrowsing_lookup", "region_connectivity",
+    "push_notifications", "mozilla_other_unresolved"
+  ];
+  const familyCounts = Object.fromEntries(otherFamilies.map(x => [x, 0]));
+  let observedPhase = "positive_control";
+  // Only fixed category names cross into reports. Never return the hostname.
+  const otherFamily = raw => {
+    let host;
+    try { host = new URL(raw).hostname.toLowerCase(); }
+    catch (_e) { return "mozilla_other_unresolved"; }
+    const isHost = x => host === x || host.endsWith("." + x);
+    if (isHost("webextensions.settings.services.mozilla.com"))
+      return "webextension_storage_sync";
+    if (isHost("firefox.settings.services.mozilla.com") ||
+        isHost("settings.services.mozilla.com"))
+      return "remote_settings";
+    if (isHost("addons.mozilla.org"))
+      return "addon_services";
+    if (isHost("normandy.cdn.mozilla.net") ||
+        isHost("normandy.content-signature.mozilla.org") ||
+        isHost("normandy.services.mozilla.com"))
+      return "normandy";
+    if (isHost("merino.services.mozilla.com") ||
+        isHost("ohttp-gateway-merino.services.mozilla.com"))
+      return "merino";
+    if (isHost("shavar.services.mozilla.com"))
+      return "safebrowsing_lookup";
+    if (isHost("location.services.mozilla.com") ||
+        isHost("detectportal.firefox.com") ||
+        isHost("mitmdetection.services.mozilla.com"))
+      return "region_connectivity";
+    if (isHost("push.services.mozilla.com"))
+      return "push_notifications";
+    return "mozilla_other_unresolved";
+  };
   const classify = raw => {
     if (!raw) return "empty";
     let uri;
@@ -163,6 +213,9 @@ const safe = {phase:"init"};
         const kind = classify(url);
         if (!Object.hasOwn(counts, kind)) return;
         counts[kind] += 1;
+        phaseCounts[observedPhase][kind] += 1;
+        if (kind === "mozilla_other")
+          familyCounts[otherFamily(url)] += 1;
         requested.seen += 1;
         if (kind === "local" && uri.host === ciHost &&
             uri.pathQueryRef === "/ci-observer-positive")
@@ -180,8 +233,12 @@ const safe = {phase:"init"};
     safe.phase = "local_control";
     const response = await fetch(ciUrl, {cache:"no-store", redirect:"error"});
     localFetchOk = response.status === 204;
-    safe.phase = "bounded_observation";
+    safe.phase = "early_idle";
+    observedPhase = "early_idle";
     await new Promise(resolve => setTimeout(resolve, 1800));
+    safe.phase = "late_idle";
+    observedPhase = "late_idle";
+    await new Promise(resolve => setTimeout(resolve, 8000));
   } finally {
     safe.phase = "observer_cleanup";
     Services.obs.removeObserver(observer, "http-on-modify-request");
@@ -197,6 +254,9 @@ const safe = {phase:"init"};
     synthetic_local_request_observed: requested.observed_local_probe,
     requests_observed: requested.seen,
     request_category_counts: counts,
+    observer_phase_counts: phaseCounts,
+    mozilla_other_family_counts: familyCounts,
+    configured_observation_ms: {early_idle: 1800, late_idle: 8000},
     endpoint_prefs: prefixes,
     preference_contract: settings,
     observer_removed_in_finally: removed,
@@ -246,6 +306,30 @@ def valid(d):
     total = d.get("requests_observed")
     if type(total) is not int or total != sum(counts.values()):
         return False
+    phase_counts = d.get("observer_phase_counts")
+    family_counts = d.get("mozilla_other_family_counts")
+    if (not isinstance(phase_counts, dict) or set(phase_counts) != set(PHASES)
+            or not isinstance(family_counts, dict)
+            or set(family_counts) != set(OTHER_FAMILIES)):
+        return False
+    for phase in PHASES:
+        row = phase_counts[phase]
+        if (not isinstance(row, dict) or set(row) != set(CATEGORIES)
+                or any(type(n) is not int or n < 0 or n > 100000
+                       for n in row.values())):
+            return False
+    if phase_counts["positive_control"]["local"] < 1:
+        return False
+    if any(sum(phase_counts[phase][kind] for phase in PHASES) != counts[kind]
+           for kind in CATEGORIES):
+        return False
+    if (any(type(n) is not int or n < 0 or n > 100000
+            for n in family_counts.values())
+            or sum(family_counts.values()) != counts["mozilla_other"]):
+        return False
+    if d.get("configured_observation_ms") != {
+            "early_idle": 1800, "late_idle": 8000}:
+        return False
     rows = d.get("endpoint_prefs")
     if (not isinstance(rows, list) or len(rows) != len(ENDPOINT_PREFS)
             or [row.get("name") for row in rows if isinstance(row, dict)]
@@ -292,6 +376,12 @@ def self_test():
         "requests_observed": 1,
         "request_category_counts": {c: 1 if c == "local" else 0
                                     for c in CATEGORIES},
+        "observer_phase_counts": {
+            phase: {c: 1 if phase == "positive_control" and c == "local"
+                    else 0 for c in CATEGORIES} for phase in PHASES
+        },
+        "mozilla_other_family_counts": {family: 0 for family in OTHER_FAMILIES},
+        "configured_observation_ms": {"early_idle": 1800, "late_idle": 8000},
         "endpoint_prefs": [
             {"name":name, "present":False, "kind":"absent", "locked":False,
              "user_override":False, "default_class":"absent",
@@ -310,6 +400,12 @@ def self_test():
         {**d, "account_signed_out":False},
         {**d, "observer_removed_in_finally":False},
         {**d, "raw_urls_in_report":True},
+        {**d, "observer_phase_counts": {**d["observer_phase_counts"],
+                "late_idle": {**d["observer_phase_counts"]["late_idle"],
+                              "local": 1}}},
+        {**d, "mozilla_other_family_counts": {
+                **d["mozilla_other_family_counts"],
+                "mozilla_other_unresolved": 1}},
         {**d, "endpoint_prefs":[{**d["endpoint_prefs"][0],
                                  "default_class":"https://example.invalid"}] +
                               d["endpoint_prefs"][1:]},
@@ -323,7 +419,7 @@ def self_test():
     ]
     for candidate in invalid:
         assert not valid(candidate), "A fabricated privacy proof passed validation"
-    print("PASS: bounded request/endpoint audit parser + 8 negative controls")
+    print("PASS: bounded 3-phase request/endpoint audit + 10 negative controls")
 
 
 def helper():
