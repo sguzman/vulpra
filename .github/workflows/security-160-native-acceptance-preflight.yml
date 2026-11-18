@@ -159,11 +159,11 @@ jobs:
           # can silently skip the actual browser while leaving CI green.
           def gate_contract_valid(blob):
               required_gates = (
-                  "      - name: Authenticate original Firefox 160 build and byte-preserving archive\\n        id: inspect\\n",
+                  "      - name: Authenticate original Firefox 160 build and byte-preserving archive\n        id: inspect\n",
                   "core.setOutput('ready','true');",
-                  "      - name: Run real packaged browser JS, WebExtension, strict TLS and Nimbus tests only\\n        id: replay\\n",
-                  "      - name: Upload authenticated Firefox 160 artifact-only runtime proof\\n        id: proof\\n",
-                  "      - name: Fail closed if authenticated native browser replay did not execute\\n        if: always()\\n",
+                  "      - name: Run real packaged browser JS, WebExtension, strict TLS and Nimbus tests only\n        id: replay\n",
+                  "      - name: Upload authenticated Firefox 160 artifact-only runtime proof\n        id: proof\n",
+                  "      - name: Fail closed if authenticated native browser replay did not execute\n        if: always()\n",
                   "INSPECT_STATUS:", "INSPECT_READY:", "REPLAY_STATUS:", "PROOF_STATUS:",
                   '"$INSPECT_STATUS" != success', '"$INSPECT_READY" != true',
                   '"$REPLAY_STATUS" != success', '"$PROOF_STATUS" != success',
@@ -173,9 +173,9 @@ jobs:
           # Reject regressions where a gate's step ID, output, or mandatory
           # verification step is accidentally dropped in a refactor.
           negative_markers = (
-              "        id: inspect\\n", "core.setOutput('ready','true');",
-              "        id: replay\\n", "        id: proof\\n",
-              "      - name: Fail closed if authenticated native browser replay did not execute\\n",
+              "        id: inspect\n", "core.setOutput('ready','true');",
+              "        id: replay\n", "        id: proof\n",
+              "      - name: Fail closed if authenticated native browser replay did not execute\n",
           )
           for marker in negative_markers:
               assert marker in source, 'Missing mutation fixture anchor'
