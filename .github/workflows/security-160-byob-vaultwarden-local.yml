@@ -134,7 +134,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker pull vaultwarden/server:1.37.4
+          docker pull vaultwarden/server@sha256:efb3cde962015fcc036b2ea625242248611943b27212ebf4392841fb30fad055
           docker run -d --name vulpra-byob-vaultwarden-ci \
             --network none --cap-drop ALL --security-opt no-new-privileges \
             --mount "type=bind,src=$RUNNER_TEMP/vulpra-vaultwarden-tls,dst=/tls,readonly" \
@@ -145,7 +145,7 @@ jobs:
             -e 'SIGNUPS_ALLOWED=true' \
             -e 'INVITATIONS_ALLOWED=false' \
             -e 'WEB_VAULT_ENABLED=false' \
-            vaultwarden/server:1.37.4 >/dev/null
+            vaultwarden/server@sha256:efb3cde962015fcc036b2ea625242248611943b27212ebf4392841fb30fad055 >/dev/null
           sleep 2
           if test "$(docker inspect -f '{{.State.Running}}' vulpra-byob-vaultwarden-ci)" != true; then
             echo 'FAIL: disposable container exited before local HTTPS startup' >&2
