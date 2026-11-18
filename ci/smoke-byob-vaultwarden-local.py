@@ -143,7 +143,7 @@ def addon_state_and_resource(h, port, base, popup):
                   active: addon.isActive === true,
                   signed: addon.signedState === AddonManager.SIGNEDSTATE_SIGNED,
                   temporary: addon.temporarilyInstalled === true,
-                  resource: addon.getResourceURI(path).spec
+                  resource: WebExtensionPolicy.getByID(addon.id)?.getURL(path) ?? null
                 } : null);
               })().catch(e => done({error: String(e).slice(0,100)}));
             """,
