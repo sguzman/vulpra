@@ -912,12 +912,24 @@ def main() -> int:
                     raise RuntimeError("Extension content/background/storage proof not observed after installation")
                 synthetic_fill_result = None
                 if byob_check:
-                    fill_state = fake_password_field_state()
-                    if not isinstance(fill_state, dict) or not (
-                            fill_state.get("only_localhost") is True and
-                            fill_state.get("fixture_value_set") is True and
-                            fill_state.get("extension_marked_fill") is True):
-                        raise RuntimeError("Isolated WebExtension failed synthetic password-field fill")
+                    # Runtime/message storage and DOM mutations are different
+                    # asynchronous steps. Poll the *actual field state* rather
+                    # than treating the proof dataset flag as a fill barrier.
+                    deadline_fill = time.monotonic() + 10
+                    fill_state = None
+                    while time.monotonic() < deadline_fill:
+                        fill_state = fake_password_field_state()
+                        if isinstance(fill_state, dict) and (
+                                fill_state.get("only_localhost") is True and
+                                fill_state.get("fixture_value_set") is True and
+                                fill_state.get("extension_marked_fill") is True):
+                            break
+                        time.sleep(0.2)
+                    else:
+                        raise RuntimeError(
+                            "Isolated WebExtension failed synthetic password-field fill "
+                            "(or field was not on localhost)"
+                        )
                     synthetic_fill_result = {
                         "verified": True,
                         "browser_extension_can_fill_local_fake_password_field": True,
