@@ -351,6 +351,12 @@ def main(repo: Path):
                                          "pref_name": record.get("pref_name")
                                          if isinstance(record, dict) else None,
                                          "controls": record.get("controls")
+                                         if isinstance(record, dict) else None,
+                                         "identity_pref": record.get("prefs", {}).get("identity.fxaccounts.enabled")
+                                         if isinstance(record, dict) else None,
+                                         "upload_pref": record.get("prefs", {}).get("datareporting.healthreport.uploadEnabled")
+                                         if isinstance(record, dict) else None,
+                                         "modules": record.get("modules")
                                          if isinstance(record, dict) else None}))
                 h.verify_byob_defaults(port, base)
                 if sentinel.read_bytes() != original:
