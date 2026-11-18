@@ -143,7 +143,7 @@ jobs:
             .user_agent_compatibility.verified == true and
             .user_agent_compatibility.firefox_compat_token == true and
             .user_agent_compatibility.vulpra_brand_token == true and
-            .user_agent_compatibility.browser_version | startswith("160.") and
+            (.user_agent_compatibility.browser_version | startswith("160.")) and
             .user_agent_compatibility.default_profile_with_no_user_agent_override == true and
             .webextension.temporary_unsigned_install == true and
             .webextension.content_scripts == true and
