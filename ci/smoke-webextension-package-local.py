@@ -126,8 +126,15 @@ def create_probe_extension(path: Path, token: str) -> None:
     )
     content = (
         "browser.runtime.sendMessage({type:'vulpra-probe'}).then(reply => {"
-        f"if (reply && reply.proof === {json.dumps(token)}) "
+        f"if (reply && reply.proof === {json.dumps(token)}) {{"
         "document.documentElement.dataset.vulpraExtensionProof = reply.proof;"
+        "// Never contact or imitate a real vault: synthetic localhost only."
+        "const testField = document.querySelector('#vulpra-synthetic-password');"
+        "if (testField && location.hostname === '127.0.0.1') {"
+        "testField.value = 'vulpra-fixture-not-a-secret';"
+        "testField.dispatchEvent(new Event('input', {bubbles:true}));"
+        "document.documentElement.dataset.vulpraSyntheticFill = 'yes';"
+        "}}"
         "}).catch(error => {"
         "document.documentElement.dataset.vulpraExtensionError = String(error);"
         "});"
@@ -143,7 +150,10 @@ class LocalPage(http.server.BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         self.server.paths.append(path)
         if path == "/extension":
-            data = b'<!doctype html><html><meta charset="utf-8"><title>Vulpra extension smoke</title><h1>WebExtension test</h1></html>'
+            data = (b'<!doctype html><html><meta charset="utf-8"><title>Vulpra extension smoke</title>'
+                    b'<h1>WebExtension test</h1><form action="javascript:void(0)">'
+                    b'<input id="vulpra-synthetic-password" type="password" autocomplete="current-password">'
+                    b'</form></html>')
             status = 200
         elif path == "/start":
             data = (b'<!doctype html><meta charset="utf-8"><title>M3 startup</title>'
@@ -784,9 +794,30 @@ def main() -> int:
                         "args": [],
                     })
 
+                def fake_password_field_state() -> object:
+                    return request(port, "POST", base + "/execute/sync", {
+                        "script": """
+                            const field = document.querySelector('#vulpra-synthetic-password');
+                            return field ? {
+                                only_localhost: location.hostname === '127.0.0.1',
+                                fixture_value_set: field.value === 'vulpra-fixture-not-a-secret',
+                                field_empty: field.value === '',
+                                extension_marked_fill:
+                                    document.documentElement.dataset.vulpraSyntheticFill === 'yes'
+                            } : null;
+                        """,
+                        "args": [],
+                    })
                 navigate("before")
                 if proof() is not None:
                     raise RuntimeError("Extension proof appeared before installation")
+                if byob_check:
+                    before_state = fake_password_field_state()
+                    if not isinstance(before_state, dict) or not (
+                            before_state.get("only_localhost") is True and
+                            before_state.get("field_empty") is True and
+                            before_state.get("extension_marked_fill") is False):
+                        raise RuntimeError("Local synthetic password field not initially empty")
                 print("PASS: Unsigned probe not present before installation", flush=True)
                 addon_id = request(port, "POST", base + "/moz/addon/install", {
                     "path": str(addon), "temporary": True,
@@ -800,10 +831,30 @@ def main() -> int:
                     time.sleep(0.25)
                 if proof() != token:
                     raise RuntimeError("Extension content/background/storage proof not observed after installation")
+                synthetic_fill_result = None
+                if byob_check:
+                    fill_state = fake_password_field_state()
+                    if not isinstance(fill_state, dict) or not (
+                            fill_state.get("only_localhost") is True and
+                            fill_state.get("fixture_value_set") is True and
+                            fill_state.get("extension_marked_fill") is True):
+                        raise RuntimeError("Isolated WebExtension failed synthetic password-field fill")
+                    synthetic_fill_result = {
+                        "verified": True,
+                        "browser_extension_can_fill_local_fake_password_field": True,
+                        "no_real_credentials_or_vault_endpoint": True,
+                    }
+                    print("PASS: separate WebExtension populated synthetic localhost password form", flush=True)
                 print("PASS: Temporary unsigned WebExtension installed; content script, background messaging and storage.local executed", flush=True)
                 request(port, "POST", base + "/moz/addon/uninstall", {"id": addon_id})
                 navigate("uninstalled")
                 uninstall_samples = verify_uninstall_stays_uninstalled(proof)
+                if byob_check:
+                    after_state = fake_password_field_state()
+                    if not isinstance(after_state, dict) or not (
+                            after_state.get("field_empty") is True and
+                            after_state.get("extension_marked_fill") is False):
+                        raise RuntimeError("Synthetic extension fill persisted after uninstall/new navigation")
                 print(f"PASS: WebExtension uninstall remained inactive across {uninstall_samples} repeated checks", flush=True)
                 nimbus_result = None
                 if nimbus_check:
@@ -826,6 +877,7 @@ def main() -> int:
                     "javascript_navigation": js_result,
                     "user_agent_compatibility": ua_result,
                     "byob_default_preferences": byob_result,
+                    "byob_external_extension_synthetic_fill": synthetic_fill_result,
                     "webextension": {"manifest_version": 2, "temporary_unsigned_install": True,
                                      "content_scripts": True, "background_messaging": True,
                                      "storage_local": True, "uninstall": True,
