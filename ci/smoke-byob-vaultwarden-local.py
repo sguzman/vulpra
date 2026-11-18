@@ -400,7 +400,13 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
     modifies browser prefs, or sends data outside the CI namespace.
     """
     report = {
+        "chrome_probe_executed": False,
+        "chrome_browser_window_found": False,
+        "chrome_target_tab_present": False,
+        "chrome_current_tab_is_local": False,
         "browser_selected_login_tab": False,
+        "diagnostic_tab_created": False,
+        "extension_probe_executed": False,
         "extension_can_find_target_tab": False,
         "extension_target_is_active": False,
         "content_script_triage_answered": False,
@@ -417,12 +423,25 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
                   const {Services} = ChromeUtils.importESModule(
                     'resource://gre/modules/Services.sys.mjs');
                   const win = Services.wm.getMostRecentWindow('navigator:browser');
-                  return !!win?.gBrowser?.selectedBrowser?.currentURI &&
-                         win.gBrowser.selectedBrowser.currentURI.spec === arguments[0];
+                  const browser = win?.gBrowser;
+                  const current = browser?.selectedBrowser?.currentURI?.spec ?? '';
+                  return {
+                    window_found: !!browser,
+                    selected_local: current.startsWith('http://127.0.0.1:'),
+                    selected_match: current === arguments[0],
+                    target_present: !!browser?.tabs?.length &&
+                      [...browser.tabs].some(t =>
+                        t.linkedBrowser?.currentURI?.spec === arguments[0])
+                  };
                 """,
                 "args": [login_url],
             }, timeout_seconds=15)
-            report["browser_selected_login_tab"] = selected is True
+            if isinstance(selected, dict):
+                report["chrome_probe_executed"] = True
+                report["chrome_browser_window_found"] = selected.get("window_found") is True
+                report["chrome_target_tab_present"] = selected.get("target_present") is True
+                report["chrome_current_tab_is_local"] = selected.get("selected_local") is True
+                report["browser_selected_login_tab"] = selected.get("selected_match") is True
         finally:
             h.request(port, "POST", base + "/moz/context", {"context": "content"})
     except RuntimeError:
@@ -437,6 +456,7 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
         if not isinstance(new_tab, dict) or not new_tab.get("handle"):
             raise RuntimeError("Could not open bounded extension diagnostic tab")
         diagnostic_window = new_tab["handle"]
+        report["diagnostic_tab_created"] = True
         h.request(port, "POST", base + "/url",
                   {"url": popup_url.split("#", 1)[0] + "#/tabs/vault"},
                   timeout_seconds=30)
@@ -474,6 +494,7 @@ def _diagnose_autofill_gap_without_secrets(h, port, base, popup_url, login_url):
             "args": [login_url],
         }, timeout_seconds=30)
         if isinstance(result, dict):
+            report["extension_probe_executed"] = True
             report["extension_can_find_target_tab"] = result.get("target_found") is True
             report["extension_target_is_active"] = result.get("target_active") is True
             report["content_script_triage_answered"] = result.get("triage_answered") is True
@@ -641,6 +662,10 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
             if not window_ids:
                 raise RuntimeError("No visible test-owned Firefox X11 window for browser PID")
             target_window = window_ids[-1]
+            # windowfocus alone does not necessarily set the EWMH active
+            # browser window that Firefox uses for current-window tab lookup.
+            subprocess.run(["xdotool", "windowactivate", "--sync", target_window],
+                           check=True, capture_output=True, timeout=15)
             subprocess.run(["xdotool", "windowfocus", "--sync", target_window],
                            check=True, capture_output=True, timeout=15)
             subprocess.run(["xdotool", "key", "--clearmodifiers",
