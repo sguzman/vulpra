@@ -24,6 +24,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 import ssl
 import zipfile
 
@@ -115,8 +116,9 @@ def check_real_https(ca):
         with urllib.request.urlopen(ENDPOINT + "/alive",
                                     context=ssl.create_default_context(), timeout=8):
             raise RuntimeError("Test's supposedly untrusted private CA was accepted globally")
-    except ssl.SSLCertVerificationError:
-        pass
+    except urllib.error.URLError as exc:
+        if not isinstance(exc.reason, ssl.SSLCertVerificationError):
+            raise
     with urllib.request.urlopen(ENDPOINT + "/api/config", context=trusted, timeout=12) as response:
         config = json.load(response)
     if not isinstance(config, dict):
