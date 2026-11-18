@@ -311,6 +311,11 @@ BYOB_PREF_NAMES = (
     "signon.autofillForms",
     "signon.generation.enabled",
 )
+BYOB_PROTECTED_THREAT_PREFS = (
+    "browser.safebrowsing.phishing.enabled",
+    "browser.safebrowsing.malware.enabled",
+    "browser.safebrowsing.downloads.enabled",
+)
 
 
 def byob_defaults_verified(record: object) -> bool:
@@ -324,6 +329,20 @@ def byob_defaults_verified(record: object) -> bool:
         record[name]["effective"] is False and
         record[name]["user_override"] is False
         for name in BYOB_PREF_NAMES
+    )
+
+
+def protected_threat_defaults_preserved(record: object) -> bool:
+    """Require true default/effective threat-pref flags; not provider readiness."""
+    if not isinstance(record, dict) or set(record) != set(BYOB_PROTECTED_THREAT_PREFS):
+        return False
+    return all(
+        isinstance(record[name], dict) and
+        set(record[name]) == {"default", "effective", "user_override"} and
+        record[name]["default"] is True and
+        record[name]["effective"] is True and
+        record[name]["user_override"] is False
+        for name in BYOB_PROTECTED_THREAT_PREFS
     )
 
 
@@ -342,7 +361,19 @@ def self_test_byob_assertions() -> None:
         assert not byob_defaults_verified(forged)
     assert not byob_defaults_verified({**good, "security.sandbox": {"default": False}})
     assert not byob_defaults_verified(None)
-    print("PASS: BYOB strict pref parser rejects absent/true/overridden/malformed values")
+    baseline = {name: {"default": True, "effective": True,
+                       "user_override": False} for name in BYOB_PROTECTED_THREAT_PREFS}
+    assert protected_threat_defaults_preserved(baseline)
+    for key in BYOB_PROTECTED_THREAT_PREFS:
+        for field, wrong in (("default", False), ("effective", False),
+                             ("user_override", True), ("default", 1),
+                             ("effective", "true")):
+            forged = {name: dict(vals) for name, vals in baseline.items()}
+            forged[key][field] = wrong
+            assert not protected_threat_defaults_preserved(forged)
+        missing = {name: dict(vals) for name, vals in baseline.items() if name != key}
+        assert not protected_threat_defaults_preserved(missing)
+    print("PASS: BYOB defaults and protected phishing/malware/download flag assertions reject altered values")
 
 
 def verify_byob_defaults(port: int, base: str) -> dict:
@@ -360,24 +391,37 @@ def verify_byob_defaults(port: int, base: str) -> dict:
                     'signon.autofillForms',
                     'signon.generation.enabled'
                 ];
+                const protections = [
+                    'browser.safebrowsing.phishing.enabled',
+                    'browser.safebrowsing.malware.enabled',
+                    'browser.safebrowsing.downloads.enabled'
+                ];
                 const defaults = Services.prefs.getDefaultBranch('');
-                return Object.fromEntries(keys.map(name => [name, {
+                const inspect = names => Object.fromEntries(names.map(name => [name, {
                     default: defaults.getBoolPref(name),
                     effective: Services.prefs.getBoolPref(name),
                     user_override: Services.prefs.prefHasUserValue(name)
                 }]));
+                return {byob: inspect(keys), protections: inspect(protections)};
             """,
             "args": [],
         }, timeout_seconds=25)
     finally:
         request(port, "POST", base + "/moz/context", {"context": "content"})
-    if not byob_defaults_verified(result):
+    if not isinstance(result, dict) or not byob_defaults_verified(result.get("byob")):
         raise RuntimeError(
             "Vulpra BYOB native default-pref acceptance failed: "
             "expected four default/effective false booleans without profile overrides"
         )
+    if not protected_threat_defaults_preserved(result.get("protections")):
+        raise RuntimeError(
+            "Vulpra BYOB default verification detected disabled/overridden "
+            "phishing, malware, or download threat-protection settings"
+        )
     return {"verified": True, "account_and_builtin_login_defaults_disabled": True,
             "preference_names_checked": 4, "no_profile_overrides": True,
+            "safebrowsing_local_feature_flags_preserved": True,
+            "safebrowsing_live_provider_readiness_verified": False,
             "passwords_read_or_written": False,
             "external_extension_or_vault_modified": False}
 
