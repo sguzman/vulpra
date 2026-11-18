@@ -155,6 +155,32 @@ jobs:
           }
           for name, fragment in required.items():
               assert fragment in source, f"Artifact replay missing {name}"
+          # A missing GitHub Actions step output evaluates to empty, and
+          # can silently skip the actual browser while leaving CI green.
+          def gate_contract_valid(blob):
+              required_gates = (
+                  "      - name: Authenticate original Firefox 160 build and byte-preserving archive\\n        id: inspect\\n",
+                  "core.setOutput('ready','true');",
+                  "      - name: Run real packaged browser JS, WebExtension, strict TLS and Nimbus tests only\\n        id: replay\\n",
+                  "      - name: Upload authenticated Firefox 160 artifact-only runtime proof\\n        id: proof\\n",
+                  "      - name: Fail closed if authenticated native browser replay did not execute\\n        if: always()\\n",
+                  "INSPECT_STATUS:", "INSPECT_READY:", "REPLAY_STATUS:", "PROOF_STATUS:",
+                  '"$INSPECT_STATUS" != success', '"$INSPECT_READY" != true',
+                  '"$REPLAY_STATUS" != success', '"$PROOF_STATUS" != success',
+              )
+              return all(s in blob for s in required_gates)
+          assert gate_contract_valid(source), 'Replay gates allow a false-green skipped native browser'
+          # Reject regressions where a gate's step ID, output, or mandatory
+          # verification step is accidentally dropped in a refactor.
+          negative_markers = (
+              "        id: inspect\\n", "core.setOutput('ready','true');",
+              "        id: replay\\n", "        id: proof\\n",
+              "      - name: Fail closed if authenticated native browser replay did not execute\\n",
+          )
+          for marker in negative_markers:
+              assert marker in source, 'Missing mutation fixture anchor'
+              assert not gate_contract_valid(source.replace(marker, '', 1)), \
+                  'False-green gate accepted deletion: ' + repr(marker)
           assert './mach build' not in source, 'Replay unexpectedly compiles browser'
           lines = source.splitlines()
           def block(index, indent):
