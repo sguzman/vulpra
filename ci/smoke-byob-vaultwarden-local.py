@@ -819,7 +819,7 @@ def _complete_genuine_bitwarden_first_run_ui(h, port, base):
               const carousel = document.querySelector("app-intro-carousel");
               const carouselLogin = carousel ?
                 document.querySelector(
-                  "app-intro-carousel + button[type='button'] + button[type='button']") : null;
+                  "app-intro-carousel > button[type='button']:last-of-type") : null;
               return {
                 route: location.hash.split('?')[0].slice(0,65),
                 extension: location.protocol === 'moz-extension:',
@@ -846,7 +846,7 @@ def _complete_genuine_bitwarden_first_run_ui(h, port, base):
             # The exact pinned client E2E uses the carousel-scoped Log in
             # button; CSS :last-of-type did not reliably identify this DOM.
             _wd_click(h, port, base,
-                      "app-intro-carousel + button[type='button'] + button[type='button']")
+                      "app-intro-carousel > button[type='button']:last-of-type")
             counts["carousel_login"] += 1
         else:
             time.sleep(0.35)
