@@ -221,6 +221,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          python3 ci/smoke-webextension-package-local.py --self-test-byob-assertions
           bash ci/tests/smoke-webextension-package-local-test.sh \
             "$GITHUB_WORKSPACE/ci/smoke-webextension-package-local.py"
           echo 'PASS: WebDriver JS/HTTP/DOM, extension fixture, Nimbus and TLS negative parser controls'
