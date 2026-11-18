@@ -68,7 +68,9 @@ PREFIXES = ("identity.fxaccounts.", "services.sync.", "datareporting.",
 
 CHROME_SCRIPT = r"""
 const done = arguments[arguments.length - 1];
+const safe = {phase:"start", pref_name:null};
 (async () => {
+  safe.phase = "services_import";
   const {Services} = ChromeUtils.importESModule(
     "resource://gre/modules/Services.sys.mjs");
   const p = Services.prefs;
@@ -81,7 +83,9 @@ const done = arguments[arguments.length - 1];
     identity: "identity.fxaccounts.enabled",
     upload: "datareporting.healthreport.uploadEnabled"
   };
+  safe.phase = "pref_inventory";
   for (const name of names) {
+    safe.pref_name = name;
     const type = p.getPrefType(name);
     const row = {
       present: type !== p.PREF_INVALID,
@@ -94,15 +98,22 @@ const done = arguments[arguments.length - 1];
     // Report boolean values only: do not inspect/upload pref URL strings,
     // including the live Sync/telemetry endpoint preferences.
     if(type === p.PREF_BOOL) {
-      row.default_bool = branch.getBoolPref(name);
+      // An optional pref may be user-only with no registered default.
+      // Never read arbitrary pref strings or return URL endpoint values.
+      row.default_bool = branch.getPrefType(name) === p.PREF_BOOL
+        ? branch.getBoolPref(name) : null;
       row.effective_bool = p.getBoolPref(name);
     }
     result.prefs[name] = row;
   }
+  safe.phase = "prefix_inventory";
+  safe.pref_name = null;
   for (const prefix of prefixes) {
     result.prefixes[prefix] = p.getChildList(prefix).length;
   }
+  safe.phase = "reversible_controls";
   for (const [shortName,name] of Object.entries(flags)) {
+    safe.pref_name = name;
     const row = result.prefs[name];
     if (!row?.present || row.kind !== "bool" || row.locked ||
         row.user_override) {
@@ -126,7 +137,9 @@ const done = arguments[arguments.length - 1];
       verified && !p.prefHasUserValue(name) &&
       p.getBoolPref(name) === oldDefault;
   }
+  safe.phase = "protected_preference_contract";
   for (const name of arguments[2]) {
+    safe.pref_name = name;
     const row = result.prefs[name];
     if (!row?.present || row.kind !== "bool" ||
         row.default_bool !== (name.startsWith("browser.safebrowsing.") ? true : false) ||
@@ -137,24 +150,30 @@ const done = arguments[arguments.length - 1];
     }
     result.modules.protected_pref_contract = true;
   }
+  safe.pref_name = null;
+  safe.phase = "sync_ui_import";
   const {UIState} = ChromeUtils.importESModule(
     "resource://services-sync/UIState.sys.mjs");
   result.modules.sync_ui_loaded = typeof UIState.get === "function";
   result.modules.sync_ui_not_configured =
     UIState.get()?.status === UIState.STATUS_NOT_CONFIGURED;
+  safe.phase = "sync_main_import";
   const {Weave} = ChromeUtils.importESModule(
     "resource://services-sync/main.sys.mjs");
   result.modules.sync_module_loaded = !!Weave &&
     typeof Weave.perDeviceEngineChoices === "boolean";
+  safe.phase = "fxaccounts_import";
   const {FxAccounts, getFxAccountsSingleton} = ChromeUtils.importESModule(
     "resource://gre/modules/FxAccounts.sys.mjs");
   const account = getFxAccountsSingleton();
   result.modules.fxaccounts_retained = !!account &&
     typeof FxAccounts.canConnectAccount === "function";
+  safe.phase = "fxaccounts_signed_out_check";
   result.account_signed_in = (await account.getSignedInUser()) !== null;
   done(result);
 })().catch(e => done({
   error_class: String(e?.name ?? "UnknownAuditError").slice(0,60),
+  phase: safe.phase, pref_name: safe.pref_name,
   audit_error: true
 }));
 """
@@ -325,6 +344,10 @@ def main(repo: Path):
                 if not valid_audit(record):
                     raise RuntimeError("Real packaged account/Sync/telemetry audit rejected: "
                                        + json.dumps({"error_class": record.get("error_class")
+                                         if isinstance(record, dict) else None,
+                                         "phase": record.get("phase")
+                                         if isinstance(record, dict) else None,
+                                         "pref_name": record.get("pref_name")
                                          if isinstance(record, dict) else None,
                                          "controls": record.get("controls")
                                          if isinstance(record, dict) else None}))
