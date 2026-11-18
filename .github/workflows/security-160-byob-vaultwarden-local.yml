@@ -141,6 +141,7 @@ jobs:
             -e 'DOMAIN=https://127.0.0.1:8443' \
             -e 'ROCKET_PORT=8443' \
             -e 'ROCKET_TLS={certs="/tls/leaf.crt",key="/tls/leaf.key"}' \
+            -e 'I_REALLY_WANT_VOLATILE_STORAGE=true' \
             -e 'SIGNUPS_ALLOWED=true' \
             -e 'INVITATIONS_ALLOWED=false' \
             -e 'WEB_VAULT_ENABLED=false' \
