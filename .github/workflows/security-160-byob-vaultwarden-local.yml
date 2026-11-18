@@ -182,7 +182,8 @@ jobs:
           set -euo pipefail
           pid="$(docker inspect -f '{{.State.Pid}}' vulpra-byob-vaultwarden-ci)"
           [[ "$pid" =~ ^[0-9]+$ ]] && test "$pid" -gt 1
-          sudo nsenter -t "$pid" -n -- runuser -u runner -- env PATH="$PATH" \
+          sudo nsenter -t "$pid" -n -- runuser -u runner -- env \
+            PATH="$PATH" VULPRA_BYOB_REGISTER_FAKE_ACCOUNT=1 \
             python3 "$GITHUB_WORKSPACE/ci/smoke-byob-vaultwarden-local.py" \
             "$GITHUB_WORKSPACE" "$RUNNER_TEMP/bitwarden-2026.10.2.xpi" \
             "$RUNNER_TEMP/vulpra-vaultwarden-tls/ca.crt"
