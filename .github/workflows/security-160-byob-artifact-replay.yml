@@ -44,10 +44,11 @@ jobs:
         with:
           # QA harness source only. Archived browser/source identity below
           # remains pinned to the original exact Firefox 160 build.
-          ref: 1a78f1fc59cca5ca5185ae6e4815290c80e0bd6c
+          ref: a7850ced3a28a8c698f764b167172ad2d5c88888
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             ci/smoke-webextension-package-local.py
+            ci/smoke-byob-login-ui.py
       - name: Download unreleased native archive and checksum from same run
         if: steps.inspect.outputs.ready == 'true'
         uses: actions/download-artifact@v4
@@ -119,12 +120,29 @@ jobs:
           python3 ci/smoke-webextension-package-local.py --self-test-byob-assertions
           python3 ci/smoke-webextension-package-local.py --self-test-synthetic-extension-fixture
           python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE" 2>&1 | tee "$RUNNER_TEMP/firefox160-byob-replay-webdriver.log"
+          python3 ci/smoke-byob-login-ui.py --self-test
+          python3 ci/smoke-byob-login-ui.py "$GITHUB_WORKSPACE" 2>&1 | tee "$RUNNER_TEMP/firefox160-byob-login-ui.log"
+          ui_report="$GITHUB_WORKSPACE/.git/vulpra-native-build/byob-login-ui-proof.json"
+          test -s "$ui_report"
+          jq -e '
+            .status == "pass" and
+            .proof.verified == true and
+            .proof.local_fake_login_submissions == 2 and
+            .proof.builtin_login_save_prompt_suppressed == true and
+            .proof.positive_control_shows_save_doorhanger == true and
+            .proof.default_disabled_restored == true and
+            .proof.real_vault_or_credentials_accessed == false and
+            .profile_sentinel_preserved == true and
+            .native_rebuild == false and
+            .release_ready == false and .security_current == false
+          ' "$ui_report" >/dev/null
           report="$(find .git/vulpra-native-build -maxdepth 1 -name 'webextension-smoke-*.json' -type f -print -quit)"
           test -s "$report"
           archive="$RUNNER_TEMP/firefox160-package/vulpra-firefox160-byob-native-ci.tar.xz"
           digest="$(sha256sum "$archive" | cut -d' ' -f1)"
-          jq --arg sha "$digest" '
+          jq --arg sha "$digest" --slurpfile ui "$ui_report" '
             . + {
+              byob_builtin_login_ui: $ui[0].proof,
               original_native_ci_run_id: "44350848442",
               original_native_ci_commit: "ffec2b1bfcc816385f72301cce2e71fa0f1ac337",
               firefox160_verified_git_tree: "c17d957eb58741df2855dc9b6c577be192315410",
@@ -152,6 +170,11 @@ jobs:
             .byob_external_extension_synthetic_fill.verified == true and
             .byob_external_extension_synthetic_fill.browser_extension_can_fill_local_fake_password_field == true and
             .byob_external_extension_synthetic_fill.no_real_credentials_or_vault_endpoint == true and
+            .byob_builtin_login_ui.verified == true and
+            .byob_builtin_login_ui.builtin_login_save_prompt_suppressed == true and
+            .byob_builtin_login_ui.positive_control_shows_save_doorhanger == true and
+            .byob_builtin_login_ui.default_disabled_restored == true and
+            .byob_builtin_login_ui.real_vault_or_credentials_accessed == false and
             .webextension.temporary_unsigned_install == true and
             .webextension.content_scripts == true and
             .webextension.background_messaging == true and
@@ -165,8 +188,8 @@ jobs:
             .tested_native_binary_without_rebuild == true and
             .release_ready == false and .security_current == false
           ' "$RUNNER_TEMP/firefox160-byob-replay-webdriver-proof.json" > /dev/null
-          echo 'PASS: real Firefox 160 BYOB prefs and synthetic extension fill on exact native package; no rebuild'
-          echo 'LIMIT: synthetic password-field fixture does not prove real Vaultwarden extension, Safe Browsing, host sandbox or release acceptance'
+          echo 'PASS: real Firefox 160 BYOB prefs, extension fill and absent built-in save doorhanger with positive control; no rebuild'
+          echo 'LIMIT: synthetic login and extension; real Vaultwarden integration, Safe Browsing provider and host sandbox still unverified'
       - name: Upload authenticated Firefox 160 artifact-only runtime proof
         id: proof
         if: success() && steps.inspect.outputs.ready == 'true'
