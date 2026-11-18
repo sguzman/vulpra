@@ -111,7 +111,7 @@ jobs:
               '.byob_builtin_login_ui.positive_control_shows_save_doorhanger == true',
               'python3 ci/smoke-byob-login-ui.py --self-test',
               'python3 ci/smoke-byob-login-ui.py "$GITHUB_WORKSPACE"',
-              'ref: a7850ced3a28a8c698f764b167172ad2d5c88888',
+              'ref: bfede7ad56a727150721bd86f2c29c884f5c9444',
               '.webextension.temporary_unsigned_install == true',
               '.security.local_untrusted_tls_denial.verified == true',
               'Fail closed if authenticated native browser replay did not execute',
