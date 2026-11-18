@@ -1,0 +1,31 @@
+name: Vulpra BYOB Default Preference Contract
+on:
+  push:
+    branches: [main]
+    paths:
+      - browser/branding/unofficial/pref/firefox-branding.js
+      - ci/test-byob-pref-defaults.sh
+      - .github/workflows/qa-byob-defaults.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-user-owned-account-and-vault-defaults:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout only Vulpra default preference source and QA fixture
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            browser/branding/unofficial/pref/firefox-branding.js
+            ci/test-byob-pref-defaults.sh
+      - name: Assert independent account and password defaults with negative cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/test-byob-pref-defaults.sh
+          bash ci/test-byob-pref-defaults.sh
+          echo 'LIMIT: no browser compiled; packaged runtime and Bitwarden/Vaultwarden integration require independent acceptance.'
