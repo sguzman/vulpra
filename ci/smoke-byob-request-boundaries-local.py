@@ -61,6 +61,7 @@ const endpointNames = arguments[1];
 const keys = arguments[2];
 const safe = {phase:"init"};
 (async () => {
+  safe.phase = "prefs_global";
   const p = Services.prefs;  // privileged Marionette global
   const branch = p.getDefaultBranch("");
   const categories = [
@@ -94,7 +95,9 @@ const safe = {phase:"init"};
       return "google_provider";
     return "other_external";
   };
+  safe.phase = "endpoint_pref_inventory";
   const prefixes = endpointNames.map(name => {
+    safe.pref_name = name;  // known audited key only, never pref value
     const type = p.getPrefType(name);
     const row = {
       name,
@@ -118,21 +121,28 @@ const safe = {phase:"init"};
     }
     return row;
   });
-  const settings = Object.fromEntries(keys.map(name => [
-    name, {present:p.getPrefType(name)===p.PREF_BOOL,
-           default_value:branch.getBoolPref(name, false),
-           effective_value:p.getBoolPref(name, false),
-           locked:p.prefIsLocked(name),
-           user_override:p.prefHasUserValue(name)}
-  ]));
+  safe.phase = "bool_pref_contract";
+  const settings = Object.fromEntries(keys.map(name => {
+    safe.pref_name = name;
+    return [name, {present:p.getPrefType(name)===p.PREF_BOOL,
+                   default_value:branch.getBoolPref(name, false),
+                   effective_value:p.getBoolPref(name, false),
+                   locked:p.prefIsLocked(name),
+                   user_override:p.prefHasUserValue(name)}];
+  }));
+  safe.pref_name = null;
+  safe.phase = "sync_ui_import";
   const {UIState} = ChromeUtils.importESModule(
     "resource://services-sync/UIState.sys.mjs");
+  safe.phase = "fxaccounts_import";
   const {getFxAccountsSingleton} = ChromeUtils.importESModule(
     "resource://gre/modules/FxAccounts.sys.mjs");
+  safe.phase = "signed_out_account";
   const signedOut = (await getFxAccountsSingleton().getSignedInUser()) === null;
+  safe.phase = "sync_ui_status";
   const syncUnconfigured = UIState.get()?.status === UIState.STATUS_NOT_CONFIGURED;
 
-  safe.phase = "observer";
+  safe.phase = "observer_setup";
   const ciHost = new URL(ciUrl).hostname;
   let removed = false;
   const observer = {
@@ -157,6 +167,7 @@ const safe = {phase:"init"};
     QueryInterface: ChromeUtils.generateQI(["nsIObserver"])
   };
   Services.obs.addObserver(observer, "http-on-modify-request");
+  safe.phase = "observer_active";
   try {
     safe.phase = "local_control";
     const response = await fetch(ciUrl, {cache:"no-store", redirect:"error"});
@@ -183,6 +194,7 @@ const safe = {phase:"init"};
   }
 })().catch(err => done({
   audit_failed: true, failed_phase: safe.phase,
+  pref_name: safe.pref_name ?? null,
   error_class: String(err?.name || "Error").slice(0,40)
 }));
 """
@@ -399,6 +411,7 @@ def audit(repo: Path):
                     # Only bounded phase/error category. Never dump source
                     # URL values or request details into CI logs.
                     reason = ({"phase":record.get("failed_phase"),
+                               "pref_name":record.get("pref_name"),
                                "error_class":record.get("error_class")}
                               if isinstance(record, dict) else {})
                     raise RuntimeError("Native endpoint observer failed privacy contract: "
