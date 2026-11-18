@@ -70,9 +70,10 @@ CHROME_SCRIPT = r"""
 const done = arguments[arguments.length - 1];
 const safe = {phase:"start", pref_name:null};
 (async () => {
-  safe.phase = "services_import";
-  const {Services} = ChromeUtils.importESModule(
-    "resource://gre/modules/Services.sys.mjs");
+  // Privileged Marionette chrome context exposes Services as a built-in
+  // global, as verified by the existing real login-save doorhanger smoke.
+  // Services.sys.mjs is not a portable import URL in this packaged build.
+  safe.phase = "services_global";
   const p = Services.prefs;
   const branch = p.getDefaultBranch("");
   const names = arguments[0];
