@@ -386,7 +386,8 @@ class _DisposableLoginForm:
         return server, "http://127.0.0.1:" + str(server.server_port) + "/ci-login"
 
 
-def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_shortcut):
+def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_shortcut,
+                                          graphical=False, browser_pid=None):
     """Use official Bitwarden add-cipher form and its real Firefox shortcut.
 
     No test JavaScript sets field values. The only expected password is typed
@@ -472,6 +473,24 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
                 "no_test_js_value_injection": True,
             }
 
+        # Validate that the actual signed add-on registered the Firefox command,
+        # rather than claiming the X11 keystroke succeeded without a binding.
+        h.request(port, "POST", base + "/url",
+                  {"url": popup_url.split("#", 1)[0] + "#/tabs/vault"},
+                  timeout_seconds=30)
+        shortcuts = h.request(port, "POST", base + "/execute/async", {
+            "script": """
+              const done = arguments[arguments.length - 1];
+              browser.commands.getAll().then(commands => done(commands
+                .filter(c => c.name === 'autofill_login')
+                .map(c => ({enabled: !!c.shortcut,
+                            expected: c.shortcut === 'Ctrl+Shift+L'}))))
+                .catch(e => done({error: String(e).slice(0, 100)}));
+            """, "args": [],
+        }, timeout_seconds=25)
+        if shortcuts != [{"enabled": True, "expected": True}]:
+            raise RuntimeError("Real Bitwarden Firefox autofill keyboard command not bound to Ctrl+Shift+L")
+
         h.request(port, "POST", base + "/url", {"url": login_url},
                   timeout_seconds=30)
         before = h.request(port, "POST", base + "/execute/sync", {
@@ -490,20 +509,46 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
                 before.get(k) is True for k in ("local", "fake_form", "initially_empty")):
             raise RuntimeError("Fake localhost login was not empty before actual Bitwarden autofill")
 
-        # Official Bitwarden Firefox manifest browser-v2026.10.2 defines
-        # the autofill_login command as Ctrl+Shift+L. Send actual W3C
-        # WebDriver key actions on the active localhost content page.
-        h.request(port, "POST", base + "/actions", {
-            "actions": [{"type": "key", "id": "vulpra-test-keyboard",
-                         "actions": [
-                             {"type": "keyDown", "value": "\ue009"},
-                             {"type": "keyDown", "value": "\ue008"},
-                             {"type": "keyDown", "value": "l"},
-                             {"type": "keyUp", "value": "l"},
-                             {"type": "keyUp", "value": "\ue008"},
-                             {"type": "keyUp", "value": "\ue009"},
-                         ]}]
-        }, timeout_seconds=20)
+        if graphical:
+            # Xvfb + a real X11 window manager; xdotool sends native XTEST
+            # keyboard events after focusing *only* this session's Firefox
+            # window, identified by the actual geckodriver browser PID.
+            if (not os.environ.get("DISPLAY") or
+                    not isinstance(browser_pid, int) or browser_pid <= 1):
+                raise RuntimeError("Graphical autofill requires a valid display and browser PID")
+            finder = ["xdotool", "search", "--onlyvisible", "--pid", str(browser_pid)]
+            end = time.monotonic() + 15
+            window_ids = []
+            while time.monotonic() < end:
+                result = subprocess.run(finder, capture_output=True, text=True,
+                                        timeout=8, check=False)
+                window_ids = [x.strip() for x in result.stdout.splitlines()
+                              if x.strip().isdigit()]
+                if result.returncode == 0 and window_ids:
+                    break
+                time.sleep(0.3)
+            if not window_ids:
+                raise RuntimeError("No visible test-owned Firefox X11 window for browser PID")
+            target_window = window_ids[-1]
+            subprocess.run(["xdotool", "windowfocus", "--sync", target_window],
+                           check=True, capture_output=True, timeout=15)
+            subprocess.run(["xdotool", "key", "--clearmodifiers",
+                            "--delay", "90", "ctrl+shift+l"],
+                           check=True, capture_output=True, timeout=15)
+        else:
+            # Historical headless W3C keyboard route remains as a distinct
+            # diagnostic; it does not count as native X11 command acceptance.
+            h.request(port, "POST", base + "/actions", {
+                "actions": [{"type": "key", "id": "vulpra-test-keyboard",
+                             "actions": [
+                                 {"type": "keyDown", "value": "\ue009"},
+                                 {"type": "keyDown", "value": "\ue008"},
+                                 {"type": "keyDown", "value": "l"},
+                                 {"type": "keyUp", "value": "l"},
+                                 {"type": "keyUp", "value": "\ue008"},
+                                 {"type": "keyUp", "value": "\ue009"},
+                             ]}]
+            }, timeout_seconds=20)
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             state = h.request(port, "POST", base + "/execute/sync", {
@@ -529,6 +574,8 @@ def save_and_autofill_real_bitwarden_login(h, port, base, popup_url, *, verify_s
                     "only_disposable_local_form": True,
                     "saved_password_or_vault_token_in_report": False,
                     "no_test_js_value_injection": True,
+                    "graphical_native_x11_shortcut": graphical,
+                    "signed_addon_command_bound": True,
                 }
             time.sleep(0.3)
         raise RuntimeError("Actual Bitwarden Ctrl+Shift+L did not fill both synthetic fields")
@@ -572,12 +619,20 @@ def main(repo, xpi, ca):
         old = b"No existing Firefox profile may be modified\n"
         sentinel.write_bytes(old)
         env = os.environ.copy()
+        graphical = os.environ.get("VULPRA_BYOB_GRAPHICAL", "0") == "1"
         env.update({"HOME": str(home), "XDG_DATA_HOME": str(home / ".local/share"),
-                    "MOZ_HEADLESS": "1",
                     "NO_PROXY": "127.0.0.1,localhost",
                     "no_proxy": "127.0.0.1,localhost"})
-        for var in ("DISPLAY", "WAYLAND_DISPLAY", "MOZ_REMOTE"):
-            env.pop(var, None)
+        if graphical:
+            if not env.get("DISPLAY"):
+                raise RuntimeError("Expected isolated virtual X11 graphical display")
+            env.pop("MOZ_HEADLESS", None)
+            env.pop("WAYLAND_DISPLAY", None)
+        else:
+            env["MOZ_HEADLESS"] = "1"
+            for var in ("DISPLAY", "WAYLAND_DISPLAY"):
+                env.pop(var, None)
+        env.pop("MOZ_REMOTE", None)
         port = h.find_port()
         proc = None
         session = None
@@ -594,7 +649,8 @@ def main(repo, xpi, ca):
                     "capabilities": {"alwaysMatch": {
                         "browserName": "firefox", "acceptInsecureCerts": False,
                         "moz:firefoxOptions": {
-                            "binary": str(browser), "args": ["-headless", "-no-remote"],
+                            "binary": str(browser),
+                            "args": ["-no-remote"] if graphical else ["-headless", "-no-remote"],
                             "profile": profile,
                             "prefs": {
                                 "remote.prefs.recommended": False,
@@ -629,7 +685,9 @@ def main(repo, xpi, ca):
                         raise RuntimeError("Saved-item test requires successfully registered disposable account")
                     verify_shortcut = os.environ.get("VULPRA_BYOB_VERIFY_REAL_AUTOFILL", "0") == "1"
                     saved_item = save_and_autofill_real_bitwarden_login(
-                        h, port, base, resource, verify_shortcut=verify_shortcut)
+                        h, port, base, resource, verify_shortcut=verify_shortcut,
+                        graphical=graphical,
+                        browser_pid=value.get("capabilities", {}).get("moz:processID"))
                     print("PASS: official Bitwarden created synthetic login cipher using real editor and server")
                     if verify_shortcut:
                         print("PASS: actual Firefox Bitwarden shortcut filled both localhost fields")
@@ -653,6 +711,7 @@ def main(repo, xpi, ca):
                     "record_saved_verified": saved_item is not None and saved_item["real_extension_ui_saved_login"] is True,
                     "record_autofill_verified": saved_item is not None and saved_item["username_and_password_both_matched"] is True,
                     "network_egress_permitted": False,
+                    "graphical_virtual_x11_test": graphical,
                     "native_browser_recompiled": False,
                     "security_current": False, "release_ready": False,
                 }
