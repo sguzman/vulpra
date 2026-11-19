@@ -113,6 +113,10 @@ fi
 GIT_INDEX_FILE="$index" git -C "$source_dir" diff --exit-code -- >/dev/null || fail 'local source files differ from the verified Vulpra candidate; refusing silent overwrite'
 
 if [[ "$mode" == build ]]; then
+  [[ "${VULPRA_NIX_DEV:-}" == 1 ]] ||
+    fail 'the original Nix developer shell is required: use ./nix/vulpra build'
+  [[ -n "${VULPRA_NIX_LIBCLANG_PATH:-}" && -d "$VULPRA_NIX_LIBCLANG_PATH" ]] ||
+    fail 'Nix libclang path missing; use ./nix/vulpra build'
   command -v python3 >/dev/null || fail 'Mozilla mach needs Python 3'
   mkdir -m 700 -p -- "$work/config"
   # The GitHub runner's mozconfig is also used locally, except the optional
@@ -124,6 +128,7 @@ if [[ "$mode" == build ]]; then
     printf '%s\n' 'ac_add_options --with-ccache=sccache' >> "$work/config/mozconfig"
   fi
   printf 'mk_add_options MOZ_PARALLEL_BUILD=%s\n' "$jobs" >> "$work/config/mozconfig"
+  printf 'ac_add_options --with-libclang-path=%s\n' "$VULPRA_NIX_LIBCLANG_PATH" >> "$work/config/mozconfig"
   echo 'Local source build (no CI binary): running Mozilla mach configure/build.'
   echo 'NOTE: Mozilla tooling may still fetch toolchain dependencies if not present locally.'
   (cd "$source_dir" && MOZCONFIG="$work/config/mozconfig" ./mach configure && MOZCONFIG="$work/config/mozconfig" ./mach build)
