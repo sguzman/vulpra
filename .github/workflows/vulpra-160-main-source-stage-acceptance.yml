@@ -28,6 +28,8 @@ jobs:
             ci/security-160-stage-byob-branding.sh
             ci/security-160-hotfix-assemble-tree.sh
             ci/fixtures/firefox160-original-branding.js
+            browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx
+            toolkit/components/nimbus/NimbusBootstrap.sys.mjs
             browser/branding/unofficial/configure.sh
             browser/branding/unofficial/locales/en-US/brand.ftl
             browser/branding/unofficial/pref/firefox-branding.js
