@@ -81,9 +81,18 @@ if [[ "$mode" == prepare ]]; then
   [[ -s "$proof" ]] || fail 'source assembly proof missing'
   command -v jq >/dev/null || fail 'jq is required to inspect the proof'
   [[ "$(jq -r .candidate_git_tree "$proof")" == "$candidate_tree" ]] || fail 'source candidate is not the independently verified 160.0.1 tree'
-  # Local clone: reuses local Git objects; never consults GitHub or pulls an artifact.
-  GIT_NO_LAZY_FETCH=1 git clone --local --no-checkout -- "$hotfix" "$source_dir"
-  GIT_NO_LAZY_FETCH=1 git -C "$source_dir" checkout --detach "$hotfix_sha"
+  # The official hotfix checkout is deliberately shallow/partial. A
+  # "git clone --local" from a shallow repository ignores --local and may
+  # fail by trying to fetch its missing objects even with lazy fetch disabled.
+  # A detached worktree shares the already-materialized Git object database,
+  # preserving the official checkout's files/index without extra downloads.
+  [[ "$(git -C "$hotfix" config --bool core.sparseCheckout || true)" != true ]] ||
+    fail 'official Firefox 160.0.1 checkout must be fully materialized, not sparse'
+  GIT_NO_LAZY_FETCH=1 git -C "$hotfix" worktree add --detach "$source_dir" "$hotfix_sha"
+  [[ -f "$source_dir/.git" ]] ||
+    fail 'detached source worktree not created as expected'
+  [[ "$(git -C "$source_dir" rev-parse HEAD)" == "$hotfix_sha" ]] ||
+    fail 'detached source worktree has unexpected source identity'
   list="$work/proof/overlay-paths.txt"
   [[ -s "$list" && "$(wc -l < "$list")" -eq 28 ]] || fail 'expected exactly 28 authenticated source changes'
   (cd "$work/stage-byob" && find . -type f -printf '%P\n' | LC_ALL=C sort) > "$work/actual-paths.txt"
