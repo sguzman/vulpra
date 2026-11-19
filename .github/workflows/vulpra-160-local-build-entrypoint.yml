@@ -5,6 +5,8 @@ on:
     paths:
       - .github/workflows/vulpra-160-local-build-entrypoint.yml
       - scripts/vulpra-build-160.sh
+      - scripts/fetch-mozilla-release.sh
+      - ci/test-fetch-mozilla-release.sh
       - scripts/build-firefox160-local.sh
       - scripts/vulpra-package-160.sh
       - nix/vulpra
@@ -25,6 +27,8 @@ jobs:
           sparse-checkout: |
             .github/workflows/vulpra-160-local-build-entrypoint.yml
             scripts/vulpra-build-160.sh
+            scripts/fetch-mozilla-release.sh
+            ci/test-fetch-mozilla-release.sh
             scripts/build-firefox160-local.sh
             scripts/vulpra-package-160.sh
             nix/vulpra
@@ -37,6 +41,8 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/vulpra-build-160.sh
+          bash -n scripts/fetch-mozilla-release.sh
+          bash -n ci/test-fetch-mozilla-release.sh
           bash -n scripts/build-firefox160-local.sh
           bash -n scripts/vulpra-package-160.sh
           bash -n nix/vulpra
@@ -164,6 +170,11 @@ jobs:
             exit 1
           fi
           echo 'PASS: detached source worktree reuses shallow Git objects without network'
+      - name: Verify failed Mozilla transfer recovers without deleting cached source
+        shell: bash
+        run: |
+          set -euo pipefail
+          VULPRA_TEST_REPO="$GITHUB_WORKSPACE" bash ci/test-fetch-mozilla-release.sh
       - name: Verify source and workflow were not modified
         shell: bash
         run: |
