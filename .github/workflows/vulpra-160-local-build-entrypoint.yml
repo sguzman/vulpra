@@ -6,6 +6,7 @@ on:
       - .github/workflows/vulpra-160-local-build-entrypoint.yml
       - scripts/vulpra-build-160.sh
       - scripts/build-firefox160-local.sh
+      - scripts/vulpra-package-160.sh
       - nix/vulpra
       - nix/vulpra-dev.sh
   workflow_dispatch:
@@ -23,6 +24,7 @@ jobs:
           set -euo pipefail
           bash -n scripts/vulpra-build-160.sh
           bash -n scripts/build-firefox160-local.sh
+          bash -n scripts/vulpra-package-160.sh
           bash -n nix/vulpra
           bash -n nix/vulpra-dev.sh
           bash -n ci/security-160-stage-overlay.sh
@@ -61,6 +63,25 @@ jobs:
             exit 1
           fi
           echo 'PASS: no source/artifact download or build without explicit source permission'
+      - name: Verify no-download status and package fail closed without a build
+        shell: bash
+        run: |
+          set -euo pipefail
+          t="$(mktemp -d)"
+          trap 'rm -rf -- "$t"' EXIT
+          export VULPRA_SOURCE_CACHE="$t/cache"
+          export VULPRA_BUILD_DIR="$t/build"
+          bash nix/vulpra status > "$t/status"
+          grep -Fq 'Official Firefox 160.0.1 source: missing' "$t/status"
+          test ! -e "$t/cache" && test ! -e "$t/build"
+          set +e
+          VULPRA_NIX_DEV=1 bash scripts/vulpra-package-160.sh > "$t/package" 2>&1
+          code="$?"
+          set -e
+          test "$code" -eq 2
+          grep -Fq 'verified source/config absent' "$t/package"
+          test ! -e "$t/cache" && test ! -e "$t/build"
+          echo 'PASS: status never enters Nix or fetches source; package refuses absent local build'
       - name: Verify source and workflow were not modified
         shell: bash
         run: |
