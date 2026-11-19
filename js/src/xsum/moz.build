@@ -15,10 +15,13 @@ SOURCES += [
   'xsum.cpp',
 ]
 
-# Suppress select warnings in third-party code, but retain -Wformat so
-# Nix GCC's -Wformat-security/-Werror=format-security hardening stays valid.
-SOURCES['xsum.cpp'].flags += ['-Wno-implicit-fallthrough', '-Wno-unused-value']
+# Suppress warnings in third-party code.
+SOURCES['xsum.cpp'].flags += ['-Wno-implicit-fallthrough', '-Wno-format', '-Wno-unused-value']
 
 LICENSED_UNDER += [
     "mit",
+]
+
+SOURCE_HEADERS += [
+	"xsum.h",
 ]

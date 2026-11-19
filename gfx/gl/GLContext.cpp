@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include <algorithm>
+#include <memory>
 #include <regex>
 #include <string>
 #include <vector>
@@ -656,8 +657,8 @@ bool GLContext::InitImpl() {
   // The order of these strings must match up with the order of the enum
   // defined in GLContext.h for vendor IDs.
   const char* vendorMatchStrings[size_t(GLVendor::Other) + 1] = {
-      "Intel",   "NVIDIA",  "ATI",          "Qualcomm", "Imagination",
-      "nouveau", "Vivante", "VMware, Inc.", "ARM",      "Unknown"};
+      "Intel",   "NVIDIA",       "ATI", "Qualcomm", "Imagination", "nouveau",
+      "Vivante", "VMware, Inc.", "ARM", "AMD",      "Unknown"};
 
   mVendor = GLVendor::Other;
   for (size_t i = 0; i < size_t(GLVendor::Other); ++i) {
@@ -689,7 +690,6 @@ bool GLContext::InitImpl() {
       "Gallium 0.4 on llvmpipe",
       "Microsoft Basic Render Driver",
       "Samsung Xclipse",
-      "AMD Radeon HD GFX10",
       "Unknown"};
 
   mRenderer = GLRenderer::Other;
@@ -2238,7 +2238,7 @@ bool GLContext::IsValidOwningThread() const {
 
 GLBlitHelper* GLContext::BlitHelper() {
   if (!mBlitHelper) {
-    mBlitHelper.reset(new GLBlitHelper(this));
+    mBlitHelper = std::make_unique<GLBlitHelper>(this);
   }
 
   return mBlitHelper.get();
@@ -2716,7 +2716,7 @@ void GLContext::BeforeGLCall_Debug(const char* const funcName) const {
   }
 
   MOZ_ASSERT(!mDebugErrorScope);
-  mDebugErrorScope.reset(new LocalErrorScope(*this));
+  mDebugErrorScope = std::make_unique<LocalErrorScope>(*this);
 }
 
 void GLContext::AfterGLCall_Debug(const char* const funcName) const {

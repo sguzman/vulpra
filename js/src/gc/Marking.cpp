@@ -785,7 +785,7 @@ void MarkingTracerT<opts>::markEphemeronEdges(EphemeronEdgeVector& edges,
     MarkColor targetColor = std::min(srcColor, MarkColor(edge.color()));
     MOZ_ASSERT(markColor() >= targetColor);
 
-    Zone* zone = edge.target()->zone();
+    Zone* zone = edge.target()->zoneFromAnyThread();
     if (targetColor == markColor() && zone->shouldMarkInZone(targetColor)) {
       ApplyGCThingTyped(edge.target(), edge.target()->getTraceKind(),
                         [this](auto t) { this->markAndTraverse(t); });
@@ -1795,10 +1795,6 @@ inline bool MarkingTracerT<opts>::processMarkStackTop(SliceBudget& budget) {
       case SlotsOrElementsKind::Unused: {
         MOZ_MAKE_COMPILER_ASSUME_IS_UNREACHABLE("Unused SlotsOrElementsKind");
       }
-
-      default:
-        // An invalid range kind must never reach the scan with unset bounds.
-        MOZ_CRASH("Invalid SlotsOrElementsKind");
     }
 
     goto scan_value_range;

@@ -20,6 +20,7 @@
 #include "mozilla/gfx/BuildConstants.h"
 #include "mozilla/gfx/Logging.h"
 #include "mozilla/gfx/Matrix.h"
+#include "mozilla/gfx/gfxVars.h"
 #include "mozilla/layers/CompositeProcessFencesHolderMap.h"
 #include "mozilla/layers/GpuFence.h"
 #include "mozilla/layers/ImageDataSerializer.h"
@@ -1183,6 +1184,13 @@ bool GLBlitHelper::Blit(const java::GeckoSurfaceTexture::Ref& surfaceTexture,
                         const gfx::IntRect& destRect,
                         const OriginPos destOrigin, const gfx::IntSize& fbSize,
                         Maybe<gfxAlphaType> convertAlpha) const {
+  MOZ_ASSERT(!gfx::gfxVars::ForceAImageReaderAndroid());
+
+  if (gfx::gfxVars::ForceAImageReaderAndroid()) {
+    MOZ_ASSERT_UNREACHABLE("unexpected to be called");
+    return false;
+  }
+
   if (!surfaceTexture) {
     return false;
   }
@@ -1277,6 +1285,16 @@ bool GLBlitHelper::BlitPlanarYCbCr(const PlanarYCbCrData& yuvData,
                                    const OriginPos destOrigin,
                                    const gfx::IntSize& fbSize,
                                    Maybe<gfxAlphaType> convertAlpha) {
+  const auto sizes = yuvData.GetPlaneSizes();
+  if (!sizes || yuvData.mYSkip || yuvData.mCbSkip || yuvData.mCrSkip ||
+      yuvData.mYStride < 0 || yuvData.mCbCrStride < 0) {
+    gfxCriticalError() << "Unusual PlanarYCbCrData: " << yuvData.mYSkip << ","
+                       << yuvData.mCbSkip << "," << yuvData.mCrSkip << ", "
+                       << yuvData.mPictureRect << ", " << yuvData.mYStride
+                       << "," << yuvData.mCbCrStride;
+    return false;
+  }
+
   const auto& prog =
       GetDrawBlitProg({kFragHeader_Tex2D,
                        {kFragSample_ThreePlane, kFragConvert_ColorMatrix,
@@ -1293,19 +1311,6 @@ bool GLBlitHelper::BlitPlanarYCbCr(const PlanarYCbCrData& yuvData,
   }
 
   // --
-
-  auto ySize = yuvData.YDataSize();
-  auto cbcrSize = yuvData.CbCrDataSize();
-  if (yuvData.mYSkip || yuvData.mCbSkip || yuvData.mCrSkip || ySize.width < 0 ||
-      ySize.height < 0 || cbcrSize.width < 0 || cbcrSize.height < 0 ||
-      yuvData.mYStride < 0 || yuvData.mCbCrStride < 0) {
-    gfxCriticalError() << "Unusual PlanarYCbCrData: " << yuvData.mYSkip << ","
-                       << yuvData.mCbSkip << "," << yuvData.mCrSkip << ", "
-                       << ySize.width << "," << ySize.height << ", "
-                       << cbcrSize.width << "," << cbcrSize.height << ", "
-                       << yuvData.mYStride << "," << yuvData.mCbCrStride;
-    return false;
-  }
 
   gfx::IntSize divisors;
   switch (yuvData.mChromaSubsampling) {
@@ -1344,9 +1349,8 @@ bool GLBlitHelper::BlitPlanarYCbCr(const PlanarYCbCrData& yuvData,
 
   const ScopedSaveMultiTex saveTex(mGL, 3, LOCAL_GL_TEXTURE_2D);
   const ResetUnpackState reset(mGL);
-  const gfx::IntSize yTexSize(yuvData.mYStride, yuvData.YDataSize().height);
-  const gfx::IntSize uvTexSize(yuvData.mCbCrStride,
-                               yuvData.CbCrDataSize().height);
+  const gfx::IntSize yTexSize(yuvData.mYStride, sizes->mY.height);
+  const gfx::IntSize uvTexSize(yuvData.mCbCrStride, sizes->mCbCr.height);
 
   if (yTexSize != mYuvUploads_YSize || uvTexSize != mYuvUploads_UVSize) {
     mYuvUploads_YSize = yTexSize;
@@ -1724,21 +1728,13 @@ bool GLBlitHelper::Blit(DMABufSurface* surface, const gfx::IntRect& destRect,
 
   const char* fragSample = nullptr;
   auto fragConvert = kFragConvert_None;
-  // Determine the reorder from source and destination formats. The blit
-  // output is RGBA-ordered for every source shape (the YUV color matrix and
-  // EGL named-channel imports expose RGB in .rgb), while the destination
-  // may store the opposite, BGRA order (e.g. canvas2d); swap R/B exactly
-  // when the two orders differ.
-  const bool srcIsBGRA = false;
   const bool dstIsBGRA = aDestFormat == gfx::SurfaceFormat::B8G8R8A8 ||
                          aDestFormat == gfx::SurfaceFormat::B8G8R8X8;
-  const bool swapRB = srcIsBGRA != dstIsBGRA;
   switch (pixelFormat) {
     case DMABufSurface::SURFACE_RGBA:
       fragSample = kFragSample_OnePlane;
-      if (swapRB) {
-        fragConvert = kFragConvert_BGR;
-      }
+      // TODO: The surface format of single-plane surfaces is unreliable, so it
+      // can't be used currently to determine a BGRA swizzle.
       break;
     case DMABufSurface::SURFACE_YUV:
       if (surface->GetTextureCount() == 2) {
@@ -1751,8 +1747,11 @@ bool GLBlitHelper::Blit(DMABufSurface* surface, const gfx::IntRect& destRect,
         return false;
       }
       pYuvArgs = &yuvArgs;
+      // YUV sources are converted to RGB by the color matrix, while the
+      // destination may store the opposite, BGRA order (e.g. canvas2d). Swap
+      // R/B when the destination is BGRA to compensate.
       fragConvert =
-          swapRB ? kFragConvert_ColorMatrixBGR : kFragConvert_ColorMatrix;
+          dstIsBGRA ? kFragConvert_ColorMatrixBGR : kFragConvert_ColorMatrix;
       break;
     default:
       return false;
