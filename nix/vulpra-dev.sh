@@ -11,7 +11,9 @@ Vulpra Nix developer commands
   vulpra-dev source       Read-only tracked-source completeness check
   vulpra-dev check        Syntax-check existing guarded shell workflows
   vulpra-dev configure    Run ./mach configure (requires Nix devShell)
-  vulpra-dev build        Run guarded ci/build-local.sh (requires Nix devShell)
+  vulpra-dev build        Build verified Firefox 160.0.1 in separate source tree
+  vulpra-dev build --fetch-source  Explicitly permit first Mozilla source download
+  vulpra-dev run          Launch local Firefox 160.0.1 with private profile
   vulpra-dev package      Package and privately smoke existing native binary
   vulpra-dev smoke        Private headless native executable smoke
   vulpra-dev wayland      Private Weston/Wayland packaged smoke
@@ -46,7 +48,7 @@ if (($#)); then shift; fi
 
 case "$command_name" in
   help|-h|--help) usage; exit 0 ;;
-  doctor|source|check|configure|build|package|smoke|wayland|accept|webext|input|mach) ;;
+  doctor|source|check|configure|build|run|package|smoke|wayland|accept|webext|input|mach) ;;
   *) error "unknown command '$command_name'; run vulpra-dev help" ;;
 esac
 
@@ -61,6 +63,21 @@ root="$(cd "$root" && pwd -P)"
   error "missing CI native mozconfig (incomplete checkout): $root"
 
 local_mozconfig="${MOZCONFIG:-$HOME/.mozbuild/vulpra-local.mozconfig}"
+
+# Default local build now targets the exact Firefox 160.0.1 Vulpra candidate,
+# not the tracked historical Firefox 159 files in repository main. Preserve
+# their source and objdir: prepare/build the 160 tree independently.
+if [[ "$command_name" == build || "$command_name" == run ]]; then
+  [[ "${VULPRA_NIX_DEV:-}" == 1 ]] ||
+    error "use ./nix/vulpra $command_name; requires pinned Nix devShell"
+  [[ -f "$root/scripts/vulpra-build-160.sh" ]] ||
+    error "missing main-branch source-first 160 local build entrypoint"
+  if [[ "$command_name" == run ]]; then
+    exec bash "$root/scripts/vulpra-build-160.sh" --run "$@"
+  fi
+  exec bash "$root/scripts/vulpra-build-160.sh" "$@"
+fi
+
 
 case "$command_name" in
   doctor)
@@ -106,6 +123,8 @@ case "$command_name" in
     ;;
   check)
     for relative in \
+      scripts/build-firefox160-local.sh \
+      scripts/vulpra-build-160.sh \
       ci/build-local.sh \
       ci/smoke-native-local.sh \
       ci/package-smoke-local.sh \
@@ -121,7 +140,7 @@ case "$command_name" in
     [[ "${VULPRA_NIX_DEV:-}" == 1 ]] ||
       error "enter 'nix develop ./nix' before running '$command_name'; refusing host-toolchain fallback"
     case "$command_name" in
-      configure|build|package|mach)
+      configure|package|mach)
         [[ -f "$local_mozconfig" ]] ||
           error "local MOZCONFIG missing: $local_mozconfig; existing workstation configuration is never overwritten"
         ;;
@@ -131,7 +150,7 @@ case "$command_name" in
     # native configure/build/mach at a versioned, additive shim that first
     # sources the untouched original workstation MOZCONFIG.
     case "$command_name" in
-      configure|build|mach)
+      configure|mach)
         libclang_dir="${VULPRA_NIX_LIBCLANG_PATH:-}"
         [[ -n "$libclang_dir" && -d "$libclang_dir" ]] ||
           error "no Nix-provided libclang directory; refusing host-toolchain fallback"
@@ -148,11 +167,6 @@ case "$command_name" in
     cd "$root"
     case "$command_name" in
       configure) exec ./mach configure "$@" ;;
-      build)
-        (($# == 0)) ||
-          error "build accepts no extra arguments; use 'vulpra-dev mach build' for custom mach flags"
-        exec bash "$root/ci/build-local.sh" "$root"
-        ;;
       package) exec bash "$root/ci/package-smoke-local.sh" "$@" ;;
       smoke) exec bash "$root/ci/smoke-native-local.sh" "$@" ;;
       wayland) exec bash "$root/ci/smoke-wayland-package-local.sh" "$@" ;;
