@@ -1,0 +1,195 @@
+# Original authenticated Firefox160 binary, real temporary browser workload
+# with bounded LD_DEBUG=bindings. Raw loader logs are never uploaded.
+name: M3 Firefox 160 Actual libxul Runtime Symbol Bindings (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-libxul-runtime-symbol-bindings.yml
+      - ci/m3-native-libxul-bindings.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  firefox160-bounded-real-bindings:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Authenticate original native producer and independent unmodified archive preservation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name] of [
+              [43138458940,'0624235fdc956ab18af3c3f310b3588ca72fff61',
+                'Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate'],
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_sha!==sha || r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.name!==name || r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Original Firefox160 browser producer/source invalid '+id);
+            }
+            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:43724886827,per_page:100});
+            for(const name of [
+              'firefox160-vulpra-preserved-native-preview-not-approved',
+              'firefox160-vulpra-preserved-materialized-source-proof']){
+              if(all.filter(a=>a.name===name&&!a.expired&&a.size_in_bytes>0 &&
+                  new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Original source/package artifact absent: '+name);
+            }
+      - name: Checkout isolated existing WebDriver runtime test and Rust binding parser
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-native-libxul-bindings.rs
+            ci/smoke-webextension-package-local.py
+      - name: Unit-test glibc binding parser and authenticate original compiled package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-native-libxul-bindings.rs -o "$RUNNER_TEMP/m3-bindings-parser-tests"
+          "$RUNNER_TEMP/m3-bindings-parser-tests"
+          rustc --edition=2021 -O ci/m3-native-libxul-bindings.rs -o "$RUNNER_TEMP/m3-bindings-parser"
+          python3 -m py_compile ci/smoke-webextension-package-local.py
+      - name: Download original unmodified source-authenticated native browser package
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native
+      - name: Download matching 28-overlay Firefox160 source-tree identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Verify source and native archive SHA before staging only under temporary checkout .git
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive" | cut -d' ' -f1)" = \
+            "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb"
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp -- "$archive" "$dest/vulpra-local-firefox160-bindings.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-bindings.tar.xz > \
+             vulpra-local-firefox160-bindings.tar.xz.sha256)
+      - name: Install native dependencies and SHA256-verified GeckoDriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends curl jq python3 libgtk-3-0t64 libdbus-glib-1-2 \
+            libasound2t64 libnss3 libgbm1
+          file="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl -fLsS --retry 3 --max-time 90 -o "$file" \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/geckodriver-bin"
+          tar -xzf "$file" -C "$RUNNER_TEMP/geckodriver-bin" geckodriver
+          test -x "$RUNNER_TEMP/geckodriver-bin/geckodriver"
+          echo "$RUNNER_TEMP/geckodriver-bin" >> "$GITHUB_PATH"
+      - name: Observe actual Firefox160 libxul bindings with default and eager PLT conditions
+        shell: bash
+        timeout-minutes: 15
+        env:
+          VULPRA_M3_VERIFY_NIMBUS: "1"
+        run: |
+          set -euo pipefail
+          default="$RUNNER_TEMP/vulpra-binding-default-traces"
+          eager="$RUNNER_TEMP/vulpra-binding-eager-traces"
+          mkdir -p "$default" "$eager"
+          trap 'rm -rf -- "$default" "$eager"' EXIT
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          env MOZ_HEADLESS=1 LD_DEBUG=bindings LD_DEBUG_OUTPUT="$default/m3-bindings" \
+            python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/m3-bindings-parser" --firefox160 \
+            "$default" "$RUNNER_TEMP/firefox160-default-binding-report.json"
+          env MOZ_HEADLESS=1 LD_BIND_NOW=1 LD_DEBUG=bindings LD_DEBUG_OUTPUT="$eager/m3-bindings" \
+            python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/m3-bindings-parser" --firefox160 \
+            "$eager" "$RUNNER_TEMP/firefox160-eager-binding-report.json"
+          jq -n \
+            --slurpfile baseline "$RUNNER_TEMP/firefox160-default-binding-report.json" \
+            --slurpfile eager "$RUNNER_TEMP/firefox160-eager-binding-report.json" '
+            ($baseline[0]) as $b | ($eager[0]) as $e |
+            if all([$b,$e][];
+              .schema_version==1 and
+              .status=="observed_firefox160_native_libxul_glibc_symbol_bindings" and
+              .original_source_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+              .original_archive_sha256=="530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+              .browser_pid_traces_with_libxul_bindings>=1 and
+              .libxul_normal_symbol_binding_events>=1 and
+              .distinct_symbol_provider_pairs_observed>=1 and
+              .observed_provider_basename_count==(.observed_provider_basenames|length) and
+              .actual_runtime_binding_proven_for_this_workload==true and
+              .raw_loader_logs_exported==false and .symbol_names_exported==false and
+              .complete_relocation_coverage_proven==false and
+              .lazy_and_transitive_feature_coverage_proven==false and
+              .new_source_pruning_authorized==false)
+            then {
+              schema_version:1,
+              status:"firefox160_actual_libxul_default_vs_eager_glibc_bindings",
+              original_firefox160_native_build:43138458940,
+              archive_preservation_run:43724886827,
+              original_native_source_commit:$b.original_source_commit,
+              original_archive_sha256:$b.original_archive_sha256,
+              default_libxul_binding_events:$b.libxul_normal_symbol_binding_events,
+              eager_libxul_binding_events:$e.libxul_normal_symbol_binding_events,
+              default_distinct_symbol_provider_pairs:$b.distinct_symbol_provider_pairs_observed,
+              eager_distinct_symbol_provider_pairs:$e.distinct_symbol_provider_pairs_observed,
+              default_provider_basenames:$b.observed_provider_basenames,
+              eager_provider_basenames:$e.observed_provider_basenames,
+              original_firefox160_webdriver_js_extensions_tls_nimbus_smoke_both_modes_passed:true,
+              loader_records_observed_from_actual_browser_processes:true,
+              raw_loader_traces_or_symbol_names_archived:false,
+              eager_binding_applied_to_observed_process:true,
+              complete_dependency_and_ffi_coverage:false,
+              no_future_dlopen_or_lazy_symbol_coverage_claim:true,
+              target_arch_hyprland_runtime_verified:false,
+              source_pruning_authorized:false,
+              security_current:false,
+              release_ready:false,
+              m3_sixth_gate_closed:false
+            } else error("failed real Firefox160 symbol-binding identity, runtime, or privacy contract") end' \
+            > "$RUNNER_TEMP/firefox160-libxul-real-binding-comparison.json"
+          jq -e '.schema_version==1 and
+            .default_libxul_binding_events>0 and .eager_libxul_binding_events>0 and
+            .original_firefox160_webdriver_js_extensions_tls_nimbus_smoke_both_modes_passed==true and
+            .loader_records_observed_from_actual_browser_processes==true and
+            .raw_loader_traces_or_symbol_names_archived==false and
+            .complete_dependency_and_ffi_coverage==false and
+            .target_arch_hyprland_runtime_verified==false and .m3_sixth_gate_closed==false' \
+            "$RUNNER_TEMP/firefox160-libxul-real-binding-comparison.json" >/dev/null
+          echo 'PASS: actual Firefox160 libxul dynamic linker bindings in real private WebDriver workload, default and eager PLT' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: observed loaded modules only, not all conditional dlopen, Rust/C++ FFI, target Arch hardware or source removal.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive only sanitized authentic Firefox160 binding counts and provider basenames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-actual-libxul-default-eager-bindings-not-ffi-closure
+          path: ${{ runner.temp }}/firefox160-libxul-real-binding-comparison.json
+          if-no-files-found: ignore
+          retention-days: 30

@@ -1,0 +1,172 @@
+# Real Firefox160 source/byte-pinned packaged browser on disposable Ubuntu:
+# glibc LD_DEBUG=libs,files observations, never a complete dlopen graph.
+name: M3 Firefox 160 Actual Initialized Loader Request Edges (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-native-loader-request-edges.yml
+      - ci/m3-firefox160-native-loader-request-edges.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-native-loader-request-edges:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Authenticate original Firefox160 native build and preserved source-matched archive
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name] of [
+              [43138458940,'0624235fdc956ab18af3c3f310b3588ca72fff61',
+                'Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate'],
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Untrusted original Firefox160 native/source evidence '+id);
+            }
+            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:43724886827,per_page:100});
+            for(const name of [
+              'firefox160-vulpra-preserved-native-preview-not-approved',
+              'firefox160-vulpra-preserved-materialized-source-proof']){
+              if(all.filter(a=>a.name===name&&!a.expired&&a.size_in_bytes>0 &&
+                  new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Pinned original source/archive artifact missing '+name);
+            }
+      - name: Checkout only checked native Rust observer and existing real browser QA
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-native-loader-request-edges.rs
+            ci/smoke-webextension-package-local.py
+      - name: Compile and test source-pinned Rust glibc request-edge parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --edition=2021 --test ci/m3-firefox160-native-loader-request-edges.rs \
+            -o "$RUNNER_TEMP/firefox160-loader-tests"
+          "$RUNNER_TEMP/firefox160-loader-tests"
+          rustc --edition=2021 -O ci/m3-firefox160-native-loader-request-edges.rs \
+            -o "$RUNNER_TEMP/firefox160-loader-observer"
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+      - name: Download exact verified native Firefox160 archive
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native
+      - name: Download independently authenticated exact source identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Check pinned tree and archive bytes, stage only in disposable checkout .git
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive" | cut -d' ' -f1)" = \
+            "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb"
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp -- "$archive" "$dest/vulpra-local-firefox160-loader-edges.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-loader-edges.tar.xz > \
+             vulpra-local-firefox160-loader-edges.tar.xz.sha256)
+      - name: Install real native shared libraries and checksum-verified geckodriver
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends curl jq python3 libgtk-3-0t64 \
+            libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          driver="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl -fLsS --retry 3 --max-time 90 -o "$driver" \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$driver" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/geckodriver-bin"
+          tar -xzf "$driver" -C "$RUNNER_TEMP/geckodriver-bin" geckodriver
+          test -x "$RUNNER_TEMP/geckodriver-bin/geckodriver"
+          echo "$RUNNER_TEMP/geckodriver-bin" >> "$GITHUB_PATH"
+      - name: Run actual native Firefox160 workload and record initialized loader edges
+        shell: bash
+        timeout-minutes: 15
+        env:
+          VULPRA_M3_VERIFY_NIMBUS: "1"
+        run: |
+          set -euo pipefail
+          traces="$RUNNER_TEMP/vulpra-firefox160-ephemeral-loader"
+          mkdir -p "$traces"
+          trap 'rm -rf -- "$traces"' EXIT
+          env MOZ_HEADLESS=1 LD_DEBUG=files,libs \
+            LD_DEBUG_OUTPUT="$traces/vulpra-loader" \
+            python3 ci/smoke-webextension-package-local.py "$GITHUB_WORKSPACE"
+          "$RUNNER_TEMP/firefox160-loader-observer" \
+            "$traces" "$RUNNER_TEMP/firefox160-actual-loader-request-edges.json"
+          jq -e '
+            .schema_version==1 and
+            .status=="firefox160_real_browser_native_glibc_initialized_loader_request_edges" and
+            .original_native_source_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .original_native_archive_sha256=="530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .total_numeric_pid_traces_examined>=1 and
+            .browser_pid_traces_with_actual_libxul_initialization>=1 and
+            .observed_initialized_library_basename_count>=3 and
+            (.observed_initialized_library_basenames|index("libxul.so"))!=null and
+            (.observed_initialized_library_basenames|index("libc.so.6"))!=null and
+            .initialized_needed_request_edge_count>=1 and
+            .initialized_needed_request_edge_count==(.initialized_needed_request_edges|length) and
+            .initialized_dynamic_request_edge_count==(.initialized_dynamic_request_edges|length) and
+            .dynamically_requested_but_no_same_trace_init_basename_count==
+              (.dynamically_requested_but_no_same_trace_init_basenames|length) and
+            .only_same_browser_pid_trace_initialized_targets_classified_as_initialized==true and
+            .glibc_reported_request_relationships_not_proven_callstacks==true and
+            .same_pid_may_include_shell_launcher_and_native_browser==true and
+            .all_runtime_attempts_or_error_paths_known==false and
+            .all_conditional_dlopen_and_dlsym_edges_proven==false and
+            .actual_symbol_binding_pairs_reconciled_by_this_report==false and
+            .target_endeavouros_hyprland_verified==false and
+            .raw_loader_logs_paths_pids_symbols_or_profile_data_exported==false and
+            .source_pruning_authorized==false and
+            .security_current==false and .release_ready==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-actual-loader-request-edges.json" >/dev/null
+          jq -r '"PASS: real Firefox160 glibc initialized-loader requests: " +
+            (.initialized_needed_request_edge_count|tostring) + " needed-by edges; " +
+            (.initialized_dynamic_request_edge_count|tostring) + " dynamic-request edges; " +
+            (.dynamically_requested_but_no_same_trace_init_basename_count|tostring) +
+            " dynamic target names not init-confirmed. Not complete loader coverage."' \
+            "$RUNNER_TEMP/firefox160-actual-loader-request-edges.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sanitized actual native initialized loader request-edge report only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-actual-initialized-loader-request-edges-not-dlopen-closure
+          path: ${{ runner.temp }}/firefox160-actual-loader-request-edges.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,122 @@
+# Independent artifact-only reconciliation of exact runtime libxul binding
+# evidence against the authenticated original Firefox 160 28-ELF inventory.
+name: M3 Firefox 160 Actual libxul Binding Evidence Reconciliation
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-libxul-binding-evidence-reconcile.yml
+      - ci/m3-firefox160-libxul-binding-evidence.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evidence-only-real-bindings:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate successful original package census and actual browser observation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name] of [
+              [43730900702,'fd4dee8a9999c303ff35e45fbcd619abe230d30e',
+                'M3 Firefox 160 Exact-Source Native ELF Package Graph (No Build)'],
+              [43741731639,'e59439d263681f511a4cace0c8a2b219941fdedd',
+                'M3 Firefox 160 Actual libxul Runtime Symbol Bindings (No Build)']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_sha!==sha || r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.name!==name || r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Unauthenticated Firefox160 source or real browser binding run '+id);
+            }
+            for(const [id,name] of [
+              [43730900702,'firefox160-source-matched-native-elf-package-graph-not-m3-closure'],
+              [43741731639,'firefox160-actual-libxul-default-eager-bindings-not-ffi-closure']]){
+              const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(all.filter(a=>a.name===name&&!a.expired&&a.size_in_bytes>0 &&
+                  new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Original authenticated source/runtime report missing '+name);
+            }
+      - name: Checkout strict source/payload crosswalk only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-libxul-binding-evidence.jq
+      - name: Download separate actual native package graph
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-source-matched-native-elf-package-graph-not-m3-closure
+          repository: sguzman/vulpra
+          run-id: 43730900702
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/graph
+      - name: Download source-pinned real browser libxul binding evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-actual-libxul-default-eager-bindings-not-ffi-closure
+          repository: sguzman/vulpra
+          run-id: 43741731639
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/bindings
+      - name: Reconcile independent reports and reject fabricated evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          graph="$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json"
+          bindings="$RUNNER_TEMP/bindings/firefox160-libxul-real-binding-comparison.json"
+          verifier="ci/m3-firefox160-libxul-binding-evidence.jq"
+          test -s "$graph" && test -s "$bindings"
+          compare() {
+            jq -n \
+              --arg source "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" \
+              --arg tree "42dd7439a27dde92f89ac5eed13f88117a4d7ab5" \
+              --slurpfile graph "$1" --slurpfile bindings "$2" \
+              -f "$verifier"
+          }
+          compare "$graph" "$bindings" > "$RUNNER_TEMP/firefox160-reconciled-libxul-binding-evidence.json"
+          jq -e '.schema_version==1 and
+            .original_native_elf_members==28 and
+            .original_direct_needed_edges==268 and
+            .observed_libxul_binding_events_default==6337 and
+            .observed_libxul_binding_events_eager==6338 and
+            .actual_provider_basenames_in_each_mode==45 and
+            .actual_glibc_binding_observations_in_exercised_libxul_workload==true and
+            .all_static_imports_guaranteed_resolved==false and
+            .all_optional_dlopen_or_Rust_CXX_FFI_proven==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-reconciled-libxul-binding-evidence.json" >/dev/null
+          jq '.original_native_source_commit="forged_source"' "$bindings" > "$RUNNER_TEMP/forged-source.json"
+          jq '.original_archive_sha256="forged_archive"' "$bindings" > "$RUNNER_TEMP/forged-archive.json"
+          jq '.default_libxul_binding_events+=1' "$bindings" > "$RUNNER_TEMP/forged-count.json"
+          jq '.default_provider_basenames[0]="not-a-real-provider.so"' "$bindings" > "$RUNNER_TEMP/forged-provider.json"
+          jq '.raw_loader_traces_or_symbol_names_archived=true' "$bindings" > "$RUNNER_TEMP/forged-privacy.json"
+          jq '.complete_dependency_and_ffi_coverage=true' "$bindings" > "$RUNNER_TEMP/forged-closure.json"
+          jq '.direct_needed_edges+=1' "$graph" > "$RUNNER_TEMP/forged-graph.json"
+          jq '.original_firefox160_webdriver_js_extensions_tls_nimbus_smoke_both_modes_passed=false' "$bindings" > "$RUNNER_TEMP/forged-runtime.json"
+          for forged in source archive count provider privacy closure runtime; do
+            if compare "$graph" "$RUNNER_TEMP/forged-$forged.json" >/dev/null 2>&1; then
+              echo "Forged Firefox160 binding evidence accepted: $forged" >&2
+              exit 1
+            fi
+          done
+          if compare "$RUNNER_TEMP/forged-graph.json" "$bindings" >/dev/null 2>&1; then
+            echo 'Forged native graph accepted' >&2; exit 1
+          fi
+          echo 'PASS: exact Firefox160 real browser binding evidence reconciled with 28 original ELFs; 8/8 forged claims rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: two bounded browser workloads, not all delayed/optional loader routes, FFI, target Arch or release.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive only bounded independent actual binding crosscheck
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-reconciled-actual-libxul-binding-witness-not-abi-release
+          path: ${{ runner.temp }}/firefox160-reconciled-libxul-binding-evidence.json
+          if-no-files-found: warn
+          retention-days: 30

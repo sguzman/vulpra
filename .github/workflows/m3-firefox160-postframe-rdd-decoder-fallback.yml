@@ -1,0 +1,232 @@
+# Real, source-attested Firefox160 VP9 decoder selection:
+# baseline FFVPX (RDD remote) -> FFmpeg (RDD remote) after BOTH bundled
+# FFVPX native libraries are denied. Pure artifact/code verification; no
+# rebuild, profile mutations, host-library removals or source pruning.
+name: M3 Firefox 160 Real RDD FFVPX to FFmpeg VP9 Fallback Verification
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-postframe-rdd-decoder-fallback.yml
+      - ci/m3-firefox160-vp9-postframe-decoder-fallback-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-decoder-switch-source-attested:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Authenticate independent original real Firefox160 source and decoder observations
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)',
+                'firefox160-vulpra-preserved-complete-git-tree-candidate'],
+              [43747660588,'f9935afb16da34f928dd2ae479c41ef50717f0b7',
+                'M3 Firefox 160 Real FFVPX vs FFmpeg Denial Evidence Crosswalk',
+                'firefox160-actual-bundled-ffvpx-vs-system-ffmpeg-denial-not-decoder-proof'],
+              [43748375268,'c0491b0d166c8fcd96e36fa239568d36a4e14bee',
+                'M3 Firefox 160 Exact Per-SONAME FFVPX Denial Crosswalk',
+                'firefox160-per-soname-ffvpx-real-denial-crosswalk-not-decoder-proof'],
+              [43750879381,'7f2c570df34fb7aba2fc7928b8828f8c26cb8d6e',
+                'M3 Firefox 160 Actual FFVPX Library Denial VP9 Replay (No Build)',
+                'firefox160-original-bundled-ffvpx-denial-real-vp9-not-full-fallback']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Original real Firefox160 native/source/decoder evidence not authentic: '+id);
+              const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(artifacts.filter(x=>x.name===artifact&&!x.expired&&x.size_in_bytes>0 &&
+                   new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Original exact source/runtime report missing, expired or ambiguous: '+artifact);
+            }
+      - name: Checkout only independent bounded post-frame crosswalk
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-vp9-postframe-decoder-fallback-crosswalk.jq
+      - name: Checkout 10 exact official Mozilla Firefox160 source/logging files read-only
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: firefox160-diagnostics-original
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/media/MediaFormatReader.cpp
+            dom/media/platforms/agnostic/VPXDecoder.h
+            dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
+            dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp
+            dom/media/platforms/ffmpeg/FFmpegLog.h
+            dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp
+            dom/media/platforms/wrappers/MediaChangeMonitor.h
+            dom/media/platforms/wrappers/MediaChangeMonitor.cpp
+            dom/media/platforms/agnostic/AgnosticDecoderModule.cpp
+            dom/media/ipc/RemoteDecoderChild.cpp
+      - name: Download original 28-overlay complete candidate source ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/ledger
+      - name: Verify actual selected-decoder description sources and no patch overlap
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          root=firefox160-diagnostics-original
+          test "$(git -C "$root" rev-parse HEAD)" = \
+            '2887d9de1f69c0e9776413da80e7ba0d1225dd9b'
+          : > "$RUNNER_TEMP/actual-decoder-source-paths.txt"
+          while IFS=' ' read -r sha path; do
+            test "$(git -C "$root" rev-parse "HEAD:$path")" = "$sha"
+            test "$(git -C "$root" hash-object -- "$path")" = "$sha"
+            echo "$path" >> "$RUNNER_TEMP/actual-decoder-source-paths.txt"
+          done <<'SOURCES'
+          aed68a10525c0116574726307809b0da4b7e17f0 dom/media/MediaFormatReader.cpp
+          719c3d65e92074f1955c7ae3272e003368516e8a dom/media/platforms/agnostic/VPXDecoder.h
+          a3373fb915a56b5fdc31af28703985b0f1df72eb dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h
+          ee24d18570d146d70252f5237810729c3319fcee dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp
+          80347b5586afe49e5f32c8631c3c6e3e0c1bb160 dom/media/platforms/ffmpeg/FFmpegLog.h
+          4d3eaf7529a534008f9150c2a16a04e5ef211566 dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp
+          9aa56dc1e7ab470290c27804612df11e1f54da18 dom/media/platforms/wrappers/MediaChangeMonitor.h
+          df6457efd1d0893836303c9544def0a5b734a702 dom/media/platforms/wrappers/MediaChangeMonitor.cpp
+          ddb9953176c1ee8cbfc02b6e881bb91d5c485388 dom/media/platforms/agnostic/AgnosticDecoderModule.cpp
+          b777fb2d780eeba99d9b5c9f958b2f07bbf42f9a dom/media/ipc/RemoteDecoderChild.cpp
+          SOURCES
+          test "$(wc -l < "$RUNNER_TEMP/actual-decoder-source-paths.txt")" -eq 10
+          test "$(sort -u "$RUNNER_TEMP/actual-decoder-source-paths.txt" | wc -l)" -eq 10
+          grep -Fq 'decoder.mDescription = mVideo.mDecoder->GetDescriptionName();' "$root/dom/media/MediaFormatReader.cpp"
+          grep -Fq '"desc:{} pending:{} waiting:{} eos:{} ds:{} sid:{} waitcdm:{}"' "$root/dom/media/MediaFormatReader.cpp"
+          grep -Fq 'return "MediaChangeMonitor decoder (pending)"_ns;' "$root/dom/media/platforms/wrappers/MediaChangeMonitor.h"
+          grep -Fq 'return decoder->GetDescriptionName();' "$root/dom/media/platforms/wrappers/MediaChangeMonitor.h"
+          grep -Fq 'return "ffvpx video decoder"_ns;' "$root/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h"
+          grep -Fq 'return "ffmpeg video decoder"_ns;' "$root/dom/media/platforms/ffmpeg/FFmpegVideoDecoder.h"
+          grep -Fq 'return "libvpx video decoder"_ns;' "$root/dom/media/platforms/agnostic/VPXDecoder.h"
+          grep -Fq 'return LinkResult::NoProvidedLib;' "$root/dom/media/platforms/ffmpeg/FFmpegLibWrapper.cpp"
+          grep -Fq 'FFMPEGP_LOG("Link result: {}",' "$root/dom/media/platforms/ffmpeg/ffvpx/FFVPXRuntimeLinker.cpp"
+          grep -Fq 'mDescription.Append(RemoteMediaInToStr(GetManager()->Location()));' "$root/dom/media/ipc/RemoteDecoderChild.cpp"
+          grep -Fq 'mDescription.Append(" remote)");' "$root/dom/media/ipc/RemoteDecoderChild.cpp"
+          jq -e '
+            .firefox160_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_git_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .source_files_modified==26 and .vulpra_source_files_added==2 and
+            .upstream_files_deleted==0 and .all_other_upstream_files_preserved==true
+          ' "$RUNNER_TEMP/ledger/candidate-tree-report.json" >/dev/null
+          overlays="$RUNNER_TEMP/ledger/overlay-paths.txt"
+          test -s "$overlays" && test "$(wc -l < "$overlays")" -eq 28
+          test "$(sort -u "$overlays"|wc -l)" -eq 28
+          if grep -Fx -f "$RUNNER_TEMP/actual-decoder-source-paths.txt" "$overlays"; then
+            echo 'FAIL: original decoder/log source path altered by an overlay' >&2; exit 1
+          fi
+          echo 'PASS: ten original Firefox160 decoder+remote+post-frame+FFVPX link source blobs are unchanged by all 28 Vulpra overlays.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Download independently verified original FFmpeg and FFVPX real media comparison
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-actual-bundled-ffvpx-vs-system-ffmpeg-denial-not-decoder-proof
+          repository: sguzman/vulpra
+          run-id: 43747660588
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/prior
+      - name: Download independently verified exact FFVPX SONAME denial results
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-per-soname-ffvpx-real-denial-crosswalk-not-decoder-proof
+          repository: sguzman/vulpra
+          run-id: 43748375268
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/soname
+      - name: Download original browser real FFVPX failure and post-frame decoder descriptions
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-original-bundled-ffvpx-denial-real-vp9-not-full-fallback
+          repository: sguzman/vulpra
+          run-id: 43750879381
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/real
+      - name: Prove post-frame RDD FFVPX to FFmpeg switch and reject all forged evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          prior="$RUNNER_TEMP/prior/firefox160-actual-ffvpx-ffmpeg-denial-source-crosswalk.json"
+          soname="$RUNNER_TEMP/soname/firefox160-exact-per-name-ffvpx-denial-proof.json"
+          real="$RUNNER_TEMP/real/firefox160-actual-bundled-ffvpx-denial-outcome.json"
+          verifier="ci/m3-firefox160-vp9-postframe-decoder-fallback-crosswalk.jq"
+          test -s "$prior" && test -s "$soname" && test -s "$real"
+          verify() {
+            jq -n --arg upstream '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile prior "$1" --slurpfile soname "$2" \
+              --slurpfile real "$3" -f "$verifier"
+          }
+          verify "$prior" "$soname" "$real" \
+            > "$RUNNER_TEMP/firefox160-verified-real-rdd-vp9-ffvpx-to-ffmpeg-fallback.json"
+          jq -e '
+            .schema_version==1 and
+            .additional_official_MediaFormatReader_change_monitor_remote_decoder_and_linker_git_blobs_verified==10 and
+            .observed_original_VP9_baseline_decoder_after_video_samples=="ffvpx video decoder (RDD remote)" and
+            .observed_original_VP9_with_bundled_FFVPX_denied_decoder_after_video_samples=="ffmpeg video decoder (RDD remote)" and
+            .working_VP9_media_frames_and_time_with_system_FFmpeg_selected_under_FFVPX_denial==true and
+            .source_logged_FFVPX_link_result_NoProvidedLib_denied_mode==true and
+            .FFVPX_denials_before_video_navigation==2 and
+            .no_video_media_error_in_either_mode==true and
+            .all_protected_feature_fallbacks_tested==false and
+            .direct_machine_code_FFVPX_dlopen_caller_and_branch_proven==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-verified-real-rdd-vp9-ffvpx-to-ffmpeg-fallback.json" >/dev/null
+
+          jq '.original_upstream_source_commit="forged"' "$prior" > "$RUNNER_TEMP/prior-source.json"
+          jq '.system_ffmpeg_denied_load_attempts=0' "$prior" > "$RUNNER_TEMP/prior-ffmpeg.json"
+          jq '.exact_decoder_provider_or_successful_fallback_identified=true' "$prior" > "$RUNNER_TEMP/prior-claim.json"
+          jq '.bundled_ffvpx_denied_load_attempts=0' "$prior" > "$RUNNER_TEMP/prior-count.json"
+          jq '.total_ffvpx_native_dlopen_denials=0' "$soname" > "$RUNNER_TEMP/soname-count.json"
+          jq '.two_separately_denied_native_FFVPX_names[0].actual_dlopen_denial_count=0' "$soname" > "$RUNNER_TEMP/soname-codec.json"
+          jq '.source_pruning_authorized=true' "$soname" > "$RUNNER_TEMP/soname-pruning.json"
+          jq '.original_compiled_native_archive_sha256="forged"' "$real" > "$RUNNER_TEMP/real-sha.json"
+          jq '.baseline_resolved_post_frame_video_decoder_descriptions=["ffmpeg video decoder (RDD remote)"]' "$real" > "$RUNNER_TEMP/real-baseline.json"
+          jq '.denied_resolved_post_frame_video_decoder_descriptions=["ffvpx video decoder (RDD remote)"]' "$real" > "$RUNNER_TEMP/real-denied.json"
+          jq '.ffvpx_real_NoProvidedLib_link_failure_logged=false' "$real" > "$RUNNER_TEMP/real-link.json"
+          jq '.ffvpx_libmozavutil_denied_dlopen_attempt_count=0' "$real" > "$RUNNER_TEMP/real-util.json"
+          jq '.with_bundled_ffvpx_denied_vp9_decoded_frames_and_advancing_time=false' "$real" > "$RUNNER_TEMP/real-playback.json"
+          jq '.exact_original_Firefox160_decoder_log_source_blobs_verified=0' "$real" > "$RUNNER_TEMP/real-source.json"
+          jq '.raw_dlopen_names_PIDs_or_profiles_archived=true' "$real" > "$RUNNER_TEMP/real-privacy.json"
+          jq '.m3_sixth_gate_closed=true' "$real" > "$RUNNER_TEMP/real-gate.json"
+          for kind in source ffmpeg claim count; do
+            if verify "$RUNNER_TEMP/prior-$kind.json" "$soname" "$real" >/dev/null 2>&1; then
+              echo "Rejected proof failed: forged prior $kind accepted" >&2; exit 1
+            fi
+          done
+          for kind in count codec pruning; do
+            if verify "$prior" "$RUNNER_TEMP/soname-$kind.json" "$real" >/dev/null 2>&1; then
+              echo "Rejected proof failed: forged SONAME $kind accepted" >&2; exit 1
+            fi
+          done
+          for kind in sha baseline denied link util playback source privacy gate; do
+            if verify "$prior" "$soname" "$RUNNER_TEMP/real-$kind.json" >/dev/null 2>&1; then
+              echo "Rejected proof failed: forged actual RDD decoder $kind accepted" >&2; exit 1
+            fi
+          done
+          echo 'PASS: exact unmodified Firefox160 source, post-frame FFVPX baseline and system FFmpeg under bundled FFVPX denial with actual VP9 decoded frames; 16/16 forgeries rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: one concrete RDD VP9 fallback route; no complete cross-codec/hardware/Rust-CXX FFI/dlopen closure, source pruning or release.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sanitized source-attested actual protected VP9 decoder fallback only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-verified-post-frame-rdd-ffvpx-to-ffmpeg-vp9-not-full-m3-closure
+          path: ${{ runner.temp }}/firefox160-verified-real-rdd-vp9-ffvpx-to-ffmpeg-fallback.json
+          if-no-files-found: warn
+          retention-days: 30

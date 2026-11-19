@@ -1,0 +1,201 @@
+# A bounded genuine syscall trace of the original Firefox160 compiled NSS
+# FIPS request. Raw strace and temporary SQL databases never uploaded.
+name: M3 Firefox 160 Original NSS FIPS Integrity Filesystem Witness
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-original-fips-integrity-file-access.yml
+      - ci/m3-firefox160-original-fips-integrity-access.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-nss-source-attested-checksum-access:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Authenticate original byte-preserved archive and prior actual NSS FIPS-request negative test
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)',
+                'firefox160-vulpra-preserved-native-preview-not-approved'],
+              [43767128907,'f97c4a42bf6fb8d11d99248dfc7a9c1f9d81da7e',
+                'M3 Firefox 160 Ephemeral FIPS Request Device-Error Crosswalk',
+                'firefox160-authenticated-original-FIPS-request-device-error-not-validated-FIPS']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Untrusted original Firefox160 NSS compiled/FIPS error producer '+id);
+              const arts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(arts.filter(a=>a.name===artifact&&!a.expired&&a.size_in_bytes>0 &&
+                 new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Untrusted original binary/native failed FIPS evidence '+artifact);
+            }
+      - name: Checkout exact source-bound original FIPS diagnostic and native probe
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-original-fips-integrity-access.py
+            ci/m3-firefox160-original-pkcs11-ephemeral-fips-db-probe.c
+      - name: Checkout official Mozilla Firefox160 FIPS entry, self-test and signature-verification sources
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: original-mozilla-fx160
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/nss/lib/softoken/fipstokn.c
+            security/nss/lib/softoken/fipstest.c
+            security/nss/lib/softoken/pkcs11.c
+            security/nss/lib/freebl/shvfy.c
+            security/nss/lib/freebl/shsign.h
+            security/nss/lib/util/secerr.h
+            nsprpub/pr/include/prerr.h
+      - name: Verify seven exact official FIPS source Git blobs and guarded integrity check ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          root=original-mozilla-fx160
+          test "$(git -C "$root" rev-parse HEAD)" = \
+            '2887d9de1f69c0e9776413da80e7ba0d1225dd9b'
+          while read -r sha path; do
+            test "$(git -C "$root" rev-parse "HEAD:$path")" = "$sha"
+            test "$(git -C "$root" hash-object "$path")" = "$sha"
+          done <<'SOURCES'
+          4f5a4c9fa639388fd76a1b14a58ebc3c5801e49c security/nss/lib/softoken/fipstokn.c
+          cd444f99b8f85c8a953efd4db08d7570f891b8d4 security/nss/lib/softoken/fipstest.c
+          542da0b5ce2dc3f6fb1e6f250b4c8995d6aac36b security/nss/lib/softoken/pkcs11.c
+          4743eb46ecb2b296fa7a11c98ab85ce2c7e1ba90 security/nss/lib/freebl/shvfy.c
+          d1a595a3913e851a99e356ca86a49e0d3bb3d88e security/nss/lib/freebl/shsign.h
+          5b7c9cc5fa6a94a2518529f600e990ad64c2e1de security/nss/lib/util/secerr.h
+          28bf6d7eba80843c9fed4a84c324abc3faa74306 nsprpub/pr/include/prerr.h
+          SOURCES
+          grep -Fq 'crv = sftk_FIPSEntryOK(rerun);' "$root/security/nss/lib/softoken/fipstokn.c"
+          grep -Fq 'crv = nsc_CommonInitialize(pReserved, PR_TRUE);' "$root/security/nss/lib/softoken/fipstokn.c"
+          grep -Fq 'return CKR_DEVICE_ERROR;' "$root/security/nss/lib/softoken/fipstest.c"
+          grep -Fq 'rv = sftk_fips_RSA_PowerUpSelfTest();' "$root/security/nss/lib/softoken/fipstest.c"
+          grep -Fq 'if (!BLAPI_SHVerify(libraryName,' "$root/security/nss/lib/softoken/fipstest.c"
+          grep -Fq 'checkName = mkCheckFileName(shName);' "$root/security/nss/lib/freebl/shvfy.c"
+          grep -Fq 'checkFD = PR_Open(checkName, PR_RDONLY, 0);' "$root/security/nss/lib/freebl/shvfy.c"
+          grep -Fq '#define SGN_SUFFIX ".chk"' "$root/security/nss/lib/freebl/shsign.h"
+          grep -Fq 'SEC_ERROR_PKCS11_DEVICE_ERROR = (SEC_ERROR_BASE + 169)' "$root/security/nss/lib/util/secerr.h"
+          grep -Fq '#define PR_LOAD_LIBRARY_ERROR (-5977L)' "$root/nsprpub/pr/include/prerr.h"
+          echo 'PASS: seven exact upstream Firefox160 Git source blobs and FIPS-before-common-initialization integrity-check anchors' >> "$GITHUB_STEP_SUMMARY"
+      - name: Download verified original Firefox160 compiled native archive unchanged
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/original
+      - name: Download independently source-attested original NSS FIPS device-error outcome
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-authenticated-original-FIPS-request-device-error-not-validated-FIPS
+          repository: sguzman/vulpra
+          run-id: 43767128907
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/prior
+      - name: Validate original immutable FIPS failure and native source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .schema_version==1 and
+            .official_original_mozilla_firefox160_source_commit==
+              "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .original_compiled_browser_archive_sha256==
+              "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .original_NSS_Init_normal_SQL_database_success==true and
+            .original_FIPS_SQL_db_NSS_Init_returned_device_error==true and
+            .source_defined_PKCS11_DEVICE_ERROR_code==-8023 and
+            .original_temporary_FIPS_mode_usable_by_archived_Firefox160_NSS==false and
+            .original_device_error_root_cause_unknown==true and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/prior/verified-original-firefox160-FIPS-request-device-error.json" >/dev/null
+          archive="$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive" | cut -d' ' -f1)" = \
+            '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb'
+          if tar -Jtf "$archive" | grep -Eq '(^|/)(libsoftokn3|libfreeblpriv3)[.]chk$'; then
+            echo 'Unexpected FIPS integrity checksum present in preserved original package' >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/exact-original-app"
+          tar -xf "$archive" -C "$RUNNER_TEMP/exact-original-app"
+          app="$RUNNER_TEMP/exact-original-app/vulpra"
+          grep -Fxq 'Name=Vulpra' "$app/application.ini"
+          for name in libnss3.so libsoftokn3.so libfreeblpriv3.so libnspr4.so; do
+            test -s "$app/$name"
+            test "$(od -An -tx1 -N4 "$app/$name"|tr -d ' \n')" = 7f454c46
+          done
+          echo "ORIGINAL_FX160_APP=$app" >> "$GITHUB_ENV"
+          echo 'PASS: original compiled source-pinned package contains both NSS providers but no expected FIPS .chk integrity files' >> "$GITHUB_STEP_SUMMARY"
+      - name: Install only disposable original native NSS SQL probe and read-only syscall tracer
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends strace libnss3-tools python3
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            ci/m3-firefox160-original-pkcs11-ephemeral-fips-db-probe.c \
+            -o "$RUNNER_TEMP/vulpra_pkcs11_fipsdb" -ldl
+          python3 -m py_compile ci/m3-firefox160-original-fips-integrity-access.py
+          python3 ci/m3-firefox160-original-fips-integrity-access.py --self-test
+      - name: Trace exact original NSS FIPS integrity checksum read failures without archiving paths
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          python3 ci/m3-firefox160-original-fips-integrity-access.py \
+            "$ORIGINAL_FX160_APP" "$RUNNER_TEMP/vulpra_pkcs11_fipsdb" \
+            "$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz" \
+            "$RUNNER_TEMP/actual-original-fips-integrity-access-witness.json"
+          jq -e --arg head "$GITHUB_SHA" '
+            .schema_version==1 and
+            .diagnostic_harness_commit==$head and
+            .original_NSS_standard_temporary_SQL_baseline_succeeded==true and
+            .original_NSS_FIPS_requested_SQL_Init_failed_device_error==true and
+            .no_original_chk_files_present_in_byte_preserved_archive==true and
+            .both_disposable_profile_database_bytes_unchanged==true and
+            .original_NSS_FIPS_mode_worked==false and
+            .all_FIPS_selftests_or_integrity_checks_individually_attributed==false and
+            .missing_chk_was_proven_the_only_possible_fatal_cause==false and
+            .original_FIPS_build_flags_completely_recovered==false and
+            .host_or_user_NSS_global_system_FIPS_activated==false and
+            .direct_NSS_FIPS_native_callstack_or_full_Rust_CXX_FFI_closure_proven==false and
+            .original_upstream_source_or_native_provider_removal_allowed==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/actual-original-fips-integrity-access-witness.json" >/dev/null
+          jq -r '"AUDIT: actual original NSS FIPS checksum file attempts="+
+            ([.modes[]|select(.mode=="fips_requested")|
+              (.actual_softoken_chk_filesystem_attempts|tostring)][0])+
+            ", ENOENT="+([.modes[]|select(.mode=="fips_requested")|
+              (.actual_softoken_chk_ENOENT_missing_events|tostring)][0])+
+            ", original FIPS initialization error=-8023"' \
+            "$RUNNER_TEMP/actual-original-fips-integrity-access-witness.json" >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: source/observed .chk absence may not be the only failing FIPS check; no source disassembly/callstack, FIPS success, full security or M3 acceptance.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive only sanitized actual original NSS checksum basename access counters
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-original-fips-chk-file-access-witness-not-FIPS-success
+          path: ${{ runner.temp }}/actual-original-fips-integrity-access-witness.json
+          if-no-files-found: warn
+          retention-days: 30

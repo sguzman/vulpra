@@ -1,0 +1,138 @@
+# Immutable, independent actual original Firefox160 NSS API to WebDriver
+# startup/local HTTPS source crosswalk. No browser rebuild, no system edits.
+name: M3 Firefox 160 Real NSS Browser Startup and HTTPS Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-nss-browser-local-https-crosswalk.yml
+      - ci/m3-firefox160-nss-browser-local-https-source-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-nss-crypto-source-to-browser-startup:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate immutable original NSS native source and actual Firefox160 browser producers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43760419551,'0d46655ff1535edc2cccdb03d2992b2fb24ed858',
+                'M3 Firefox 160 Original NSS FreeBL Softoken Real API Crosswalk',
+                'firefox160-original-source-verified-nss-freebl-softoken-api-failure-not-TLS'],
+              [43761905154,'ed213726d0703f0e14071234f04de9e7bb3733f6',
+                'M3 Firefox 160 Original NSS-Denied Browser Startup and Local HTTPS',
+                'firefox160-original-nss-denied-browser-local-https-no-full-TLS-closure']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Untrusted original NSS native/Firefox160 browser CI producer '+id);
+              const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(a.filter(x=>x.name===artifact&&!x.expired&&x.size_in_bytes>0 &&
+                   new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Original NSS source/native/browser artifact missing or expired: '+artifact);
+            }
+      - name: Checkout strict NSS original native versus actual browser jq crosswalk only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-nss-browser-local-https-source-crosswalk.jq
+      - name: Download source-authenticated original NSS API results
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-original-source-verified-nss-freebl-softoken-api-failure-not-TLS
+          repository: sguzman/vulpra
+          run-id: 43760419551
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native
+      - name: Download genuine original Firefox160 WebDriver HTTP/HTTPS under NSS library denial
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-original-nss-denied-browser-local-https-no-full-TLS-closure
+          repository: sguzman/vulpra
+          run-id: 43761905154
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/browser
+      - name: Cross-verify exact source/native IDs, actual browser denial and sixteen false-evidence records
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          native="$RUNNER_TEMP/native/firefox160-source-attested-original-NSS-freebl-softoken-probe.json"
+          browser="$RUNNER_TEMP/browser/firefox160-original-browser-nss-local-https-observation.json"
+          jqfile=ci/m3-firefox160-nss-browser-local-https-source-crosswalk.jq
+          test -s "$native" && test -s "$browser"
+          compare() {
+            jq -n --arg upstream '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile native "$1" --slurpfile browser "$2" -f "$jqfile"
+          }
+          compare "$native" "$browser" > "$RUNNER_TEMP/firefox160-actual-nss-browser-local-https-source-crosswalk.json"
+          jq -e '
+            .schema_version==1 and
+            .browser_baseline_WebDriver_session_created==true and
+            .browser_baseline_actual_local_HTTP_navigation_and_javascript==true and
+            .browser_baseline_strict_self_signed_local_HTTPS_certificate_rejected==true and
+            .browser_softoken_denied_actual_attempts==2 and
+            .browser_softoken_denial_rejected_WebDriver_session==true and
+            .browser_freebl_denied_actual_attempts==3 and
+            .browser_freebl_denial_rejected_WebDriver_session==true and
+            .combined_mode_softoken_loader_attempts==2 and
+            .combined_mode_freebl_loader_attempts==0 and
+            .combined_mode_rejected_WebDriver_session==true and
+            .all_actual_NSS_denied_browser_cases_failed_before_local_HTTP_or_HTTPS_navigation==true and
+            .browser_tested_trusted_local_certificate_TLS_handshake==false and
+            .direct_compiled_machine_dlopen_caller_attributed==false and
+            .complete_Rust_CXX_FFI_dlopen_dlsym_closure_proven==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-actual-nss-browser-local-https-source-crosswalk.json" >/dev/null
+
+          jq '.exact_official_firefox160_source_commit="fake"' "$native" > "$RUNNER_TEMP/native-source.json"
+          jq '.baseline_original_NSS_NoDB_Init_passed=false' "$native" > "$RUNNER_TEMP/native-init.json"
+          jq '.tested_softoken_missing_loader_attempts=0' "$native" > "$RUNNER_TEMP/native-softoken.json"
+          jq '.tested_freebl_missing_loader_attempts=0' "$native" > "$RUNNER_TEMP/native-freebl.json"
+          jq '.original_native_package_build_run=1234' "$native" > "$RUNNER_TEMP/native-package.json"
+          jq '.original_missing_provider_fallback_success_proven=true' "$native" > "$RUNNER_TEMP/native-fallback.json"
+
+          jq '.original_native_browser_archive_sha256="fake"' "$browser" > "$RUNNER_TEMP/browser-sha.json"
+          jq '.baseline_real_webdriver_local_http_js_and_strict_tls_succeeded=false' "$browser" > "$RUNNER_TEMP/browser-baseline.json"
+          jq '.modes[0].https_localhost_webdriver_error_class="unknown error"' "$browser" > "$RUNNER_TEMP/browser-tls.json"
+          jq '.modes[1].actual_denied_softoken_requests=0' "$browser" > "$RUNNER_TEMP/browser-softoken.json"
+          jq '.modes[2].actual_denied_freebl_requests=0' "$browser" > "$RUNNER_TEMP/browser-freebl.json"
+          jq '.modes[3].actual_denied_freebl_requests=3' "$browser" > "$RUNNER_TEMP/browser-both.json"
+          jq '.modes[2].session_created=true' "$browser" > "$RUNNER_TEMP/browser-session.json"
+          jq '.modes[1].browser_private_profile_sentinel_preserved=false' "$browser" > "$RUNNER_TEMP/browser-private.json"
+          jq '.real_TLS_handshake_with_trusted_server_verified=true' "$browser" > "$RUNNER_TEMP/browser-overclaim.json"
+          jq '.m3_sixth_gate_closed=true' "$browser" > "$RUNNER_TEMP/browser-gate.json"
+
+          for kind in source init softoken freebl package fallback; do
+            if compare "$RUNNER_TEMP/native-$kind.json" "$browser" >/dev/null 2>&1; then
+              echo "Forged original NSS source/native evidence accepted: $kind" >&2; exit 1
+            fi
+          done
+          for kind in sha baseline tls softoken freebl both session private overclaim gate; do
+            if compare "$native" "$RUNNER_TEMP/browser-$kind.json" >/dev/null 2>&1; then
+              echo "Forged actual original Firefox160 browser NSS/TLS evidence accepted: $kind" >&2; exit 1
+            fi
+          done
+          echo 'PASS: same original Firefox160 source and native archive, real browser baseline HTTP+JS+strict local TLS; NSS denied 2/3/2 blocked native loads and all three WebDriver session creations rejected; 16/16 false reports rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: HTTPS not reached in denied modes, no trusted HTTPS validation or permission to prune libraries; global NSS/security/FFI gate OPEN.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve independent bounded original NSS browser startup and localhost HTTPS proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-source-attested-real-nss-browser-startup-https-failures-not-full-TLS
+          path: ${{ runner.temp }}/firefox160-actual-nss-browser-local-https-source-crosswalk.json
+          if-no-files-found: warn
+          retention-days: 30

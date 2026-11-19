@@ -1,0 +1,164 @@
+# Diagnostic only: trace Firefox's exact NSS GYP default to the unmodified
+# compiled native package. Source defaults are not a substitute for compiler flags.
+name: M3 Firefox160 Original NSS FIPS GYP and ELF Contract
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-original-nss-fips-build-contract.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-and-preserved-elf:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Authenticate the preserved original Firefox160 native artifact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const id=43724886827;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+              r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+              r.head_sha!=='54728803f058c3edf54d2e8d3f6e0a7d2af0aec6' ||
+              r.name!=='Firefox 160 Verified Native Archive Preservation (No Build)' ||
+              r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Untrusted preserved native package run');
+            const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            if(artifacts.filter(a=>
+                a.name==='firefox160-vulpra-preserved-native-preview-not-approved' &&
+                !a.expired && a.size_in_bytes>0 && new Date(a.expires_at)>new Date()
+              ).length!==1)
+              throw Error('Untrusted/expired native archive');
+      - name: Checkout exact official Firefox160 NSS integration, GYP defaults and self-test source
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/moz.build
+            build/gyp_base.mozbuild
+            security/nss/nss.gyp
+            security/nss/coreconf/config.gypi
+            security/nss/lib/softoken/fipstest.c
+      - name: Verify exact-source Gecko NSS GYP default chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          while read -r sha path; do
+            test "$(git rev-parse "HEAD:$path")" = "$sha"
+            test "$(git hash-object "$path")" = "$sha"
+          done <<'SOURCES'
+          78cd2fe824381d5d05fe781c697565fdd944ce52 security/moz.build
+          191c763b39014bf87e10aa4736edeebb8dd6286d build/gyp_base.mozbuild
+          d467ef1482c7e758b9d373056e93354c10ea49eb security/nss/nss.gyp
+          f0e0df9a469e9f28eab84e9d82c590d6ba117bbf security/nss/coreconf/config.gypi
+          cd444f99b8f85c8a953efd4db08d7570f891b8d4 security/nss/lib/softoken/fipstest.c
+          SOURCES
+          grep -Fq 'include("/build/gyp_base.mozbuild")' security/moz.build
+          grep -Fq 'gyp_vars = {}' build/gyp_base.mozbuild
+          grep -Fq 'GYP_DIRS["nss"].input = "nss/nss.gyp"' security/moz.build
+          grep -Fq 'GYP_DIRS["nss"].variables = gyp_vars' security/moz.build
+          grep -Fq "'coreconf/config.gypi'" security/nss/nss.gyp
+          grep -Fq "'disable_fips%': 1," security/nss/coreconf/config.gypi
+          grep -Fq "[ 'disable_fips==1', {" security/nss/coreconf/config.gypi
+          grep -Fq "'NSS_FIPS_DISABLED'," security/nss/coreconf/config.gypi
+          grep -Fq "'NSS_NO_INIT_SUPPORT'," security/nss/coreconf/config.gypi
+          grep -Fq '#ifndef NSS_FIPS_DISABLED' security/nss/lib/softoken/fipstest.c
+          grep -Fq 'return CKR_DEVICE_ERROR;' security/nss/lib/softoken/fipstest.c
+          # Explicitly refuse to infer the default when the precise upstream
+          # Gecko integration introduces an override. Catch common assignments,
+          # not just one literal formatting of gyp_vars["disable_fips"].
+          if grep -En 'disable_fips|NSS_FIPS_DISABLED|NSS_NO_INIT_SUPPORT' \
+             security/moz.build build/gyp_base.mozbuild; then
+            echo 'Unexpected NSS FIPS override in Firefox GYP integration' >&2
+            exit 1
+          fi
+          echo 'PASS: exact original Firefox160 Gecko NSS integration supplies no disable_fips override; GYP default is 1, selecting NSS_FIPS_DISABLED and NSS_NO_INIT_SUPPORT' >> "$GITHUB_STEP_SUMMARY"
+      - name: Download byte-preserved original native Firefox160 package
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/original
+      - name: Observe original compiled NSS ELF data without changing its bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive" | cut -d' ' -f1)" = \
+            530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb
+          mkdir -p "$RUNNER_TEMP/app"
+          tar -xf "$archive" -C "$RUNNER_TEMP/app"
+          lib="$RUNNER_TEMP/app/vulpra/libsoftokn3.so"
+          test -s "$lib" && test ! -L "$lib"
+          test "$(od -An -tx1 -N4 "$lib"|tr -d ' \n')" = 7f454c46
+          grep -Fxq 'Name=Vulpra' "$RUNNER_TEMP/app/vulpra/application.ini"
+          # The upstream FIPS-enabled RSA KAT contains this exact literal.
+          # Absence from an optimized/stripped ELF is an indicator, NOT proof
+          # of a specific preprocessor macro or FIPS policy/certification.
+          kat_present=false
+          if grep -aFq 'Known plaintext message utilized' "$lib"; then
+            kat_present=true
+          fi
+          exported_fc_initialize=false
+          if readelf -W --dyn-syms "$lib" | grep -Eq ' FC_Initialize(@|$)'; then
+            exported_fc_initialize=true
+          fi
+          jq -n --argjson kat "$kat_present" --argjson exported "$exported_fc_initialize" '
+            {
+              schema_version:1,
+              official_firefox160_source_commit:"2887d9de1f69c0e9776413da80e7ba0d1225dd9b",
+              original_compiled_archive_sha256:"530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb",
+              original_build_producer_run:43138458940,
+              original_archive_preservation_run:43724886827,
+              exact_upstream_gecko_gyp_default_disable_fips:1,
+              upstream_default_selects_NSS_FIPS_DISABLED:true,
+              upstream_default_selects_NSS_NO_INIT_SUPPORT:true,
+              explicit_disable_fips_override_in_checked_gecko_integration:false,
+              original_libsoftokn3_elf_was_read_only_inspected:true,
+              original_elf_contains_FIPS_RSA_KAT_literal:$kat,
+              original_elf_dynamically_exports_FC_Initialize:$exported,
+              original_producer_compiler_command_line_or_defines_recovered:false,
+              compiled_NSS_FIPS_DISABLED_macro_definitively_proven:false,
+              actual_FIPS_requested_NSS_Init_succeeded:false,
+              original_NSS_provider_removal_authorized:false,
+              m3_sixth_gate_closed:false,
+              security_current:false,
+              release_ready:false
+            }' > "$RUNNER_TEMP/original-nss-fips-gyp-elf-contract.json"
+          jq -e '
+            .schema_version==1 and
+            .exact_upstream_gecko_gyp_default_disable_fips==1 and
+            .upstream_default_selects_NSS_FIPS_DISABLED==true and
+            .upstream_default_selects_NSS_NO_INIT_SUPPORT==true and
+            .explicit_disable_fips_override_in_checked_gecko_integration==false and
+            .original_libsoftokn3_elf_was_read_only_inspected==true and
+            .original_producer_compiler_command_line_or_defines_recovered==false and
+            .compiled_NSS_FIPS_DISABLED_macro_definitively_proven==false and
+            .m3_sixth_gate_closed==false and .release_ready==false
+          ' "$RUNNER_TEMP/original-nss-fips-gyp-elf-contract.json" >/dev/null
+          echo "Original NSS softoken ELF contains FIPS RSA KAT literal: $kat_present" >> "$GITHUB_STEP_SUMMARY"
+          echo "Original NSS softoken ELF exports FC_Initialize: $exported_fc_initialize" >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: source defaults and ELF literal presence/absence cannot prove the original compile flags or FIPS startup root cause; original NSS and profiles unchanged.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive sanitized source and binary observation only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-original-nss-gyp-default-and-elf-literal-not-build-flags
+          path: ${{ runner.temp }}/original-nss-fips-gyp-elf-contract.json
+          if-no-files-found: warn
+          retention-days: 7

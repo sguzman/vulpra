@@ -1,0 +1,144 @@
+# Evidence-only independent crosswalk of the exact 28 packaged ELF bare imports.
+# No Firefox execution, native compilation or host loader behavior claimed.
+name: M3 Firefox 160 Three-Userland Unversioned Symbol Crosswalk (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-three-userland-unversioned-symbol-crosswalk.yml
+      - ci/m3-firefox160-three-userland-unversioned-symbol-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile-bare-symbols:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate original archive graph and two completed userspace scans
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name] of [
+              [43730900702,'fd4dee8a9999c303ff35e45fbcd619abe230d30e',
+                'M3 Firefox 160 Exact-Source Native ELF Package Graph (No Build)'],
+              [43740138658,'9f12779d002f3b5b0a0ebcecc342ad766bfbc0ad',
+                'M3 Firefox 160 Native Versioned Symbol Candidate Coverage (No Build)'],
+              [43740286694,'28c4a2ac1f824243ead664ef71cbcc2480e6aff1',
+                'M3 Firefox 160 Arch Userland Versioned Symbol Candidates (No Build)']]){
+              const {data:run}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(run.repository?.full_name!=='sguzman/vulpra' ||
+                 run.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 run.head_sha!==sha || run.name!==name ||
+                 run.status!=='completed' || run.conclusion!=='success')
+                throw Error('Untrusted original package/bare-import witness '+id);
+            }
+            for(const [id,name] of [
+              [43730900702,'firefox160-source-matched-native-elf-package-graph-not-m3-closure'],
+              [43740138658,'firefox160-unversioned-symbol-candidates-ubuntu-22.04-not-abi-release'],
+              [43740138658,'firefox160-unversioned-symbol-candidates-ubuntu-24.04-not-abi-release'],
+              [43740286694,'firefox160-arch-versioned-symbol-candidates-not-target-abi-release']]){
+              const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(artifacts.filter(a=>a.name===name&&!a.expired&&a.size_in_bytes>0 &&
+                  new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Missing authentic source/ABI report '+name);
+            }
+      - name: Checkout independent jq verifier only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-three-userland-unversioned-symbol-crosswalk.jq
+      - name: Retrieve source-matched 28-ELF source/producer graph
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-source-matched-native-elf-package-graph-not-m3-closure
+          repository: sguzman/vulpra
+          run-id: 43730900702
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/graph
+      - name: Retrieve original Ubuntu 22.04 bare imports
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-unversioned-symbol-candidates-ubuntu-22.04-not-abi-release
+          repository: sguzman/vulpra
+          run-id: 43740138658
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/u22
+      - name: Retrieve original Ubuntu 24.04 bare imports
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-unversioned-symbol-candidates-ubuntu-24.04-not-abi-release
+          repository: sguzman/vulpra
+          run-id: 43740138658
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/u24
+      - name: Retrieve original disposable Arch userspace bare imports
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-arch-versioned-symbol-candidates-not-target-abi-release
+          repository: sguzman/vulpra
+          run-id: 43740286694
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/arch
+      - name: Reconcile exact imports and reject forged source, class and completion reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          command -v jq
+          graph="$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json"
+          u22="$RUNNER_TEMP/u22/firefox160-unversioned-symbol-candidates-ubuntu-22.04.json"
+          u24="$RUNNER_TEMP/u24/firefox160-unversioned-symbol-candidates-ubuntu-24.04.json"
+          arch="$RUNNER_TEMP/arch/firefox160-arch-unversioned-symbol-candidates.json"
+          verifier="ci/m3-firefox160-three-userland-unversioned-symbol-crosswalk.jq"
+          test -s "$graph" && test -s "$u22" && test -s "$u24" && test -s "$arch"
+          compare() {
+            jq -n --arg source 2887d9de1f69c0e9776413da80e7ba0d1225dd9b \
+              --arg tree 42dd7439a27dde92f89ac5eed13f88117a4d7ab5 \
+              --slurpfile graph "$graph" \
+              --slurpfile ubuntu22 "$1" --slurpfile ubuntu24 "$2" \
+              --slurpfile arch "$3" -f "$verifier"
+          }
+          compare "$u22" "$u24" "$arch" > "$RUNNER_TEMP/unversioned-three-userland-crosswalk.json"
+          jq -e '.schema_version==1 and
+            .exact_bare_undefined_import_records==2154 and
+            .exact_requester_name_bind_tuple_parity==true and
+            .no_strong_bare_import_without_direct_candidate==true and
+            .actual_loader_symbol_bindings_proven==false and
+            .optional_dlopen_and_ffi_closure_complete==false and
+            .target_endeavouros_hyprland_verified==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/unversioned-three-userland-crosswalk.json" >/dev/null
+          jq '.unversioned_import_candidate_details[0].undefined_symbol="forged_name"' "$u22" \
+            > "$RUNNER_TEMP/forged-u22.json"
+          if compare "$RUNNER_TEMP/forged-u22.json" "$u24" "$arch" >/dev/null 2>&1; then
+            echo 'Forged requester/symbol tuple accepted' >&2; exit 1
+          fi
+          jq '.direct_needed_export_name_candidates+=1' "$u24" \
+            > "$RUNNER_TEMP/forged-u24.json"
+          if compare "$u22" "$RUNNER_TEMP/forged-u24.json" "$arch" >/dev/null 2>&1; then
+            echo 'Forged candidate count accepted' >&2; exit 1
+          fi
+          jq '.all_unversioned_imports_loader_resolved=true' "$arch" \
+            > "$RUNNER_TEMP/forged-arch.json"
+          if compare "$u22" "$u24" "$RUNNER_TEMP/forged-arch.json" >/dev/null 2>&1; then
+            echo 'Forged loader closure claim accepted' >&2; exit 1
+          fi
+          jq -r '"PASS: 2154 exact bare undefined requester/name/bind tuples match all three userspaces; " +
+            (.userspace_candidate_difference_count|tostring) + " per-import candidate records vary; " +
+            "3/3 forged evidence variants rejected. Not a runtime symbol-binding proof."' \
+            "$RUNNER_TEMP/unversioned-three-userland-crosswalk.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve independent bare-symbol crosswalk evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-three-userland-bare-symbol-crosswalk-not-loader-closure
+          path: ${{ runner.temp }}/unversioned-three-userland-crosswalk.json
+          if-no-files-found: warn
+          retention-days: 30

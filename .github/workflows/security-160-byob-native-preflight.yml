@@ -1,0 +1,142 @@
+name: Firefox 160 BYOB Native Preview Preflight (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-byob-native-preview.yml
+      - .github/workflows/security-160-byob-artifact-replay.yml
+      - .github/workflows/security-160-byob-native-preflight.yml
+      - ci/smoke-webextension-package-local.py
+      - ci/smoke-byob-login-ui.py
+      - ci/security-160-stage-byob-branding.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-source-and-runtime-contracts:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout BYOB-specific build workflow and source harness only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/security-160-byob-native-preview.yml
+            .github/workflows/security-160-byob-artifact-replay.yml
+            .github/workflows/security-160-byob-native-preflight.yml
+            ci/smoke-webextension-package-local.py
+            ci/smoke-byob-login-ui.py
+            ci/security-160-stage-byob-branding.sh
+      - name: Check YAML and fail-closed BYOB source/build/runtime contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ruby -e 'require "yaml"; YAML.load_file(ARGV.fetch(0)); puts "PASS: native preview YAML parsed"' \
+            .github/workflows/security-160-byob-native-preview.yml
+          ruby -e 'require "yaml"; YAML.load_file(ARGV.fetch(0)); puts "PASS: artifact-only replay YAML parsed"' \
+            .github/workflows/security-160-byob-artifact-replay.yml
+          python3 ci/smoke-webextension-package-local.py --self-test-synthetic-extension-fixture
+          bash -n ci/security-160-stage-byob-branding.sh
+          python3 -m py_compile ci/smoke-webextension-package-local.py ci/smoke-byob-login-ui.py
+          python3 ci/smoke-webextension-package-local.py --self-test-byob-assertions
+          python3 ci/smoke-byob-login-ui.py --self-test
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          p=Path('.github/workflows/security-160-byob-native-preview.yml')
+          c=p.read_text()
+          markers={
+            "exclusive BYOB variant":"security-160-stage-byob-branding.sh",
+            "exact new candidate tree":"c17d957eb58741df2855dc9b6c577be192315410",
+            "old branding pinned":"9308a1b26f339e0e89d959f0c4559eb7596a0fe6",
+            "new branding pinned":"ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e",
+            "independently pinned main source":"ca4ef5eea3e63b75cc0db0ce8e036dccce1b8511",
+            "preserved base stage":"ci/security-160-stage-overlay.sh",
+            "exact full tree materialization":"Materialize ONLY verified source patches, prove exact complete Git tree",
+            "native compile":"Compile exact materialized Firefox 160 Vulpra candidate",
+            "separate provider-safe runtime QA":"VULPRA_VERIFY_BYOB_DEFAULTS:",
+            "user-agent QA":"VULPRA_VERIFY_UA_COMPAT:",
+            "privileged Gecko default-pref test":".byob_default_preferences.verified==true",
+            "extension still works":".webextension.temporary_unsigned_install==true",
+            "strict HTTPS denial":".security.local_untrusted_tls_denial.verified==true",
+            "no approved security currency":"security_current:false",
+            "no release approval":"release_ready:false",
+            "no automatic user profile modification":"original_firefox_profile_preserved:true",
+            "independent archive":"firefox160-byob-vulpra-unreleased-native-preview-not-approved",
+          }
+          for name,value in markers.items():
+            assert value in c, f'Native BYOB candidate missing {name}'
+          assert not re.search(r'^\s+release_ready\s*:\s*true',c,re.M)
+          assert not re.search(r'^\s+security_current\s*:\s*true',c,re.M)
+          assert 'VULPRA_SAFEBROWSING_KEY_SOURCE' not in c, 'Unexpected external provider key dependency'
+          assert '--enable-official-branding' not in c, 'Unexpected Mozilla official branding'
+          scripts=[]
+          lines=c.splitlines()
+          for i,line in enumerate(lines):
+            m=re.match(r'^(\s+)run: \|\s*$',line)
+            if not m: continue
+            base=len(m.group(1))
+            arr=[]
+            for nxt in lines[i+1:]:
+              if not nxt.strip():
+                arr.append('')
+                continue
+              ind=len(nxt)-len(nxt.lstrip())
+              if ind<=base: break
+              arr.append(nxt[base+2:])
+            assert arr, f'Empty shell block line {i+1}'
+            scripts.append('\n'.join(arr)+'\n')
+          assert len(scripts)>=13, f'Expected native smoke/build scripts, got {len(scripts)}'
+          for i,script in enumerate(scripts):
+            ret=subprocess.run(['bash','-n'],input=script,text=True,capture_output=True)
+            assert ret.returncode==0, f'Bash block {i+1} syntax failed: {ret.stderr}'
+          print(f'PASS: {len(markers)} BYOB native source and runtime contracts; {len(scripts)} shell scripts')
+          artifact=Path('.github/workflows/security-160-byob-artifact-replay.yml').read_text()
+          artifact_markers=(
+              'run_id:44350848442',
+              "r.head_sha!=='ffec2b1bfcc816385f72301cce2e71fa0f1ac337'",
+              'c17d957eb58741df2855dc9b6c577be192315410',
+              'ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e',
+              'id: inspect', "core.setOutput('ready','true')",
+              'id: replay', 'id: proof',
+              'VULPRA_VERIFY_BYOB_DEFAULTS: "1"',
+              '.byob_default_preferences.verified == true',
+              '.byob_default_preferences.safebrowsing_local_feature_flags_preserved == true',
+              '.byob_default_preferences.safebrowsing_live_provider_readiness_verified == false',
+              '.byob_external_extension_synthetic_fill.verified == true',
+              '.byob_builtin_login_ui.verified == true',
+              '.byob_builtin_login_ui.positive_control_shows_save_doorhanger == true',
+              'python3 ci/smoke-byob-login-ui.py --self-test',
+              'python3 ci/smoke-byob-login-ui.py "$GITHUB_WORKSPACE"',
+              'ref: bfede7ad56a727150721bd86f2c29c884f5c9444',
+              '.webextension.temporary_unsigned_install == true',
+              '.security.local_untrusted_tls_denial.verified == true',
+              'Fail closed if authenticated native browser replay did not execute',
+              'INSPECT_STATUS:', 'REPLAY_STATUS:', 'PROOF_STATUS:',
+              'release_ready: false', 'security_current: false',
+          )
+          assert all(x in artifact for x in artifact_markers), 'BYOB artifact replay not fail-closed or unpinned'
+          # Native producer 44350848442 has completed successfully with
+          # a checksum-preserved package. Permit a single path-scoped push
+          # trigger so this independent replay can run now, but never from
+          # unrelated commits/branches or an unverified producer.
+          trigger = (
+              '  push:\n'
+              '    branches: [upgrade/firefox-160-overlay-prototype]\n'
+              '    paths:\n'
+              '      - .github/workflows/security-160-byob-artifact-replay.yml\n'
+          )
+          assert trigger in artifact, 'BYOB replay missing single-branch, single-file push guard'
+          assert '  workflow_dispatch:' in artifact
+          assert artifact.count('  push:') == 1
+          for required in ("id: inspect", "id: replay", "id: proof",
+                           "core.setOutput('ready','true')",
+                           'Fail closed if authenticated native browser replay did not execute'):
+              assert required in artifact
+              assert required not in artifact.replace(required,'',1), 'mutation must remove the exact anchor'
+          print(f'PASS: {len(artifact_markers)} independently pinned artifact-only BYOB replay conditions')
+          print('LIMIT: static preflight; no Firefox source compiled or browser artifact replayed in this job')
+          PY

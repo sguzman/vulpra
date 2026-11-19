@@ -1,0 +1,260 @@
+// Parse temporary Firefox160 MOZ_LOG_FILE files for exact, source-grounded
+// FFVPX link-failure and platform decoder diagnostic witnesses.
+// Report counts only; do not export log lines, paths, PIDs, profiles, or log
+// filenames. No browser build or source edits. Rust std-only.
+use std::collections::BTreeSet;
+use std::env;
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Write};
+use std::path::Path;
+
+const MAX_FILES: usize = 128;
+const MAX_FILE_BYTES: u64 = 40 * 1024 * 1024;
+const MAX_TOTAL_BYTES: u64 = 512 * 1024 * 1024;
+const MAX_LINE_BYTES: usize = 128 * 1024;
+#[derive(Default)]
+struct Tally {
+    log_files: usize,
+    pdm_any: u64,
+    pdm_rdd_order: u64,
+    pdm_agnostic_vpx_support: u64,
+    ffvpx_link_no_provided_lib: u64,
+    ffvpx_link_success: u64,
+    ffvpx_unable_to_load_lib: u64,
+    ffmpeg_video_lines: u64,
+    media_format_reader_video_decoder_init_lines: u64,
+    media_format_reader_libvpx_video_decoder_inits: u64,
+    media_format_reader_ffvpx_video_decoder_inits: u64,
+    media_format_reader_ffmpeg_video_decoder_inits: u64,
+    media_format_reader_other_video_decoder_inits: u64,
+    source_defined_video_decoder_descriptions: BTreeSet<String>,
+    mediaformatreader_video_update_log_count: u64,
+    resolved_post_frame_video_decoder_descriptions: BTreeSet<String>,
+    total_lines: u64,
+}
+// Only code-defined MediaFormatReader GetDescriptionName() strings, not whole
+// logs. Deliberately reject quotes, slashes, backslashes, control chars and
+// long values that could contain private log metadata or local filesystem paths.
+fn safe_description(line:&str)->Option<&str>{
+    let (_,tail)=line.split_once("description: \"")?;
+    let (desc,_)=tail.split_once('"')?;
+    if desc.len()<3 || desc.len()>72 ||
+       !desc.bytes().all(|b| b.is_ascii_alphanumeric() ||
+         b" ._()+-".contains(&b)) {
+        return None;
+    }
+    Some(desc)
+}
+fn classify(line:&str, t:&mut Tally) {
+    t.total_lines+=1;
+    if line.contains("PlatformDecoderModule") {
+        t.pdm_any+=1;
+        if line.contains("PDMInitializer, RDD PDM order:") {
+            t.pdm_rdd_order+=1;
+        }
+        if line.contains("Agnostic decoder supports requested type") {
+            t.pdm_agnostic_vpx_support+=1;
+        }
+        if line.contains("FFVPX: Link result: NoProvidedLib") {
+            t.ffvpx_link_no_provided_lib+=1;
+        }
+        if line.contains("FFVPX: Link result: Success") {
+            t.ffvpx_link_success+=1;
+        }
+    }
+    if line.contains("FFmpegVideo") {
+        t.ffmpeg_video_lines+=1;
+        if line.contains("FFVPX: unable to load library ") {
+            t.ffvpx_unable_to_load_lib+=1;
+        }
+    }
+    // The exact Firefox160 MediaFormatReader.cpp source logs this string
+    // after a decoder's successful Init(), using GetDescriptionName().
+    // Only recognize immutable, literal description allowlist strings.
+    // Never serialize unknown video names, log lines, or user-provided fields.
+    // MediaFormatReader::Update() prints mDescription after the first video
+    // output sets it from mVideo.mDecoder->GetDescriptionName() again.
+    // Exclude the MediaChangeMonitor "(pending)" wrapper name.
+    if line.contains("MediaFormatReader") &&
+       line.to_ascii_lowercase().contains("update(video)") &&
+       line.contains(" desc:") {
+        t.mediaformatreader_video_update_log_count+=1;
+        if let Some((_,rest))=line.split_once(" desc:") {
+            if let Some((name,_))=rest.split_once(" pending:") {
+                // Reuse the same path/PID/quote-rejecting safety grammar.
+                let encoded=format!("description: \"{name}\"");
+                if !name.contains("(pending)") {
+                    if let Some(clean)=safe_description(&encoded) {
+                        if t.resolved_post_frame_video_decoder_descriptions.len()<8 {
+                            t.resolved_post_frame_video_decoder_descriptions.insert(clean.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if line.contains("MediaFormatReader") &&
+       line.contains("Decoder init finished for video codec:") {
+        t.media_format_reader_video_decoder_init_lines+=1;
+        if let Some(desc)=safe_description(line){
+            if t.source_defined_video_decoder_descriptions.len()<8 {
+                t.source_defined_video_decoder_descriptions.insert(desc.to_string());
+            }
+        }
+        if line.contains("description: \"libvpx video decoder\"") {
+            t.media_format_reader_libvpx_video_decoder_inits+=1;
+        } else if line.contains("description: \"ffvpx video decoder\"") {
+            t.media_format_reader_ffvpx_video_decoder_inits+=1;
+        } else if line.contains("description: \"ffmpeg video decoder\"") {
+            t.media_format_reader_ffmpeg_video_decoder_inits+=1;
+        } else {
+            t.media_format_reader_other_video_decoder_inits+=1;
+        }
+    }
+}
+fn count_logs(root:&Path, prefix:&str)->Result<Tally,String>{
+    if prefix!="baseline-moz" && prefix!="denied-moz" {
+        return Err("unexpected Firefox160 temporary logging prefix".into());
+    }
+    if !root.is_dir(){return Err("ephemeral MOZ_LOG directory missing".into());}
+    let mut entries=Vec::new();
+    let mut bytes=0u64;
+    for entry in fs::read_dir(root).map_err(|_|"temporary MOZ_LOG read error")? {
+        let entry=entry.map_err(|_|"bad temporary MOZ_LOG entry")?;
+        let n=entry.file_name();
+        let Some(n)=n.to_str() else {continue};
+        if !(n==prefix || n.starts_with(&format!("{prefix}."))) {continue;}
+        let meta=fs::symlink_metadata(entry.path()).map_err(|_|"bad MOZ_LOG metadata")?;
+        if !meta.file_type().is_file() || meta.len()>MAX_FILE_BYTES {
+            return Err("symlinked, nonregular or oversized MOZ_LOG file".into());
+        }
+        // The launcher or geckodriver can create empty per-process log files;
+        // only nonempty logs can witness an actual native source diagnostic.
+        if meta.len()==0 {continue;}
+        bytes=bytes.checked_add(meta.len()).ok_or("MOZ_LOG byte overflow")?;
+        if bytes>MAX_TOTAL_BYTES {return Err("MOZ_LOG aggregate exceeds cap".into());}
+        entries.push(entry.path());
+    }
+    if entries.is_empty() || entries.len()>MAX_FILES{
+        return Err("no captured MOZ_LOG_FILE files or excessive process logs".into());
+    }
+    entries.sort();
+    let mut result=Tally::default();
+    result.log_files=entries.len();
+    let mut row=Vec::new();
+    for path in entries {
+        let file=File::open(path).map_err(|_|"cannot open temporary log")?;
+        let mut reader=BufReader::new(file);
+        loop {
+            row.clear();
+            let n=reader.read_until(b'\n',&mut row).map_err(|_|"cannot read temporary log")?;
+            if n==0 {break;}
+            if n>MAX_LINE_BYTES {return Err("MOZ_LOG oversized line".into());}
+            if let Ok(line)=std::str::from_utf8(&row) {classify(line,&mut result);}
+        }
+    }
+    Ok(result)
+}
+fn json(t:&Tally)->String{
+    format!(concat!(
+        "{{\"schema_version\":1,",
+        "\"status\":\"firefox160_private_mozilla_decoder_log_counters\",",
+        "\"raw_private_log_files_captured\":{},",
+        "\"counted_MOZ_LOG_lines\":{},",
+        "\"platform_decoder_module_log_lines\":{},",
+        "\"rdd_pdm_order_markers\":{},",
+        "\"agnostic_decoder_support_markers\":{},",
+        "\"ffvpx_NoProvidedLib_link_result_markers\":{},",
+        "\"ffvpx_Success_link_result_markers\":{},",
+        "\"ffvpx_unable_to_load_library_markers\":{},",
+        "\"ffmpeg_video_log_lines\":{},",
+        "\"mediaformatreader_video_decoder_initialized_log_count\":{},",
+        "\"mediaformatreader_libvpx_decoder_initialized_count\":{},",
+        "\"mediaformatreader_ffvpx_decoder_initialized_count\":{},",
+        "\"mediaformatreader_ffmpeg_decoder_initialized_count\":{},",
+        "\"mediaformatreader_unclassified_decoder_initialized_count\":{},",
+        "\"mediaformatreader_safely_bounded_code_defined_decoder_descriptions\":[{}],",
+        "\"mediaformatreader_video_update_log_count\":{},",
+        "\"mediaformatreader_resolved_post_frame_video_decoder_descriptions\":[{}],",
+        "\"actual_FFVPX_NoProvidedLib_source_log_observed\":{},",
+        "\"specific_video_decoder_selected_from_these_log_markers\":false,",
+        "\"direct_compiled_FFVPX_machine_branch_proven\":false,",
+        "\"raw_MOZ_LOG_files_or_lines_archived\":false,",
+        "\"source_pruning_authorized\":false,",
+        "\"m3_sixth_gate_closed\":false}}\n"
+    ),t.log_files,t.total_lines,t.pdm_any,t.pdm_rdd_order,
+      t.pdm_agnostic_vpx_support,t.ffvpx_link_no_provided_lib,t.ffvpx_link_success,
+      t.ffvpx_unable_to_load_lib,t.ffmpeg_video_lines,
+      t.media_format_reader_video_decoder_init_lines,
+      t.media_format_reader_libvpx_video_decoder_inits,
+      t.media_format_reader_ffvpx_video_decoder_inits,
+      t.media_format_reader_ffmpeg_video_decoder_inits,
+      t.media_format_reader_other_video_decoder_inits,
+      t.source_defined_video_decoder_descriptions.iter()
+        .map(|n|format!("\"{n}\"")).collect::<Vec<_>>().join(","),
+      t.mediaformatreader_video_update_log_count,
+      t.resolved_post_frame_video_decoder_descriptions.iter()
+        .map(|n|format!("\"{n}\"")).collect::<Vec<_>>().join(","),
+      if t.ffvpx_link_no_provided_lib>0 {"true"} else {"false"})
+}
+fn run()->Result<(),String>{
+    let args:Vec<String>=env::args().collect();
+    if args.len()!=4 {
+        return Err("usage: m3-ffvpx-mozlog-observer EPHEMERAL_DIR baseline-moz|denied-moz REPORT_JSON".into());
+    }
+    let count=count_logs(Path::new(&args[1]),&args[2])?;
+    let out=Path::new(&args[3]);
+    File::create(out).and_then(|mut f|f.write_all(json(&count).as_bytes()))
+        .map_err(|_|"cannot write sanitized Firefox160 log counters")?;
+    println!("PASS: Mozilla decoder logs sanitized, {} files, {} PDM lines, {} FFVPX NoProvidedLib markers; no raw log archived",
+        count.log_files,count.pdm_any,count.ffvpx_link_no_provided_lib);
+    Ok(())
+}
+fn main(){if let Err(e)=run(){eprintln!("FAIL: {e}");std::process::exit(1);}}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test] fn exact_source_logging_markers() {
+        let mut t=Tally::default();
+        for line in [
+            "[Parent 123: Main Thread]: D/PlatformDecoderModule FFVPX: Link result: NoProvidedLib",
+            "[RDD 321: Media]: D/PlatformDecoderModule PDMInitializer, RDD PDM order:",
+            "[RDD 321: Media]: D/PlatformDecoderModule Agnostic decoder supports requested type 'video/vp9'",
+            "[RDD 321: Media]: D/FFmpegVideo FFVPX: unable to load library /private/noshow.so",
+            "[RDD 321: Media]: D/PlatformDecoderModule FFVPX: Link result: Success",
+            "[RDD 321: Media]: D/MediaFormatReader Decoder init finished for video codec: \"vp9\", description: \"libvpx video decoder\", process: \"RDD\"",
+            "[RDD 321: Media]: V/MediaFormatReader ::Update: Update(video) ni=1 no=1 in:1 out:2 qs=0 decoding:false flushing:false desc:MediaChangeMonitor decoder (pending) pending:0 waiting:false",
+            "[RDD 321: Media]: V/MediaFormatReader ::Update: Update(video) ni=1 no=1 in:1 out:2 qs=0 decoding:false flushing:false desc:libvpx video decoder pending:0 waiting:false"
+        ] {classify(line,&mut t);}
+        assert_eq!(t.ffvpx_link_no_provided_lib,1);
+        assert_eq!(t.ffvpx_link_success,1);
+        assert_eq!(t.pdm_rdd_order,1);
+        assert_eq!(t.pdm_agnostic_vpx_support,1);
+        assert_eq!(t.ffvpx_unable_to_load_lib,1);
+        assert_eq!(t.media_format_reader_libvpx_video_decoder_inits,1);
+        assert_eq!(t.media_format_reader_ffvpx_video_decoder_inits,0);
+        assert_eq!(t.media_format_reader_video_decoder_init_lines,1);
+        assert_eq!(t.mediaformatreader_video_update_log_count,2);
+        assert_eq!(t.resolved_post_frame_video_decoder_descriptions.len(),1);
+        assert!(t.resolved_post_frame_video_decoder_descriptions.contains("libvpx video decoder"));
+        assert!(t.source_defined_video_decoder_descriptions.contains("libvpx video decoder"));
+        let sanitized=json(&t);
+        assert!(sanitized.contains("\"actual_FFVPX_NoProvidedLib_source_log_observed\":true"));
+        assert!(!sanitized.contains("/private/"));
+        assert!(sanitized.contains("\"mediaformatreader_libvpx_decoder_initialized_count\":1"));
+    }
+    #[test] fn ignore_fake_markers_outside_expected_log_category(){
+        let mut t=Tally::default();
+        classify("untrusted random log FFVPX: Link result: NoProvidedLib",&mut t);
+        classify("untrusted random log FFVPX: unable to load library private",&mut t);
+        assert_eq!(t.ffvpx_link_no_provided_lib,0);
+        assert_eq!(t.ffvpx_unable_to_load_lib,0);
+        classify("D/MediaFormatReader Decoder init finished for video codec: \"vp9\", description: \"untrusted-private-decoder\"", &mut t);
+        assert_eq!(t.media_format_reader_other_video_decoder_inits,1);
+        assert!(t.source_defined_video_decoder_descriptions.contains("untrusted-private-decoder"));
+        assert!(safe_description("description: \"/private/location\"").is_none());
+        assert!(safe_description("description: \"raw\nnewline\"").is_none());
+        assert!(safe_description("description: \"example@host\"").is_none());
+        assert!(count_logs(Path::new("/tmp"),"unknown").is_err());
+    }
+}

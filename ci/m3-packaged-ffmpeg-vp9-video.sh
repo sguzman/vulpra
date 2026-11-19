@@ -50,13 +50,22 @@ if test "$#" -ne 4; then
   exit 2
 fi
 repo="$1"; shim="$2"; gecko="$3"; output="$4"
+# Historical FFmpeg replay is the default. Explicit FFVPX testing is opt-in:
+# the two bundled mozav* libraries are NOT host FFmpeg provider candidates.
+deny_group="${VULPRA_M3_VP9_DENIAL_GROUP:-ffmpeg}"
+case "$deny_group" in
+  ffmpeg) expected_output="$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-video.json" ;;
+  ffvpx) expected_output="$RUNNER_TEMP/m3-packaged-ffvpx-vp9-video.json" ;;
+  ffvpx_ffmpeg) expected_output="$RUNNER_TEMP/m3-packaged-ffvpx-ffmpeg-vp9-video.json" ;;
+  *) echo 'Refusing unsupported native provider denial group' >&2; exit 2 ;;
+esac
 test "$repo" = "$GITHUB_WORKSPACE"
 test "$(git -C "$repo" rev-parse HEAD)" = "$GITHUB_SHA"
 # A replay may run a newer test harness against a previously compiled,
 # source-pinned package. Keep both identities distinct in its evidence.
 compiled_source="${VULPRA_M3_COMPILED_SOURCE_SHA:-$GITHUB_SHA}"
 [[ "$compiled_source" =~ ^[0-9a-f]{40}$ ]]
-test "$output" = "$RUNNER_TEMP/m3-packaged-ffmpeg-vp9-video.json"
+test "$output" = "$expected_output"
 test ! -e "$output"
 test -s "$shim" && test ! -L "$shim"
 test -x "$gecko"
@@ -140,17 +149,29 @@ run_mode() {
   local sentinel="$(sha256sum "$home/.mozilla/firefox/profiles.ini" | cut -d' ' -f1)"
   local log="$tmp/$mode-denial.log"
   : > "$log"; chmod 0600 "$log"
+  # Only temporary source-grounded Firefox160 decoder logs; never upload raw logs.
+  local -a private_decoder_logging=()
+  if test -n "${VULPRA_M3_FFVPX_LOG_OBSERVER:-}"; then
+    [[ "$deny_group" == ffvpx || "$deny_group" == ffvpx_ffmpeg ]] &&
+      test -x "$VULPRA_M3_FFVPX_LOG_OBSERVER"
+    private_decoder_logging=(
+      MOZ_LOG=PlatformDecoderModule:5,FFmpegVideo:5,MediaFormatReader:5
+      "MOZ_LOG_FILE=$tmp/$mode-moz"
+    )
+  fi
   port="$(new_port)"
   if test "$mode" = denied; then
     env -u VULPRA_M3_DENY_FIXTURE_EXE \
-      LD_PRELOAD="$shim" VULPRA_M3_DENY_GROUP=ffmpeg VULPRA_M3_DENY_LOG="$log" \
+      LD_PRELOAD="$shim" VULPRA_M3_DENY_GROUP="$deny_group" VULPRA_M3_DENY_LOG="$log" \
       HOME="$home" XDG_DATA_HOME="$home/.local/share" MOZ_HEADLESS=1 \
       NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
+      "${private_decoder_logging[@]}" \
       "$gecko" --host 127.0.0.1 --port "$port" > "$tmp/$mode-geckodriver.log" 2>&1 &
   else
     env -u LD_PRELOAD -u VULPRA_M3_DENY_GROUP -u VULPRA_M3_DENY_LOG \
       HOME="$home" XDG_DATA_HOME="$home/.local/share" MOZ_HEADLESS=1 \
       NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
+      "${private_decoder_logging[@]}" \
       "$gecko" --host 127.0.0.1 --port "$port" > "$tmp/$mode-geckodriver.log" 2>&1 &
   fi
   driver_pid="$!"
@@ -193,20 +214,41 @@ run_mode() {
     sleep 0.25
   done
   after="$(grep -Ec '^DENIED (dlopen|dlmopen) ' "$log" || true)"
+  # Count only exact FFVPX library basenames, even if glibc receives paths.
+  # Export integers only; the raw shim log (including paths/PIDs) is deleted.
+  local codec_denials=0 util_denials=0 system_ffmpeg_denials=0
+  if [[ "$deny_group" == ffvpx || "$deny_group" == ffvpx_ffmpeg ]]; then
+    codec_denials="$(grep -Ec '^DENIED (dlopen|dlmopen) (.*/)?libmozavcodec[.]so [0-9]+$' "$log" || true)"
+    util_denials="$(grep -Ec '^DENIED (dlopen|dlmopen) (.*/)?libmozavutil[.]so [0-9]+$' "$log" || true)"
+  fi
+  if [[ "$deny_group" == ffmpeg || "$deny_group" == ffvpx_ffmpeg ]]; then
+    system_ffmpeg_denials="$(grep -Ec '^DENIED (dlopen|dlmopen) (.*/)?(libavcodec[.]so[.][[:alnum:]._-]+|libavcodec-ffmpeg[.]so[.][[:alnum:]._-]+) [0-9]+$' "$log" || true)"
+  fi
   attached="$(grep -c '^ATTACHED browser-process ' "$log" || true)"
   if wd GET /status >/dev/null 2>&1 &&
     wd GET "/session/$session/title" >/dev/null 2>&1; then alive=true; fi
   if test "$(sha256sum "$home/.mozilla/firefox/profiles.ini" | cut -d' ' -f1)" = "$sentinel"; then
     preserved=true
   fi
+  local mozlog_json=null
+  if test -n "${VULPRA_M3_FFVPX_LOG_OBSERVER:-}"; then
+    # Close browser and geckodriver before reading ephemeral diagnostic files.
+    stop_driver
+    "$VULPRA_M3_FFVPX_LOG_OBSERVER" "$tmp" "$mode-moz" "$tmp/$mode-moz-sanitized.json"
+    mozlog_json="$(cat "$tmp/$mode-moz-sanitized.json")"
+  fi
   jq -nc --arg mode "$mode" --argjson before "$before" --argjson after "$after" \
-    --argjson attached "$attached" --argjson decoded "$video_ok" \
+    --argjson attached "$attached" --argjson codec "$codec_denials" --argjson util "$util_denials" --argjson system_ffmpeg "$system_ffmpeg_denials" --argjson mozlog "$mozlog_json" --argjson decoded "$video_ok" \
     --argjson error "$media_error" --argjson alive "$alive" \
     --argjson preserved "$preserved" --argjson state "$state" '{
     mode:$mode,actual_packaged_browser_session:true,
+    mozilla_ffvpx_private_log_observation:$mozlog,
     browser_interposer_attached:($attached>0),
     ffmpeg_denials_before_video_navigation:$before,
     ffmpeg_denials_after_video_navigation:$after,
+    ffvpx_codec_denials_count:$codec,
+    ffvpx_util_denials_count:$util,
+    system_ffmpeg_denials_count:$system_ffmpeg,
     new_denials_during_video_navigation:($after-$before),
     vp9_decoded_frames_and_time_verified:$decoded,
     media_error_observed:$error,
@@ -214,13 +256,19 @@ run_mode() {
     isolated_profile_preserved:$preserved,
     observed_video_state:$state
   }' >> "$tmp/modes.jsonl"
-  echo "AUDIT: $mode VP9_decoded=$video_ok media_error=$media_error FFmpeg_denied_before=$before denied_after=$after responsive=$alive"
+  echo "AUDIT: $mode VP9_decoded=$video_ok media_error=$media_error provider_group=$deny_group denied_before=$before denied_after=$after responsive=$alive"
   stop_driver
 }
 run_mode baseline
 run_mode denied
-jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive "$archive_sha" '{
-  schema_version:1,status:"real_packaged_VP9_WebDriver_video_decode_with_FFmpeg_denial",
+jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive "$archive_sha" --arg denial "$deny_group" '{
+  schema_version:1,
+  status:(if $denial=="ffvpx" then
+    "real_packaged_VP9_WebDriver_video_decode_with_bundled_FFVPX_denial"
+    elif $denial=="ffvpx_ffmpeg" then
+    "real_packaged_VP9_WebDriver_video_outcome_with_combined_FFVPX_and_FFmpeg_denial"
+    else "real_packaged_VP9_WebDriver_video_decode_with_FFmpeg_denial" end),
+  denial_group:$denial,
   source_commit:$source,test_harness_commit:$harness,
   normal_packaged_archive_sha256:$archive,
   fixture_VP9_codec_validated:true,
@@ -228,7 +276,35 @@ jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive 
   baseline_VP9_playback_passed:([.[]|select(.mode=="baseline")|.vp9_decoded_frames_and_time_verified][0]//false),
   denied_VP9_playback_passed:([.[]|select(.mode=="denied")|.vp9_decoded_frames_and_time_verified][0]//false),
   denied_VP9_media_error_observed:([.[]|select(.mode=="denied")|.media_error_observed][0]//false),
-  denied_FFmpeg_loader_attempts:([.[]|select(.mode=="denied")|.ffmpeg_denials_after_video_navigation][0]//0),
+  denied_FFmpeg_loader_attempts:(if $denial=="ffmpeg" then
+    ([.[]|select(.mode=="denied")|.ffmpeg_denials_after_video_navigation][0]//0)
+    else null end),
+  denied_FFVPX_loader_attempts:(if $denial=="ffvpx" then
+    ([.[]|select(.mode=="denied")|.ffmpeg_denials_after_video_navigation][0]//0)
+    else null end),
+  denied_FFVPX_libmozavcodec_load_attempts:(if $denial=="ffvpx" then
+    ([.[]|select(.mode=="denied")|.ffvpx_codec_denials_count][0]//0)
+    else null end),
+  denied_FFVPX_libmozavutil_load_attempts:(if $denial=="ffvpx" then
+    ([.[]|select(.mode=="denied")|.ffvpx_util_denials_count][0]//0)
+    else null end),
+  combined_ffvpx_ffmpeg_denied_total:(if $denial=="ffvpx_ffmpeg" then
+    ([.[]|select(.mode=="denied")|.ffmpeg_denials_after_video_navigation][0]//0)
+    else null end),
+  combined_denied_ffvpx_codec_loads:(if $denial=="ffvpx_ffmpeg" then
+    ([.[]|select(.mode=="denied")|.ffvpx_codec_denials_count][0]//0)
+    else null end),
+  combined_denied_ffvpx_util_loads:(if $denial=="ffvpx_ffmpeg" then
+    ([.[]|select(.mode=="denied")|.ffvpx_util_denials_count][0]//0)
+    else null end),
+  combined_denied_system_ffmpeg_loads:(if $denial=="ffvpx_ffmpeg" then
+    ([.[]|select(.mode=="denied")|.system_ffmpeg_denials_count][0]//0)
+    else null end),
+  combined_denial_both_provider_families_observed:(if $denial=="ffvpx_ffmpeg" then
+    ([.[]|select(.mode=="denied")|.ffvpx_codec_denials_count][0]//0)>0 and
+    ([.[]|select(.mode=="denied")|.ffvpx_util_denials_count][0]//0)>0 and
+    ([.[]|select(.mode=="denied")|.system_ffmpeg_denials_count][0]//0)>0
+    else false end),
   denial_attempts_after_video_navigation:([.[]|select(.mode=="denied")|.new_denials_during_video_navigation][0]//0),
   exact_source_private_webdriver_modes_safe:(
     length==2 and (map(.mode)|sort)==["baseline","denied"] and
@@ -236,7 +312,33 @@ jq -s --arg source "$compiled_source" --arg harness "$GITHUB_SHA" --arg archive 
   VP9_playback_with_FFmpeg_denied_demonstrated:(
     [.[]|select(.mode=="denied")|.vp9_decoded_frames_and_time_verified][0]//false),
   real_denied_FFmpeg_attempt_observed:(
-    [.[]|select(.mode=="denied")|(.browser_interposer_attached and .ffmpeg_denials_after_video_navigation>0)][0]//false),
+    if $denial=="ffmpeg" then
+      ([.[]|select(.mode=="denied")|(.browser_interposer_attached and .ffmpeg_denials_after_video_navigation>0)][0]//false)
+    else false end),
+  real_denied_FFVPX_attempt_observed:(
+    if $denial=="ffvpx" then
+      ([.[]|select(.mode=="denied")|(.browser_interposer_attached and .ffmpeg_denials_after_video_navigation>0)][0]//false)
+    else false end),
+  denied_VP9_outcome:(if [.[]|select(.mode=="denied")|.vp9_decoded_frames_and_time_verified][0] then
+    "decoded_frames_and_advancing_time"
+    elif [.[]|select(.mode=="denied")|.media_error_observed][0] then
+    "media_error"
+    else "no_verified_decoded_frames_or_media_error" end),
+  real_denied_native_provider_load_outcome_proven_only_for_named_group:true,
+  private_mozilla_ffvpx_logs_observed_in_both_modes:
+    (all(.[];.mozilla_ffvpx_private_log_observation!=null and
+       .mozilla_ffvpx_private_log_observation.raw_private_log_files_captured>=1)),
+  observed_FFVPX_NoProvidedLib_source_log_in_denied_mode:
+    ([.[]|select(.mode=="denied")|
+        .mozilla_ffvpx_private_log_observation.actual_FFVPX_NoProvidedLib_source_log_observed][0]//false),
+  FFVPX_NoProvidedLib_source_log_count_in_denied_mode:
+    ([.[]|select(.mode=="denied")|
+        .mozilla_ffvpx_private_log_observation.ffvpx_NoProvidedLib_link_result_markers][0]//0),
+  combined_source_level_all_FFmpeg_backends_absent_proven:false,
+  combined_libvpx_fallback_selected_proven:false,
+  source_owner_direct_machine_caller_proven:false,
+  FFVPX_missing_provider_source_guard_taken_proven:false,
+  successful_alternative_decoder_identified:false,
   specific_VP9_decoder_implementation_identified:false,
   alternative_H264_software_decoder_fallback_proven:false,
   VAAPI_Wayland_DMABuf_runtime_fallback_proven:false,
@@ -249,10 +351,24 @@ jq -e '
   .schema_version==1 and .fixture_VP9_codec_validated==true and
   .baseline_VP9_playback_passed==true and
   .exact_source_private_webdriver_modes_safe==true and
-  .real_denied_FFmpeg_attempt_observed==true and
+  ((.denial_group=="ffmpeg" and .real_denied_FFmpeg_attempt_observed==true) or
+   (.denial_group=="ffvpx" and .real_denied_FFVPX_attempt_observed==true and
+      .denied_FFVPX_loader_attempts>0 and
+      .denied_FFVPX_libmozavcodec_load_attempts>=0 and
+      .denied_FFVPX_libmozavutil_load_attempts>=0 and
+      (.denied_FFVPX_libmozavcodec_load_attempts+
+       .denied_FFVPX_libmozavutil_load_attempts)==.denied_FFVPX_loader_attempts) or
+   (.denial_group=="ffvpx_ffmpeg" and
+      .combined_ffvpx_ffmpeg_denied_total>0 and
+      .combined_denied_ffvpx_codec_loads>0 and
+      .combined_denied_ffvpx_util_loads>0 and
+      .combined_ffvpx_ffmpeg_denied_total==
+       (.combined_denied_ffvpx_codec_loads+.combined_denied_ffvpx_util_loads+
+        .combined_denied_system_ffmpeg_loads))) and
+  .FFVPX_missing_provider_source_guard_taken_proven==false and
   .specific_VP9_decoder_implementation_identified==false and
   .alternative_H264_software_decoder_fallback_proven==false and
   .m3_sixth_gate_closed==false and .source_pruning_authorized==false
 ' "$output" >/dev/null
-echo "PASS: actual packaged browser VP9/WebM baseline decoded frames; FFmpeg-denied media outcome recorded"
-echo "LIMIT: denial may cause VP9/WebM error; software decoder fallback, VAAPI, DMABuf and full closure unproven"
+echo "PASS: actual packaged browser VP9/WebM baseline decoded frames; real $deny_group denial outcome recorded"
+echo "LIMIT: direct FFVPX loader caller, specific decoding engine, missing-provider source guard, VAAPI, DMABuf and full closure unproven"

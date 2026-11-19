@@ -1,0 +1,141 @@
+# Authenticate exact official Firefox160 NSS source ownership, real packaged
+# NSS C API init/RNG results under independently scoped missing-provider
+# injections, and reject fabricated outcomes. No browser or system changes.
+name: M3 Firefox 160 Original NSS FreeBL Softoken Real API Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-original-nss-guard-real-api-crosswalk.yml
+      - ci/m3-firefox160-nss-freebl-softoken-real-api-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-NSS-source-to-native-failure:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate source-owner and original native NSS provider failure producers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43745057569,'b43a2309f5d6557ac0ba86874563544a7f973574',
+                'M3 Firefox 160 Exact NSS FFVPX Loader Source Ownership',
+                'firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks'],
+              [43760051406,'68294a9467ee09a65819b831f3fea22fbb854ae1',
+                'M3 Firefox 160 Original NSS FreeBL and Softoken Missing-Provider Replay',
+                'firefox160-original-packaged-nss-freebl-softoken-native-api-missing-provider-not-TLS']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Unauthenticated Firefox160 original NSS source or actual C API producer '+id);
+              const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(a.filter(x=>x.name===artifact&&!x.expired&&x.size_in_bytes>0 &&
+                   new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Missing/expired exact original NSS source/runtime artifact '+artifact);
+            }
+      - name: Checkout independent strict source/ABI/native NSS jq crosswalk only
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-nss-freebl-softoken-real-api-crosswalk.jq
+      - name: Download original source-pinned NSS loader ownership and guarded source paths
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-four-nss-ffvpx-source-owned-loader-candidates-not-callstacks
+          repository: sguzman/vulpra
+          run-id: 43745057569
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Download four genuine original native NSS API execution/denial outcomes
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-original-packaged-nss-freebl-softoken-native-api-missing-provider-not-TLS
+          repository: sguzman/vulpra
+          run-id: 43760051406
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native
+      - name: Prove exact source and native library failure states; falsify sixteen reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          source="$RUNNER_TEMP/source/firefox160-exact-nss-ffvpx-source-runtime-crosswalk.json"
+          native="$RUNNER_TEMP/native/firefox160-original-nss-guarded-provider-observation.json"
+          verifier=ci/m3-firefox160-nss-freebl-softoken-real-api-crosswalk.jq
+          test -s "$source" && test -s "$native"
+          compare() {
+            jq -n --arg upstream '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile source "$1" --slurpfile runtime "$2" -f "$verifier"
+          }
+          compare "$source" "$native" > "$RUNNER_TEMP/firefox160-source-attested-original-NSS-freebl-softoken-probe.json"
+          jq -e '
+            .schema_version==1 and
+            .original_compiled_native_archive_sha256==
+              "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .original_libsoftokn3_and_libfreeblpriv3_mapped_in_baseline==true and
+            .baseline_original_NSS_NoDB_Init_passed==true and
+            .baseline_original_PK11_GenerateRandom_passed==true and
+            .tested_softoken_missing_loader_attempts==2 and
+            .tested_freebl_missing_loader_attempts==3 and
+            .tested_combined_mode_softoken_denials==2 and
+            .tested_combined_mode_freebl_denials==0 and
+            .softoken_denied_blocks_internal_NSS_initialization==true and
+            .freebl_denied_blocks_internal_NSS_initialization==true and
+            .combined_denial_freebl_not_attempted_due_to_earlier_softoken_failure==true and
+            .original_NSS_failure_returned_without_probe_process_crash_or_timeout==true and
+            .this_evidence_is_native_NSS_API_probe_not_real_webdriver_TLS_browser==true and
+            .original_missing_provider_fallback_success_proven==false and
+            .all_NSS_FIPS_PKCS11_TLS_and_security_paths_exercised==false and
+            .complete_native_Rust_CXX_FFI_dlopen_dlsym_dependency_graph_proven==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-source-attested-original-NSS-freebl-softoken-probe.json" >/dev/null
+
+          jq '.official_release_commit="forged"' "$source" > "$RUNNER_TEMP/src-commit.json"
+          jq '.source_candidate_rows[0].candidate_provider="wrong.so"' "$source" > "$RUNNER_TEMP/src-owner.json"
+          jq '.source_candidate_rows[1].source_load_failure_guard_present=false' "$source" > "$RUNNER_TEMP/src-guard.json"
+          jq '.m3_sixth_gate_closed=true' "$source" > "$RUNNER_TEMP/src-gate.json"
+
+          jq '.original_compiled_archive_sha256="forged"' "$native" > "$RUNNER_TEMP/nat-byte.json"
+          jq '.baseline_original_NSS_initialized_and_generated_random=false' "$native" > "$RUNNER_TEMP/nat-baseline.json"
+          jq '.modes[0].original_packaged_libfreeblpriv3_ELF_mapped=false' "$native" > "$RUNNER_TEMP/nat-mapping.json"
+          jq '.modes[0].generated_random_bytes_nonzero=false' "$native" > "$RUNNER_TEMP/nat-entropy.json"
+          jq '.modes[1].NSS_NoDB_Init_rc=0' "$native" > "$RUNNER_TEMP/nat-softinit.json"
+          jq '.modes[1].actual_denied_libsoftokn3_loader_requests=0' "$native" > "$RUNNER_TEMP/nat-softdenial.json"
+          jq '.modes[2].NSS_NoDB_Init_rc=0' "$native" > "$RUNNER_TEMP/nat-freeinit.json"
+          jq '.modes[2].actual_denied_libfreeblpriv3_loader_requests=0' "$native" > "$RUNNER_TEMP/nat-freedenial.json"
+          jq '.modes[3].actual_denied_libfreeblpriv3_loader_requests=3' "$native" > "$RUNNER_TEMP/nat-combined.json"
+          jq '.modes[2].original_packaged_libsoftokn3_ELF_mapped=false' "$native" > "$RUNNER_TEMP/nat-map2.json"
+          jq '.all_missing_provider_tests_completed_without_process_crash_or_timeout=false' "$native" > "$RUNNER_TEMP/nat-crash.json"
+          jq '.actual_real_firefox_browser_or_TLS_flow_tested=true' "$native" > "$RUNNER_TEMP/nat-tlsclaim.json"
+          for kind in commit owner guard gate; do
+            if compare "$RUNNER_TEMP/src-$kind.json" "$native" >/dev/null 2>&1; then
+              echo "Accepted forged original NSS source state: $kind" >&2; exit 1
+            fi
+          done
+          for kind in byte baseline mapping entropy softinit softdenial freeinit freedenial combined map2 crash tlsclaim; do
+            if compare "$source" "$RUNNER_TEMP/nat-$kind.json" >/dev/null 2>&1; then
+              echo "Accepted forged actual native NSS provider outcome: $kind" >&2; exit 1
+            fi
+          done
+          echo 'PASS: original Firefox160 NSS official source guards and actual pinned libnss3 API missing FreeBL/softoken outcomes; exact 2,3,2 observed denials; 16/16 forged artifacts rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: native API initialization returns failure without process crashes; NOT a real Firefox TLS browser fallback nor all security/FFI/optional loader gate closure.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded independent native NSS guarded-failure proof only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-original-source-verified-nss-freebl-softoken-api-failure-not-TLS
+          path: ${{ runner.temp }}/firefox160-source-attested-original-NSS-freebl-softoken-probe.json
+          if-no-files-found: warn
+          retention-days: 30

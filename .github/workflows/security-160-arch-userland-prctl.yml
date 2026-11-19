@@ -1,0 +1,191 @@
+# Run original SHA-256-authenticated Firefox 160 Vulpra in disposable Arch
+# userspace. The Docker host kernel != user's EndeavourOS/Hyprland kernel.
+# No rebuild, release, sandbox override, workstation changes, or external
+# network connection from the browser container.
+name: Firefox 160 Arch Userland Real Content Prctl Denial (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-arch-userland-prctl.yml
+      - ci/security-160-real-content-prctl.py
+      - ci/VulpraSeccompProbeChild.sys.mjs
+      - ci/VulpraSeccompProbeParent.sys.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  arch-userland-prctl:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Authenticate original Firefox build and preserved binary/source proofs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const {data:producer}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:43138458940});
+            if(producer.repository?.full_name!=='sguzman/vulpra' ||
+               producer.head_sha!=='0624235fdc956ab18af3c3f310b3588ca72fff61' ||
+               producer.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               producer.name!=='Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate' ||
+               producer.status!=='completed' || producer.conclusion!=='success')
+              throw Error('Native Firefox 160 producer not authenticated');
+            const {data:mirror}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:43724886827});
+            if(mirror.repository?.full_name!=='sguzman/vulpra' ||
+               mirror.head_sha!=='54728803f058c3edf54d2e8d3f6e0a7d2af0aec6' ||
+               mirror.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               mirror.name!=='Firefox 160 Verified Native Archive Preservation (No Build)' ||
+               mirror.status!=='completed' || mirror.conclusion!=='success')
+              throw Error('Source/binary preservation run not authenticated');
+            const all=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:43724886827,per_page:100});
+            for(const name of ['firefox160-vulpra-preserved-native-preview-not-approved',
+                               'firefox160-vulpra-preserved-materialized-source-proof']){
+              const matches=all.filter(a=>a.name===name && !a.expired &&
+                a.size_in_bytes>0 && new Date(a.expires_at)>new Date());
+              if(matches.length!==1) throw Error('Missing/expired source or package: '+name);
+            }
+            core.info('PASS: pinned source/native archive producer and mirror');
+      - name: Checkout limited authentic native security probe
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-real-content-prctl.py
+            ci/VulpraSeccompProbeChild.sys.mjs
+            ci/VulpraSeccompProbeParent.sys.mjs
+            ci/security-160-content-process-seccomp.py
+            ci/smoke-webextension-package-local.py
+      - name: Retrieve preserved original native package and checksum
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native
+      - name: Retrieve original complete Mozilla/Vulpra tree identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Verify original release/tree identity, native bytes and forged fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/security-160-real-content-prctl.py
+          python3 ci/security-160-real-content-prctl.py --self-test
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c "$(basename "$archive").sha256")
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp -- "$archive" "$dest/vulpra-local-firefox160-arch-prctl-ci.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-arch-prctl-ci.tar.xz > vulpra-local-firefox160-arch-prctl-ci.tar.xz.sha256)
+      - name: Fetch pinned geckodriver and verify native executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl -fLsS --retry 3 --max-time 90 -o "$file" \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$file" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/geckodriver-bin"
+          tar -xzf "$file" -C "$RUNNER_TEMP/geckodriver-bin" geckodriver
+          test -x "$RUNNER_TEMP/geckodriver-bin/geckodriver"
+      - name: Build disposable Arch Linux runtime dependencies in Docker only
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull archlinux:base
+          docker image inspect --format '{{index .RepoDigests 0}}' archlinux:base > "$RUNNER_TEMP/arch-base-image-digest.txt"
+          cat > "$RUNNER_TEMP/Dockerfile.vulpra-arch-prctl" <<'DOCKER'
+          FROM archlinux:base
+          RUN pacman -Syu --noconfirm --needed \
+              python bash coreutils curl jq tar xz gtk3 dbus-glib alsa-lib nss mesa \
+              libx11 libxcomposite libxdamage libxfixes libxrandr libxt libxcb \
+              fontconfig ttf-dejavu ca-certificates
+          DOCKER
+          docker build -f "$RUNNER_TEMP/Dockerfile.vulpra-arch-prctl" \
+            -t vulpra-firefox160-arch-prctl:ci "$RUNNER_TEMP"
+      - name: Execute real native content-worker seccomp denial inside Arch userland
+        shell: bash
+        timeout-minutes: 9
+        run: |
+          set -euo pipefail
+          docker run --rm --network none --read-only \
+            --user "$(id -u):$(id -g)" \
+            --cap-drop ALL --cap-add CHOWN \
+            --security-opt no-new-privileges \
+            --pids-limit 512 --memory 4g --shm-size 256m \
+            --tmpfs /tmp:rw,exec,nosuid,nodev,mode=1777,size=2048m \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -v "$RUNNER_TEMP:/reports:rw" \
+            --workdir /workspace \
+            --entrypoint /bin/bash vulpra-firefox160-arch-prctl:ci -c '
+              set -euo pipefail
+              grep -Fxq "ID=arch" /etc/os-release
+              export PATH="/reports/geckodriver-bin:$PATH"
+              geckodriver --version | grep -Fq "geckodriver 0.37.1"
+              python ci/security-160-real-content-prctl.py \
+                /workspace /reports/firefox160-arch-content-prctl-proof.json
+              python ci/security-160-real-content-prctl.py --home-write \
+                /workspace /reports/firefox160-arch-content-home-write-proof.json
+            '
+          digest="$(sha256sum "$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz" | cut -d' ' -f1)"
+          jq -e --arg digest "$digest" '
+            .schema_version==1 and .status=="pass" and
+            .native_package_sha256==$digest and
+            .native_prctl_capbset_read_parent_allowed==true and
+            .native_prctl_capbset_read_tab_returned_einval==true and
+            .actual_chromeutils_tab_role_authenticated==true and
+            .same_tab_pid_has_seccomp_mode_2==true and
+            .same_tab_seccomp_mode_2_at_syscall==true and
+            .same_tab_pid_has_no_new_privileges==true and
+            .forbidden_content_worker_syscall_denial_verified==true and
+            .original_firefox_profile_preserved==true and
+            .no_sandbox_prefs_or_host_kernel_policy_relaxed==true and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-arch-content-prctl-proof.json" >/dev/null
+          jq -e --arg digest "$digest" '
+            .schema_version==1 and .status=="pass" and
+            .native_package_sha256==$digest and
+            .same_browser_parent_home_write_control_succeeded==true and
+            .same_browser_parent_home_write_canary_removed==true and
+            .native_open_create_home_content_worker_denied==true and
+            .actual_chromeutils_tab_role_authenticated==true and
+            .same_tab_pid_has_seccomp_mode_2==true and
+            .same_tab_seccomp_mode_2_at_syscall==true and
+            .same_tab_pid_has_no_new_privileges==true and
+            .filesystem_denial_not_exclusively_attributed_to_seccomp==true and
+            .original_firefox_profile_preserved==true and
+            .raw_pids_or_user_data_archived==false and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/firefox160-arch-content-home-write-proof.json" >/dev/null
+          echo 'PASS: authentic Arch-userland Firefox 160 tab denied prctl and disposable HOME create.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: disposable Docker userland, NOT target EndeavourOS/Hyprland kernel or GPU.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded Arch-userland security outcome and image provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-arch-userland-real-content-prctl-not-target-release
+          path: |
+            ${{ runner.temp }}/firefox160-arch-content-prctl-proof.json
+            ${{ runner.temp }}/firefox160-arch-content-home-write-proof.json
+            ${{ runner.temp }}/arch-base-image-digest.txt
+          if-no-files-found: warn
+          retention-days: 30

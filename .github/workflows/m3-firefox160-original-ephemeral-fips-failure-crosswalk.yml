@@ -1,0 +1,169 @@
+# Independently authenticate original Mozilla Firefox160 NSS FIPS-request
+# failed initialization, compare actual non-FIPS PKCS11 and local trusted TLS.
+# This records a genuine device error, NOT a successful FIPS runtime test.
+name: M3 Firefox 160 Ephemeral FIPS Request Device-Error Crosswalk
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-original-ephemeral-fips-failure-crosswalk.yml
+      - ci/m3-firefox160-original-ephemeral-fips-failure-crosswalk.jq
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  actual-original-nss-fips-request-device-error:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Authenticate original accepted nonFIPS PKCS11/TLS and actual failed FIPS mode producers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,name,artifact] of [
+              [43765487245,'75c05a84c747b141f6196aec384323a6dbfaacf0',
+                'M3 Firefox 160 Original NSS PKCS11 FIPS Readonly Source Crosswalk',
+                'firefox160-source-attested-original-pkcs11-sha256-fips-readonly-not-FIPS-certified'],
+              [43766793297,'272888fa610a1b9d6d218b4d47902e8466628232',
+                'M3 Firefox 160 Original Ephemeral NSS SQL FIPS Mode Replay',
+                'firefox160-original-FIPS-requested-NSS-device-error-not-FIPS-success']]){
+              const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(r.repository?.full_name!=='sguzman/vulpra' ||
+                 r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 r.head_sha!==sha || r.name!==name ||
+                 r.status!=='completed' || r.conclusion!=='success')
+                throw Error('Untrusted original Firefox160 baseline/FIPS failed native producer '+id);
+              const arts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:id,per_page:100});
+              if(arts.filter(a=>a.name===artifact&&!a.expired&&a.size_in_bytes>0 &&
+                  new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Original immutable nonFIPS/FIPS device-error artifact unavailable: '+artifact);
+            }
+      - name: Checkout only bounded independent source and native FIPS-error verifier
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-firefox160-original-ephemeral-fips-failure-crosswalk.jq
+      - name: Checkout exact upstream Firefox160 NSS and NSPR error-code headers
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: official-firefox160
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/nss/lib/util/secerr.h
+            nsprpub/pr/include/prerr.h
+      - name: Verify source-exact PKCS11 device error and NSPR library error constants
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C official-firefox160 rev-parse HEAD)" = \
+            '2887d9de1f69c0e9776413da80e7ba0d1225dd9b'
+          test "$(git -C official-firefox160 rev-parse HEAD:security/nss/lib/util/secerr.h)" = \
+            '5b7c9cc5fa6a94a2518529f600e990ad64c2e1de'
+          test "$(git -C official-firefox160 hash-object security/nss/lib/util/secerr.h)" = \
+            '5b7c9cc5fa6a94a2518529f600e990ad64c2e1de'
+          test "$(git -C official-firefox160 rev-parse HEAD:nsprpub/pr/include/prerr.h)" = \
+            '28bf6d7eba80843c9fed4a84c324abc3faa74306'
+          test "$(git -C official-firefox160 hash-object nsprpub/pr/include/prerr.h)" = \
+            '28bf6d7eba80843c9fed4a84c324abc3faa74306'
+          grep -Fq '#define SEC_ERROR_BASE (-0x2000)' official-firefox160/security/nss/lib/util/secerr.h
+          grep -Fq 'SEC_ERROR_PKCS11_DEVICE_ERROR = (SEC_ERROR_BASE + 169)' official-firefox160/security/nss/lib/util/secerr.h
+          grep -Fq '#define PR_LOAD_LIBRARY_ERROR (-5977L)' official-firefox160/nsprpub/pr/include/prerr.h
+          echo 'PASS: original exact Firefox160 error headers: SEC_ERROR_PKCS11_DEVICE_ERROR=-8023, PR_LOAD_LIBRARY_ERROR=-5977' >> "$GITHUB_STEP_SUMMARY"
+      - name: Download independently source-attested original successful nonFIPS NSS and trusted localhost TLS
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 43765487245
+          name: firefox160-source-attested-original-pkcs11-sha256-fips-readonly-not-FIPS-certified
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/baseline
+      - name: Download actual original Firefox160 temporarily requested FIPS device-error runtime
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 43766793297
+          name: firefox160-original-FIPS-requested-NSS-device-error-not-FIPS-success
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/fips
+      - name: Reconcile original NSS native FIPS failure and reject sixteen forged outcomes
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous="$RUNNER_TEMP/baseline/source-verified-original-nss-pkcs11-fips-readonly.json"
+          fips="$RUNNER_TEMP/fips/original-nss-temporary-fips-observation.json"
+          verifier=ci/m3-firefox160-original-ephemeral-fips-failure-crosswalk.jq
+          test -s "$previous" && test -s "$fips"
+          reconcile() {
+            jq -n --arg source '2887d9de1f69c0e9776413da80e7ba0d1225dd9b' \
+              --arg tree '42dd7439a27dde92f89ac5eed13f88117a4d7ab5' \
+              --arg archive '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb' \
+              --slurpfile baseline "$1" --slurpfile fips "$2" -f "$verifier"
+          }
+          reconcile "$previous" "$fips" > \
+            "$RUNNER_TEMP/verified-original-firefox160-FIPS-request-device-error.json"
+          jq -e '
+            .schema_version==1 and
+            .original_compiled_browser_archive_sha256==
+              "530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb" and
+            .original_NSS_Init_normal_SQL_database_success==true and
+            .original_temporary_FIPS_mode_verified_successfully_enabled_by_host_modutil_only==true and
+            .original_temporary_FIPS_mode_usable_by_archived_Firefox160_NSS==false and
+            .source_defined_PKCS11_DEVICE_ERROR_code==-8023 and
+            .source_defined_PR_LOAD_LIBRARY_ERROR_code==-5977 and
+            .original_FIPS_SQL_db_NSS_Init_returned_device_error==true and
+            .original_FIPS_PK11_IsFIPS_getter_was_not_called==true and
+            .original_FIPS_request_softoken_denials_observed==2 and
+            .original_FIPS_request_freebl_denials_observed==0 and
+            .original_FIPS_request_freebl_denial_not_exercised_due_to_earlier_error==true and
+            .original_temporary_SQL_database_bytes_unchanged==true and
+            .original_device_error_root_cause_unknown==true and
+            .FIPS_security_140_compliance_or_certification_proven==false and
+            .Rust_CXX_FFI_dlopen_dlsym_dependency_closure_complete==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/verified-original-firefox160-FIPS-request-device-error.json" >/dev/null
+
+          jq '.original_official_Mozilla_Firefox160_commit="forged"' "$previous" > "$RUNNER_TEMP/base-source.json"
+          jq '.original_compiled_Firefox160_native_archive_sha256="forged"' "$previous" > "$RUNNER_TEMP/base-archive.json"
+          jq '.actual_PK11_IsFIPS_readonly_result=1' "$previous" > "$RUNNER_TEMP/base-fips.json"
+          jq '.actual_trusted_local_RSA_CA_https_webdriver_success_in_separate_real_browser_run=false' "$previous" > "$RUNNER_TEMP/base-tls.json"
+          jq '.m3_sixth_gate_closed=true' "$previous" > "$RUNNER_TEMP/base-gate.json"
+          jq '.original_native_browser_archive_sha256="forged"' "$fips" > "$RUNNER_TEMP/now-archive.json"
+          jq '.disposable_modutil_enabled_FIPS_in_temp_DB_and_verified=false' "$fips" > "$RUNNER_TEMP/now-modutil.json"
+          jq '.modes[0].original_NSS_Init_sql_rc=-1' "$fips" > "$RUNNER_TEMP/now-baseline.json"
+          jq '.modes[1].original_NSS_Init_error_code=0' "$fips" > "$RUNNER_TEMP/now-device.json"
+          jq '.modes[1].original_PK11_IsFIPS_mode=1' "$fips" > "$RUNNER_TEMP/now-fipsclaim.json"
+          jq '.modes[2].original_NSS_Init_error_code=-8023' "$fips" > "$RUNNER_TEMP/now-loader.json"
+          jq '.modes[2].actual_denied_softoken_native_loads=0' "$fips" > "$RUNNER_TEMP/now-softoken.json"
+          jq '.modes[3].actual_denied_freebl_native_loads=3' "$fips" > "$RUNNER_TEMP/now-freebl.json"
+          jq '.original_temporary_NSS_DB_bytes_unchanged_after_all_original_native_probes=false' "$fips" > "$RUNNER_TEMP/now-db.json"
+          jq '.FIPS_device_error_underlying_cause_disassembled_or_proven=true' "$fips" > "$RUNNER_TEMP/now-overclaim.json"
+          jq '.m3_sixth_gate_closed=true' "$fips" > "$RUNNER_TEMP/now-gate.json"
+          for case in source archive fips tls gate; do
+            if reconcile "$RUNNER_TEMP/base-$case.json" "$fips" >/dev/null 2>&1; then
+              echo "FAIL: forged old original nonFIPS/TLS accepted: $case" >&2; exit 1
+            fi
+          done
+          for case in archive modutil baseline device fipsclaim loader softoken freebl db overclaim gate; do
+            if reconcile "$previous" "$RUNNER_TEMP/now-$case.json" >/dev/null 2>&1; then
+              echo "FAIL: forged actual temporary FIPS failure accepted: $case" >&2; exit 1
+            fi
+          done
+          echo 'PASS: authentic original Firefox160 nonFIPS NSS/TLS works; temporary FIPS mode requested using temp DB but NSS_Init returns actual SEC_ERROR_PKCS11_DEVICE_ERROR, not a successful FIPS runtime; 16/16 forged artifacts rejected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: underlying FIPS device error unproven; do not claim FIPS-certified, FIPS-enabled original runtime, source-pruning or full M3 FFI closure.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive strict bounded authenticated original NSS FIPS-request failure only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-authenticated-original-FIPS-request-device-error-not-validated-FIPS
+          path: ${{ runner.temp }}/verified-original-firefox160-FIPS-request-device-error.json
+          if-no-files-found: warn
+          retention-days: 30

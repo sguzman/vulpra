@@ -1,0 +1,98 @@
+name: Firefox 160 Selected Security-Source Retention (No Native Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-source-retention.yml
+      - ci/security-160-verify-retained-fixes.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-six-pinned-firefox160-security-blobs:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout migration security-source verifier only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-verify-retained-fixes.sh
+      - name: Checkout pinned upstream Firefox 160 security paths
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: firefox160
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            gfx/thebes/SharedFontList.cpp
+            gfx/thebes/SharedFontList.h
+            dom/ipc/ProcessIsolation.cpp
+            netwerk/protocol/http/nsHttpChannel.cpp
+            netwerk/protocol/http/nsHttpChannel.h
+            dom/media/FileBlockCache.cpp
+      - name: Checkout established main-branch security manifest
+        uses: actions/checkout@v4
+        with:
+          repository: sguzman/vulpra
+          ref: main
+          path: main-security
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json
+      - name: Retrieve the independently verified full Firefox 160 candidate ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-complete-git-tree-candidate
+          run-id: 43112919678
+          repository: sguzman/vulpra
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/firefox160-ledger
+      - name: Verify retained exact-source security blobs and reject forged evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-verify-retained-fixes.sh
+          manifest="$GITHUB_WORKSPACE/main-security/docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json"
+          upstream="$GITHUB_WORKSPACE/firefox160"
+          ledger="$RUNNER_TEMP/firefox160-ledger"
+          proof="$RUNNER_TEMP/firefox160-retained-security-source-proof.json"
+          bash ci/security-160-verify-retained-fixes.sh --check "$upstream" "$manifest" "$ledger" "$proof"
+          jq -e '
+            .selected_cves_checked == 4 and
+            .exact_upstream_release_blobs_retained == 6 and
+            .selected_security_paths_overwritten == 0 and
+            .full_advisory_audited == false and
+            .security_current == false and
+            .release_ready == false
+          ' "$proof" >/dev/null
+          jq '.patch_files[0].firefox_160_release_git_blob = ("0"*40)' "$manifest" > "$RUNNER_TEMP/forged-manifest.json"
+          if bash ci/security-160-verify-retained-fixes.sh --check "$upstream" "$RUNNER_TEMP/forged-manifest.json" "$ledger" "$RUNNER_TEMP/bad-manifest-proof.json" >/dev/null 2>&1; then
+            echo 'FAIL: accepted forged upstream security-source hash' >&2
+            exit 1
+          fi
+          cp -a "$ledger" "$RUNNER_TEMP/forged-ledger"
+          sed -i '1c gfx/thebes/SharedFontList.cpp' "$RUNNER_TEMP/forged-ledger/overlay-paths.txt"
+          if bash ci/security-160-verify-retained-fixes.sh --check "$upstream" "$manifest" "$RUNNER_TEMP/forged-ledger" "$RUNNER_TEMP/bad-ledger-proof.json" >/dev/null 2>&1; then
+            echo 'FAIL: accepted security-file overlay substitution' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/bad-manifest-proof.json"
+          test ! -e "$RUNNER_TEMP/bad-ledger-proof.json"
+          echo 'PASS: bounded six-file source identity plus both tampering rejection controls'
+          echo 'LIMIT: four CVEs only; no Mozilla advisory completeness, native security, or release claim'
+      - name: Archive bounded source-only audit proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-vulpra-four-cve-source-retention
+          path: ${{ runner.temp }}/firefox160-retained-security-source-proof.json
+          if-no-files-found: error
+          retention-days: 30

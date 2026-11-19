@@ -126,8 +126,15 @@ def create_probe_extension(path: Path, token: str) -> None:
     )
     content = (
         "browser.runtime.sendMessage({type:'vulpra-probe'}).then(reply => {"
-        f"if (reply && reply.proof === {json.dumps(token)}) "
+        f"if (reply && reply.proof === {json.dumps(token)}) {{"
         "document.documentElement.dataset.vulpraExtensionProof = reply.proof;"
+        "/* Synthetic localhost fixture only: never contact a real vault. */"
+        "const testField = document.querySelector('#vulpra-synthetic-password');"
+        "if (testField && location.hostname === '127.0.0.1') {"
+        "testField.value = 'vulpra-fixture-not-a-secret';"
+        "testField.dispatchEvent(new Event('input', {bubbles:true}));"
+        "document.documentElement.dataset.vulpraSyntheticFill = 'yes';"
+        "}}"
         "}).catch(error => {"
         "document.documentElement.dataset.vulpraExtensionError = String(error);"
         "});"
@@ -138,12 +145,47 @@ def create_probe_extension(path: Path, token: str) -> None:
         output.writestr("content.js", content)
 
 
+def self_test_synthetic_extension_fixture() -> None:
+    """Check the generated add-on's JavaScript and local-only scope offline."""
+    with tempfile.TemporaryDirectory(prefix="vulpra-ext-fixture-") as tmp:
+        xpi = Path(tmp) / "synthetic-local-only.xpi"
+        create_probe_extension(xpi, "synthetic-test-token-not-a-password")
+        with zipfile.ZipFile(xpi) as package:
+            names = set(package.namelist())
+            if names != {"manifest.json", "background.js", "content.js"}:
+                raise AssertionError("Unexpected extension fixture files")
+            manifest = json.loads(package.read("manifest.json"))
+            if manifest["permissions"] != ["storage", "http://127.0.0.1/*"]:
+                raise AssertionError("Test extension requested external host permission")
+            background = package.read("background.js").decode()
+            content = package.read("content.js").decode()
+            if "vulpra-fixture-not-a-secret" not in content or "https://" in content:
+                raise AssertionError("Synthetic password fill fixture invalid")
+            if "vulpra-fixture-not-a-secret" in background:
+                raise AssertionError("Synthetic form value leaked into extension storage")
+            for js in (background, content):
+                if shutil.which("node") is None:
+                    raise RuntimeError("Node is required for offline generated JavaScript syntax QA")
+                checked = subprocess.run(
+                    ["node", "--check", "-"], input=js, text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    timeout=15, check=False)
+                if checked.returncode != 0:
+                    raise AssertionError(
+                        "Generated extension JavaScript invalid: " +
+                        checked.stderr[:350])
+    print("PASS: local-only synthetic extension fixture has valid JS and no external permissions")
+
+
 class LocalPage(http.server.BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = self.path.split("?")[0]
         self.server.paths.append(path)
         if path == "/extension":
-            data = b'<!doctype html><html><meta charset="utf-8"><title>Vulpra extension smoke</title><h1>WebExtension test</h1></html>'
+            data = (b'<!doctype html><html><meta charset="utf-8"><title>Vulpra extension smoke</title>'
+                    b'<h1>WebExtension test</h1><form action="javascript:void(0)">'
+                    b'<input id="vulpra-synthetic-password" type="password" autocomplete="current-password">'
+                    b'</form></html>')
             status = 200
         elif path == "/start":
             data = (b'<!doctype html><meta charset="utf-8"><title>M3 startup</title>'
@@ -209,6 +251,216 @@ def verify_js_navigation(port: int, base: str, server: http.server.ThreadingHTTP
     return {"verified": True, "local_request_sequence": functional,
             "final_url": last["url"], "final_document_title": last["title"],
             "final_document_text": last["text"]}
+
+def valid_compat_user_agent(user_agent: object, browser_version: object) -> bool:
+    """Require Firefox and Vulpra tokens for the real app's major.minor.
+
+    Firefox release-patch versions (such as 160.0.1) normally advertise
+    major.minor (160.0) in navigator.userAgent. Accept either that
+    major.minor token or the exact app version, never an unrelated patch.
+    Keep the default, unmodified browser UA and never log its full value.
+    """
+    if not isinstance(user_agent, str) or not isinstance(browser_version, str):
+        return False
+    components = browser_version.split(".")
+    if (len(components) not in (2, 3) or components[0] != "160" or
+            any(not part.isascii() or not part.isdecimal() or
+                (len(part) > 1 and part[0] == "0")
+                for part in components) or len(user_agent) > 1024):
+        return False
+    ua_release = ".".join(components[:2])
+    allowed_versions = {ua_release, browser_version}
+    tokens = set(user_agent.split())
+    return all(
+        any(f"{product}/{version}" in tokens for version in allowed_versions)
+        for product in ("Firefox", "Vulpra")
+    )
+
+
+def test_compat_user_agent_parser() -> None:
+    good = "Mozilla/5.0 (X11; Linux x86_64; rv:160.0) Gecko/20100101 Firefox/160.0 Vulpra/160.0"
+    exact = good.replace("Firefox/160.0 Vulpra/160.0",
+                         "Firefox/160.0.1 Vulpra/160.0.1")
+    mixed = good.replace("Vulpra/160.0", "Vulpra/160.0.1")
+    for value in (good, exact, mixed):
+        assert valid_compat_user_agent(value, "160.0.1")
+    assert valid_compat_user_agent(good, "160.0")
+    bad = (
+        good.replace("Firefox/160.0 ", ""),
+        good.replace("Vulpra/160.0", ""),
+        good.replace("Firefox/160.0", "Firefox/159.0"),
+        good.replace("Firefox/160.0", "FakeFirefox/160.0"),
+        good.replace("Vulpra/160.0", "Vulpra/161.0"),
+        good.replace("Firefox/160.0", "Firefox/160.0.2"),
+        good.replace("Vulpra/160.0", "Vulpra/160.0.2"),
+        "", None,
+    )
+    for value in bad:
+        assert not valid_compat_user_agent(value, "160.0.1"), "Invalid UA accepted"
+    assert not valid_compat_user_agent(exact, "160.0")
+    assert not valid_compat_user_agent(good, "159.0")
+    assert not valid_compat_user_agent(good, "160.0.1.1")
+    assert not valid_compat_user_agent(good, None)
+    print("PASS: Firefox/Vulpra major.minor UA and patch-version token policy; forged tokens rejected")
+
+
+def verify_compat_user_agent(port: int, base: str,
+                             browser_version: object) -> dict:
+    """Test unmodified default UA on previously navigated localhost page."""
+    value = request(port, "POST", base + "/execute/sync", {
+        "script": (
+            "return {ua: navigator.userAgent, "
+            "localPage: location.protocol === 'http:' && location.hostname === '127.0.0.1'};"
+        ),
+        "args": [],
+    })
+    ua = value.get("ua") if isinstance(value, dict) else None
+    if not isinstance(value, dict) or value.get("localPage") is not True or not (
+            valid_compat_user_agent(ua, browser_version)):
+        # Only describe the presence of expected version tokens, not the UA,
+        # which may expose platform details. Do not override any browser prefs.
+        parts = browser_version.split(".") if isinstance(browser_version, str) else []
+        base_version = ".".join(parts[:2]) if len(parts) >= 2 else ""
+        tokens = set(ua.split()) if isinstance(ua, str) else set()
+        flags = {
+            "local_page": isinstance(value, dict) and value.get("localPage") is True,
+            "firefox_major_minor": bool(base_version and f"Firefox/{base_version}" in tokens),
+            "vulpra_major_minor": bool(base_version and f"Vulpra/{base_version}" in tokens),
+            "firefox_exact": isinstance(browser_version, str) and f"Firefox/{browser_version}" in tokens,
+            "vulpra_exact": isinstance(browser_version, str) and f"Vulpra/{browser_version}" in tokens,
+        }
+        raise RuntimeError(
+            "Firefox/Vulpra default-UA compatibility failed on real localhost page; "
+            "redacted token-presence flags: " + json.dumps(flags, sort_keys=True)
+        )
+    return {
+        "verified": True, "firefox_compat_token": True,
+        "vulpra_brand_token": True, "browser_version": browser_version,
+        "default_profile_with_no_user_agent_override": True,
+        "local_page": True,
+    }
+
+
+BYOB_PREF_NAMES = (
+    "identity.fxaccounts.enabled",
+    "signon.rememberSignons",
+    "signon.autofillForms",
+    "signon.generation.enabled",
+)
+BYOB_PROTECTED_THREAT_PREFS = (
+    "browser.safebrowsing.phishing.enabled",
+    "browser.safebrowsing.malware.enabled",
+    "browser.safebrowsing.downloads.enabled",
+)
+
+
+def byob_defaults_verified(record: object) -> bool:
+    """Require four effective AND default false prefs, no user overrides."""
+    if not isinstance(record, dict) or set(record) != set(BYOB_PREF_NAMES):
+        return False
+    return all(
+        isinstance(record[name], dict) and
+        set(record[name]) == {"default", "effective", "user_override"} and
+        record[name]["default"] is False and
+        record[name]["effective"] is False and
+        record[name]["user_override"] is False
+        for name in BYOB_PREF_NAMES
+    )
+
+
+def protected_threat_defaults_preserved(record: object) -> bool:
+    """Require true default/effective threat-pref flags; not provider readiness."""
+    if not isinstance(record, dict) or set(record) != set(BYOB_PROTECTED_THREAT_PREFS):
+        return False
+    return all(
+        isinstance(record[name], dict) and
+        set(record[name]) == {"default", "effective", "user_override"} and
+        record[name]["default"] is True and
+        record[name]["effective"] is True and
+        record[name]["user_override"] is False
+        for name in BYOB_PROTECTED_THREAT_PREFS
+    )
+
+
+def self_test_byob_assertions() -> None:
+    good = {name: {"default": False, "effective": False,
+                   "user_override": False} for name in BYOB_PREF_NAMES}
+    assert byob_defaults_verified(good)
+    for key in BYOB_PREF_NAMES:
+        for field, bad in (("default", True), ("effective", True),
+                           ("user_override", True), ("default", 0),
+                           ("effective", "false")):
+            forged = {n: dict(v) for n, v in good.items()}
+            forged[key][field] = bad
+            assert not byob_defaults_verified(forged)
+        forged = {n: dict(v) for n, v in good.items() if n != key}
+        assert not byob_defaults_verified(forged)
+    assert not byob_defaults_verified({**good, "security.sandbox": {"default": False}})
+    assert not byob_defaults_verified(None)
+    baseline = {name: {"default": True, "effective": True,
+                       "user_override": False} for name in BYOB_PROTECTED_THREAT_PREFS}
+    assert protected_threat_defaults_preserved(baseline)
+    for key in BYOB_PROTECTED_THREAT_PREFS:
+        for field, wrong in (("default", False), ("effective", False),
+                             ("user_override", True), ("default", 1),
+                             ("effective", "true")):
+            forged = {name: dict(vals) for name, vals in baseline.items()}
+            forged[key][field] = wrong
+            assert not protected_threat_defaults_preserved(forged)
+        missing = {name: dict(vals) for name, vals in baseline.items() if name != key}
+        assert not protected_threat_defaults_preserved(missing)
+    print("PASS: BYOB defaults and protected phishing/malware/download flag assertions reject altered values")
+
+
+def verify_byob_defaults(port: int, base: str) -> dict:
+    """Query live effective/default branches in an isolated Gecko profile.
+
+    Never loads or writes stored password databases and never contacts a vault.
+    """
+    request(port, "POST", base + "/moz/context", {"context": "chrome"})
+    try:
+        result = request(port, "POST", base + "/execute/sync", {
+            "script": """
+                const keys = [
+                    'identity.fxaccounts.enabled',
+                    'signon.rememberSignons',
+                    'signon.autofillForms',
+                    'signon.generation.enabled'
+                ];
+                const protections = [
+                    'browser.safebrowsing.phishing.enabled',
+                    'browser.safebrowsing.malware.enabled',
+                    'browser.safebrowsing.downloads.enabled'
+                ];
+                const defaults = Services.prefs.getDefaultBranch('');
+                const inspect = names => Object.fromEntries(names.map(name => [name, {
+                    default: defaults.getBoolPref(name),
+                    effective: Services.prefs.getBoolPref(name),
+                    user_override: Services.prefs.prefHasUserValue(name)
+                }]));
+                return {byob: inspect(keys), protections: inspect(protections)};
+            """,
+            "args": [],
+        }, timeout_seconds=25)
+    finally:
+        request(port, "POST", base + "/moz/context", {"context": "content"})
+    if not isinstance(result, dict) or not byob_defaults_verified(result.get("byob")):
+        raise RuntimeError(
+            "Vulpra BYOB native default-pref acceptance failed: "
+            "expected four default/effective false booleans without profile overrides"
+        )
+    if not protected_threat_defaults_preserved(result.get("protections")):
+        raise RuntimeError(
+            "Vulpra BYOB default verification detected disabled/overridden "
+            "phishing, malware, or download threat-protection settings"
+        )
+    return {"verified": True, "account_and_builtin_login_defaults_disabled": True,
+            "preference_names_checked": 4, "no_profile_overrides": True,
+            "safebrowsing_local_feature_flags_preserved": True,
+            "safebrowsing_live_provider_readiness_verified": False,
+            "passwords_read_or_written": False,
+            "external_extension_or_vault_modified": False}
+
 
 def certificate_denial(status: int, body: object) -> bool:
     """Fail closed: exact W3C HTTP 400 insecure-certificate navigation only.
@@ -528,6 +780,15 @@ def main() -> int:
     if sys.argv[1:] == ["--self-test-cert-parser"]:
         test_certificate_denial_parser()
         return 0
+    if sys.argv[1:] == ["--self-test-user-agent-parser"]:
+        test_compat_user_agent_parser()
+        return 0
+    if sys.argv[1:] == ["--self-test-byob-assertions"]:
+        self_test_byob_assertions()
+        return 0
+    if sys.argv[1:] == ["--self-test-synthetic-extension-fixture"]:
+        self_test_synthetic_extension_fixture()
+        return 0
     repo = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Code/Apps/vulpra").resolve()
     gecko = shutil.which("geckodriver")
     if not gecko:
@@ -542,6 +803,8 @@ def main() -> int:
     nimbus_check = os.environ.get("VULPRA_M3_VERIFY_NIMBUS", "0") == "1"
     promo_check = os.environ.get("VULPRA_M3_VERIFY_NO_ASROUTER_PROMOS", "0") == "1"
     adsfeed_check = os.environ.get("VULPRA_M3_VERIFY_NO_NEWTAB_ADSFEED", "0") == "1"
+    ua_check = os.environ.get("VULPRA_VERIFY_UA_COMPAT", "0") == "1"
+    byob_check = os.environ.get("VULPRA_VERIFY_BYOB_DEFAULTS", "0") == "1"
     archive = verified_archive(repo)
     print(f"PASS: Verified existing archive {archive.name}", flush=True)
     logdir = repo / ".git/vulpra-native-build"
@@ -587,7 +850,7 @@ def main() -> int:
         try:
             with gecko_log.open("wb") as driver_log:
                 proc = subprocess.Popen([gecko, "--host", "127.0.0.1", "--port", str(port)] +
-                                        (["--allow-system-access"] if nimbus_check or promo_check or adsfeed_check else []),
+                                        (["--allow-system-access"] if nimbus_check or promo_check or adsfeed_check or byob_check else []),
                                         env=env, stdout=driver_log, stderr=subprocess.STDOUT,
                                         start_new_session=True)
                 wait_ready(port, proc)
@@ -600,6 +863,11 @@ def main() -> int:
                             "args": ["-headless", "-no-remote"],
                             "prefs": {
                                 "browser.shell.checkDefaultBrowser": False,
+                                # Automation recommended prefs can disable
+                                # threat protection. Bypass them for this
+                                # opt-in BYOB check, without security prefs.
+                                **({"remote.prefs.recommended": False}
+                                   if byob_check else {}),
                                 "app.update.enabled": False,
                                 "extensions.update.enabled": False,
                             },
@@ -617,6 +885,16 @@ def main() -> int:
                 base = f"/session/{session_id}"
                 js_result = verify_js_navigation(port, base, server)
                 print("PASS: real WebDriver JS redirect, HTTP 302 and final DOM", flush=True)
+                ua_result = None
+                if ua_check:
+                    ua_result = verify_compat_user_agent(
+                        port, base, reported.get("browserVersion")
+                    )
+                    print("PASS: default browser UA contains both Firefox and Vulpra version tokens", flush=True)
+                byob_result = None
+                if byob_check:
+                    byob_result = verify_byob_defaults(port, base)
+                    print("PASS: live Vulpra default/effective BYOB prefs off without user overrides", flush=True)
                 tls_result = verify_local_certificate_denial(
                     port, base, work, logdir / f"webextension-tls-failure-{stamp}.json"
                 )
@@ -631,9 +909,30 @@ def main() -> int:
                         "args": [],
                     })
 
+                def fake_password_field_state() -> object:
+                    return request(port, "POST", base + "/execute/sync", {
+                        "script": """
+                            const field = document.querySelector('#vulpra-synthetic-password');
+                            return field ? {
+                                only_localhost: location.hostname === '127.0.0.1',
+                                fixture_value_set: field.value === 'vulpra-fixture-not-a-secret',
+                                field_empty: field.value === '',
+                                extension_marked_fill:
+                                    document.documentElement.dataset.vulpraSyntheticFill === 'yes'
+                            } : null;
+                        """,
+                        "args": [],
+                    })
                 navigate("before")
                 if proof() is not None:
                     raise RuntimeError("Extension proof appeared before installation")
+                if byob_check:
+                    before_state = fake_password_field_state()
+                    if not isinstance(before_state, dict) or not (
+                            before_state.get("only_localhost") is True and
+                            before_state.get("field_empty") is True and
+                            before_state.get("extension_marked_fill") is False):
+                        raise RuntimeError("Local synthetic password field not initially empty")
                 print("PASS: Unsigned probe not present before installation", flush=True)
                 addon_id = request(port, "POST", base + "/moz/addon/install", {
                     "path": str(addon), "temporary": True,
@@ -647,10 +946,42 @@ def main() -> int:
                     time.sleep(0.25)
                 if proof() != token:
                     raise RuntimeError("Extension content/background/storage proof not observed after installation")
+                synthetic_fill_result = None
+                if byob_check:
+                    # Runtime/message storage and DOM mutations are different
+                    # asynchronous steps. Poll the *actual field state* rather
+                    # than treating the proof dataset flag as a fill barrier.
+                    deadline_fill = time.monotonic() + 10
+                    fill_state = None
+                    while time.monotonic() < deadline_fill:
+                        fill_state = fake_password_field_state()
+                        if isinstance(fill_state, dict) and (
+                                fill_state.get("only_localhost") is True and
+                                fill_state.get("fixture_value_set") is True and
+                                fill_state.get("extension_marked_fill") is True):
+                            break
+                        time.sleep(0.2)
+                    else:
+                        raise RuntimeError(
+                            "Isolated WebExtension failed synthetic password-field fill "
+                            "(or field was not on localhost)"
+                        )
+                    synthetic_fill_result = {
+                        "verified": True,
+                        "browser_extension_can_fill_local_fake_password_field": True,
+                        "no_real_credentials_or_vault_endpoint": True,
+                    }
+                    print("PASS: separate WebExtension populated synthetic localhost password form", flush=True)
                 print("PASS: Temporary unsigned WebExtension installed; content script, background messaging and storage.local executed", flush=True)
                 request(port, "POST", base + "/moz/addon/uninstall", {"id": addon_id})
                 navigate("uninstalled")
                 uninstall_samples = verify_uninstall_stays_uninstalled(proof)
+                if byob_check:
+                    after_state = fake_password_field_state()
+                    if not isinstance(after_state, dict) or not (
+                            after_state.get("field_empty") is True and
+                            after_state.get("extension_marked_fill") is False):
+                        raise RuntimeError("Synthetic extension fill persisted after uninstall/new navigation")
                 print(f"PASS: WebExtension uninstall remained inactive across {uninstall_samples} repeated checks", flush=True)
                 nimbus_result = None
                 if nimbus_check:
@@ -671,6 +1002,9 @@ def main() -> int:
                     "schema_version": 1, "status": "pass",
                     "package": archive.name,
                     "javascript_navigation": js_result,
+                    "user_agent_compatibility": ua_result,
+                    "byob_default_preferences": byob_result,
+                    "byob_external_extension_synthetic_fill": synthetic_fill_result,
                     "webextension": {"manifest_version": 2, "temporary_unsigned_install": True,
                                      "content_scripts": True, "background_messaging": True,
                                      "storage_local": True, "uninstall": True,

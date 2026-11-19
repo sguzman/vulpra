@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "kind": "firefox160_four_boundary_bugs_six_public_landings_all_changed_paths_inventory",
+  "official_source_repository": "mozilla-firefox/firefox",
+  "firefox160_release_commit": "2887d9de1f69c0e9776413da80e7ba0d1225dd9b",
+  "vulpra_candidate_git_tree": "42dd7439a27dde92f89ac5eed13f88117a4d7ab5",
+  "original_ci_run_id": 43138458940,
+  "selected_cve_count": 4,
+  "upstream_commits_examined": 6,
+  "changed_file_records": 31,
+  "unique_changed_paths": 27,
+  "commits": [
+    {
+      "cve": "CVE-2026-124855",
+      "mozilla_bug": 2072096,
+      "upstream_commit": "31ff32bbcdcf80827e72d6af6d5241bfbb9c7658",
+      "commit_title": "Bug 2072096 - Part 1: Ensure all blob:null URIs hold consistent principals, r=dom-core-reviewers,vhilla,smaug",
+      "changed_paths": [
+        "dom/file/uri/BlobURL.cpp",
+        "dom/file/uri/BlobURL.h",
+        "dom/file/uri/BlobURLProtocolHandler.cpp",
+        "dom/file/uri/BlobURLProtocolHandler.h",
+        "dom/ipc/ContentChild.cpp",
+        "dom/ipc/ContentParent.cpp"
+      ]
+    },
+    {
+      "cve": "CVE-2026-124855",
+      "mozilla_bug": 2072096,
+      "upstream_commit": "6955af1bd121f6da8c590c699d6e2e3fba42bfb9",
+      "commit_title": "Bug 2072096 - Part 2: Clarify meaning of BlobURL::GetNullPrincipal, r=vhilla",
+      "changed_paths": [
+        "dom/file/uri/BlobURL.cpp",
+        "dom/file/uri/BlobURL.h",
+        "dom/file/uri/BlobURLProtocolHandler.cpp",
+        "dom/file/uri/BlobURLProtocolHandler.h",
+        "ipc/glue/URIParams.ipdlh"
+      ]
+    },
+    {
+      "cve": "CVE-2026-124859",
+      "mozilla_bug": 2074179,
+      "upstream_commit": "4b3e088a325ceb62bb355e9abf264f76a0e829f0",
+      "commit_title": "Bug 2074179 - Reject ErrorResult-internal nsresult values in IPC deserialization. r=tschuster,ipc-reviewers,nika",
+      "changed_paths": [
+        "dom/bindings/BindingUtils.cpp",
+        "dom/bindings/ErrorResult.h",
+        "ipc/chromium/src/chrome/common/ipc_message_utils.h"
+      ]
+    },
+    {
+      "cve": "CVE-2026-124903",
+      "mozilla_bug": 2084673,
+      "upstream_commit": "f1c9c8b97e0e162b7b78d6c9d2b1aa38c29e3443",
+      "commit_title": "Bug 2084673 - Simplify mojo dead proxy handling, r=ipc-reviewers,mccr8",
+      "changed_paths": [
+        "ipc/chromium/gtest/ports_unittest.cc",
+        "ipc/chromium/src/mojo/core/ports/event.cc",
+        "ipc/chromium/src/mojo/core/ports/event.h",
+        "ipc/chromium/src/mojo/core/ports/node.cc",
+        "ipc/chromium/src/mojo/core/ports/node.h",
+        "ipc/chromium/src/mojo/core/ports/node_delegate.h",
+        "ipc/glue/NodeChannel.cpp",
+        "ipc/glue/NodeChannel.h",
+        "ipc/glue/NodeController.cpp",
+        "ipc/glue/NodeController.h",
+        "ipc/glue/ProtocolUtils.h",
+        "ipc/ipdl/ipdl.py",
+        "tools/fuzzing/ipc/IPCFuzzController.cpp"
+      ]
+    },
+    {
+      "cve": "CVE-2026-124907",
+      "mozilla_bug": 2087324,
+      "upstream_commit": "ba26f55c646c3002a3d7c9de475861d1cc675724",
+      "commit_title": "Bug 2087324 - Pre: Codify assumption that map entries are non-null, in order to prevent creation of empty map entries. r=lsalzman",
+      "changed_paths": [
+        "dom/canvas/HostWebGLContext.cpp",
+        "dom/canvas/HostWebGLContext.h"
+      ]
+    },
+    {
+      "cve": "CVE-2026-124907",
+      "mozilla_bug": 2087324,
+      "upstream_commit": "53fa8fe451d46060c0e4be67e55042e22783bc49",
+      "commit_title": "Bug 2087324 - Inspect WebGL tracked memory on the canvas rendering thread. r=lsalzman,mccr8",
+      "changed_paths": [
+        "dom/canvas/WebGLMemoryTracker.cpp",
+        "dom/canvas/WebGLMemoryTracker.h"
+      ]
+    }
+  ],
+  "limits": {
+    "public_bug_id_search_not_exhaustive": true,
+    "complete_cve_fix_hunks_verified": false,
+    "diverged_release_blobs_are_not_automatically_failures": true,
+    "security_current": false,
+    "release_ready": false
+  }
+}

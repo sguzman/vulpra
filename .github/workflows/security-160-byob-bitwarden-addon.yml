@@ -1,0 +1,164 @@
+name: Firefox 160 BYOB Real Signed Bitwarden Smoke (No Vault)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths: [ci/smoke-byob-bitwarden-addon.py, .github/workflows/security-160-byob-bitwarden-addon.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-bitwarden-addon:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Authenticate native BYOB producer
+        id: identity
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const r=(await github.rest.actions.getWorkflowRun({owner,repo,run_id:44350848442})).data;
+            if (r.repository?.full_name!=='sguzman/vulpra' ||
+                r.head_sha!=='ffec2b1bfcc816385f72301cce2e71fa0f1ac337' ||
+                r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                r.status!=='completed' || r.conclusion!=='success')
+              throw Error('BYOB native producer not authenticated');
+            const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:44350848442,per_page:100});
+            for(const name of ['firefox160-byob-vulpra-unreleased-native-preview-not-approved',
+                               'firefox160-byob-vulpra-materialized-source-proof']) {
+              if(a.filter(x=>x.name===name && !x.expired && x.size_in_bytes>0).length!==1)
+                throw Error('Missing or expired verified source/native package: '+name);
+            }
+            core.setOutput('ready','true');
+      - name: Checkout only BYOB test harness
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/smoke-byob-bitwarden-addon.py
+            ci/smoke-webextension-package-local.py
+      - name: Retrieve original compiled BYOB package
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 44350848442
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: firefox160-byob-vulpra-unreleased-native-preview-not-approved
+          path: ${{ runner.temp }}/producer
+      - name: Retrieve original BYOB source identity
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 44350848442
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: firefox160-byob-vulpra-materialized-source-proof
+          path: ${{ runner.temp }}/source
+      - name: Verify source identity and native package checksum
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .upstream_release_commit == "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree == "c17d957eb58741df2855dc9b6c577be192315410" and
+            .verified_overlays == 28 and .exact_assembly_tree_match == true and
+            .byob_source_variant_verified == true and
+            .byob_branding_blob == "ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e"
+          ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
+          archive="$RUNNER_TEMP/producer/vulpra-firefox160-byob-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$(dirname "$archive")" && sha256sum -c "$(basename "$archive").sha256")
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp "$archive" "$dest/vulpra-local-firefox160-bitwarden-qa.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-bitwarden-qa.tar.xz > vulpra-local-firefox160-bitwarden-qa.tar.xz.sha256)
+      - name: Install test dependencies and verified geckodriver
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y python3 jq curl iproute2 util-linux libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          curl --fail --location --show-error --silent --retry 3 --max-time 90 \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz' \
+            -o "$RUNNER_TEMP/geckodriver.tar.gz"
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$RUNNER_TEMP/geckodriver.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/geckodriver.tar.gz" -C "$RUNNER_TEMP/bin" geckodriver
+          "$RUNNER_TEMP/bin/geckodriver" --version
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Fetch official exact-version Mozilla Bitwarden signed XPI
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --max-time 120 \
+            'https://addons.mozilla.org/firefox/downloads/file/5198653/bitwarden_password_manager-2026.10.2.xpi' \
+            -o "$RUNNER_TEMP/bitwarden-2026.10.2.xpi"
+          printf '%s  %s\n' 'abf9d7273dd55ac0583ecc6997f7f7ae3d29de11e2ad0a4838b80e2b941daa73' "$RUNNER_TEMP/bitwarden-2026.10.2.xpi" | sha256sum -c -
+          python3 ci/smoke-byob-bitwarden-addon.py --self-test
+          echo 'Official Bitwarden XPI fetched; not redistributed as an artifact'
+      - name: Install and activate real Bitwarden in loopback-only network namespace
+        id: test
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo unshare --net -- bash -euo pipefail -c '
+            ip link set lo up
+            exec runuser -u runner -- env PATH="$1" \
+              python3 "$2/ci/smoke-byob-bitwarden-addon.py" "$2" "$3"
+          ' _ "$PATH" "$GITHUB_WORKSPACE" "$RUNNER_TEMP/bitwarden-2026.10.2.xpi"
+          report="$GITHUB_WORKSPACE/.git/vulpra-native-build/byob-bitwarden-proof.json"
+          test -s "$report"
+          jq -e '
+            .status == "pass" and
+            .extension.official_amo_version == "2026.10.2" and
+            .extension.gecko_id_matches == true and
+            .extension.xpi_sha256 == "abf9d7273dd55ac0583ecc6997f7f7ae3d29de11e2ad0a4838b80e2b941daa73" and
+            .extension.real_signed_permanent_install == true and
+            .extension.active_and_enabled == true and
+            .extension.uninstall_verified == true and
+            .byob_defaults_pre_and_post_install == true and
+            .isolated_network_without_external_egress == true and
+            .disposable_browser_profile == true and
+            .personal_vault_accessed == false and
+            .vaultwarden_endpoint_tested == false and
+            .native_rebuild == false and .security_current == false and
+            .release_ready == false
+          ' "$report" >/dev/null
+          test "$(jq -r .extension.xpi_sha256 "$report")" = \
+            "$(sha256sum "$RUNNER_TEMP/bitwarden-2026.10.2.xpi" | cut -d' ' -f1)"
+          echo 'PASS: actual official signed Bitwarden activated, BYOB defaults preserved, uninstall verified'
+          echo 'LIMIT: no Vaultwarden integration, vault login, or password fill'
+      - name: Upload bounded signed-extension acceptance report
+        id: proof
+        if: success() && steps.identity.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-byob-real-bitwarden-signed-addon-proof
+          path: .git/vulpra-native-build/byob-bitwarden-proof.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail closed on skipped browser or proof
+        if: always()
+        shell: bash
+        env:
+          ID: ${{ steps.identity.outcome }}
+          READY: ${{ steps.identity.outputs.ready }}
+          TEST: ${{ steps.test.outcome }}
+          PROOF: ${{ steps.proof.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$ID" != success || "$READY" != true || "$TEST" != success || "$PROOF" != success ]]; then
+            echo 'FAIL: real Bitwarden browser test or proof missing/failed' >&2
+            exit 1
+          fi
+          echo 'PASS: real signed-extension browser test and proof upload both ran'

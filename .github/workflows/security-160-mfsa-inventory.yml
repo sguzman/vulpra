@@ -1,0 +1,93 @@
+name: Firefox 160 Full Advisory Identifier Inventory (Source-Only)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - ci/security-160-mfsa-inventory.sh
+      - .github/workflows/security-160-mfsa-inventory.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  advisory-scope-inventory:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout read-only advisory scope extractor
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-mfsa-inventory.sh
+      - name: Checkout established bounded four-CVE source evidence
+        uses: actions/checkout@v4
+        with:
+          repository: sguzman/vulpra
+          ref: main
+          path: main-security
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json
+      - name: Exercise extractor and negative source-claim controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-mfsa-inventory.sh
+          manifest="$GITHUB_WORKSPACE/main-security/docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json"
+          sample="$RUNNER_TEMP/sample-mfsa.html"
+          cat > "$sample" <<'HTML'
+          <!doctype html><html><head><title>Security Vulnerabilities fixed in Firefox 160</title></head>
+          <body><h1>Mozilla Foundation Security Advisory 2026-125</h1>
+          <h2>CVE-2026-124853</h2><h2>CVE-2026-124854</h2>
+          <h2>CVE-2026-124856</h2><h2>CVE-2026-124902</h2>
+          <h2>CVE-2026-124852</h2><p>CVE-2026-124852 repeated</p></body></html>
+          HTML
+          bash ci/security-160-mfsa-inventory.sh --extract "$sample" "$manifest" "$RUNNER_TEMP/sample-proof.json"
+          jq -e '
+            .unique_cve_identifiers_in_html == 5 and
+            .previously_checked_source_cve_identifiers == 4 and
+            .other_advisory_cve_identifiers_without_individual_source_spotchecks == 1 and
+            .remaining_unreviewed_identifiers == ["CVE-2026-124852"] and
+            .security_current == false
+          ' "$RUNNER_TEMP/sample-proof.json" >/dev/null
+          jq '.scope.security_current=true' "$manifest" > "$RUNNER_TEMP/forged-manifest.json"
+          if bash ci/security-160-mfsa-inventory.sh --extract "$sample" "$RUNNER_TEMP/forged-manifest.json" "$RUNNER_TEMP/forged-proof.json" >/dev/null 2>&1; then
+            echo 'FAIL: accepted forged security-current manifest' >&2
+            exit 1
+          fi
+          sed '/CVE-2026-124902/d' "$sample" > "$RUNNER_TEMP/missing-cve.html"
+          if bash ci/security-160-mfsa-inventory.sh --extract "$RUNNER_TEMP/missing-cve.html" "$manifest" "$RUNNER_TEMP/absent-proof.json" >/dev/null 2>&1; then
+            echo 'FAIL: accepted advisory missing previously checked CVE' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/forged-proof.json"
+          test ! -e "$RUNNER_TEMP/absent-proof.json"
+          echo 'PASS: fixture, deduplication and both negative controls'
+      - name: Fetch official Mozilla MFSA 2026-125 and inventory CVE identifiers
+        shell: bash
+        run: |
+          set -euo pipefail
+          advisory="$RUNNER_TEMP/mozilla-mfsa-2026-125.html"
+          manifest="$GITHUB_WORKSPACE/main-security/docs/vulpra/SECURITY-160-INITIAL-PATCH-GAPS-20261110.json"
+          curl --fail --location --show-error --silent --retry 3 --max-time 90 \
+            'https://www.mozilla.org/en-US/security/advisories/mfsa2026-125/' \
+            --output "$advisory"
+          bash ci/security-160-mfsa-inventory.sh --extract \
+            "$advisory" "$manifest" "$RUNNER_TEMP/firefox160-mfsa-scope.json"
+          jq -e '
+            .kind == "firefox160_official_advisory_cve_text_inventory" and
+            .unique_cve_identifiers_in_html > 4 and
+            .previously_checked_source_cve_identifiers == 4 and
+            .other_advisory_cve_identifiers_without_individual_source_spotchecks > 0 and
+            .every_security_fix_independently_verified == false and
+            .security_current == false and .release_ready == false
+          ' "$RUNNER_TEMP/firefox160-mfsa-scope.json" >/dev/null
+          echo 'LIMIT: advisory identifier coverage only, not 160 binary or security-current verification'
+      - name: Archive source-only advisory scope manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-mfsa2026-125-advisory-identifier-scope
+          path: ${{ runner.temp }}/firefox160-mfsa-scope.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,162 @@
+name: Firefox 160.0.1 BYOB Patch Retention (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths: [.github/workflows/security-160-hotfix-patch-retention.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  official-patches:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Authenticate exact original source-only producer
+        id: identity
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:44435299158});
+            if(r.repository?.full_name!=='sguzman/vulpra' ||
+               r.head_sha!=='b6063cadea93b89d2af64053a6d23cca61de0085' ||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+               r.name!=='Firefox 160.0.1 Separate BYOB Full Source-Tree Proof (No Browser Build)' ||
+               r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Original complete Firefox 160.0.1 source run not authenticated');
+            const artifacts=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:44435299158,per_page:100});
+            const found=artifacts.filter(a=>a.name==='firefox160-0-1-byob-source-tree-proof-no-browser' &&
+              !a.expired && a.size_in_bytes>0 && new Date(a.expires_at)>new Date());
+            if(found.length!==1) throw Error('Accepted source-only artifact missing or expired');
+            core.setOutput('ready','true');
+      - name: Retrieve separately accepted BYOB full-source identity
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 44435299158
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: firefox160-0-1-byob-source-tree-proof-no-browser
+          path: ${{ runner.temp }}/proof
+      - name: Checkout exact official Firefox 160.0 patch antecedents
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: original
+          persist-credentials: false
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/media/ChannelMediaDecoder.cpp
+            gfx/gl/GLBlitHelper.cpp
+            browser/config/version.txt
+      - name: Checkout exact official Firefox 160.0.1 patch files
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 58fed86b1b6864ad71b83c910a879d6f1a6b678b
+          path: hotfix
+          persist-credentials: false
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            dom/media/ChannelMediaDecoder.cpp
+            gfx/gl/GLBlitHelper.cpp
+            browser/config/version.txt
+      - name: Authenticate BYOB tree and independently inspect preserved source fixes
+        id: test
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          old=2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          hotfix=58fed86b1b6864ad71b83c910a879d6f1a6b678b
+          candidate=d6f7faf6583831a58d127480db54b5bcd5ab5949
+          test "$(git -C original rev-parse HEAD)" = "$old"
+          test "$(git -C hotfix rev-parse HEAD)" = "$hotfix"
+          report="$RUNNER_TEMP/proof/firefox160-0-1-byob-tree/hotfix-candidate-tree-proof.json"
+          changes="$RUNNER_TEMP/proof/firefox160-0-1-byob-tree/changed-against-official-hotfix.tsv"
+          test -s "$report" && test -s "$changes"
+          jq -e --arg old "$old" --arg hotfix "$hotfix" --arg tree "$candidate" '
+            .schema_version==1 and
+            .kind=="firefox160_0_1_full_source_with_exact_original_byob_overlay" and
+            .original_release_commit==$old and
+            .hotfix_release_commit==$hotfix and .candidate_git_tree==$tree and
+            .source_overlay_count==28 and .modified_upstream_paths==26 and
+            .vulpra_only_source_additions==2 and .removed_upstream_paths==0 and
+            .all_overlay_upstream_bases_unchanged_since_160_0==true and
+            .all_other_mozilla_hotfix_source_paths_preserved==true and
+            .candidate_git_tree_assembled_without_checkout==true and
+            .byob_branding_blob=="ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e" and
+            .native_browser_compiled==false and .real_browser_runtime_verified==false and
+            .provider_backed_safebrowsing_verified==false and
+            .security_current==false and .release_ready==false
+          ' "$report" >/dev/null
+          test "$(wc -l < "$changes")" -eq 28
+          test "$(awk -F '\t' '$1=="M"{n++}END{print n+0}' "$changes")" -eq 26
+          test "$(awk -F '\t' '$1=="A"{n++}END{print n+0}' "$changes")" -eq 2
+          test "$(awk -F '\t' '$1!="M"&&$1!="A"{n++}END{print n+0}' "$changes")" -eq 0
+          for record in \
+            'dom/media/ChannelMediaDecoder.cpp 01d2de6bcd67f1549cb56fc4665d5521f03ad304 d688d7ec968395490c84c308eb0ddc241a7ba2ea' \
+            'gfx/gl/GLBlitHelper.cpp db296751dfa72868771cf2064558d8623fe47674 0fb43a1429ef359313ebae7873ac3b2cd20fea64' \
+            'browser/config/version.txt 068a3c2d4f016d3866ea4532960424bf2943c12a 9aab5b81294c1aeb29b4b926c76bb1e52c617cd6'; do
+            read -r path base_blob hotfix_blob <<< "$record"
+            test "$(git hash-object "original/$path")" = "$base_blob"
+            test "$(git hash-object "hotfix/$path")" = "$hotfix_blob"
+            test "$(git -C original rev-parse "HEAD:$path")" = "$base_blob"
+            test "$(git -C hotfix rev-parse "HEAD:$path")" = "$hotfix_blob"
+            test "$base_blob" != "$hotfix_blob"
+            if grep -Fq $'\t'"$path" "$changes"; then
+              echo "FAIL: Vulpra overlay overrides official hotfix patch: $path" >&2
+              exit 1
+            fi
+          done
+          test "$(cat original/browser/config/version.txt)" = 160.0
+          test "$(cat hotfix/browser/config/version.txt)" = 160.0.1
+          jq -n --arg old "$old" --arg hotfix "$hotfix" --arg tree "$candidate" '{
+            schema_version:1,status:"pass",
+            original_commit:$old,hotfix_commit:$hotfix,
+            byob_candidate_tree:$tree,
+            official_media_patch_blob_preserved:true,
+            official_linux_graphics_patch_blob_preserved:true,
+            official_160_0_1_version_source_preserved:true,
+            official_source_retention_independently_checked:true,
+            native_browser_compiled:false,
+            actual_fix_runtime_verified:false,
+            provider_backed_safebrowsing_verified:false,
+            security_current:false,release_ready:false
+          }' > "$RUNNER_TEMP/source-retention.json"
+          echo 'PASS: official media, Wayland graphics and version source retained in authenticated BYOB tree'
+          echo 'LIMIT: source identity only; no compiled CVE/graphics/runtime/release approval'
+      - name: Archive bounded source-only proof
+        id: proof
+        if: success() && steps.identity.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-0-1-byob-media-wayland-source-retention-not-runtime
+          path: ${{ runner.temp }}/source-retention.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail closed if any authentication, native-source check or upload was skipped
+        if: always()
+        shell: bash
+        env:
+          AUTH: ${{ steps.identity.outcome }}
+          READY: ${{ steps.identity.outputs.ready }}
+          TEST: ${{ steps.test.outcome }}
+          PROOF: ${{ steps.proof.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$AUTH" != success || "$READY" != true || "$TEST" != success || "$PROOF" != success ]]; then
+            echo 'FAIL: exact-source hotfix retention not independently accepted' >&2
+            exit 1
+          fi
+          echo 'PASS: Firefox160.0.1 BYOB source hotfix retention; release still BLOCKED'

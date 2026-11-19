@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "kind": "firefox160_three_public_security_bug_landings_source_crosswalk",
+  "upstream_repository": "mozilla-firefox/firefox",
+  "upstream_release": "2887d9de1f69c0e9776413da80e7ba0d1225dd9b",
+  "candidate_git_tree": "42dd7439a27dde92f89ac5eed13f88117a4d7ab5",
+  "original_native_run": 43138458940,
+  "selected_cve_count": 3,
+  "selected_commit_file_records": 11,
+  "selected_unique_paths": 11,
+  "landings": [
+    {
+      "cve": "CVE-2026-124874",
+      "mozilla_bug": 2080420,
+      "upstream_commit": "1bedf724b441ee7e15979c206b3e143676c9f14f",
+      "commit_title": "Bug 2080420 - Tighten matching of early hint preloads to their consumers r=necko-reviewers,jesup",
+      "changed_paths": [
+        "netwerk/protocol/http/EarlyHintPreloader.cpp",
+        "netwerk/protocol/http/EarlyHintPreloader.h",
+        "netwerk/protocol/http/EarlyHintRegistrar.cpp",
+        "netwerk/protocol/http/EarlyHintRegistrar.h",
+        "netwerk/protocol/http/HttpChannelParent.cpp"
+      ]
+    },
+    {
+      "cve": "CVE-2026-124905",
+      "mozilla_bug": 2086254,
+      "upstream_commit": "a274700a0da7cbe35f81703b8b81610ee5ebfcfc",
+      "commit_title": "Bug 2086254 - Set cancel content JS Epoch only when BrowserChild exists r=dom-core-reviewers,smaug",
+      "changed_paths": [
+        "docshell/base/nsDocShell.cpp"
+      ]
+    },
+    {
+      "cve": "CVE-2026-124872",
+      "mozilla_bug": 2079689,
+      "upstream_commit": "55de37c0d3f09e5ac57be77b71674da9b83d2086",
+      "commit_title": "Bug 2079689 - Ensure WeakRef targets are added to the CC graph r=mccr8,spidermonkey-reviewers,sfink",
+      "changed_paths": [
+        "js/public/friend/CycleCollector.h",
+        "js/src/gc/FinalizationObservers.cpp",
+        "js/src/gc/FinalizationObservers.h",
+        "js/src/gc/GCRuntime.h",
+        "xpcom/base/CycleCollectedJSRuntime.cpp"
+      ]
+    }
+  ],
+  "limits": {
+    "public_bug_commit_search_not_exhaustive": true,
+    "full_fix_commit_set_unverified": true,
+    "changed_path_identity_only": true,
+    "divergence_does_not_mean_fix_absent": true,
+    "all_selected_cve_fixes_verified": false,
+    "full_mfsa_reviewed": false,
+    "security_current": false,
+    "release_ready": false
+  }
+}

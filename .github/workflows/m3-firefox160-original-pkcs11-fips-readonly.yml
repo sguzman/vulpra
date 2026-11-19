@@ -1,0 +1,196 @@
+name: M3 Firefox 160 Original NSS PKCS11 SHA256 FIPS Readonly Probe
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-original-pkcs11-fips-readonly.yml
+      - ci/m3-firefox160-original-pkcs11-fips-readonly-probe.c
+      - ci/m3-firefox160-original-pkcs11-fips-readonly-replay.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-nss-pkcs11-readonly:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Authenticate original preserved Firefox160 package producer
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const id=43724886827;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+            if(r.repository?.full_name!=='sguzman/vulpra'||
+               r.head_branch!=='upgrade/firefox-160-overlay-prototype'||
+               r.head_sha!=='54728803f058c3edf54d2e8d3f6e0a7d2af0aec6'||
+               r.name!=='Firefox 160 Verified Native Archive Preservation (No Build)'||
+               r.status!=='completed'||r.conclusion!=='success')
+              throw Error('Original native Firefox160 archive producer not authentic');
+            const list=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:id,per_page:100});
+            for(const name of ['firefox160-vulpra-preserved-native-preview-not-approved',
+                               'firefox160-vulpra-preserved-complete-git-tree-candidate']){
+              if(list.filter(a=>a.name===name&&!a.expired&&a.size_in_bytes>0 &&
+                   new Date(a.expires_at)>new Date()).length!==1)
+                throw Error('Original source/archive evidence absent or expired: '+name);
+            }
+      - name: Checkout narrow native NSS probe and evidence harness
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/m3-deny-optional-native-providers.c
+            ci/m3-firefox160-original-pkcs11-fips-readonly-probe.c
+            ci/m3-firefox160-original-pkcs11-fips-readonly-replay.sh
+      - name: Checkout exact original Firefox160 NSS PKCS11 and FreeBL source
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: upstream-exact-original
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            security/nss/lib/pk11wrap/pk11load.c
+            security/nss/lib/softoken/manifest.mn
+            security/nss/lib/freebl/loader.c
+            security/nss/lib/freebl/genload.c
+            security/nss/lib/freebl/blname.c
+            security/nss/lib/freebl/manifest.mn
+            security/nss/lib/pk11wrap/pk11slot.c
+            security/nss/lib/pk11wrap/pk11util.c
+            security/nss/lib/pk11wrap/pk11pub.h
+            security/nss/lib/util/pkcs11t.h
+      - name: Verify ten original Mozilla NSS source Git blobs and read-only PKCS11 callsite
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          root=upstream-exact-original
+          test "$(git -C "$root" rev-parse HEAD)" = \
+            '2887d9de1f69c0e9776413da80e7ba0d1225dd9b'
+          : > "$RUNNER_TEMP/original-source-paths.txt"
+          while read -r sha path; do
+            test "$(git -C "$root" rev-parse "HEAD:$path")" = "$sha"
+            test "$(git -C "$root" hash-object -- "$path")" = "$sha"
+            echo "$path" >> "$RUNNER_TEMP/original-source-paths.txt"
+          done <<'SOURCES'
+          3fb57828311d699b14d26eb213d6029dd11d66dd security/nss/lib/pk11wrap/pk11load.c
+          43ebfd8a6113a5141f4d09ecef73070b78b261a1 security/nss/lib/softoken/manifest.mn
+          bb8fe3a7f9cf16a14154f5eb5b5c1ea376c7c093 security/nss/lib/freebl/loader.c
+          e3231e3e527f463b47148b74cb3d7b39ab31456a security/nss/lib/freebl/genload.c
+          4bad74ada087feb407a03f811b8e52d0856bb163 security/nss/lib/freebl/blname.c
+          39633d5b46d331f8e7987250c74a29251633461d security/nss/lib/freebl/manifest.mn
+          67e7d2300df300b98f5c4e09a2b4bfe72e4f5a4f security/nss/lib/pk11wrap/pk11slot.c
+          677692b13253075e93e2dc49185f58e0e4c3fa87 security/nss/lib/pk11wrap/pk11util.c
+          e5403084f40da86e78cf00bf793a03e691cff156 security/nss/lib/pk11wrap/pk11pub.h
+          6c0686180398edaebf15a2f30a82ad91870a5c54 security/nss/lib/util/pkcs11t.h
+          SOURCES
+          test "$(wc -l < "$RUNNER_TEMP/original-source-paths.txt")" -eq 10
+          grep -Fq 'PK11_GetInternalSlot(void)' "$root/security/nss/lib/pk11wrap/pk11slot.c"
+          grep -Fq 'PK11_GetInternalKeySlot(void)' "$root/security/nss/lib/pk11wrap/pk11slot.c"
+          grep -Fq 'PK11_DoesMechanism(PK11SlotInfo *slot, CK_MECHANISM_TYPE type)' "$root/security/nss/lib/pk11wrap/pk11slot.c"
+          grep -Fq 'PK11_IsPresent(PK11SlotInfo *slot)' "$root/security/nss/lib/pk11wrap/pk11slot.c"
+          grep -Fq 'PK11_IsFIPS(void)' "$root/security/nss/lib/pk11wrap/pk11util.c"
+          grep -Fq 'return mod->isFIPS;' "$root/security/nss/lib/pk11wrap/pk11util.c"
+          grep -Fq 'return NSS_GetSystemFIPSEnabled();' "$root/security/nss/lib/pk11wrap/pk11util.c"
+          grep -Fq 'PK11_FreeSlot(PK11SlotInfo *slot);' "$root/security/nss/lib/pk11wrap/pk11pub.h"
+          grep -Fq '#define CKM_SHA256 0x00000250UL' "$root/security/nss/lib/util/pkcs11t.h"
+          echo 'PASS: exact original 10 NSS loader, PKCS11/FIPS read-only and mechanism Git blobs' >> "$GITHUB_STEP_SUMMARY"
+      - name: Download byte-pinned original compiled browser archive
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/original
+      - name: Download exact original 28 Vulpra overlay path ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-complete-git-tree-candidate
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/ledger
+      - name: Verify source/non-overlap and original native NSS package bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .firefox160_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .assembled_git_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .source_files_modified==26 and .vulpra_source_files_added==2 and
+            .upstream_files_deleted==0 and
+            .all_other_upstream_files_preserved==true
+          ' "$RUNNER_TEMP/ledger/candidate-tree-report.json" >/dev/null
+          overlay="$RUNNER_TEMP/ledger/overlay-paths.txt"
+          test -s "$overlay"
+          test "$(wc -l < "$overlay")" -eq 28
+          if grep -Fx -f "$RUNNER_TEMP/original-source-paths.txt" "$overlay"; then
+            echo 'FAIL: exact original NSS source overlaid by Vulpra' >&2; exit 1
+          fi
+          archive="$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz"
+          (cd "$RUNNER_TEMP/original" && sha256sum -c "$(basename "$archive").sha256")
+          test "$(sha256sum "$archive" | cut -d' ' -f1)" = \
+            '530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb'
+          mkdir -p "$RUNNER_TEMP/real-original-native"
+          tar -xf "$archive" -C "$RUNNER_TEMP/real-original-native"
+          find "$RUNNER_TEMP/real-original-native" -type f -name libnss3.so -print > \
+            "$RUNNER_TEMP/nss-original.txt"
+          test "$(wc -l < "$RUNNER_TEMP/nss-original.txt")" -eq 1
+          path="$(cat "$RUNNER_TEMP/nss-original.txt")"
+          for n in libnss3.so libsoftokn3.so libfreeblpriv3.so libnspr4.so; do
+            test -s "$(dirname "$path")/$n"
+          done
+          echo "NSS_ORIGINAL_PATH=$path" >> "$GITHUB_ENV"
+          echo 'PASS: all original NSS PKCS11 source paths unmodified and exact compiled NSS binaries preserved' >> "$GITHUB_STEP_SUMMARY"
+      - name: Compile read-only original native PKCS11/FIPS observer and scoped denial shim
+        shell: bash
+        run: |
+          set -euo pipefail
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            ci/m3-firefox160-original-pkcs11-fips-readonly-probe.c \
+            -o "$RUNNER_TEMP/vulpra_pkcs11_readonly" -ldl
+          cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared \
+            ci/m3-deny-optional-native-providers.c \
+            -o "$RUNNER_TEMP/native-nss-deny.so" -ldl
+          bash -n ci/m3-firefox160-original-pkcs11-fips-readonly-replay.sh
+      - name: Observe actual original PKCS11 slots and FIPS status read-only in four native modes
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          bash ci/m3-firefox160-original-pkcs11-fips-readonly-replay.sh \
+            "$NSS_ORIGINAL_PATH" "$RUNNER_TEMP/native-nss-deny.so" \
+            "$RUNNER_TEMP/vulpra_pkcs11_readonly" \
+            "$RUNNER_TEMP/original-pkcs11-readonly-report.json"
+          jq -e --arg commit "$GITHUB_SHA" '
+            .schema_version==1 and .probe_harness_commit==$commit and
+            .baseline_real_original_PKCS11_available==true and
+            .original_packaged_NSS_PKCS11_readonly_operations_executed==true and
+            .all_original_NSS_PKCS11_probes_completed_without_crash==true and
+            .softoken_missing_actual_loads_observed==true and
+            .freebl_missing_actual_loads_observed==true and
+            .combined_target_softoken_failure_prevents_freebl_attempt==true and
+            .no_FIPS_mode_change_or_system_crypto_config_mutation==true and
+            .full_Rust_CXX_FFI_dlopen_dlsym_graph_closed==false and
+            .source_pruning_authorized==false and .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/original-pkcs11-readonly-report.json" >/dev/null
+          jq -r '"AUDIT: original native PKCS11 SHA256 supported="+
+            ([.modes[]|select(.mode=="baseline")|.SHA256_PKCS11_mechanism_available][0]|tostring)+
+            " FIPS mode="+(.original_module_FIPS_mode_readonly|tostring)+
+            " system FIPS="+(.runner_system_FIPS_mode_readonly|tostring)' \
+            "$RUNNER_TEMP/original-pkcs11-readonly-report.json" >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: FIPS status READ ONLY; no FIPS enablement, certification, private key/PIN tests, or complete native FFI proof' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive sanitized original NSS PKCS11 readonly status and actual load denials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-original-native-pkcs11-sha256-fips-readonly-not-certified
+          path: ${{ runner.temp }}/original-pkcs11-readonly-report.json
+          if-no-files-found: warn
+          retention-days: 30

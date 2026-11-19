@@ -58,6 +58,22 @@ static bool group_matches(const char *group, const char *name) {
   if (!strcmp(group, "gbm")) return gbm;
   if (!strcmp(group, "vaapi")) return va;
   if (!strcmp(group, "ffmpeg")) return ff;
+  // Opt-in double-provider failure only: both packaged FFVPX native names
+  // and system FFmpeg libavcodec candidates. Preserve single-group semantics.
+  if (!strcmp(group, "ffvpx_ffmpeg"))
+    return ff || !strcmp(base, "libmozavcodec.so") ||
+           !strcmp(base, "libmozavutil.so");
+  // Original Firefox160 NSS internal PKCS#11 / FreeBL native providers.
+  // These groups are opt-in only and are never part of media denial modes.
+  bool softoken = !strcmp(base, "libsoftokn3.so");
+  bool freebl = !strcmp(base, "libfreeblpriv3.so");
+  if (!strcmp(group, "nss_softoken")) return softoken;
+  if (!strcmp(group, "nss_freebl")) return freebl;
+  if (!strcmp(group, "nss_both")) return softoken || freebl;
+  // Bundled FFVPX is distinct from host FFmpeg. Target only its two
+  // actual packaged native SONAMEs, never generic libavcodec libraries.
+  if (!strcmp(group, "ffvpx"))
+    return !strcmp(base, "libmozavcodec.so") || !strcmp(base, "libmozavutil.so");
   return false;
 }
 

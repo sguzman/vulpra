@@ -1,0 +1,190 @@
+# Compare every authenticated Firefox 160 ELF's direct DT_NEEDED declarations
+# against glibc interpreter --list metadata, without executing application main.
+name: M3 Firefox 160 All-ELF Glibc Loader Resolution (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/m3-firefox160-native-elf-loader-list.yml
+      - ci/security-160-native-elf-loader-list.rs
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  all-native-elf-list-only:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - name: Authenticate original native Firefox160 build, 90-day source archive and current direct-ELF census
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            for(const [id,sha,workflow] of [
+              [43138458940,'0624235fdc956ab18af3c3f310b3588ca72fff61',
+                'Firefox 160 Vulpra Exact-Source Native Build & Runtime Candidate'],
+              [43724886827,'54728803f058c3edf54d2e8d3f6e0a7d2af0aec6',
+                'Firefox 160 Verified Native Archive Preservation (No Build)'],
+              [43730900702,'fd4dee8a9999c303ff35e45fbcd619abe230d30e',
+                'M3 Firefox 160 Exact-Source Native ELF Package Graph (No Build)']]){
+              const {data:run}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:id});
+              if(run.repository?.full_name!=='sguzman/vulpra' ||
+                 run.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                 run.head_sha!==sha || run.name!==workflow ||
+                 run.status!=='completed' || run.conclusion!=='success')
+                throw Error('Native/source/dependency provenance is not authenticated: '+id);
+            }
+            for(const [runId,name] of [
+              [43724886827,'firefox160-vulpra-preserved-native-preview-not-approved'],
+              [43724886827,'firefox160-vulpra-preserved-materialized-source-proof'],
+              [43730900702,'firefox160-source-matched-native-elf-package-graph-not-m3-closure']]){
+              const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+                {owner,repo,run_id:runId,per_page:100});
+              if(a.filter(x=>x.name===name&&!x.expired&&x.size_in_bytes>0&&
+                new Date(x.expires_at)>new Date()).length!==1)
+                throw Error('Missing exact pinned artifact '+name);
+            }
+      - name: Checkout only the std-only source-authenticated ELF loader observer
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-native-elf-loader-list.rs
+      - name: Build small Rust metadata observer and reject forged linker output
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          rustc --version
+          rustc --edition=2021 --test ci/security-160-native-elf-loader-list.rs \
+            -o "$RUNNER_TEMP/native-elf-loader-unit"
+          "$RUNNER_TEMP/native-elf-loader-unit"
+          rustc --edition=2021 -O ci/security-160-native-elf-loader-list.rs \
+            -o "$RUNNER_TEMP/native-elf-loader"
+      - name: Retrieve original preserved source/package and independently checked ELF census
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-native-preview-not-approved
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/native
+      - name: Retrieve original full-source identity
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-vulpra-preserved-materialized-source-proof
+          repository: sguzman/vulpra
+          run-id: 43724886827
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source
+      - name: Retrieve independent package ELF census for per-file crosscheck
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox160-source-matched-native-elf-package-graph-not-m3-closure
+          repository: sguzman/vulpra
+          run-id: 43730900702
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/graph
+      - name: Install bounded glibc metadata dependencies on disposable GitHub runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          case "$RUNNER_OS:$ImageOS" in
+            Linux:ubuntu22) gtk=libgtk-3-0; alsa=libasound2 ;;
+            Linux:ubuntu24) gtk=libgtk-3-0t64; alsa=libasound2t64 ;;
+            *) echo 'Unsupported GitHub CI userspace' >&2; exit 1 ;;
+          esac
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends binutils jq coreutils iproute2 libstdc++6 libgomp1 \
+            "$gtk" libdbus-glib-1-2 "$alsa" libnss3 libgbm1 libegl1
+          test -x /lib64/ld-linux-x86-64.so.2
+      - name: Verify exact Firefox160 candidate source and original tar checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true
+          ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
+          (cd "$RUNNER_TEMP/native" && sha256sum -c vulpra-firefox160-native-ci.tar.xz.sha256)
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz"
+          digest="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          jq -e --arg sha "$digest" '
+            .schema_version==1 and .archive_sha256==$sha and
+            .firefox160_upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .firefox160_candidate_git_tree=="42dd7439a27dde92f89ac5eed13f88117a4d7ab5" and
+            .native_browser_producer_run==43138458940 and
+            .exact_source_archive_mirror_run==43724886827 and
+            .direct_needed_edges==268 and (.elf_members|length)==28 and
+            .all_native_binary_execution_avoided==true and
+            .dlopen_and_indirect_runtime_dependencies_complete==false and
+            .complete_host_loader_closure_proven==false and
+            .complete_native_ffi_dependency_map_proven==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json" >/dev/null
+          mkdir -p "$RUNNER_TEMP/extracted"
+          tar -xf "$archive" -C "$RUNNER_TEMP/extracted"
+          test -s "$RUNNER_TEMP/extracted/vulpra/libxul.so"
+          test -x "$RUNNER_TEMP/extracted/vulpra/vulpra-bin"
+      - name: Verify each of 268 Firefox160 direct deps in glibc --list, no browser launch
+        shell: bash
+        timeout-minutes: 7
+        run: |
+          set -euo pipefail
+          mkdir -m 0700 "$RUNNER_TEMP/metadata-private-home"
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz"
+          digest="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          sudo unshare --net -- env \
+            HOME="$RUNNER_TEMP/metadata-private-home" \
+            MOZ_DISABLE_NONLOCAL_CONNECTIONS=1 \
+            "$RUNNER_TEMP/native-elf-loader" \
+            "$RUNNER_TEMP/extracted/vulpra" "$digest" \
+            "$RUNNER_TEMP/firefox160-loader-list-${{ matrix.os }}.json"
+          test ! -e "$RUNNER_TEMP/metadata-private-home/.mozilla"
+          jq -e --arg digest "$digest" --slurpfile sources "$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json" '
+            . as $r | $sources[0] as $g |
+            .schema_version==1 and
+            .status=="source_pinned_firefox160_all_28_elf_loader_list_resolution" and
+            .firefox160_source_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .firefox160_archive_sha256==$digest and
+            .firefox160_elf_members_listed==28 and
+            (.firefox160_elf_basenames|length)==28 and
+            .declared_direct_needed_edges==268 and
+            .direct_needed_sonames_present_in_loader_lists==268 and
+            .loader_listed_provider_name_occurrences>=268 and
+            (.per_firefox160_elf|keys)==($g.elf_members|map(.name)|sort) and
+            all($g.elf_members[];
+              . as $m |
+              ($r.per_firefox160_elf[$m.name].declared_direct_needed_names|sort)==($m.needed|sort) and
+              $r.per_firefox160_elf[$m.name].declared_direct_needed_count==($m.needed|length)
+            ) and
+            .glibc_linker_list_metadata_only==true and
+            .application_main_executed==false and .no_network_egress==true and
+            .actual_genuine_feature_workflows_proven==false and
+            .complete_lazy_or_future_dlopen_map_proven==false and
+            .arch_hyprland_runtime_tested==false and
+            .raw_loader_paths_or_pids_exported==false and
+            .source_pruning_authorized==false and
+            .security_current==false and .release_ready==false and
+            .m3_sixth_gate_closed==false
+          ' "$RUNNER_TEMP/firefox160-loader-list-${{ matrix.os }}.json" >/dev/null
+          echo 'PASS: 28/28 actual Firefox160 ELF loader maps contain all 268/268 direct dependencies.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: read-only glibc --list; does NOT execute native entrypoints or prove conditional dlopen, FFI or target workstation ABI.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded per-ELF loader basenames and provenance only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-28-elf-loader-list-${{ matrix.os }}-not-m3-gate
+          path: ${{ runner.temp }}/firefox160-loader-list-${{ matrix.os }}.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -54,3 +54,16 @@ The `upstream-base` branch contains the original release source snapshot with Mo
 Project color: <img src="docs/vulpra/swatch.svg" alt="Vulpra lilac swatch" width="26" height="15"> `oklch(72% 0.13 308)`.
 
 **License:** Firefox-derived files retain their upstream licensing, notices and third-party license obligations. Vulpra-specific files have their own explicit licensing as applicable. The initial template MIT license must not be treated as relicensing the Firefox code. See [license and provenance notes](docs/vulpra/UPSTREAM.md).
+
+
+## Local development and Firefox 160.0.1 upgrade limitations
+
+**Do not use placeholder `--old-source /path/to/...` and `--hotfix-source /path/to/...` commands as if they were a ready local build.** The previous instructions incorrectly implied that the developer already had both official Mozilla checkouts. Their paths and presence on the target machine have **not** been established.
+
+Vulpra already has a real Nix/nom-based local development toolchain on the repository's `main` branch: [`nix/vulpra`](https://github.com/sguzman/vulpra/blob/main/nix/vulpra), [`nix/flake.nix`](https://github.com/sguzman/vulpra/blob/main/nix/flake.nix), [`nix/README.md`](https://github.com/sguzman/vulpra/blob/main/nix/README.md). From the existing local Vulpra root (typically `~/Code/Apps/vulpra`), `./nix/vulpra doctor` and `./nix/vulpra build` operate on **the currently checked-out native Vulpra source**. They do not compile the new Firefox 160.0.1 candidate if the local checkout remains on the older `main` source, and this upgrade branch does not yet include the `nix/` tooling. Do **not** casually switch branches or overwrite existing build outputs expecting the two trees to be interchangeable.
+
+The Firefox 160.0.1 BYOB candidate currently exists as an **authenticated CI-produced source overlay**, not a full locally checkable-out source branch. [`scripts/build-firefox160-local.sh`](scripts/build-firefox160-local.sh) is an **experimental, unfinished manual helper** requiring pre-existing clean official Firefox 160.0 and 160.0.1 Git trees. It does not provision those sources or the Nix development environment. It is **not** a complete or user-ready local-build interface, and its existence should not be reported as closing local build acceptance.
+
+A production-quality local build entry point must: reuse the existing `main` Nix developer shell/cache, determine whether the required Mozilla source already exists, request authorization before any necessary one-time source download, materialize the authenticated 28-file overlay into an independent working tree, and then invoke incremental local `mach` builds. Do not fetch a CI binary in place of building source, claim zero network use when upstream source is missing, or modify Firefox Developer Edition's installed binary/profile.
+
+The **compiled and CI-runtime-tested** Firefox 160.0.1 browser is separately available as an unreleased GitHub Actions artifact, but acquiring that precompiled binary is optional and does **not** constitute local compilation. Google Safe Browsing remains deferred for limited personal dogfooding; ordinary security protections must not be disabled.

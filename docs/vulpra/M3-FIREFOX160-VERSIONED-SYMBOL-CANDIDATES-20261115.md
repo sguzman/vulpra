@@ -1,0 +1,46 @@
+# Firefox 160: source-pinned native GNU versioned symbol import candidates on three CI userspaces (2026-11-15)
+
+## Accepted native ELF metadata evidence, not real relocation approval
+
+The actual, already-compiled **Firefox160 Vulpra native package** was inspected using the existing bounded original ELF GNU version-indexed symbol candidate scanner, extended for a paired source+archive SHA256 override that only accepts the authenticated Firefox160 source. No native Firefox build, native browser runtime, dynamic ELF loading, user workstation change, source pruning or release occurred.
+
+**Exact provenance:** Original native build [43138458940](https://github.com/sguzman/vulpra/actions/runs/43138458940); byte-identical SHA sidecar + package preserved by [43724886827](https://github.com/sguzman/vulpra/actions/runs/43724886827); official Firefox160 source commit `2887d9de1f69c0e9776413da80e7ba0d1225dd9b`, assembled Vulpra 28-overlay Git tree `42dd7439a27dde92f89ac5eed13f88117a4d7ab5`; native tar.xz SHA-256 `530b79584801c3632a583d4ebca7e4f5158870133f88dae647d5be7b7def97eb`. Independent [28 ELF / 268 direct DT_NEEDED census 43730900702 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/43730900702) and [521 GNU VERNEED version-name contracts on three CI userspaces](M3-FIREFOX160-GNU-VERSION-NAME-CROSSWALK-20261115.md) were authenticated before running the finer scanner.
+
+### Actual individual versioned imported symbol checks
+
+| Authenticated read-only native symbol evidence | Accepted result |
+| --- | --- |
+| [Ubuntu22 and Ubuntu24 metadata run 43733957707 — BOTH SUCCESS](https://github.com/sguzman/vulpra/actions/runs/43733957707) | 28 native source-matched ELF requesters, 4,592 version-indexed undefined imported symbol instances, zero missing/unknown metadata candidate names |
+| [Disposable Arch Linux userspace 43734169158 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/43734169158) | Same 4,592 imported symbol instances and candidate-class totals, zero missing/unknown metadata candidates |
+| [Independent three-userspace exact symbol-record reconciliation 43734732034 — SUCCESS](https://github.com/sguzman/vulpra/actions/runs/43734732034) | **4,592 identical** full requester/provider/symbol/version/binding-kind/candidate-class records on all three CI userspaces; every one of 521 independent per-ELF/provider/version requirement triples represented; **14 deliberately falsified source/ABI/role claims rejected** |
+
+| Firefox160 real packaged native ELF static candidate outcome | Count |
+| --- | ---: |
+| **Total GNU-indexed versioned undefined dynamic symbol imports** | **4,592** |
+| Exact imported **symbol name + GNU version** present in declared SONAME candidate export names | **3,989** |
+| Exact name+version in modern `libc.so.6` metadata after glibc consolidation, instead of declared legacy provider candidate | **603** |
+| No available candidate export library | **0** |
+| Versioned import candidate with no name+version match | **0** |
+| Actual packaged native ELF requester basenames examined | **28** |
+| Distinct provider library basenames for these imported symbols | **17** |
+
+Of the **603** legacy-glibc compatibility candidates, **535** have declared `libpthread.so.0` as the provider, **60** `libdl.so.2`, **7** `librt.so.1` and **1** `libresolv.so.2`. These match modern `libc.so.6` exported **name+version** metadata, not merely a matching version label. All three CI userspace reports produced the same 3,989/603 classifications, yet this does not prove that the actual loader will resolve them through `libc` at execution. The actual ELF symbol list includes **47 WEAK** imports; a name+version candidate does not convert an optional weak binding into a guaranteed real relocation.
+
+**Historical compiled original comparison:** The [Firefox159-era original ELF symbol candidate audit](M3-NATIVE-ELF-VERSIONED-SYMBOL-CANDIDATES-20261031.md) reported **4,611** versioned import instances (**4,008** declared candidate / **603** glibc consolidation). This Firefox160 package has **4,592** (**3,989/603**) — an **aggregate difference of -19 imported symbol instances**. It does **not** establish which source functions, features, symbols or linker placements changed without an exact cross-revision per-import diff on the original source-pinned artifacts; no source pruning or size savings inferred. Separately, GNU required version-name *tuples* rose from historical **519** to Firefox160 **521**, which does not conflict with a lower number of individual versioned imports: multiple imports share a version-name requirement.
+
+### Why the independent checks matter
+
+The [existing bounded ELF parser](../../ci/m3-native-elf-symbol-provider-candidates.py) checks each imported symbol's GNU dynamic-symbol **version index** against the same ELF's `VERNEED` index-to-**declared SONAME provider + GNU version** map. The actual `name@version` is then compared with exports in the original packaged library or in the Ubuntu/Arch host **`ldconfig` metadata candidate**, with a special literal same-name+version fallback to modern glibc libc for former `libpthread`, `libdl`, `librt`, `libresolv` names. The symbol inspector and its existing [VERNEED source scanner](../../ci/m3-native-elf-version-contract.py) retain their historical pinned-original default and require an explicit paired Firefox160 release source and native SHA256 for the opt-in new case. They report the actual userspace rather than mislabeling all results Ubuntu24. All browser package members are bounded, ELF64/x86-64, original SHA-authenticated and inspected by `readelf` without executing or loading native code.
+
+The independent [strict jq comparison](../../ci/m3-firefox160-three-userland-versioned-symbol-crosswalk.jq) authenticates all four input workflow runs, exact Firefox160 archive/source tree, real **521** GNU named-provider requirements, and each of the **4,592** exact native undefined symbol records and class labels across Ubuntu22, Ubuntu24 and Arch. It proves that **all 521 distinct requester/provider/version need triples exactly equal the union deduplicated from the 4,592 versioned imports**. The first attempt [43734567205 FAILED](https://github.com/sguzman/vulpra/actions/runs/43734567205) was a *verifier logic issue*, not a native ELF or candidate-name failure: `jq index()` searched for a subsequence of arrays rather than a nested array-element identity. The original artifacts were inspected directly; all 521 requirement triples matched. The verifier was replaced with a true **sorted/unique exact-set comparison**, without weakening the assertions, and [43734732034 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/43734732034) rejected **14 forged** source/archive/symbol/class/host/binding/safety witnesses.
+
+### Remaining native dependency and security limits
+
+**Candidate exported names are not actual dynamic loader symbol bindings.** This scan does not execute ELF application mains, `ldd`, a normal browser, or load untrusted plugins. It does not prove actual relocation resolution, load order or symbol interposition, C++ ABI/type/size semantics, weak binding behavior, undefined **unversioned** symbol availability, all transitive imports, optional `dlopen`/`dlsym` provider activation, fallbacks, Cargo/Rust static archives or C++/Rust FFI ownership, or all protected browser features. The host candidate lookup uses `ldconfig` library name hints, which do **not** establish the actual runtime-selected provider. The Arch run is **Arch userspace within Docker on a GitHub-hosted Ubuntu kernel**, not the target EndeavourOS/Hyprland host kernel, dual-GPU/Wayland or installed local ABI.
+
+The evidence does not establish Firefox160 CVE/MFSA security-current status, configured Safe Browsing provider [#8](https://github.com/sguzman/vulpra/issues/8), all-role isolation/target security issue [#9](https://github.com/sguzman/vulpra/issues/9), source-pruning safety, release readiness or merge approval. [Draft PR #6](https://github.com/sguzman/vulpra/pull/6) remains **draft/unmerged**. This advances the **still-open** M3 sixth dependency-map gate without closing it: **M3 83% (5/6), Vulpra overall 61% (delta +0 percentage points)**. Nothing changed on the actual workstation or its Firefox/profile.
+
+
+## Complementary bare / unversioned import audit (2026-11-15)
+
+The original Firefox160 native package also has **2,154 bare undefined dynamic imports**. Ubuntu 22.04, Ubuntu 24.04 and isolated Arch userspace successfully inspected the exact 28 ELF members; an independent crosswalk verified identical requester/name/bind tuples and exactly two weak `crashreporter`/`pidfd_*` candidate differences. See [the full unversioned symbol crosswalk](M3-FIREFOX160-UNVERSIONED-SYMBOL-CROSSWALK-20261115.md) and [independent passing CI](https://github.com/sguzman/vulpra/actions/runs/43740754186). This adds static export-name candidate evidence **only**, not loader-selected relocations or M3 closure. Overall 61% (Δ +0 pp), M3 83% (5/6).

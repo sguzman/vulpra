@@ -185,7 +185,23 @@ def package_versions(archive_path):
     return members
 
 
+def recorded_userspace():
+    """Report only the inspected known Linux userspace, not a claimed host kernel."""
+    fields = {}
+    for line in Path("/etc/os-release").read_text(encoding="utf-8").splitlines():
+        if line.startswith(("ID=", "VERSION_ID=")):
+            key, value = line.split("=", 1)
+            fields[key] = value.strip().strip('"')
+    kind, version = fields.get("ID"), fields.get("VERSION_ID")
+    if kind == "ubuntu" and version in ("22.04", "24.04"):
+        return kind, version, "Ubuntu " + version + " x86-64 CI userspace metadata candidates"
+    if kind == "arch":
+        return kind, None, "Arch Linux x86-64 CI userspace metadata candidates"
+    raise ValueError("Unsupported native ELF version-contract CI userspace")
+
+
 def analyze(archive_path):
+    userspace_id, userspace_version, userspace_label = recorded_userspace()
     modules = package_versions(archive_path)
     providers = defaultdict(list)
     for member in modules:
@@ -229,7 +245,10 @@ def analyze(archive_path):
         "schema_version": 1,
         "source_commit": SOURCE,
         "original_archive_sha256": ARCHIVE,
-        "host": "GitHub Actions Ubuntu 24.04 x86_64 (not user's Arch/Hyprland)",
+        "host": userspace_label,
+        "scanned_userspace_id": userspace_id,
+        "scanned_userspace_version": userspace_version,
+        "target_host_kernel_verified": False,
         "scanned_native_elf_files": len(modules),
         "native_elf_declared_version_requirements": len(rows),
         "unique_version_provider_basenames": len({r["provider_basename"] for r in rows}),
@@ -288,11 +307,25 @@ Version definition section '.gnu.version_d' contains 2 entries:
 
 
 def main():
+    global SOURCE, ARCHIVE
     parser = argparse.ArgumentParser()
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--source-commit",
+                        choices=[SOURCE, "2887d9de1f69c0e9776413da80e7ba0d1225dd9b"])
+    parser.add_argument("--archive-sha256")
     args = parser.parse_args()
+    # The historical original workflow still uses the exact built-in SHA
+    # and source pin. Firefox 160 opt-in must supply BOTH and its archive
+    # checksum must be independently verified by the caller beforehand.
+    if (args.source_commit is None) != (args.archive_sha256 is None):
+        parser.error("source and package SHA-256 overrides must be paired")
+    if args.source_commit is not None:
+        if (args.source_commit != "2887d9de1f69c0e9776413da80e7ba0d1225dd9b" or
+                not re.fullmatch(r"[0-9a-f]{64}", args.archive_sha256)):
+            parser.error("Only independently source-pinned Firefox 160 is supported")
+        SOURCE, ARCHIVE = args.source_commit, args.archive_sha256
     if args.self_test:
         print("PASS:", selftest(), "malformed version provenance fixtures rejected")
         if args.archive is None:

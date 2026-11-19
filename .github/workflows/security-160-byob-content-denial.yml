@@ -1,0 +1,191 @@
+# Recheck two real Gecko tab sandbox denial paths in the exact BYOB Firefox160
+# candidate. This reuses the already compiled, SHA-256-authenticated archive.
+# No browser rebuild, user profile mutation, host policy change or release.
+name: Firefox 160 BYOB Actual Content Denials (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-byob-content-denial.yml
+      - ci/security-160-real-content-prctl.py
+      - ci/VulpraSeccompProbeChild.sys.mjs
+      - ci/VulpraSeccompProbeParent.sys.mjs
+      - ci/security-160-content-process-seccomp.py
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  byob-real-tab-denial:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Authenticate original compiled BYOB producer and retained artifacts
+        id: identity
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const {data:r}=await github.rest.actions.getWorkflowRun({owner,repo,run_id:44350848442});
+            if (r.repository?.full_name!=='sguzman/vulpra' ||
+                r.head_sha!=='ffec2b1bfcc816385f72301cce2e71fa0f1ac337' ||
+                r.head_branch!=='upgrade/firefox-160-overlay-prototype' ||
+                r.status!=='completed' || r.conclusion!=='success')
+              throw Error('Exact BYOB native producer not authenticated');
+            const a=await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {owner,repo,run_id:44350848442,per_page:100});
+            for(const name of ['firefox160-byob-vulpra-unreleased-native-preview-not-approved',
+                               'firefox160-byob-vulpra-materialized-source-proof']) {
+              const matches=a.filter(x=>x.name===name && !x.expired &&
+                x.size_in_bytes>0 && new Date(x.expires_at)>new Date());
+              if(matches.length!==1)
+                throw Error('Missing or expired original BYOB archive/source: '+name);
+            }
+            core.setOutput('ready','true');
+      - name: Checkout limited real-browser security probes
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-real-content-prctl.py
+            ci/VulpraSeccompProbeChild.sys.mjs
+            ci/VulpraSeccompProbeParent.sys.mjs
+            ci/security-160-content-process-seccomp.py
+            ci/smoke-webextension-package-local.py
+      - name: Retrieve original BYOB native package and sidecar
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 44350848442
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: firefox160-byob-vulpra-unreleased-native-preview-not-approved
+          path: ${{ runner.temp }}/native
+      - name: Retrieve original BYOB complete-source identity
+        if: steps.identity.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          repository: sguzman/vulpra
+          run-id: 44350848442
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: firefox160-byob-vulpra-materialized-source-proof
+          path: ${{ runner.temp }}/source
+      - name: Authenticate full source, original native bytes and adversarial fixtures
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -m py_compile ci/security-160-real-content-prctl.py
+          python3 ci/security-160-real-content-prctl.py --self-test
+          jq -e '
+            .upstream_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .complete_materialized_source_tree=="c17d957eb58741df2855dc9b6c577be192315410" and
+            .verified_overlays==28 and .exact_assembly_tree_match==true and
+            .upstream_paths_otherwise_preserved==true and
+            .byob_source_variant_verified==true and
+            .byob_branding_blob=="ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e"
+          ' "$RUNNER_TEMP/source/materialized-candidate.json" >/dev/null
+          archive="$RUNNER_TEMP/native/vulpra-firefox160-byob-native-ci.tar.xz"
+          test -s "$archive" && test -s "$archive.sha256"
+          (cd "$RUNNER_TEMP/native" && sha256sum -c "$(basename "$archive").sha256")
+          dest="$GITHUB_WORKSPACE/.git/vulpra-native-build/packages"
+          mkdir -p "$dest"
+          cp -- "$archive" "$dest/vulpra-local-firefox160-byob-denial-ci.tar.xz"
+          (cd "$dest" && sha256sum vulpra-local-firefox160-byob-denial-ci.tar.xz > vulpra-local-firefox160-byob-denial-ci.tar.xz.sha256)
+          echo 'PASS: original compiled BYOB source/bytes and falsified denial fixtures'
+      - name: Install isolated runtime dependencies and checksum-pinned geckodriver
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=3 install -y \
+            --no-install-recommends curl jq iproute2 util-linux python3 \
+            libgtk-3-0t64 libdbus-glib-1-2 libasound2t64 libnss3 libgbm1
+          driver="$RUNNER_TEMP/geckodriver-v0.37.1-linux64.tar.gz"
+          curl -fLsS --retry 3 --max-time 90 -o "$driver" \
+            'https://github.com/mozilla/geckodriver/releases/download/v0.37.1/geckodriver-v0.37.1-linux64.tar.gz'
+          printf '%s  %s\n' 'e815130ea95983e162ae91843b48d3a3ce991735635fce83a647afde21e09f7e' "$driver" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/geckodriver-bin"
+          tar -xzf "$driver" -C "$RUNNER_TEMP/geckodriver-bin" geckodriver
+          "$RUNNER_TEMP/geckodriver-bin/geckodriver" --version | grep -Fq 'geckodriver 0.37.1'
+          echo "$RUNNER_TEMP/geckodriver-bin" >> "$GITHUB_PATH"
+      - name: Recheck BYOB real tab-worker syscall and HOME denials without egress
+        id: test
+        if: steps.identity.outputs.ready == 'true'
+        shell: bash
+        timeout-minutes: 9
+        run: |
+          set -euo pipefail
+          sudo unshare --net -- bash -euo pipefail -c '
+            ip link set lo up
+            test -z "$(ip -4 route show)" && test -z "$(ip -6 route show)"
+            runuser -u runner -- env PATH="$1" python3 "$2/ci/security-160-real-content-prctl.py" \
+              "$2" "$3/byob-real-tab-prctl.json"
+            runuser -u runner -- env PATH="$1" python3 "$2/ci/security-160-real-content-prctl.py" \
+              --home-write "$2" "$3/byob-real-tab-home-write.json"
+          ' _ "$PATH" "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+          digest="$(sha256sum "$RUNNER_TEMP/native/vulpra-firefox160-byob-native-ci.tar.xz" | cut -d' ' -f1)"
+          jq -e --arg sha "$digest" '
+            .schema_version==1 and .status=="pass" and
+            .native_package_sha256==$sha and
+            .original_firefox_profile_preserved==true and
+            .native_prctl_capbset_read_parent_allowed==true and
+            .native_prctl_capbset_read_tab_returned_einval==true and
+            .actual_chromeutils_tab_role_authenticated==true and
+            .same_tab_pid_has_seccomp_mode_2==true and
+            .same_tab_seccomp_mode_2_at_syscall==true and
+            .same_tab_pid_has_no_new_privileges==true and
+            .forbidden_content_worker_syscall_denial_verified==true and
+            .raw_pids_or_user_data_archived==false and
+            .no_sandbox_prefs_or_host_kernel_policy_relaxed==true and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/byob-real-tab-prctl.json" >/dev/null
+          jq -e --arg sha "$digest" '
+            .schema_version==1 and .status=="pass" and
+            .native_package_sha256==$sha and
+            .original_firefox_profile_preserved==true and
+            .same_browser_parent_home_write_control_succeeded==true and
+            .same_browser_parent_home_write_canary_removed==true and
+            .native_open_create_home_content_worker_denied==true and
+            .actual_chromeutils_tab_role_authenticated==true and
+            .same_tab_pid_has_seccomp_mode_2==true and
+            .same_tab_seccomp_mode_2_at_syscall==true and
+            .same_tab_pid_has_no_new_privileges==true and
+            .filesystem_denial_not_exclusively_attributed_to_seccomp==true and
+            .raw_pids_or_user_data_archived==false and
+            .no_sandbox_prefs_or_host_kernel_policy_relaxed==true and
+            .security_current==false and .release_ready==false
+          ' "$RUNNER_TEMP/byob-real-tab-home-write.json" >/dev/null
+          echo 'PASS: exact BYOB Firefox160 tab blocked native prctl and HOME create' >> "$GITHUB_STEP_SUMMARY"
+          echo 'LIMIT: Ubuntu runner only, no target EndeavourOS acceptance, provider or release approval' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload only redacted actual BYOB sandbox-denial proof
+        id: proof
+        if: success() && steps.identity.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-byob-real-tab-denials-not-release-approval
+          path: |
+            ${{ runner.temp }}/byob-real-tab-prctl.json
+            ${{ runner.temp }}/byob-real-tab-home-write.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail closed on absent native sandbox proof or upload
+        if: always()
+        shell: bash
+        env:
+          ID: ${{ steps.identity.outcome }}
+          READY: ${{ steps.identity.outputs.ready }}
+          TEST: ${{ steps.test.outcome }}
+          PROOF: ${{ steps.proof.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$ID" != success || "$READY" != true || "$TEST" != success || "$PROOF" != success ]]; then
+            echo 'FAIL: original BYOB native tab denial, source authenticity or proof incomplete' >&2
+            exit 1
+          fi
+          echo 'PASS: real BYOB tab-worker denial proof uploaded; public release still blocked'

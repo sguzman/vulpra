@@ -1,0 +1,196 @@
+name: Firefox 160 BYOB Source-Tree Candidate Proof (No Browser Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - ci/security-160-stage-byob-branding.sh
+      - .github/workflows/security-160-byob-source-proof.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separately-attest-byob-source-tree:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout fixed original 28-overlay staging scripts and tested derivation tool
+        uses: actions/checkout@v4
+        with:
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            browser/branding/unofficial/configure.sh
+            browser/branding/unofficial/locales/en-US/brand.ftl
+            browser/branding/unofficial/pref/firefox-branding.js
+            browser/moz.configure
+            toolkit/components/normandy/jar.mn
+            toolkit/components/normandy/lib/NormandyApi.sys.mjs
+            toolkit/components/normandy/lib/NormandyUtils.sys.mjs
+            toolkit/components/normandy/schemas/LegacyHeartbeat.schema.json
+            browser/extensions/newtab/webext-glue/moz.build
+            browser/extensions/newtab/lib/ActivityStream.sys.mjs
+            browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+            browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
+            taskcluster/kinds/toolchain/android.yml
+            python/mozbuild/mozbuild/frontend/emitter.py
+            browser/components/asrouter/modules/ASRouter.sys.mjs
+            toolkit/components/moz.build
+            browser/components/BrowserComponents.manifest
+            browser/components/DesktopActorRegistry.sys.mjs
+            browser/components/asrouter/moz.build
+            browser/extensions/newtab/addon-jar.mn
+            browser/extensions/newtab/build-newtab-bundles.py
+            browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx
+            browser/extensions/newtab/webpack.system-addon.config.js
+            dom/webgpu/tests/cts/checkout/node.tsconfig.json
+            python/mozbuild/mozbuild/testing.py
+            toolkit/components/nimbus/moz.build
+            toolkit/components/normandy/moz.build
+            toolkit/modules/AppConstants.sys.mjs
+            browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx
+            toolkit/components/nimbus/NimbusBootstrap.sys.mjs
+            ci/security-160-stage-overlay.sh
+            ci/security-160-assemble-git-tree.sh
+            ci/security-160-stage-byob-branding.sh
+      - name: Checkout pinned exact official Firefox 160 release source slices
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          path: firefox160
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            browser/branding/unofficial/configure.sh
+            browser/branding/unofficial/locales/en-US/brand.ftl
+            browser/branding/unofficial/pref/firefox-branding.js
+            browser/moz.configure
+            toolkit/components/normandy/jar.mn
+            toolkit/components/normandy/lib/NormandyApi.sys.mjs
+            toolkit/components/normandy/lib/NormandyUtils.sys.mjs
+            toolkit/components/normandy/schemas/LegacyHeartbeat.schema.json
+            browser/extensions/newtab/webext-glue/moz.build
+            browser/extensions/newtab/lib/ActivityStream.sys.mjs
+            browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+            browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
+            taskcluster/kinds/toolchain/android.yml
+            python/mozbuild/mozbuild/frontend/emitter.py
+            browser/components/asrouter/modules/ASRouter.sys.mjs
+            toolkit/components/moz.build
+            browser/components/BrowserComponents.manifest
+            browser/components/DesktopActorRegistry.sys.mjs
+            browser/components/asrouter/moz.build
+            browser/extensions/newtab/addon-jar.mn
+            browser/extensions/newtab/build-newtab-bundles.py
+            browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx
+            browser/extensions/newtab/webpack.system-addon.config.js
+            dom/webgpu/tests/cts/checkout/node.tsconfig.json
+            python/mozbuild/mozbuild/testing.py
+            toolkit/components/nimbus/moz.build
+            toolkit/components/normandy/moz.build
+            toolkit/modules/AppConstants.sys.mjs
+            browser/app/profile/firefox.js
+      - name: Checkout exact previously source-verified BYOB branding from main
+        uses: actions/checkout@v4
+        with:
+          ref: ca4ef5eea3e63b75cc0db0ce8e036dccce1b8511
+          path: byob-main
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            browser/branding/unofficial/pref/firefox-branding.js
+            ci/test-byob-pref-defaults.sh
+      - name: Authenticate old 28-overlay candidate and derive new opt-in BYOB variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-stage-overlay.sh
+          bash -n ci/security-160-stage-byob-branding.sh
+          bash -n ci/security-160-assemble-git-tree.sh
+          bash -n byob-main/ci/test-byob-pref-defaults.sh
+          test "$(git -C firefox160 rev-parse HEAD)" = 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          test "$(git -C byob-main rev-parse HEAD)" = ca4ef5eea3e63b75cc0db0ce8e036dccce1b8511
+          main_brand="$GITHUB_WORKSPACE/byob-main/browser/branding/unofficial/pref/firefox-branding.js"
+          test "$(git hash-object "$main_brand")" = ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e
+          bash byob-main/ci/test-byob-pref-defaults.sh "$main_brand"
+          original="$RUNNER_TEMP/firefox160-original-28"
+          derived="$RUNNER_TEMP/firefox160-byob-28"
+          bash ci/security-160-stage-overlay.sh --stage "$GITHUB_WORKSPACE/firefox160" "$original"
+          bash ci/security-160-stage-byob-branding.sh --derive "$original" "$main_brand" "$derived"
+          original_brand="$original/browser/branding/unofficial/pref/firefox-branding.js"
+          derived_brand="$derived/browser/branding/unofficial/pref/firefox-branding.js"
+          test "$(git hash-object "$original_brand")" = 9308a1b26f339e0e89d959f0c4559eb7596a0fe6
+          test "$(git hash-object "$derived_brand")" = ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e
+          test "$(find "$derived" -type f | wc -l)" -eq 28
+          # Fail-closed negative fixtures. Invalid input must not create outputs.
+          cp -- "$main_brand" "$RUNNER_TEMP/invalid-byob.js"
+          printf '\n' >> "$RUNNER_TEMP/invalid-byob.js"
+          if bash ci/security-160-stage-byob-branding.sh --derive "$original"               "$RUNNER_TEMP/invalid-byob.js" "$RUNNER_TEMP/refused-invalid" >/dev/null 2>&1; then
+            echo 'FAIL: tampered BYOB source accepted' >&2; exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/refused-invalid"
+          if bash ci/security-160-stage-byob-branding.sh --derive "$original" "$main_brand" "$derived" >/dev/null 2>&1; then
+            echo 'FAIL: overwrote existing candidate' >&2; exit 1
+          fi
+          if bash ci/security-160-stage-byob-branding.sh --derive "$original" "$main_brand"               "$GITHUB_WORKSPACE/forbidden-byob-output" >/dev/null 2>&1; then
+            echo 'FAIL: wrote inside source checkout' >&2; exit 1
+          fi
+          test ! -e "$GITHUB_WORKSPACE/forbidden-byob-output"
+          echo 'PASS: original 28-file source and independently pinned main BYOB source authenticated'
+      - name: Prove both complete Firefox 160 Git trees differ ONLY in BYOB branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          source="$GITHUB_WORKSPACE/firefox160"
+          original="$RUNNER_TEMP/firefox160-original-28"
+          derived="$RUNNER_TEMP/firefox160-byob-28"
+          old_report="$RUNNER_TEMP/firefox160-original-tree"
+          new_report="$RUNNER_TEMP/firefox160-byob-tree"
+          bash ci/security-160-assemble-git-tree.sh --assemble "$source" "$original" "$old_report"
+          bash ci/security-160-assemble-git-tree.sh --assemble "$source" "$derived" "$new_report"
+          old="$(jq -er '.assembled_git_tree' "$old_report/candidate-tree-report.json")"
+          new="$(jq -er '.assembled_git_tree' "$new_report/candidate-tree-report.json")"
+          test "$old" = 42dd7439a27dde92f89ac5eed13f88117a4d7ab5
+          test "$new" != "$old"
+          jq -e '.source_files_modified == 26 and .vulpra_source_files_added == 2 and
+            .upstream_files_deleted == 0 and .all_other_upstream_files_preserved == true and
+            .native_binary_compiled == false and .security_current == false'             "$new_report/candidate-tree-report.json" >/dev/null
+          git -C "$source" diff-tree --no-commit-id --name-status -r "$old" "$new"             > "$RUNNER_TEMP/byob-source-only-changes.tsv"
+          printf 'M\tbrowser/branding/unofficial/pref/firefox-branding.js\n'             | cmp - "$RUNNER_TEMP/byob-source-only-changes.tsv"
+          expected_blob="$(git -C "$source" rev-parse "$new:browser/branding/unofficial/pref/firefox-branding.js")"
+          test "$expected_blob" = ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e
+          test -z "$(git -C "$source" status --porcelain)"
+          git diff --exit-code
+          jq -n --arg base "$old" --arg candidate "$new"             --arg base_blob 9308a1b26f339e0e89d959f0c4559eb7596a0fe6             --arg byob_blob ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e '{
+              schema_version:1,
+              kind:"firefox160_BYOB_separate_complete_source_candidate",
+              firefox160_release:"2887d9de1f69c0e9776413da80e7ba0d1225dd9b",
+              source_of_byob_branding:"ca4ef5eea3e63b75cc0db0ce8e036dccce1b8511",
+              original_28_overlay_complete_tree:$base,
+              byob_28_overlay_complete_tree:$candidate,
+              original_branding_blob:$base_blob,
+              byob_branding_blob:$byob_blob,
+              changed_paths:["browser/branding/unofficial/pref/firefox-branding.js"],
+              other_27_overlays_preserved:true,
+              upstream_paths_otherwise_preserved:true,
+              complete_source_tree_assembled:true,
+              browser_configured:false,
+              native_browser_compiled:false,
+              effective_runtime_byob_defaults_verified:false,
+              release_ready:false,
+              security_current:false
+            }' > "$RUNNER_TEMP/firefox160-byob-candidate-proof.json"
+          echo "PASS: separate full Git candidate tree $new; original complete tree $old unchanged"
+          echo 'LIMIT: no native compile, install, real WebDriver or live Vaultwarden credentials.'
+      - name: Preserve source-tree proof but never pretend the old binary was rebuilt
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-byob-new-source-tree-proof-no-browser
+          path: |
+            ${{ runner.temp }}/firefox160-byob-candidate-proof.json
+            ${{ runner.temp }}/byob-source-only-changes.tsv
+          if-no-files-found: error
+          retention-days: 30
