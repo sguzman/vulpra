@@ -140,6 +140,24 @@ jobs:
             dom/media/ChannelMediaDecoder.cpp
             gfx/gl/GLBlitHelper.cpp
             browser/config/version.txt
+      - name: Restore exact pinned Vulpra-only source files when sparse checkout omits them
+        shell: bash
+        run: |
+          set -euo pipefail
+          for entry in \
+            "browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx 717e107fa4af5dbffbb0b98083fe84bc5f0c6705" \
+            "toolkit/components/nimbus/NimbusBootstrap.sys.mjs df7e5b95aa96d930550d794753c1acef942c70da"; do
+            read -r file expected <<< "$entry"
+            git cat-file -e "HEAD:$file"
+            test "$(git rev-parse "HEAD:$file")" = "$expected"
+            if ! test -f "$file"; then
+              mkdir -p -- "$(dirname -- "$file")"
+              git show "HEAD:$file" > "$file"
+            fi
+            test -f "$file" && test ! -L "$file"
+            test "$(git hash-object "$file")" = "$expected"
+          done
+          echo 'PASS: exact Vulpra-added upstream-absent source blobs materialized in sparse CI'
       - name: Verify main BYOB branding and original pinned source fixture
         id: verify
         shell: bash
