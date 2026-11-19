@@ -80,6 +80,78 @@ for path in dom/media/ChannelMediaDecoder.cpp gfx/gl/GLBlitHelper.cpp; do
     fail "required hotfix path absent from full diff: $path"
 done
 
+# Derive the exact 28 staged source paths from the current, accepted Firefox
+# 160 staging contract. This is an overlap INVENTORY, not an overlay port.
+stage_script="$(cd -- "$(dirname -- "$0")" && pwd -P)/security-160-stage-overlay.sh"
+[[ -f "$stage_script" ]] || fail 'original source-overlay contract missing'
+{
+  grep -oE 'hash_is "\$dest/[^"]+"' "$stage_script" |
+    sed -E 's|^hash_is "\$dest/||;s|"$||' | grep -v '^\$path https://github.com/mozilla-firefox/firefox \
+  --arg old_release FIREFOX_160_0_RELEASE --arg old_commit "$old" --arg old_tree "$old_tree" \
+  --arg new_release FIREFOX_160_0_1_RELEASE --arg new_commit "$new" --arg new_tree "$new_tree" \
+  --argjson added "$added" --argjson modified "$modified" \
+  --argjson deleted "$deleted" --argjson typechanged "$typechanged" \
+  --argjson total "$total" \
+  --argjson overlay_total "$overlay_total" --argjson overlay_changed "$overlay_changed" \
+  '{
+    schema_version:1, kind:"complete_mozilla_firefox_160_to_160_0_1_git_tree_delta",
+    upstream_repository:$upstream_repository,
+    original:{tag:$old_release,commit:$old_commit,git_tree:$old_tree},
+    hotfix:{tag:$new_release,commit:$new_commit,git_tree:$new_tree},
+    full_git_tree_diff_verified:true,
+    git_diff_renames_disabled:true,
+    counts:{added:$added,modified:$modified,deleted:$deleted,
+            typechanged:$typechanged,total:$total},
+    changed_path_listing:"changed-paths.tsv",
+    overlay_paths_total:$overlay_total,
+    overlay_paths_extracted_from_staging_contract:true,
+    overlay_upstream_changed_paths_count:$overlay_changed,
+    overlay_paths_listing:"overlay-paths.txt",
+    overlay_overlap_paths_listing:"overlay-upstream-overlap-paths.txt",
+    priority_source_paths_changed:["dom/media/ChannelMediaDecoder.cpp",
+                                   "gfx/gl/GLBlitHelper.cpp"],
+    overlay_compatibility_verified:false,
+    candidate_source_tree_assembled:false,
+    native_binary_compiled:false,
+    native_browser_retested:false,
+    provider_backed_safebrowsing_verified:false,
+    security_current:false,release_ready:false
+  }' > "$dest/hotfix-source-delta.json"
+jq -e '.schema_version==1 and .full_git_tree_diff_verified==true and
+  .counts.total==(.counts.added+.counts.modified+.counts.deleted+.counts.typechanged) and
+  .overlay_paths_total==28 and
+  .overlay_upstream_changed_paths_count>=0 and
+  .overlay_compatibility_verified==false and .native_binary_compiled==false and
+  .security_current==false and .release_ready==false' "$dest/hotfix-source-delta.json" >/dev/null
+printf 'PASS: full official Firefox 160.0 -> 160.0.1 Git tree diff: %s changed paths\n' "$total"
+printf 'PASS: audio/video and graphics source paths changed; original release tags and trees authenticated\n'
+printf 'PASS: 28 existing Vulpra overlay paths inventoried; %s intersect official hotfix changes\n' "$overlay_changed"
+printf 'LIMIT: overlay adaptation, recompilation, native security and release readiness NOT accepted\n'
+
+  sed -n "/^done <<'PINNED_STABLE_BASE_OVERLAYS'$/,/^PINNED_STABLE_BASE_OVERLAYS$/p" "$stage_script" |
+    sed '1d;$d' | awk '{print $1}'
+  grep -E "^  '(browser/|toolkit/)[^ ]+ [0-9a-f]{40}'" "$stage_script" |
+    sed -E "s|^  '([^ ]+) .*|\1|"
+} | LC_ALL=C sort -u > "$dest/overlay-paths.txt"
+overlay_total="$(wc -l < "$dest/overlay-paths.txt")"
+[[ "$overlay_total" -eq 28 ]] || fail 'source staging overlay inventory drifted from 28'
+grep -Fxq 'browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx' "$dest/overlay-paths.txt" ||
+  fail 'missing expected Vulpra-added PromoCard module'
+grep -Fxq 'toolkit/components/nimbus/NimbusBootstrap.sys.mjs' "$dest/overlay-paths.txt" ||
+  fail 'missing expected Vulpra-added Nimbus bootstrap module'
+cut -f2 "$dest/changed-paths.tsv" | LC_ALL=C sort -u > "$work/upstream-changed-paths"
+comm -12 "$dest/overlay-paths.txt" "$work/upstream-changed-paths" > "$dest/overlay-upstream-overlap-paths.txt"
+overlay_changed="$(wc -l < "$dest/overlay-upstream-overlap-paths.txt")"
+[[ "$overlay_changed" -ge 0 && "$overlay_changed" -le 28 ]] ||
+  fail 'invalid overlay conflict count'
+# The two original Vulpra-only files may not silently become upstream files.
+for source_added in \
+  browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/PromoCard/PromoCardOptOut.jsx \
+  toolkit/components/nimbus/NimbusBootstrap.sys.mjs; do
+  [[ -z "$(git -C "$work/mozilla" ls-tree "$new" -- "$source_added")" ]] ||
+    fail "official hotfix unexpectedly owns an original Vulpra-only source path: $source_added"
+done
+
 jq -n \
   --arg upstream_repository https://github.com/mozilla-firefox/firefox \
   --arg old_release FIREFOX_160_0_RELEASE --arg old_commit "$old" --arg old_tree "$old_tree" \
