@@ -56,7 +56,24 @@ hash_is "$upstream/browser/app/profile/firefox.js" 15a12b67bde1501b2070a19c77a66
 # content therefore survives without dropping any upstream 160 edits.
 hash_is "$repo/browser/branding/unofficial/configure.sh" 659250d7a9606c5a583b4d8f14a104a6cd390e19
 hash_is "$repo/browser/branding/unofficial/locales/en-US/brand.ftl" 36b392d5fae6ba5ef1cb1a5a7cca823b6e74ec0b
-hash_is "$repo/browser/branding/unofficial/pref/firefox-branding.js" 9308a1b26f339e0e89d959f0c4559eb7596a0fe6
+# The current main branch intentionally ships newer BYOB defaults. Keep the
+# independently proven original 160 overlay byte-for-byte as the *first*
+# staging input, and let security-160-stage-byob-branding.sh apply that
+# independently verified BYOB file afterward.
+brand_path=browser/branding/unofficial/pref/firefox-branding.js
+brand_original_blob=9308a1b26f339e0e89d959f0c4559eb7596a0fe6
+brand_byob_blob=ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e
+brand_worktree_blob="$(git hash-object -- "$repo/$brand_path")"
+case "$brand_worktree_blob" in
+  "$brand_original_blob") ;;
+  "$brand_byob_blob")
+    # No remote lazy fetch: require the historical source object to be
+    # present locally. Never weaken the original 28-file source contract.
+    GIT_NO_LAZY_FETCH=1 git -C "$repo" cat-file -e "$brand_original_blob^{blob}" ||
+      fail "original pinned branding object absent from local Vulpra Git checkout"
+    ;;
+  *) fail "unexpected Vulpra branding source identity: $brand_worktree_blob" ;;
+esac
 hash_is "$repo/browser/moz.configure" 1d7a9bd2af8eb419e7f59d3f737c2fcf9c57995a
 
 for path in \
@@ -65,7 +82,12 @@ for path in \
   browser/branding/unofficial/pref/firefox-branding.js \
   browser/moz.configure; do
   mkdir -p -- "$dest/$(dirname -- "$path")"
-  cp -- "$repo/$path" "$dest/$path"
+  if [[ "$path" == "$brand_path" && "$brand_worktree_blob" == "$brand_byob_blob" ]]; then
+    GIT_NO_LAZY_FETCH=1 git -C "$repo" cat-file blob "$brand_original_blob" > "$dest/$path" ||
+      fail 'cannot materialize pinned original branding without network'
+  else
+    cp -- "$repo/$path" "$dest/$path"
+  fi
 done
 
 # Firefox 160 modified its 192 KiB profile preference file since beta:
