@@ -34,6 +34,15 @@ root build outputs. The pinned Nix shell can itself download missing toolchain
 store paths as usual. Subsequent builds reuse source and objdir for incremental
 native compilation.
 
+**Interrupted Firefox 160.0.1 source fetch:** the official Git download now
+uses repository-local HTTP/1.1 and makes at most two attempts. It preserves
+the source cache instead of deleting or silently replacing it. A later
+`./nix/vulpra build --fetch-source` can reuse complete Git objects already
+received; Git cannot resume the middle of an incomplete pack. The completed
+Firefox 160.0 source checkout is independently reused. If an interrupted
+checkout contains unexpected modifications, the build fails without
+overwriting those files. No prebuilt browser archive is involved.
+
 To launch the locally built browser using a completely separate profile:
 
 ```fish
