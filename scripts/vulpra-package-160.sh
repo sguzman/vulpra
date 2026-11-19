@@ -4,9 +4,18 @@
 set -Eeuo pipefail
 umask 077
 die() { printf 'Vulpra local package: %s\n' "$*" >&2; exit 2; }
-[[ "$#" == 0 ]] || die 'package takes no arguments: ./nix/vulpra package'
-[[ "${VULPRA_NIX_DEV:-}" == 1 ]] ||
-  die 'requires pinned Nix developer shell: ./nix/vulpra package'
+preflight=0
+if [[ "$#" == 1 && "$1" == --preflight ]]; then
+  preflight=1
+elif [[ "$#" != 0 ]]; then
+  die 'package takes no arguments: ./nix/vulpra package'
+fi
+# A read-only readiness check is performed by the launcher before Nix is
+# entered. Packaging itself still requires the exact pinned Nix toolchain.
+if (( preflight == 0 )); then
+  [[ "${VULPRA_NIX_DEV:-}" == 1 ]] ||
+    die 'requires pinned Nix developer shell: ./nix/vulpra package'
+fi
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 work="${VULPRA_BUILD_DIR:-$HOME/Code/Builds/vulpra-160.0.1}"
 cache="${VULPRA_SOURCE_CACHE:-$HOME/.cache/vulpra/mozilla}"
@@ -39,12 +48,19 @@ grep -Fxq 'Version=160.0.1' "$obj/dist/bin/application.ini" ||
   die 'compiled binary is not Firefox 160.0.1'
 [[ -f "$repo/ci/package-smoke-local.sh" ]] ||
   die 'existing local package+smoke workflow missing'
+if (( preflight == 1 )); then
+  echo 'PASS: authenticated native Vulpra 160.0.1 exists; package may enter Nix'
+  exit 0
+fi
 command -v flock >/dev/null || die 'missing flock'
 mkdir -p -- "$cache"
-exec 9>"$cache/vulpra160-build.lock"
-flock -n 9 ||
+# Hold the same exclusive lock as the source build for the ENTIRE package
+# smoke. Use FD 8: the downstream package-smoke script opens FD 9 for its
+# own lock, and would otherwise silently release the outer build lock.
+exec 8>"$cache/vulpra160-build.lock"
+flock -n 8 ||
   die 'another Firefox160 source/build/package task is running'
 echo 'Packaging and headless-testing LOCAL Firefox 160.0.1 Vulpra.'
 echo 'No CI binary download; running existing package-smoke with private HOME.'
 export MOZCONFIG="$config"
-exec bash "$repo/ci/package-smoke-local.sh" "$source" 9>&-
+exec bash "$repo/ci/package-smoke-local.sh" "$source"
