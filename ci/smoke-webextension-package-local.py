@@ -253,35 +253,55 @@ def verify_js_navigation(port: int, base: str, server: http.server.ThreadingHTTP
             "final_document_text": last["text"]}
 
 def valid_compat_user_agent(user_agent: object, browser_version: object) -> bool:
-    """Require BOTH Firefox and independent Vulpra tokens from a real page.
+    """Require Firefox and Vulpra tokens for the real app's major.minor.
 
-    This is not a network/site-compatibility test and deliberately never logs
-    the complete string, which can include host-specific platform details.
+    Firefox release-patch versions (such as 160.0.1) normally advertise
+    major.minor (160.0) in navigator.userAgent. Accept either that
+    major.minor token or the exact app version, never an unrelated patch.
+    Keep the default, unmodified browser UA and never log its full value.
     """
     if not isinstance(user_agent, str) or not isinstance(browser_version, str):
         return False
-    if not browser_version.startswith("160.") or len(user_agent) > 1024:
+    components = browser_version.split(".")
+    if (len(components) not in (2, 3) or components[0] != "160" or
+            any(not part.isascii() or not part.isdecimal() or
+                (len(part) > 1 and part[0] == "0")
+                for part in components) or len(user_agent) > 1024):
         return False
-    tokens = user_agent.split()
-    expected = ("Firefox/" + browser_version, "Vulpra/" + browser_version)
-    return all(token in tokens for token in expected)
+    ua_release = ".".join(components[:2])
+    allowed_versions = {ua_release, browser_version}
+    tokens = set(user_agent.split())
+    return all(
+        any(f"{product}/{version}" in tokens for version in allowed_versions)
+        for product in ("Firefox", "Vulpra")
+    )
 
 
 def test_compat_user_agent_parser() -> None:
     good = "Mozilla/5.0 (X11; Linux x86_64; rv:160.0) Gecko/20100101 Firefox/160.0 Vulpra/160.0"
+    exact = good.replace("Firefox/160.0 Vulpra/160.0",
+                         "Firefox/160.0.1 Vulpra/160.0.1")
+    mixed = good.replace("Vulpra/160.0", "Vulpra/160.0.1")
+    for value in (good, exact, mixed):
+        assert valid_compat_user_agent(value, "160.0.1")
     assert valid_compat_user_agent(good, "160.0")
-    bad = (good.replace("Firefox/160.0 ", ""),
-           good.replace("Vulpra/160.0", ""),
-           good.replace("Firefox/160.0", "Firefox/159.0"),
-           good.replace("Firefox/160.0", "FakeFirefox/160.0"),
-           good.replace("Vulpra/160.0", "Vulpra/161.0"),
-           "", None, "Firefox/160.0 Vulpra/160.0",)
-    for value in bad[:-1]:
-        assert not valid_compat_user_agent(value, "160.0"), "Invalid UA accepted"
+    bad = (
+        good.replace("Firefox/160.0 ", ""),
+        good.replace("Vulpra/160.0", ""),
+        good.replace("Firefox/160.0", "Firefox/159.0"),
+        good.replace("Firefox/160.0", "FakeFirefox/160.0"),
+        good.replace("Vulpra/160.0", "Vulpra/161.0"),
+        good.replace("Firefox/160.0", "Firefox/160.0.2"),
+        good.replace("Vulpra/160.0", "Vulpra/160.0.2"),
+        "", None,
+    )
+    for value in bad:
+        assert not valid_compat_user_agent(value, "160.0.1"), "Invalid UA accepted"
+    assert not valid_compat_user_agent(exact, "160.0")
     assert not valid_compat_user_agent(good, "159.0")
+    assert not valid_compat_user_agent(good, "160.0.1.1")
     assert not valid_compat_user_agent(good, None)
-    assert not valid_compat_user_agent(good, "160.0.1")
-    print("PASS: strict Firefox/Vulpra 160 UA token parser rejects missing/forged/incorrect tokens")
+    print("PASS: Firefox/Vulpra major.minor UA and patch-version token policy; forged tokens rejected")
 
 
 def verify_compat_user_agent(port: int, base: str,
@@ -294,9 +314,25 @@ def verify_compat_user_agent(port: int, base: str,
         ),
         "args": [],
     })
+    ua = value.get("ua") if isinstance(value, dict) else None
     if not isinstance(value, dict) or value.get("localPage") is not True or not (
-            valid_compat_user_agent(value.get("ua"), browser_version)):
-        raise RuntimeError("Firefox 160 default UA did not expose both Firefox and Vulpra tokens on the real local page")
+            valid_compat_user_agent(ua, browser_version)):
+        # Only describe the presence of expected version tokens, not the UA,
+        # which may expose platform details. Do not override any browser prefs.
+        parts = browser_version.split(".") if isinstance(browser_version, str) else []
+        base_version = ".".join(parts[:2]) if len(parts) >= 2 else ""
+        tokens = set(ua.split()) if isinstance(ua, str) else set()
+        flags = {
+            "local_page": isinstance(value, dict) and value.get("localPage") is True,
+            "firefox_major_minor": bool(base_version and f"Firefox/{base_version}" in tokens),
+            "vulpra_major_minor": bool(base_version and f"Vulpra/{base_version}" in tokens),
+            "firefox_exact": isinstance(browser_version, str) and f"Firefox/{browser_version}" in tokens,
+            "vulpra_exact": isinstance(browser_version, str) and f"Vulpra/{browser_version}" in tokens,
+        }
+        raise RuntimeError(
+            "Firefox/Vulpra default-UA compatibility failed on real localhost page; "
+            "redacted token-presence flags: " + json.dumps(flags, sort_keys=True)
+        )
     return {
         "verified": True, "firefox_compat_token": True,
         "vulpra_brand_token": True, "browser_version": browser_version,
