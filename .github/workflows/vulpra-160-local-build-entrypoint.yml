@@ -18,6 +18,20 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/workflows/vulpra-160-local-build-entrypoint.yml
+            scripts/vulpra-build-160.sh
+            scripts/build-firefox160-local.sh
+            scripts/vulpra-package-160.sh
+            nix/vulpra
+            nix/vulpra-dev.sh
+            ci/security-160-stage-overlay.sh
+            ci/security-160-stage-byob-branding.sh
+            ci/security-160-hotfix-assemble-tree.sh
       - name: Validate source builder and existing Nix dispatch syntax
         shell: bash
         run: |
