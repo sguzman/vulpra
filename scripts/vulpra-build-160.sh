@@ -33,6 +33,7 @@ while (( $# )); do
   case "$1" in
     --help|-h) usage; exit 0;;
     --status) action=status; shift;;
+    --preflight) action=preflight; shift;;
     --run) action=run; shift;;
     --fetch-source) fetch=1; shift;;
     --jobs) (( $# >= 2 )) || die 'missing --jobs value'; jobs="$2"; shift 2;;
@@ -71,6 +72,36 @@ if [[ "$action" == status ]]; then
     "$(if [[ -x "$work/source/obj-vulpra-linux/dist/bin/vulpra" ]]; then echo present; else echo missing; fi)"
   echo 'No source downloads, compilation, or browser profile changes.'
   exit 0
+fi
+
+# This guard runs BEFORE entering Nix. Missing upstream source must not
+# unexpectedly trigger a Nix/nom toolchain realization or any network fetch.
+if [[ "$action" == preflight ]]; then
+  if [[ -s "$work/prepared-source-tree.sha" ]]; then
+    [[ "$(cat "$work/prepared-source-tree.sha")" ==
+       d6f7faf6583831a58d127480db54b5bcd5ab5949 &&
+       -d "$work/source" ]] ||
+      die 'prepared source identity is incomplete or changed; refusing to start Nix'
+    echo 'PASS: verified Vulpra source already prepared; no source download needed'
+    exit 0
+  fi
+  if [[ -e "$work" ]]; then
+    die "incomplete or unverified local build directory: $work; refusing overwrite"
+  fi
+  if is_source "$old" "$old_sha" && is_source "$new" "$new_sha"; then
+    echo 'PASS: official Mozilla source caches present; no source download needed'
+    exit 0
+  fi
+  cat >&2 <<HELP
+Official Mozilla source is not cached for local Vulpra 160.0.1.
+No Nix evaluation, source fetch, binary download or compilation was started.
+
+To explicitly authorize the one-time Mozilla SOURCE download:
+  ./nix/vulpra build --fetch-source
+
+That source download can be large. Your existing browser is unaffected.
+HELP
+  exit 3
 fi
 
 if [[ "$action" == run ]]; then
