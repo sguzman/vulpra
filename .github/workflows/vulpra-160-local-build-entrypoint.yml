@@ -96,7 +96,7 @@ jobs:
           grep -Fq 'verified source/config absent' "$t/package"
           test ! -e "$t/cache" && test ! -e "$t/build"
           echo 'PASS: status never enters Nix or fetches source; package refuses absent local build'
-      - name: Prove default build and run never realize Nix when source is missing
+      - name: Prove build, run and package never realize Nix when required artifacts are missing
         shell: bash
         run: |
           set -euo pipefail
@@ -115,15 +115,21 @@ jobs:
           build_code="$?"
           PATH="$t/bin:$PATH" bash nix/vulpra run > "$t/run-out" 2>&1
           run_code="$?"
+          PATH="$t/bin:$PATH" bash nix/vulpra package > "$t/package-out" 2>&1
+          package_code="$?"
           set -e
           test "$build_code" -eq 3
           test "$run_code" -eq 1
+          test "$package_code" -eq 2
           grep -Fq 'No Nix evaluation, source fetch, binary download or compilation was started' "$t/build-out"
           grep -Fq 'work-dir has no verified prepared source' "$t/run-out"
+          grep -Fq 'verified source/config absent' "$t/package-out"
+          grep -Fq 'exec 8>' scripts/vulpra-package-160.sh
+          grep -Fq 'flock -n 8' scripts/vulpra-package-160.sh
           test ! -e "$t/build-nix-called"
           test ! -e "$t/build"
           test ! -e "$t/cache"
-          echo 'PASS: default build and run fail safely without Nix, source fetch or filesystem writes'
+          echo 'PASS: build, run and package fail safely without Nix, source fetch or filesystem writes; package shares build lock'
       - name: Reproduce and prevent shallow Mozilla local-clone failure offline
         shell: bash
         run: |
