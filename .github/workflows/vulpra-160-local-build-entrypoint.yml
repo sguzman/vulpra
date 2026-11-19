@@ -82,6 +82,40 @@ jobs:
           grep -Fq 'verified source/config absent' "$t/package"
           test ! -e "$t/cache" && test ! -e "$t/build"
           echo 'PASS: status never enters Nix or fetches source; package refuses absent local build'
+      - name: Reproduce and prevent shallow Mozilla local-clone failure offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          t="$(mktemp -d)"
+          trap 'rm -rf -- "$t"' EXIT
+          git init -q "$t/origin"
+          git -C "$t/origin" config user.name "Vulpra CI"
+          git -C "$t/origin" config user.email "ci@example.invalid"
+          git -C "$t/origin" config uploadpack.allowFilter true
+          mkdir -p "$t/origin/source"
+          echo 'Mozilla source object' > "$t/origin/source/test.txt"
+          git -C "$t/origin" add .
+          git -C "$t/origin" commit -qm 'fixture'
+          git -c protocol.file.allow=always clone -q --depth=1 --filter=blob:none \
+            "file://$t/origin" "$t/cache"
+          test "$(git -C "$t/cache" rev-parse --is-shallow-repository)" = true
+          test "$(git -C "$t/cache" config --get remote.origin.promisor)" = true
+          # A Git worktree reuses the existing shallow/partial source object
+          # database; no second download or new standalone clone is required.
+          GIT_NO_LAZY_FETCH=1 git -C "$t/cache" worktree add --detach "$t/work" HEAD
+          test -f "$t/work/.git"
+          test -f "$t/work/source/test.txt"
+          cmp "$t/cache/source/test.txt" "$t/work/source/test.txt"
+          test -z "$(git -C "$t/cache" status --porcelain)"
+          test -z "$(git -C "$t/work" status --porcelain)"
+          # shellcheck disable=SC2016
+          grep -Fq 'GIT_NO_LAZY_FETCH=1 git -C "$hotfix" worktree add' \
+            scripts/build-firefox160-local.sh
+          if grep -Fq 'git clone --local --no-checkout' scripts/build-firefox160-local.sh; then
+            echo 'FAIL: old shallow-clone bug returned' >&2
+            exit 1
+          fi
+          echo 'PASS: detached source worktree reuses shallow Git objects without network'
       - name: Verify source and workflow were not modified
         shell: bash
         run: |
