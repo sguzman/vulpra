@@ -1,0 +1,79 @@
+# Complete source-only Firefox 160.0 -> 160.0.1 hotfix tree audit.
+# No production checkout, browser recompilation or release.
+name: Firefox 160.0.1 Complete Upstream Source Delta (No Build)
+on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - ci/security-160-hotfix-source-delta.sh
+      - .github/workflows/security-160-hotfix-source-delta.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  complete-hotfix-delta:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout only the source-delta audit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-hotfix-source-delta.sh
+      - name: Validate script syntax, Git and jq
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash -n ci/security-160-hotfix-source-delta.sh
+          git --version
+          jq --version
+      - name: Fetch two exact official Mozilla release trees, diff all paths
+        id: audit
+        shell: bash
+        timeout-minutes: 22
+        run: |
+          set -euo pipefail
+          bash ci/security-160-hotfix-source-delta.sh --audit "$RUNNER_TEMP/firefox160-hotfix-delta"
+          proof="$RUNNER_TEMP/firefox160-hotfix-delta/hotfix-source-delta.json"
+          test -s "$proof" && test -s "$RUNNER_TEMP/firefox160-hotfix-delta/changed-paths.tsv"
+          jq -e '
+            .schema_version==1 and
+            .kind=="complete_mozilla_firefox_160_to_160_0_1_git_tree_delta" and
+            .original.commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .hotfix.commit=="58fed86b1b6864ad71b83c910a879d6f1a6b678b" and
+            .full_git_tree_diff_verified==true and
+            .counts.total>0 and
+            .overlay_compatibility_verified==false and
+            .native_binary_compiled==false and .native_browser_retested==false and
+            .provider_backed_safebrowsing_verified==false and
+            .security_current==false and .release_ready==false
+          ' "$proof" >/dev/null
+          echo 'PASS: exact official Mozilla complete source delta, no browser build or release' >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.counts | "Added: \(.added), modified: \(.modified), deleted: \(.deleted), type changes: \(.typechanged), total: \(.total)"' "$proof" >> "$GITHUB_STEP_SUMMARY"
+          echo 'OPEN: 28-overlay compatibility, security patch retention, native build and provider authorization' >> "$GITHUB_STEP_SUMMARY"
+      - name: Archive bounded public source-path inventory
+        id: proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox160-to-160-0-1-complete-source-path-delta-not-release-approval
+          path: ${{ runner.temp }}/firefox160-hotfix-delta/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail closed if exact-source audit or artifact was skipped
+        if: always()
+        shell: bash
+        env:
+          AUDIT: ${{ steps.audit.outcome }}
+          PROOF: ${{ steps.proof.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$AUDIT" != success || "$PROOF" != success ]]; then
+            echo 'FAIL: complete Mozilla 160.0.1 source-delta audit did not complete' >&2
+            exit 1
+          fi
+          echo 'PASS: bounded complete upstream Git-tree path inventory uploaded; release remains blocked'
