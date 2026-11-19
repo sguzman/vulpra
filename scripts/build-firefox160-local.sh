@@ -8,7 +8,6 @@ repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 old_sha=2887d9de1f69c0e9776413da80e7ba0d1225dd9b
 hotfix_sha=58fed86b1b6864ad71b83c910a879d6f1a6b678b
 candidate_tree=d6f7faf6583831a58d127480db54b5bcd5ab5949
-branding_sha=ca4ef5eea3e63b75cc0db0ce8e036dccce1b8511
 brand_path=browser/branding/unofficial/pref/firefox-branding.js
 brand_blob=ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e
 
@@ -67,10 +66,13 @@ if [[ "$mode" == prepare ]]; then
   [[ "$(git -C "$old" rev-parse HEAD)" == "$old_sha" ]] || fail 'old checkout is not official Firefox 160.0'
   [[ "$(git -C "$hotfix" rev-parse HEAD)" == "$hotfix_sha" ]] || fail 'hotfix checkout is not official Firefox 160.0.1'
   [[ -z "$(git -C "$old" status --porcelain)" && -z "$(git -C "$hotfix" status --porcelain)" ]] || fail 'official source checkout has uncommitted changes'
-  [[ -f "$repo/ci/security-160-stage-overlay.sh" && -f "$repo/ci/security-160-stage-byob-branding.sh" && -f "$repo/ci/security-160-hotfix-assemble-tree.sh" ]] || fail 'required Vulpra source-staging scripts missing; select the Firefox 160 upgrade branch'
-  git -C "$repo" cat-file -e "$branding_sha:$brand_path" || fail 'pinned BYOB branding commit not in local Vulpra Git; fetch repository history first'
+  [[ -f "$repo/ci/security-160-stage-overlay.sh" && -f "$repo/ci/security-160-stage-byob-branding.sh" && -f "$repo/ci/security-160-hotfix-assemble-tree.sh" ]] || fail 'required Vulpra source-staging scripts missing on main'
+  [[ -f "$repo/$brand_path" && ! -L "$repo/$brand_path" ]] ||
+    fail 'current main BYOB branding source is missing or symlinked'
+  [[ "$(git hash-object "$repo/$brand_path")" == "$brand_blob" ]] ||
+    fail 'main BYOB branding does not match the independently verified source blob'
   mkdir -m 700 -p -- "$work"
-  git -C "$repo" show "$branding_sha:$brand_path" > "$work/branding.js"
+  cp -- "$repo/$brand_path" "$work/branding.js"
   [[ "$(git hash-object "$work/branding.js")" == "$brand_blob" ]] || fail 'BYOB branding identity mismatch'
   bash "$repo/ci/security-160-stage-overlay.sh" --stage "$old" "$work/stage-original"
   bash "$repo/ci/security-160-stage-byob-branding.sh" --derive "$work/stage-original" "$work/branding.js" "$work/stage-byob"
