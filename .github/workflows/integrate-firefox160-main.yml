@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/integrate-firefox160-main.yml
+      - ci/land-firefox160-on-main.sh
   workflow_dispatch:
 permissions:
   contents: write
