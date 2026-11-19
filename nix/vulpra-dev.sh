@@ -131,6 +131,7 @@ case "$command_name" in
     for relative in \
       scripts/build-firefox160-local.sh \
       scripts/vulpra-build-160.sh \
+      scripts/vulpra-package-160.sh \
       ci/build-local.sh \
       ci/smoke-native-local.sh \
       ci/package-smoke-local.sh \
