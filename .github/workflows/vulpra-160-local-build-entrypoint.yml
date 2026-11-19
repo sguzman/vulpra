@@ -28,7 +28,9 @@ jobs:
           bash -n ci/security-160-stage-overlay.sh
           bash -n ci/security-160-stage-byob-branding.sh
           bash -n ci/security-160-hotfix-assemble-tree.sh
+          # shellcheck disable=SC2016
           grep -Fq 'exec bash "$root/scripts/vulpra-build-160.sh" "$@"' nix/vulpra-dev.sh
+          # shellcheck disable=SC2016
           grep -Fq 'case "$command_name" in' nix/vulpra-dev.sh
           grep -Fq 'old_sha=2887d9de1f69c0e9776413da80e7ba0d1225dd9b' scripts/vulpra-build-160.sh
           grep -Fq 'new_sha=58fed86b1b6864ad71b83c910a879d6f1a6b678b' scripts/vulpra-build-160.sh
@@ -54,7 +56,10 @@ jobs:
           test ! -e "$t/build"
           test ! -e "$t/cache/firefox-160.0"
           test ! -e "$t/cache/firefox-160.0.1"
-          ! grep -R -q 'github.com' "$t/cache"
+          if grep -R -q 'github.com' "$t/cache"; then
+            echo 'FAIL: unexpected source network metadata in no-download test' >&2
+            exit 1
+          fi
           echo 'PASS: no source/artifact download or build without explicit source permission'
       - name: Verify source and workflow were not modified
         shell: bash

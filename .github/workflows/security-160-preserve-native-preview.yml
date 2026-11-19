@@ -70,7 +70,6 @@ jobs:
       - name: Verify original package bytes and exact Mozilla/Vulpra tree identity
         shell: bash
         run: |
-          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           native="$RUNNER_TEMP/native"
           source="$RUNNER_TEMP/source/materialized-candidate.json"
@@ -101,9 +100,11 @@ jobs:
           test "$(cut -f2 "$changes" | sort | sha256sum | cut -d' ' -f1)" = \
             "$(sort "$overlays" | sha256sum | cut -d' ' -f1)"
           digest="$(sha256sum "$archive" | cut -d' ' -f1)"
-          echo "Authenticated original native package SHA-256: $digest" >> "$GITHUB_STEP_SUMMARY"
-          echo 'Original Firefox 160 candidate; UNRELEASED, not security-current.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'No compilation, privilege changes, sandbox policy changes or workstation modifications.' >> "$GITHUB_STEP_SUMMARY"
+          {
+          echo "Authenticated original native package SHA-256: $digest"
+          echo 'Original Firefox 160 candidate; UNRELEASED, not security-current.'
+          echo 'No compilation, privilege changes, sandbox policy changes or workstation modifications.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve identical unreleased binary and original checksum for 90 days
         uses: actions/upload-artifact@v4
         with:

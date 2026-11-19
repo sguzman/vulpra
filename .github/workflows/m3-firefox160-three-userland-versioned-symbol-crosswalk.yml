@@ -103,7 +103,6 @@ jobs:
           SOURCE_SHA: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
           SOURCE_TREE: 42dd7439a27dde92f89ac5eed13f88117a4d7ab5
         run: |
-          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           graph="$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json"
@@ -171,9 +170,11 @@ jobs:
           if reconcile "$graph" "$versions" "$ubuntu22" "$ubuntu24" "$RUNNER_TEMP/forged-arch.json" >/dev/null 2>&1; then
             echo 'FAIL: forged Arch host label accepted' >&2; exit 1
           fi
-          echo 'PASS: all 4592 Firefox160 individual versioned symbol candidate records identical across Ubuntu22/24/Arch, backed by 521 GNU version contracts.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'PASS: 14 forged source/archive/symbol/name/class/host/safety witnesses rejected.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'LIMIT: no actual dynamic relocations, unversioned/weak/dlopen/FFI closure, target native host or release acceptance.' >> "$GITHUB_STEP_SUMMARY"
+          {
+          echo 'PASS: all 4592 Firefox160 individual versioned symbol candidate records identical across Ubuntu22/24/Arch, backed by 521 GNU version contracts.'
+          echo 'PASS: 14 forged source/archive/symbol/name/class/host/safety witnesses rejected.'
+          echo 'LIMIT: no actual dynamic relocations, unversioned/weak/dlopen/FFI closure, target native host or release acceptance.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Archive only bounded three-userspace individual symbol candidate parity
         if: always()
         uses: actions/upload-artifact@v4

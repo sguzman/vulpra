@@ -95,7 +95,6 @@ jobs:
       - name: Observe original compiled NSS ELF data without changing its bytes
         shell: bash
         run: |
-          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           archive="$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz"
           test -s "$archive" && test -s "$archive.sha256"
@@ -152,9 +151,11 @@ jobs:
             .compiled_NSS_FIPS_DISABLED_macro_definitively_proven==false and
             .m3_sixth_gate_closed==false and .release_ready==false
           ' "$RUNNER_TEMP/original-nss-fips-gyp-elf-contract.json" >/dev/null
-          echo "Original NSS softoken ELF contains FIPS RSA KAT literal: $kat_present" >> "$GITHUB_STEP_SUMMARY"
-          echo "Original NSS softoken ELF exports FC_Initialize: $exported_fc_initialize" >> "$GITHUB_STEP_SUMMARY"
-          echo 'LIMIT: source defaults and ELF literal presence/absence cannot prove the original compile flags or FIPS startup root cause; original NSS and profiles unchanged.' >> "$GITHUB_STEP_SUMMARY"
+          {
+          echo "Original NSS softoken ELF contains FIPS RSA KAT literal: $kat_present"
+          echo "Original NSS softoken ELF exports FC_Initialize: $exported_fc_initialize"
+          echo 'LIMIT: source defaults and ELF literal presence/absence cannot prove the original compile flags or FIPS startup root cause; original NSS and profiles unchanged.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Archive sanitized source and binary observation only
         if: always()
         uses: actions/upload-artifact@v4

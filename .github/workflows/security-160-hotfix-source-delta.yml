@@ -37,7 +37,6 @@ jobs:
         shell: bash
         timeout-minutes: 22
         run: |
-          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           bash ci/security-160-hotfix-source-delta.sh --audit "$RUNNER_TEMP/firefox160-hotfix-delta"
           proof="$RUNNER_TEMP/firefox160-hotfix-delta/hotfix-source-delta.json"
@@ -60,10 +59,12 @@ jobs:
             .provider_backed_safebrowsing_verified==false and
             .security_current==false and .release_ready==false
           ' "$proof" >/dev/null
-          echo 'PASS: exact official Mozilla complete source delta, no browser build or release' >> "$GITHUB_STEP_SUMMARY"
-          jq -r '.counts | "Added: \(.added), modified: \(.modified), deleted: \(.deleted), type changes: \(.typechanged), total: \(.total)"' "$proof" >> "$GITHUB_STEP_SUMMARY"
-          jq -r '"Vulpra overlay files overlapping hotfix changes: \(.overlay_upstream_changed_paths_count) / \(.overlay_paths_total)"' "$proof" >> "$GITHUB_STEP_SUMMARY"
-          echo 'OPEN: 28-overlay rebase compatibility, security patch retention, native build and provider authorization' >> "$GITHUB_STEP_SUMMARY"
+          {
+          echo 'PASS: exact official Mozilla complete source delta, no browser build or release'
+          jq -r '.counts | "Added: \(.added), modified: \(.modified), deleted: \(.deleted), type changes: \(.typechanged), total: \(.total)"' "$proof"
+          jq -r '"Vulpra overlay files overlapping hotfix changes: \(.overlay_upstream_changed_paths_count) / \(.overlay_paths_total)"' "$proof"
+          echo 'OPEN: 28-overlay rebase compatibility, security patch retention, native build and provider authorization'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Archive bounded public source-path inventory
         id: proof
         if: success()

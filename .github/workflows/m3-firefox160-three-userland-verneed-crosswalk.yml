@@ -92,7 +92,6 @@ jobs:
           SOURCE_SHA: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
           SOURCE_TREE: 42dd7439a27dde92f89ac5eed13f88117a4d7ab5
         run: |
-          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           graph="$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json"
@@ -158,9 +157,11 @@ jobs:
           if reconcile "$graph" "$ubuntu22" "$ubuntu24" "$RUNNER_TEMP/forged-arch.json" >/dev/null 2>&1; then
             echo 'FAIL: forged Arch userspace identity accepted' >&2; exit 1
           fi
-          echo 'PASS: 521 exact Firefox160 source-matched GNU version names are identical across Ubuntu22, Ubuntu24 and Arch userspace.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'PASS: 12 forged identity/requirements/provider/sandbox/closure reports rejected.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'LIMIT: version-name candidates, not actual ELF symbol binding, optional dlopen/FFI graph, target workstation or safe pruning.' >> "$GITHUB_STEP_SUMMARY"
+          {
+          echo 'PASS: 521 exact Firefox160 source-matched GNU version names are identical across Ubuntu22, Ubuntu24 and Arch userspace.'
+          echo 'PASS: 12 forged identity/requirements/provider/sandbox/closure reports rejected.'
+          echo 'LIMIT: version-name candidates, not actual ELF symbol binding, optional dlopen/FFI graph, target workstation or safe pruning.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Archive bounded three-userspace GNU version-name parity proof
         if: always()
         uses: actions/upload-artifact@v4
