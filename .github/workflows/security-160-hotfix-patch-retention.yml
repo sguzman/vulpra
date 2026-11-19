@@ -82,8 +82,8 @@ jobs:
           candidate=d6f7faf6583831a58d127480db54b5bcd5ab5949
           test "$(git -C original rev-parse HEAD)" = "$old"
           test "$(git -C hotfix rev-parse HEAD)" = "$hotfix"
-          report="$RUNNER_TEMP/proof/hotfix-candidate-tree-proof.json"
-          changes="$RUNNER_TEMP/proof/changed-against-official-hotfix.tsv"
+          report="$RUNNER_TEMP/proof/firefox160-0-1-byob-tree/hotfix-candidate-tree-proof.json"
+          changes="$RUNNER_TEMP/proof/firefox160-0-1-byob-tree/changed-against-official-hotfix.tsv"
           test -s "$report" && test -s "$changes"
           jq -e --arg old "$old" --arg hotfix "$hotfix" --arg tree "$candidate" '
             .schema_version==1 and
