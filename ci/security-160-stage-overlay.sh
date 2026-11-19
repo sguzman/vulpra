@@ -67,10 +67,11 @@ brand_worktree_blob="$(git hash-object -- "$repo/$brand_path")"
 case "$brand_worktree_blob" in
   "$brand_original_blob") ;;
   "$brand_byob_blob")
-    # No remote lazy fetch: require the historical source object to be
-    # present locally. Never weaken the original 28-file source contract.
-    GIT_NO_LAZY_FETCH=1 git -C "$repo" cat-file -e "$brand_original_blob^{blob}" ||
-      fail "original pinned branding object absent from local Vulpra Git checkout"
+    # Shallow main checkouts do not necessarily contain historical Git blobs.
+    # Use the exact versioned 1.5 KiB original-branding source fixture,
+    # authenticated to the same pinned Git blob as the old candidate.
+    brand_original_fixture="$repo/ci/fixtures/firefox160-original-branding.js"
+    hash_is "$brand_original_fixture" "$brand_original_blob"
     ;;
   *) fail "unexpected Vulpra branding source identity: $brand_worktree_blob" ;;
 esac
@@ -83,8 +84,7 @@ for path in \
   browser/moz.configure; do
   mkdir -p -- "$dest/$(dirname -- "$path")"
   if [[ "$path" == "$brand_path" && "$brand_worktree_blob" == "$brand_byob_blob" ]]; then
-    GIT_NO_LAZY_FETCH=1 git -C "$repo" cat-file blob "$brand_original_blob" > "$dest/$path" ||
-      fail 'cannot materialize pinned original branding without network'
+    cp -- "$brand_original_fixture" "$dest/$path"
   else
     cp -- "$repo/$path" "$dest/$path"
   fi
