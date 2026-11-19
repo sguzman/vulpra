@@ -11,11 +11,12 @@ Vulpra Nix launcher (Nix Output Monitor)
   ./nix/vulpra source          Inspect source checkout completeness
   ./nix/vulpra check           Syntax-check native build scripts
   ./nix/vulpra configure       Run the native mach configure
+  ./nix/vulpra status          Read-only local Firefox 160 source/build status (no Nix/download)
   ./nix/vulpra build           Build verified Firefox 160 Vulpra locally in a separate tree
   ./nix/vulpra build --fetch-source  Approve a one-time official Mozilla SOURCE download
   ./nix/vulpra run             Launch the locally built browser with its private profile
   ./nix/vulpra build --jobs 8  Override local native build parallelism
-  ./nix/vulpra package         Package and privately smoke the native binary
+  ./nix/vulpra package         Package and privately smoke the same locally built Firefox 160
   ./nix/vulpra smoke|wayland|accept|webext|input
   ./nix/vulpra mach ARGS       Delegate mach commands inside the devShell
   ./nix/vulpra help            Show this message
@@ -38,6 +39,13 @@ if (($#)); then shift; fi
 
 case "$action" in
   help|-h|--help) usage; exit 0 ;;
+  status)
+    (($# == 0)) || error "'status' takes no extra arguments"
+    here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+    [[ -f "$here/scripts/vulpra-build-160.sh" ]] ||
+      error "missing main-branch Firefox 160 local source builder"
+    exec bash "$here/scripts/vulpra-build-160.sh" --status
+    ;;
   shell)
     (($# == 0)) || error "'shell' takes no extra arguments"
     command_args=(fish)
