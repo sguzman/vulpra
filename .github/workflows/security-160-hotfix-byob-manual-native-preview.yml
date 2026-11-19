@@ -1,5 +1,14 @@
 name: Firefox 160.0.1 BYOB Manual Native Preview (Unreleased)
+# GitHub requires workflow_dispatch workflow files to exist on the default
+# branch. This draft-only branch has no permission to merge or modify main.
+# The exact one-shot approval commit message below enables a future branch
+# push ONLY when the owner explicitly authorizes an expensive native build.
+# Normal source changes, workflow changes, and initial installation skip jobs.
 on:
+  push:
+    branches: [upgrade/firefox-160-overlay-prototype]
+    paths:
+      - .github/workflows/security-160-hotfix-byob-manual-native-preview.yml
   workflow_dispatch:
     inputs:
       authorize_native_build:
@@ -11,7 +20,14 @@ permissions:
   contents: read
 jobs:
   stage-twenty-eight-exact-source-overlays:
-    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype' && inputs.authorize_native_build == true
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.authorize_native_build == true) ||
+        (github.event_name == 'push' &&
+         github.event.head_commit.message == 'Authorize one Firefox 160.0.1 Vulpra native CI build')
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -163,7 +179,14 @@ jobs:
 
   materialize-verified-firefox160-candidate:
     needs: stage-twenty-eight-exact-source-overlays
-    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype' && inputs.authorize_native_build == true
+    if: >-
+      github.repository == 'sguzman/vulpra' &&
+      github.ref == 'refs/heads/upgrade/firefox-160-overlay-prototype' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.authorize_native_build == true) ||
+        (github.event_name == 'push' &&
+         github.event.head_commit.message == 'Authorize one Firefox 160.0.1 Vulpra native CI build')
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     env:
