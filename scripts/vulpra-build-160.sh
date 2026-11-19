@@ -78,9 +78,7 @@ fi
 # unexpectedly trigger a Nix/nom toolchain realization or any network fetch.
 if [[ "$action" == preflight ]]; then
   if [[ -s "$work/prepared-source-tree.sha" ]]; then
-    [[ "$(cat "$work/prepared-source-tree.sha")" ==
-       d6f7faf6583831a58d127480db54b5bcd5ab5949 &&
-       -d "$work/source" ]] ||
+    [[ "$(cat "$work/prepared-source-tree.sha")" == d6f7faf6583831a58d127480db54b5bcd5ab5949 && -d "$work/source" ]] ||
       die 'prepared source identity is incomplete or changed; refusing to start Nix'
     echo 'PASS: verified Vulpra source already prepared; no source download needed'
     exit 0
