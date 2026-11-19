@@ -9,6 +9,48 @@ An ordinary `nix develop ./nix` therefore does **not** copy the enormous
 Firefox source tree into the Nix store. No Nix operation here deletes or
 reconfigures the existing `obj-vulpra-linux` build directory.
 
+## Current local Vulpra build on main (Firefox 160.0.1)
+
+The ordinary `./nix/vulpra build` command **now assembles and compiles**
+Vulpra's pinned Firefox 160.0.1 BYOB candidate into a separate local source
+and object directory (`~/Code/Builds/vulpra-160.0.1`). The old Firefox 159
+source files in the repository root are retained for provenance, but they
+are **not** the source built by the default `build` command.
+
+```fish
+./nix/vulpra build
+```
+
+If the official Mozilla source is not already cached, the builder stops and
+prints the one-time, explicit **source download** opt-in command:
+
+```fish
+./nix/vulpra build --fetch-source
+```
+
+The download may be large. Neither command downloads a precompiled Vulpra
+binary, replaces installed Firefox, changes its profile, or mutates the old
+root build outputs. The pinned Nix shell can itself download missing toolchain
+store paths as usual. Subsequent builds reuse source and objdir for incremental
+native compilation.
+
+To launch the locally built browser using a completely separate profile:
+
+```fish
+./nix/vulpra run
+```
+
+To check cached upstream source readiness without starting any Nix realization:
+
+```fish
+bash scripts/vulpra-build-160.sh --status
+```
+
+The historical commands `./nix/vulpra mach` and
+`./nix/vulpra configure` still address the original Firefox 159 checkout;
+they are not interchangeable with the default 160 build workflow. Full local
+160 build and EndeavourOS/Hyprland runtime acceptance are **not yet verified**.
+
 ## Enter the toolchain with Nix Output Monitor
 
 Nix/Lix is installed separately on the workstation. Enable `nix-command` and
