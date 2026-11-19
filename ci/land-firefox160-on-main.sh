@@ -82,12 +82,10 @@ git -C "$repo" restore --source="$base" --staged -- \
 final_tree="$(git -C "$repo" write-tree)"
 [[ "$(git -C "$repo" show "$final_tree:browser/config/version.txt")" == 160.0.1 ]] ||
   fail 'final tree is not 160.0.1'
-[[ "$(git -C "$repo" rev-parse "$final_tree:browser/branding/unofficial/pref/firefox-branding.js")" ==
-   ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e ]] ||
+[[ "$(git -C "$repo" rev-parse "$final_tree:browser/branding/unofficial/pref/firefox-branding.js")" == ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e ]] ||
   fail 'Vulpra branding changed'
 for path in AGENTS.md CLAUDE.md README.md ci/security-160-stage-overlay.sh nix/vulpra; do
-  [[ "$(git -C "$repo" rev-parse "$final_tree:$path")" ==
-     "$(git -C "$repo" rev-parse "$base:$path")" ]] ||
+  [[ "$(git -C "$repo" rev-parse "$final_tree:$path")" == "$(git -C "$repo" rev-parse "$base:$path")" ]] ||
     fail "project-owned source not preserved: $path"
 done
 
