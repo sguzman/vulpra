@@ -1,0 +1,196 @@
+name: Vulpra Main Firefox160 Source Stage Acceptance (No Native Build)
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/vulpra-160-main-source-stage-acceptance.yml
+      - ci/security-160-stage-overlay.sh
+      - ci/security-160-stage-byob-branding.sh
+      - ci/security-160-hotfix-assemble-tree.sh
+      - ci/fixtures/firefox160-original-branding.js
+      - scripts/build-firefox160-local.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authenticate-main-local-stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout current main staging scripts and 28 exact Vulpra overlay source files
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-stage-overlay.sh
+            ci/security-160-stage-byob-branding.sh
+            ci/security-160-hotfix-assemble-tree.sh
+            ci/fixtures/firefox160-original-branding.js
+            browser/branding/unofficial/configure.sh
+            browser/branding/unofficial/locales/en-US/brand.ftl
+            browser/branding/unofficial/pref/firefox-branding.js
+            browser/moz.configure
+            browser/app/profile/firefox.js
+            toolkit/components/normandy/jar.mn
+            toolkit/components/normandy/lib/NormandyApi.sys.mjs
+            toolkit/components/normandy/lib/NormandyUtils.sys.mjs
+            toolkit/components/normandy/schemas/LegacyHeartbeat.schema.json
+            browser/extensions/newtab/webext-glue/moz.build
+            browser/extensions/newtab/lib/ActivityStream.sys.mjs
+            browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+            browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
+            taskcluster/kinds/toolchain/android.yml
+            python/mozbuild/mozbuild/frontend/emitter.py
+            browser/components/asrouter/modules/ASRouter.sys.mjs
+            toolkit/components/moz.build
+            browser/components/BrowserComponents.manifest
+            browser/components/DesktopActorRegistry.sys.mjs
+            browser/components/asrouter/moz.build
+            browser/extensions/newtab/addon-jar.mn
+            browser/extensions/newtab/build-newtab-bundles.py
+            browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx
+            browser/extensions/newtab/webpack.system-addon.config.js
+            dom/webgpu/tests/cts/checkout/node.tsconfig.json
+            python/mozbuild/mozbuild/testing.py
+            toolkit/components/nimbus/moz.build
+            toolkit/components/normandy/moz.build
+            toolkit/modules/AppConstants.sys.mjs
+      - name: Checkout pinned official Firefox 160 release overlay bases only
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          path: upstream160
+          sparse-checkout: |
+            browser/branding/unofficial/configure.sh
+            browser/branding/unofficial/locales/en-US/brand.ftl
+            browser/branding/unofficial/pref/firefox-branding.js
+            browser/moz.configure
+            browser/app/profile/firefox.js
+            toolkit/components/normandy/jar.mn
+            toolkit/components/normandy/lib/NormandyApi.sys.mjs
+            toolkit/components/normandy/lib/NormandyUtils.sys.mjs
+            toolkit/components/normandy/schemas/LegacyHeartbeat.schema.json
+            browser/extensions/newtab/webext-glue/moz.build
+            browser/extensions/newtab/lib/ActivityStream.sys.mjs
+            browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+            browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
+            taskcluster/kinds/toolchain/android.yml
+            python/mozbuild/mozbuild/frontend/emitter.py
+            browser/components/asrouter/modules/ASRouter.sys.mjs
+            toolkit/components/moz.build
+            browser/components/BrowserComponents.manifest
+            browser/components/DesktopActorRegistry.sys.mjs
+            browser/components/asrouter/moz.build
+            browser/extensions/newtab/addon-jar.mn
+            browser/extensions/newtab/build-newtab-bundles.py
+            browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx
+            browser/extensions/newtab/webpack.system-addon.config.js
+            dom/webgpu/tests/cts/checkout/node.tsconfig.json
+            python/mozbuild/mozbuild/testing.py
+            toolkit/components/nimbus/moz.build
+            toolkit/components/normandy/moz.build
+            toolkit/modules/AppConstants.sys.mjs
+      - name: Checkout official Firefox 160.0.1 Git tree with sparse overlay bases
+        uses: actions/checkout@v4
+        with:
+          repository: mozilla-firefox/firefox
+          ref: 58fed86b1b6864ad71b83c910a879d6f1a6b678b
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          path: upstream160hotfix
+          sparse-checkout: |
+            browser/branding/unofficial/configure.sh
+            browser/branding/unofficial/locales/en-US/brand.ftl
+            browser/branding/unofficial/pref/firefox-branding.js
+            browser/moz.configure
+            browser/app/profile/firefox.js
+            toolkit/components/normandy/jar.mn
+            toolkit/components/normandy/lib/NormandyApi.sys.mjs
+            toolkit/components/normandy/lib/NormandyUtils.sys.mjs
+            toolkit/components/normandy/schemas/LegacyHeartbeat.schema.json
+            browser/extensions/newtab/webext-glue/moz.build
+            browser/extensions/newtab/lib/ActivityStream.sys.mjs
+            browser/extensions/newtab/lib/DiscoveryStreamFeed.sys.mjs
+            browser/extensions/newtab/lib/TopSitesFeed.sys.mjs
+            taskcluster/kinds/toolchain/android.yml
+            python/mozbuild/mozbuild/frontend/emitter.py
+            browser/components/asrouter/modules/ASRouter.sys.mjs
+            toolkit/components/moz.build
+            browser/components/BrowserComponents.manifest
+            browser/components/DesktopActorRegistry.sys.mjs
+            browser/components/asrouter/moz.build
+            browser/extensions/newtab/addon-jar.mn
+            browser/extensions/newtab/build-newtab-bundles.py
+            browser/extensions/newtab/content-src/components/DiscoveryStreamComponents/AdBanner/AdBanner.jsx
+            browser/extensions/newtab/webpack.system-addon.config.js
+            dom/webgpu/tests/cts/checkout/node.tsconfig.json
+            python/mozbuild/mozbuild/testing.py
+            toolkit/components/nimbus/moz.build
+            toolkit/components/normandy/moz.build
+            toolkit/modules/AppConstants.sys.mjs
+            dom/media/ChannelMediaDecoder.cpp
+            gfx/gl/GLBlitHelper.cpp
+            browser/config/version.txt
+      - name: Verify main BYOB branding and original pinned source fixture
+        id: verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-stage-overlay.sh
+          bash -n ci/security-160-stage-byob-branding.sh
+          bash -n ci/security-160-hotfix-assemble-tree.sh
+          test "$(git hash-object ci/fixtures/firefox160-original-branding.js)" = 9308a1b26f339e0e89d959f0c4559eb7596a0fe6
+          test "$(git hash-object browser/branding/unofficial/pref/firefox-branding.js)" = ae3fd50a6aee0ad58933dca09db39b7b87c0eb5e
+          test "$(git -C upstream160 rev-parse HEAD)" = 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
+          test "$(git -C upstream160hotfix rev-parse HEAD)" = 58fed86b1b6864ad71b83c910a879d6f1a6b678b
+          bash ci/security-160-stage-overlay.sh --stage \
+            "$GITHUB_WORKSPACE/upstream160" "$RUNNER_TEMP/stage-original"
+          bash ci/security-160-stage-byob-branding.sh --derive \
+            "$RUNNER_TEMP/stage-original" \
+            "$GITHUB_WORKSPACE/browser/branding/unofficial/pref/firefox-branding.js" \
+            "$RUNNER_TEMP/stage-byob"
+          bash ci/security-160-hotfix-assemble-tree.sh --assemble \
+            "$GITHUB_WORKSPACE/upstream160" "$GITHUB_WORKSPACE/upstream160hotfix" \
+            "$RUNNER_TEMP/stage-byob" "$RUNNER_TEMP/proof"
+          jq -e '
+            .original_release_commit=="2887d9de1f69c0e9776413da80e7ba0d1225dd9b" and
+            .hotfix_release_commit=="58fed86b1b6864ad71b83c910a879d6f1a6b678b" and
+            .candidate_git_tree=="d6f7faf6583831a58d127480db54b5bcd5ab5949" and
+            .source_overlay_count==28 and
+            .modified_upstream_paths==26 and
+            .vulpra_only_source_additions==2 and
+            .removed_upstream_paths==0 and
+            .all_other_mozilla_hotfix_source_paths_preserved==true and
+            .native_browser_compiled==false and .release_ready==false
+          ' "$RUNNER_TEMP/proof/hotfix-candidate-tree-proof.json" >/dev/null
+          echo 'PASS: main produced exact independently compiled Firefox160.0.1 candidate source-tree SHA'
+          echo 'LIMIT: source-only regression: no native binary build or target-host QA here'
+      - name: Save bounded exact source-tree acceptance proof
+        id: proof
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra160-main-nix-local-source-stage-proof
+          path: ${{ runner.temp }}/proof/hotfix-candidate-tree-proof.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail closed if staging or proof archive did not both pass
+        if: always()
+        shell: bash
+        env:
+          STAGE: ${{ steps.verify.outcome }}
+          PROOF: ${{ steps.proof.outcome }}
+        run: |
+          set -euo pipefail
+          [[ "$STAGE" == success && "$PROOF" == success ]] || {
+            echo 'FAIL: main source stage or archived proof incomplete' >&2
+            exit 1
+          }
+          echo 'PASS: main source staging and archived source identity both accepted'
