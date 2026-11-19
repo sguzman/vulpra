@@ -228,7 +228,7 @@ jobs:
           test "$(grep -Ec '^DENIED (dlopen|dlmopen) ' "$log")" -eq 2
           grep -Eq '^DENIED dlopen libmozavcodec.so [0-9]+$' "$log"
           grep -Eq '^DENIED dlopen libmozavutil.so [0-9]+$' "$log"
-          ! grep -Eq '^DENIED .* (libavcodec.so.60|libnss3.so) ' "$log"
+          if grep -Eq '^DENIED .* (libavcodec.so.60|libnss3.so) ' "$log"; then echo 'FAIL: unexpected provider denial in isolated fixture' >&2; exit 1; fi
           : > "$log"
           env LD_PRELOAD="$RUNNER_TEMP/vulpra-deny-optional-native-providers.so" \
             VULPRA_M3_DENY_FIXTURE_EXE=vulpra_ffvpx_probe \
@@ -236,7 +236,7 @@ jobs:
             "$RUNNER_TEMP/vulpra_ffvpx_probe"
           test "$(grep -Ec '^DENIED (dlopen|dlmopen) ' "$log")" -eq 1
           grep -Eq '^DENIED dlopen libavcodec.so.60 [0-9]+$' "$log"
-          ! grep -Eq '^DENIED .* (libmozavcodec.so|libmozavutil.so) ' "$log"
+          if grep -Eq '^DENIED .* (libmozavcodec.so|libmozavutil.so) ' "$log"; then echo 'FAIL: unexpected provider denial in isolated fixture' >&2; exit 1; fi
           rm -f "$log" "$RUNNER_TEMP/vulpra_ffvpx_probe"
           echo 'PASS: source-scoped native shim FFVPX denies only both mozav* libraries; FFmpeg group remains separate'
       - name: Actual original Firefox160 WebDriver video baseline versus bundled FFVPX loader denial

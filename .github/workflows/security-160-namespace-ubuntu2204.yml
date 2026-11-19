@@ -240,7 +240,7 @@ jobs:
           firefox="$RUNNER_TEMP/firefox160-content-sandbox-proof.json"
           runner="$RUNNER_TEMP/firefox160-runner-userns-child-report.json"
           report="$RUNNER_TEMP/firefox160-userns-crosswalk.json"
-          test -s "$firefox" && test -s "$runner" && ! -e "$report"
+          test -s "$firefox" && test -s "$runner" && test ! -e "$report"
           jq -n --slurpfile f "$firefox" --slurpfile r "$runner" '
             ($f[0]) as $browser |
             ($r[0]) as $host |
@@ -317,7 +317,7 @@ jobs:
           host="$RUNNER_TEMP/firefox160-runner-userns-child-report.json"
           crosswalk="$RUNNER_TEMP/firefox160-userns-crosswalk.json"
           target="$RUNNER_TEMP/firefox160-ubuntu2204-namespace-acceptance.json"
-          test -s "$proof" && test -s "$host" && test -s "$crosswalk" && ! -e "$target"
+          test -s "$proof" && test -s "$host" && test -s "$crosswalk" && test ! -e "$target"
           jq -n --slurpfile f "$proof" --slurpfile h "$host" --slurpfile c "$crosswalk" '
             ($f[0]) as $browser |
             ($h[0]) as $runner |

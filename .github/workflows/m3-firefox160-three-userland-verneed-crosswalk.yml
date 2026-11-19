@@ -92,6 +92,7 @@ jobs:
           SOURCE_SHA: 2887d9de1f69c0e9776413da80e7ba0d1225dd9b
           SOURCE_TREE: 42dd7439a27dde92f89ac5eed13f88117a4d7ab5
         run: |
+          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           graph="$RUNNER_TEMP/graph/firefox160-source-matched-native-elf-graph.json"

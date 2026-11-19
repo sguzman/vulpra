@@ -226,14 +226,14 @@ jobs:
           grep -Eq '^DENIED dlopen libmozavcodec.so [0-9]+$' "$log"
           grep -Eq '^DENIED dlopen libmozavutil.so [0-9]+$' "$log"
           grep -Eq '^DENIED dlopen libavcodec.so.60 [0-9]+$' "$log"
-          ! grep -Eq '^DENIED (dlopen|dlmopen) libnss3.so ' "$log"
+          if grep -Eq '^DENIED (dlopen|dlmopen) libnss3.so ' "$log"; then echo 'FAIL: unexpected provider denial in isolated fixture' >&2; exit 1; fi
           : > "$log"
           env LD_PRELOAD="$RUNNER_TEMP/deny-native.so" \
             VULPRA_M3_DENY_FIXTURE_EXE=combined_probe \
             VULPRA_M3_DENY_GROUP=ffvpx VULPRA_M3_DENY_LOG="$log" \
             "$RUNNER_TEMP/combined_probe"
           test "$(grep -Ec '^DENIED (dlopen|dlmopen) ' "$log")" -eq 2
-          ! grep -Eq '^DENIED (dlopen|dlmopen) libavcodec.so.60 ' "$log"
+          if grep -Eq '^DENIED (dlopen|dlmopen) libavcodec.so.60 ' "$log"; then echo 'FAIL: unexpected provider denial in isolated fixture' >&2; exit 1; fi
           : > "$log"
           env LD_PRELOAD="$RUNNER_TEMP/deny-native.so" \
             VULPRA_M3_DENY_FIXTURE_EXE=combined_probe \

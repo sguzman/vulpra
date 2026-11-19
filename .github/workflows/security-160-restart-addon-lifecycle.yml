@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Authenticate original Firefox 160 build and byte-preserving archive
+        id: inspect
         uses: actions/github-script@v7
         with:
           script: |
@@ -44,6 +45,7 @@ jobs:
               if(matches.length!==1) throw Error('Preserved archive missing/expired/ambiguous: '+name);
             }
             core.info('PASS: original native producer and verified byte-preserving mirror');
+            core.setOutput('ready','true');
       - name: Checkout original WebDriver helper and new restart QA script
         if: steps.inspect.outputs.ready == 'true'
         uses: actions/checkout@v4

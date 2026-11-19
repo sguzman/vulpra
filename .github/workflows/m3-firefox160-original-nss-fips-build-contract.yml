@@ -95,6 +95,7 @@ jobs:
       - name: Observe original compiled NSS ELF data without changing its bytes
         shell: bash
         run: |
+          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           archive="$RUNNER_TEMP/original/vulpra-firefox160-native-ci.tar.xz"
           test -s "$archive" && test -s "$archive.sha256"

@@ -155,6 +155,7 @@ jobs:
         shell: bash
         timeout-minutes: 10
         run: |
+          # shellcheck disable=SC2086 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           digest="$(sha256sum "$RUNNER_TEMP/native/vulpra-firefox160-native-ci.tar.xz" | cut -d' ' -f1)"
           docker run --rm --network none --read-only \

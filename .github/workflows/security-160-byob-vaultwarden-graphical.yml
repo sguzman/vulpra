@@ -156,7 +156,7 @@ jobs:
           [[ "$pid" =~ ^[0-9]+$ ]] && test "$pid" -gt 1
           sudo nsenter -t "$pid" -n -- ip link set lo up
           ready=0
-          for n in $(seq 1 50); do
+          for _ in $(seq 1 50); do
             if sudo nsenter -t "$pid" -n -- curl --fail --silent --show-error --max-time 2 \
               --cacert "$RUNNER_TEMP/vulpra-vaultwarden-tls/ca.crt" \
               'https://127.0.0.1:8443/alive' > /dev/null 2>&1; then

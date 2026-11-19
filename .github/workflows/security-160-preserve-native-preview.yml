@@ -70,6 +70,7 @@ jobs:
       - name: Verify original package bytes and exact Mozilla/Vulpra tree identity
         shell: bash
         run: |
+          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           native="$RUNNER_TEMP/native"
           source="$RUNNER_TEMP/source/materialized-candidate.json"

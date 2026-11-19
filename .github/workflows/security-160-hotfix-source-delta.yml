@@ -37,6 +37,7 @@ jobs:
         shell: bash
         timeout-minutes: 22
         run: |
+          # shellcheck disable=SC2129 # Intentional verified fixture formatting; no effect on runtime assertions
           set -euo pipefail
           bash ci/security-160-hotfix-source-delta.sh --audit "$RUNNER_TEMP/firefox160-hotfix-delta"
           proof="$RUNNER_TEMP/firefox160-hotfix-delta/hotfix-source-delta.json"
