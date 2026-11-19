@@ -43,12 +43,12 @@ To launch the locally built browser using a completely separate profile:
 To check cached upstream source readiness without starting any Nix realization:
 
 ```fish
-bash scripts/vulpra-build-160.sh --status
+./nix/vulpra status
 ```
 
-The historical commands `./nix/vulpra mach` and
-`./nix/vulpra configure` still address the original Firefox 159 checkout;
-they are not interchangeable with the default 160 build workflow. Full local
+`./nix/vulpra mach` addresses the historical imported Firefox 159 source.
+Standalone `./nix/vulpra configure` now deliberately refuses to configure
+that old tree: `./nix/vulpra build` configures the verified 160 source automatically. Full local
 160 build and EndeavourOS/Hyprland runtime acceptance are **not yet verified**.
 
 ## Enter the toolchain with Nix Output Monitor
@@ -102,11 +102,11 @@ developer shell. Do not set it manually to bypass the guard.
 | Command | Effect |
 | --- | --- |
 | `vulpra-dev doctor` | Inventory basic local toolchain and preserve-only local mozconfig status |
-| `vulpra-dev source` | Check tracked source completeness and sparse checkout status |
+| `vulpra-dev source` | Check the historical imported source checkout (not the 160 build) |
 | `vulpra-dev check` | Syntax-check existing guarded CI/local shell workflows |
-| `vulpra-dev configure` | Existing `./mach configure`, no source rewriting |
-| `vulpra-dev build` | Existing locked `ci/build-local.sh` native build and logging |
-| `vulpra-dev package` | Existing isolated package/smoke runner |
+| `vulpra-dev configure` | Refuses the old Firefox 159 configure path; the current 160 build configures automatically |
+| `vulpra-dev build` | Prepare/authenticate and incrementally compile the separate Firefox 160.0.1 source tree |
+| `vulpra-dev package` | Package the same locally compiled Firefox 160.0.1 and smoke-test its private profile |
 | `vulpra-dev smoke` | Existing private native headless test |
 | `vulpra-dev wayland` | Existing private Weston/Wayland QA |
 | `vulpra-dev accept` | Existing private localhost JS and archive acceptance |
@@ -118,19 +118,15 @@ its profile. The environment contains GCC/Clang-related tooling, Rust, the
 Gecko Python build prerequisites, JS runtime (not a request to use npm),
 assembler, developer instrumentation, graphics headers, Weston and WebDriver.
 
-**Local mozconfig is intentionally not overwritten.** Your existing
-`~/.mozbuild/vulpra-local.mozconfig` includes a workstation-specific WASI
-sysroot override. `ci/mozconfig-linux` is a different CI configuration, and
-the Nix shell will **not** substitute it.
-
-When you invoke `./nix/vulpra configure` or `./nix/vulpra build`, the guarded
-CLI sets `MOZCONFIG` **only for that command** to the tracked
-`nix/mozconfig-overlay.sh`. That shell script **sources the unchanged original
-mozconfig** (or your explicit pre-existing `MOZCONFIG`) and adds exactly one
-`--with-libclang-path` option pointing at the Nix-provided LLVM 21 shared
-library. `VULPRA_MOZCONFIG_SOURCE` records the original path for that command.
-Nothing edits the source mozconfig or deletes the existing object directory,
-but a normal Gecko configure/build may update its own generated object files.
+**Mozconfig separation:** `./nix/vulpra build` creates a local
+`~/Code/Builds/vulpra-160.0.1/config/mozconfig` based on the pinned CI
+Firefox160 configuration plus Nix-provided shared libclang. It neither
+overwrites your historical `~/.mozbuild/vulpra-local.mozconfig` (which
+has a workstation WASI override) nor writes to the old Firefox159 object
+directory. The historical `./nix/vulpra mach ...` command still uses the
+tracked `nix/mozconfig-overlay.sh` shim with your unchanged original
+mozconfig. Nix's developer shell supplies the WASI toolchain for both.
+An actual on-workstation 160 build remains to be verified.
 
 This shim is needed because Mozilla's
 `build/moz.configure/bindgen.configure` doesn't automatically discover
@@ -154,9 +150,8 @@ and `-gdwarf-4`. A workstation `mach build` therefore failed at
 The Vulpra-only Nix devShell now exports `AS` as the **same pinned native
 GCC compiler driver** used by `mach configure`. It does not alter a
 system-wide environment, the personal mozconfig, the installed browser,
-or built outputs; re-running `./nix/vulpra configure` is necessary to
-regenerate the native object-directory makefiles with the corrected
-assembler. `test-native-assembler.sh` runs a native assembly smoke with
+or built outputs; the current `./nix/vulpra build` configures its separate
+Firefox 160 object directory with the corrected native assembler. `test-native-assembler.sh` runs a native assembly smoke with
 the actual failed flags in CI before another full browser build is attempted.
 This is an isolated assembler check, **not full browser-build acceptance**.
 
