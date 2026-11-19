@@ -56,14 +56,36 @@ Project color: <img src="docs/vulpra/swatch.svg" alt="Vulpra lilac swatch" width
 **License:** Firefox-derived files retain their upstream licensing, notices and third-party license obligations. Vulpra-specific files have their own explicit licensing as applicable. The initial template MIT license must not be treated as relicensing the Firefox code. See [license and provenance notes](docs/vulpra/UPSTREAM.md).
 
 
-## Local development and Firefox 160.0.1 upgrade limitations
+## Build the current Vulpra locally with Nix (Firefox 160.0.1)
 
-**Do not use placeholder `--old-source /path/to/...` and `--hotfix-source /path/to/...` commands as if they were a ready local build.** The previous instructions incorrectly implied that the developer already had both official Mozilla checkouts. Their paths and presence on the target machine have **not** been established.
+From an up-to-date `main` checkout of Vulpra, use the **existing Nix/nom launcher**:
 
-Vulpra already has a real Nix/nom-based local development toolchain on the repository's `main` branch: [`nix/vulpra`](https://github.com/sguzman/vulpra/blob/main/nix/vulpra), [`nix/flake.nix`](https://github.com/sguzman/vulpra/blob/main/nix/flake.nix), [`nix/README.md`](https://github.com/sguzman/vulpra/blob/main/nix/README.md). From the existing local Vulpra root (typically `~/Code/Apps/vulpra`), `./nix/vulpra doctor` and `./nix/vulpra build` operate on **the currently checked-out native Vulpra source**. They do not compile the new Firefox 160.0.1 candidate if the local checkout remains on the older `main` source, and this upgrade branch does not yet include the `nix/` tooling. Do **not** casually switch branches or overwrite existing build outputs expecting the two trees to be interchangeable.
+```fish
+./nix/vulpra build
+```
 
-The Firefox 160.0.1 BYOB candidate currently exists as an **authenticated CI-produced source overlay**, not a full locally checkable-out source branch. [`scripts/build-firefox160-local.sh`](scripts/build-firefox160-local.sh) is an **experimental, unfinished manual helper** requiring pre-existing clean official Firefox 160.0 and 160.0.1 Git trees. It does not provision those sources or the Nix development environment. It is **not** a complete or user-ready local-build interface, and its existence should not be reported as closing local build acceptance.
+The default local build now targets the same independently authenticated Firefox 160.0.1 BYOB source candidate tested by CI, NOT the historical Firefox 159 source files still stored in the repository root. It assembles the 28 verified Vulpra source overlays with the official Mozilla Firefox 160.0.1 source in a **separate** `~/Code/Builds/vulpra-160.0.1/source` directory and runs the native `./mach configure` and `./mach build` **inside the repository's pinned Nix developer shell**. Build objects stay there; existing Vulpra 159 build outputs, Firefox Developer Edition and its profile remain untouched.
 
-A production-quality local build entry point must: reuse the existing `main` Nix developer shell/cache, determine whether the required Mozilla source already exists, request authorization before any necessary one-time source download, materialize the authenticated 28-file overlay into an independent working tree, and then invoke incremental local `mach` builds. Do not fetch a CI binary in place of building source, claim zero network use when upstream source is missing, or modify Firefox Developer Edition's installed binary/profile.
+If the official source is not already cached, the command **stops before downloading it** and says how to authorize the one-time upstream SOURCE fetch:
 
-The **compiled and CI-runtime-tested** Firefox 160.0.1 browser is separately available as an unreleased GitHub Actions artifact, but acquiring that precompiled binary is optional and does **not** constitute local compilation. Google Safe Browsing remains deferred for limited personal dogfooding; ordinary security protections must not be disabled.
+```fish
+./nix/vulpra build --fetch-source
+```
+
+This may be a **large download** of Mozilla's official Firefox source; it never downloads the CI-built Vulpra executable. Subsequent builds use the cached source and are incremental. Nix may also fetch missing pinned toolchain dependencies through the user's configured binary caches.
+
+To launch **the locally built copy** with a separate profile:
+
+```fish
+./nix/vulpra run
+```
+
+To inspect cache readiness without downloading source or launching Firefox:
+
+```fish
+bash scripts/vulpra-build-160.sh --status
+```
+
+The signed-off candidate's complete source Git tree is pinned to `d6f7faf6583831a58d127480db54b5bcd5ab5949` and the Mozilla hotfix release commit to `58fed86b1b6864ad71b83c910a879d6f1a6b678b`. The source assembly and CI-produced compiled browser have been checked independently, but **the complete native build on the actual target EndeavourOS/Hyprland desktop is not yet verified**. Never confuse a source-only test or CI browser build with target-machine acceptance. This remains an experimental dogfood browser, not a public security release; Google Safe Browsing provider integration is deferred.
+
+The repository retains historical Firefox 159 tracked source files for provenance; `./nix/vulpra mach` and `./nix/vulpra configure` still operate on those files. Use `./nix/vulpra build` for the current 160 candidate until further source-tree migration. Do not claim the physical 159 root has been replaced by 160.
