@@ -1,0 +1,64 @@
+name: Vulpra 160 Local Nix Build Entrypoint Contract (No Source Download)
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/vulpra-160-local-build-entrypoint.yml
+      - scripts/vulpra-build-160.sh
+      - scripts/build-firefox160-local.sh
+      - nix/vulpra
+      - nix/vulpra-dev.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-local-entrypoint-no-network:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source builder and existing Nix dispatch syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/vulpra-build-160.sh
+          bash -n scripts/build-firefox160-local.sh
+          bash -n nix/vulpra
+          bash -n nix/vulpra-dev.sh
+          bash -n ci/security-160-stage-overlay.sh
+          bash -n ci/security-160-stage-byob-branding.sh
+          bash -n ci/security-160-hotfix-assemble-tree.sh
+          grep -Fq 'exec bash "$root/scripts/vulpra-build-160.sh" "$@"' nix/vulpra-dev.sh
+          grep -Fq 'case "$command_name" in' nix/vulpra-dev.sh
+          grep -Fq 'old_sha=2887d9de1f69c0e9776413da80e7ba0d1225dd9b' scripts/vulpra-build-160.sh
+          grep -Fq 'new_sha=58fed86b1b6864ad71b83c910a879d6f1a6b678b' scripts/vulpra-build-160.sh
+          echo 'PASS: launcher, Nix dispatch, and authenticated source scripts parse'
+      - name: Verify safe no-download preflight and one-command build interface
+        shell: bash
+        run: |
+          set -euo pipefail
+          t="$(mktemp -d)"
+          trap 'rm -rf -- "$t"' EXIT
+          export VULPRA_SOURCE_CACHE="$t/cache"
+          export VULPRA_BUILD_DIR="$t/build"
+          bash scripts/vulpra-build-160.sh --help > "$t/help"
+          grep -Fq './nix/vulpra build --fetch-source' "$t/help"
+          bash scripts/vulpra-build-160.sh --status > "$t/status"
+          grep -Fq 'Official Firefox 160.0.1 source: missing' "$t/status"
+          set +e
+          VULPRA_NIX_DEV=1 bash scripts/vulpra-build-160.sh > "$t/out" 2>&1
+          code="$?"
+          set -e
+          test "$code" -eq 3
+          grep -Fq './nix/vulpra build --fetch-source' "$t/out"
+          test ! -e "$t/build"
+          test ! -e "$t/cache/firefox-160.0"
+          test ! -e "$t/cache/firefox-160.0.1"
+          ! grep -R -q 'github.com' "$t/cache"
+          echo 'PASS: no source/artifact download or build without explicit source permission'
+      - name: Verify source and workflow were not modified
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          echo 'PASS: source checkout remained unchanged; no remote binary used'
