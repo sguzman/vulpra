@@ -1,12 +1,26 @@
 # Firefox 160 Safe Browsing provider and credential distribution review
 
-**Status (2026-11-12): BLOCKED — provider authorization, working credential, native proof and release permission not established.** This is engineering and policy triage, not legal authorization.
+**Status (2026-11-18): BLOCKED — real BYOB Firefox 160 local classifier verified, but no accepted provider credential, effective v5 HTTPS endpoint, provider-backed threat-list proof, distribution authorization or security-current release approval.** This is engineering and policy triage, not legal authorization.
 
 ## What the native evidence says
 
 - The exact-source Firefox 160 Vulpra archive passed the corrected real-browser effective phishing/malware/download preference, URL-classifier-service and table-registration checks after opting out of WebDriver's security-disabling recommended defaults (`remote.prefs.recommended=false`).
 - The same browser **failed** `SafeBrowsing.checkGoogleSafeBrowsingKey('google5')`, and lacked effective v5 HTTPS list-update and hash-lookup URLs. [Failed-but-informative CI 43249363996](https://github.com/sguzman/vulpra/actions/runs/43249363996). Its non-secret diagnostic evidence is not provider-backed protection evidence.
 - The build mozconfig `ci/mozconfig-linux` currently omits `--with-google-safebrowsing-api-keyfile`. The official Mozilla optimized mozconfig uses private Mozilla build material; Vulpra may not assume rights to those keys.
+
+## 2026-11-18 native BYOB candidate provider-blocker acceptance — expected missing provider
+
+[**Independent exact-BYOB native CI #44431581439 — SUCCESS as a negative diagnostic**](https://github.com/sguzman/vulpra/actions/runs/44431581439), [nonsecret proof artifact 14486053272](https://github.com/sguzman/vulpra/actions/runs/44431581439/artifacts/14486053272), reuses the real source- and SHA-256-verified compiled BYOB Firefox 160 package from [producer 44350848442](https://github.com/sguzman/vulpra/actions/runs/44350848442), **not** the older pre-BYOB Firefox 160 archive. The proof's package SHA-256 is `0bf9f7f1467516532df4c7de59188f0ca8404b04154cb62ccc7577fd85ff5157`.
+
+The existing read-only `ci/security-160-safebrowsing-readiness.py` browser probe ran under a **temporary Firefox process/profile, real Gecko classifier and loopback-only, no-external-route namespace**. It confirmed that phishing, malware and download feature flags, runtime feature update flags, populated table registrations, classifier database/list manager, and `SafeBrowsing.sys.mjs` initialization remain intact, without WebDriver's production-security-disabling recommended default prefs. The provider configuration nevertheless failed on **exactly three** independently validated blockers:
+
+- `google5_credential_missing_or_unaccepted`
+- `google5_effective_https_update_endpoint_unavailable`
+- `google5_effective_https_hash_lookup_unavailable`
+
+The test intentionally accepts only that exact failure set, with all local classifier checks still passing and no unexpected user pref overrides. [CI-only gate `cf8c94e`](https://github.com/sguzman/vulpra/commit/cf8c94ead97f88bc7f4c983009740953c600263e) rejects twelve synthetic malformed/forged/security-disabled variants and requires a real native browser report, uploaded artifact and unconditional fail-closed gate. **The successful CI means the expected release blocker was detected correctly, not that Safe Browsing protects users.** No API key, key staging, native rebuild, threat list download, malicious navigation, user-profile access or provider network call occurred.
+
+**Authorization remains separate:** Google's currently published Safe Browsing [terms](https://developers.google.com/safe-browsing/terms) restrict commercial use without a separate agreement; [Google APIs terms](https://developers.google.com/terms/) restrict embedding developer credentials in open-source projects. Private CI staging does not establish a legal/operational right to distribute an extractable credential inside Vulpra. No provider has been authorized, selected for release, integrated or tested against live threat data. Preserve `release_ready=false`, `security_current=false`, draft PR #6, and the separate sandbox/update gates. No source pruning or changes to the user's workstation or vault.
 
 ## Provider selection and applicable obligations
 
