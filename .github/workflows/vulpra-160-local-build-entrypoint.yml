@@ -96,6 +96,33 @@ jobs:
           grep -Fq 'verified source/config absent' "$t/package"
           test ! -e "$t/cache" && test ! -e "$t/build"
           echo 'PASS: status never enters Nix or fetches source; package refuses absent local build'
+      - name: Prove default build and run never realize Nix when source is missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          t="$(mktemp -d)"
+          trap 'rm -rf -- "$t"' EXIT
+          export VULPRA_SOURCE_CACHE="$t/cache"
+          export VULPRA_BUILD_DIR="$t/build"
+          mkdir -p "$t/bin"
+          for command_name in nix nom; do
+            printf '#!/usr/bin/env bash\\nprintf "unexpected Nix realization\\n" >> "$VULPRA_BUILD_DIR-nix-called"\\nexit 99\\n' > "$t/bin/$command_name"
+            chmod +x "$t/bin/$command_name"
+          done
+          set +e
+          PATH="$t/bin:$PATH" bash nix/vulpra build > "$t/build-out" 2>&1
+          build_code="$?"
+          PATH="$t/bin:$PATH" bash nix/vulpra run > "$t/run-out" 2>&1
+          run_code="$?"
+          set -e
+          test "$build_code" -eq 3
+          test "$run_code" -eq 1
+          grep -Fq 'No Nix evaluation, source fetch, binary download or compilation was started' "$t/build-out"
+          grep -Fq 'work-dir has no verified prepared source' "$t/run-out"
+          test ! -e "$t/build-nix-called"
+          test ! -e "$t/build"
+          test ! -e "$t/cache"
+          echo 'PASS: default build and run fail safely without Nix, source fetch or filesystem writes'
       - name: Reproduce and prevent shallow Mozilla local-clone failure offline
         shell: bash
         run: |
