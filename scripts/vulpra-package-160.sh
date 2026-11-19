@@ -20,7 +20,7 @@ source="$work/source"
 obj="$source/obj-vulpra-linux"
 config="$work/config/mozconfig"
 index="$work/candidate.index"
-[[ -d "$source/.git" && -f "$source/mach" && -s "$index" &&
+[[ ( -d "$source/.git" || -f "$source/.git" ) && -f "$source/mach" && -s "$index" &&
    -s "$work/prepared-source-tree.sha" && -s "$config" ]] ||
   die 'verified source/config absent; first run ./nix/vulpra build'
 [[ "$(cat "$work/prepared-source-tree.sha")" == "$expected_tree" ]] ||
