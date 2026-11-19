@@ -179,15 +179,10 @@ HELP
   fi
 
   if ! is_source "$new" "$new_sha"; then
-    [[ ! -e "$new" ]] ||
-      die "hotfix source cache exists but is unverified: $new; no automatic deletion or overwrite"
-    mkdir -p -- "$(dirname -- "$new")"
-    echo 'Fetching official Mozilla Firefox 160.0.1 source (large one-time source acquisition).'
-    git clone --quiet --depth=1 --filter=blob:none \
-      --branch FIREFOX_160_0_1_RELEASE \
-      https://github.com/mozilla-firefox/firefox.git "$new"
-    [[ "$(git -C "$new" rev-parse HEAD)" == "$new_sha" ]] ||
-      die 'official Firefox 160.0.1 commit mismatch'
+    [[ -f "$repo/scripts/fetch-mozilla-release.sh" ]] ||
+      die 'missing recoverable official Mozilla source-fetch helper on main'
+    echo 'Fetching or safely recovering official Firefox 160.0.1 source (not a compiled browser).'
+    bash "$repo/scripts/fetch-mozilla-release.sh" "$new" FIREFOX_160_0_1_RELEASE "$new_sha"
   fi
   is_source "$old" "$old_sha" || die 'Firefox 160.0 authenticated source missing or dirty'
   is_source "$new" "$new_sha" || die 'Firefox 160.0.1 authenticated source missing or dirty'
