@@ -1,4 +1,5 @@
 name: Firefox 160.0.1 BYOB Manual Native Preview (Unreleased)
+# Approved CI attempt: Firefox 160.0.1 BYOB dogfooding candidate (unreleased; separate profiles only).
 # GitHub requires workflow_dispatch workflow files to exist on the default
 # branch. This draft-only branch has no permission to merge or modify main.
 # The exact one-shot approval commit message below enables a future branch
