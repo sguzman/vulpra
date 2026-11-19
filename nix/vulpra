@@ -69,11 +69,20 @@ case "$action" in
     fi
     command_args=(vulpra-dev build "$@")
     ;;
+  package)
+    (($# == 0)) || error "'package' takes no extra arguments"
+    repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+    [[ -f "$repo/scripts/vulpra-package-160.sh" ]] ||
+      error "missing local Vulpra 160 package workflow"
+    # Refuse Nix realization/downloads when no compiled local binary exists.
+    bash "$repo/scripts/vulpra-package-160.sh" --preflight
+    command_args=(vulpra-dev package)
+    ;;
   shell)
     (($# == 0)) || error "'shell' takes no extra arguments"
     command_args=(fish)
     ;;
-  doctor|source|check|configure|package|smoke|wayland|accept|webext|input|mach)
+  doctor|source|check|configure|smoke|wayland|accept|webext|input|mach)
     command_args=(vulpra-dev "$action" "$@")
     ;;
   *) error "unknown action '$action'; use ./nix/vulpra help" ;;
