@@ -49,3 +49,24 @@ The `upstream-base` branch contains the original release source snapshot with Mo
 Project color: <img src="docs/vulpra/swatch.svg" alt="Vulpra lilac swatch" width="26" height="15"> `oklch(72% 0.13 308)`.
 
 **License:** Firefox-derived files retain their upstream licensing, notices and third-party license obligations. Vulpra-specific files have their own explicit licensing as applicable. The initial template MIT license must not be treated as relicensing the Firefox code. See [license and provenance notes](docs/vulpra/UPSTREAM.md).
+
+
+## Local Firefox 160.0.1 build (no CI binary)
+
+The experimental [local source-build helper](scripts/build-firefox160-local.sh) lets you compile Vulpra on Linux from **existing official Mozilla Git checkouts**, without downloading the precompiled GitHub Actions artifact. It is a Bash wrapper around the same pinned 28-file BYOB source assembly accepted by CI, not a Nix derivation yet.
+
+```sh
+# From this repository's upgrade/firefox-160-overlay-prototype branch:
+bash scripts/build-firefox160-local.sh prepare \
+  --old-source /path/to/clean-official-firefox-160.0-git \
+  --hotfix-source /path/to/clean-official-firefox-160.0.1-git \
+  --work-dir "$HOME/Code/Builds/vulpra-160.0.1"
+bash scripts/build-firefox160-local.sh build \
+  --work-dir "$HOME/Code/Builds/vulpra-160.0.1" --jobs 8
+bash scripts/build-firefox160-local.sh run \
+  --work-dir "$HOME/Code/Builds/vulpra-160.0.1"
+```
+
+The **first `prepare` command requires both official Mozilla source Git checkouts to exist already**. It performs no network fetch, leaves them unchanged, checks exact version/blob identities and recreates the accepted complete Vulpra source tree in a fresh, separate local directory. If the source is not already available, obtaining it involves a potentially large **one-time source download**; the helper deliberately does not initiate that without your choice. `build` reuses its work directory for subsequent incremental builds and does not use CI artifacts; Mozilla's `mach` may still need to obtain missing toolchains/dependencies unless provisioned separately. No privileged commands or system installation are performed by the helper. `run` uses a build-local isolated profile under `work-dir/profile-data/vulpra/default`, not your existing Firefox Developer Edition or downloaded Vulpra test profile.
+
+**Not yet tested as a complete local source build on the target EndeavourOS/Hyprland machine.** CI has independently compiled and tested the exact Firefox 160.0.1 candidate; this helper has passed Bash syntax and repository-identity checks but needs host QA. Google Safe Browsing provider integration is deferred for experimental personal dogfooding, not a public security release.
