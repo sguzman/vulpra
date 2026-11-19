@@ -106,6 +106,7 @@ jobs:
           export VULPRA_BUILD_DIR="$t/build"
           mkdir -p "$t/bin"
           for command_name in nix nom; do
+            # shellcheck disable=SC2016
             printf '#!/usr/bin/env bash\\nprintf "unexpected Nix realization\\n" >> "$VULPRA_BUILD_DIR-nix-called"\\nexit 99\\n' > "$t/bin/$command_name"
             chmod +x "$t/bin/$command_name"
           done
