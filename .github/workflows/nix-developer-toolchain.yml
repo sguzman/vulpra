@@ -43,6 +43,11 @@ jobs:
             AGENTS.md
             mach
             ci/mozconfig-linux
+            scripts/vulpra-build-160.sh
+            scripts/build-firefox160-local.sh
+            ci/security-160-stage-overlay.sh
+            ci/security-160-stage-byob-branding.sh
+            ci/security-160-hotfix-assemble-tree.sh
             ci/build-local.sh
             ci/package-smoke-local.sh
             ci/smoke-native-local.sh
