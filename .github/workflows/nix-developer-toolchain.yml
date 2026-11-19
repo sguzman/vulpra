@@ -44,6 +44,7 @@ jobs:
             mach
             ci/mozconfig-linux
             scripts/vulpra-build-160.sh
+            scripts/fetch-mozilla-release.sh
             scripts/vulpra-package-160.sh
             scripts/build-firefox160-local.sh
             ci/security-160-stage-overlay.sh
