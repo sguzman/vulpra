@@ -17,7 +17,8 @@ Vulpra native build: Firefox 160.0.1 committed directly on main.
   ./nix/vulpra status            Read-only source and native build status
   ./nix/vulpra build             Compile source in the CURRENT main checkout
   ./nix/vulpra build --jobs 8    Set native build parallelism
-  ./nix/vulpra run               Launch locally compiled Vulpra, isolated
+  ./nix/vulpra run               Launch compiled Vulpra with persistent dogfooding profile
+  ./nix/vulpra qa                Launch compiled Vulpra with separate build QA profile
   ./nix/vulpra package           Package and smoke the native main build
 
 The Firefox source is ALREADY ON MAIN. No Mozilla source checkout, downloader,
@@ -32,6 +33,7 @@ while (($#)); do
     --status) action=status; shift ;;
     --preflight) action=preflight; shift ;;
     --run) action=run; shift ;;
+    --qa) action=qa; shift ;;
     --configure) action=configure; shift ;;
     --jobs)
       (($# >= 2)) || die 'missing --jobs value'
@@ -80,13 +82,19 @@ if [[ "$action" == preflight ]]; then
   echo 'PASS: Firefox 160.0.1 source is committed and materialized on main; no download needed'
   exit 0
 fi
-if [[ "$action" == run ]]; then
+if [[ "$action" == run || "$action" == qa ]]; then
   is_native || die 'native Vulpra 160.0.1 not built yet; ./nix/vulpra build'
   [[ -f "$repo/packaging/vulpra" ]] || die 'private profile launcher missing'
   [[ ! -L "$obj/dist/bin/vulpra-launch" ]] || die 'refusing linked launcher'
   install -m 0755 -- "$repo/packaging/vulpra" "$obj/dist/bin/vulpra-launch"
-  mkdir -p -m 0700 -- "$obj/profile-data"
-  exec env XDG_DATA_HOME="$obj/profile-data" "$obj/dist/bin/vulpra-launch"
+  if [[ "$action" == qa ]]; then
+    mkdir -p -m 0700 -- "$obj/profile-data"
+    exec env XDG_DATA_HOME="$obj/profile-data" "$obj/dist/bin/vulpra-launch"
+  fi
+  # Dogfooding persists across rebuilds: never keep daily browsing data in obj/.
+  # An explicit XDG_DATA_HOME makes the profile location stable across shells.
+  mkdir -p -m 0700 -- "$HOME/.local/share"
+  exec env XDG_DATA_HOME="$HOME/.local/share" "$obj/dist/bin/vulpra-launch"
 fi
 [[ "$action" == configure || "$action" == build ]] ||
   die 'unknown build operation'
