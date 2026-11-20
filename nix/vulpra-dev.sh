@@ -26,9 +26,9 @@ Use from the repository root:
   nix develop ./nix --command vulpra-dev doctor
   nix develop ./nix --command fish
 
-The native build sources your original MOZCONFIG (or your already-existing
-~/.mozbuild/vulpra-local.mozconfig) through the versioned Nix libclang shim.
-The original file is never changed. Nothing here installs Firefox.
+The native main build derives a private mozconfig from ci/mozconfig-linux,
+with Nix libclang and an isolated obj-vulpra-main-160 output directory.
+Your original workstation MOZCONFIG is never changed. Nothing installs Firefox.
 HELP
 }
 
