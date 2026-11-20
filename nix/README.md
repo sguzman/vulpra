@@ -11,54 +11,47 @@ reconfigures the existing `obj-vulpra-linux` build directory.
 
 ## Current local Vulpra build on main (Firefox 160.0.1)
 
-The ordinary `./nix/vulpra build` command **now assembles and compiles**
-Vulpra's pinned Firefox 160.0.1 BYOB candidate into a separate local source
-and object directory (`~/Code/Builds/vulpra-160.0.1`). The old Firefox 159
-source files in the repository root are retained for provenance, but they
-are **not** the source built by the default `build` command.
+**Firefox 160.0.1 source is committed in `main` itself.** In particular,
+`browser/config/version.txt` is `160.0.1`. The previous Firefox159 root
+source has been replaced in Git history by a normal forward commit; no
+alternate development branch is required. History remains intact.
 
-```fish
-./nix/vulpra build
-```
-
-If the official Mozilla source is not already cached, the builder stops and
-prints the one-time, explicit **source download** opt-in command:
-
-```fish
-./nix/vulpra build --fetch-source
-```
-
-The download may be large. Neither command downloads a precompiled Vulpra
-binary, replaces installed Firefox, changes its profile, or mutates the old
-root build outputs. The pinned Nix shell can itself download missing toolchain
-store paths as usual. Subsequent builds reuse source and objdir for incremental
-native compilation.
-
-**Interrupted Firefox 160.0.1 source fetch:** the official Git download now
-uses repository-local HTTP/1.1 and makes at most two attempts. It preserves
-the source cache instead of deleting or silently replacing it. A later
-`./nix/vulpra build --fetch-source` can reuse complete Git objects already
-received; Git cannot resume the middle of an incomplete pack. The completed
-Firefox 160.0 source checkout is independently reused. If an interrupted
-checkout contains unexpected modifications, the build fails without
-overwriting those files. No prebuilt browser archive is involved.
-
-To launch the locally built browser using a completely separate profile:
-
-```fish
-./nix/vulpra run
-```
-
-To check cached upstream source readiness without starting any Nix realization:
+The normal build runs `mach configure` and `mach build` **in this
+repository's checked-out source**, via the pinned Nix/nom developer shell.
+It never downloads or clones another Mozilla source tree and never downloads
+a precompiled Vulpra/CI browser artifact.
 
 ```fish
 ./nix/vulpra status
+./nix/vulpra build
 ```
 
-`./nix/vulpra mach` addresses the historical imported Firefox 159 source.
-Standalone `./nix/vulpra configure` now deliberately refuses to configure
-that old tree: `./nix/vulpra build` configures the verified 160 source automatically. Full local
-160 build and EndeavourOS/Hyprland runtime acceptance are **not yet verified**.
+The new compiler output lives in the ignored
+`obj-vulpra-main-160/` directory. The historical
+`obj-vulpra-linux/` directory is not reused or deleted. A generated
+`mozconfig` in `~/.cache/vulpra/main160/mozconfig` carries the known Linux
+Vulpra settings, explicit Nix libclang and optional sccache; it does not
+rewrite personal mozconfig files or installed Firefox profiles.
+
+Other commands:
+
+```fish
+./nix/vulpra configure
+./nix/vulpra build --jobs 8
+./nix/vulpra run
+./nix/vulpra package
+```
+
+The first build can still cause **Nix and Mozilla build tools** to obtain
+missing toolchain/build dependencies; that is distinct from downloading a
+second Firefox source tree. The old
+`./nix/vulpra build --fetch-source` command is deliberately rejected as
+obsolete. `status` and `run` do not enter Nix.
+
+The Vulpra-specific project directories `ci/`, `nix/`, `scripts/`,
+`packaging/`, and `docs/vulpra/` are retained on `main`. Native
+compilation on the intended EndeavourOS/Hyprland host, packaging and runtime
+acceptance remain **unverified until actually run there**.
 
 ## Enter the toolchain with Nix Output Monitor
 
