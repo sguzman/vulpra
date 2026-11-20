@@ -13,7 +13,8 @@ Vulpra Nix launcher (Nix Output Monitor)
   ./nix/vulpra configure       Configure Firefox 160.0.1 directly from main
   ./nix/vulpra status          Read-only main source/build status (no Nix/download)
   ./nix/vulpra build           Compile committed Firefox 160.0.1 source on main
-  ./nix/vulpra run             Launch local Vulpra with private profile (no Nix evaluation)
+  ./nix/vulpra run             Dogfood local Vulpra with permanent ~/.local/share/vulpra/default profile
+  ./nix/vulpra qa              Run local Vulpra with a separate build QA profile
   ./nix/vulpra build --jobs 8  Override local native build parallelism
   ./nix/vulpra package         Package and privately smoke the native main build
   ./nix/vulpra smoke|wayland|accept|webext|input
@@ -46,13 +47,14 @@ case "$action" in
       error "missing main-branch Firefox 160 local source builder"
     exec bash "$here/scripts/vulpra-build-160.sh" --status
     ;;
-  run)
+  run|qa)
     # Launching an already compiled binary does not need a Nix realization.
     # Do not let a simple GUI run start downloads on a slow connection.
     repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
     [[ -f "$repo/scripts/vulpra-build-160.sh" ]] ||
       error "missing local Vulpra browser launcher"
-    exec bash "$repo/scripts/vulpra-build-160.sh" --run "$@"
+    (($# == 0)) || error "'$action' takes no extra arguments"
+    exec bash "$repo/scripts/vulpra-build-160.sh" "--$action"
     ;;
   build|configure)
     repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
