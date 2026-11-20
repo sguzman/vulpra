@@ -122,7 +122,9 @@ echo "Object directory: $obj (old Firefox159 object directory remains untouched)
 echo "No separate upstream checkout, no binary/artifact download."
 cd "$repo"
 if [[ "$action" == configure ]]; then
-  exec ./mach configure 8>&-
+  ./mach configure 8>&-
+  echo 'PASS: configured committed Firefox160.0.1 source on main'
+  exit 0
 fi
 ./mach configure 8>&-
 ./mach build 8>&-
