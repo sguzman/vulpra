@@ -62,27 +62,44 @@ done
 
 export HOME="$work/home" PATH="$work/bin:$PATH"
 export VULPRA_TEST_ARGS="$work/args" VULPRA_TEST_ENV="$work/env"
+# Default mode: persistent dogfooding, never tied to a disposable objdir.
 bash "$repo/nix/vulpra" run
+printf '%s\n' --no-remote --new-instance --profile \
+  "$HOME/.local/share/vulpra/default" > "$work/expected-args"
+printf '%s\n' "$HOME" "$HOME/.local/share" > "$work/expected-env"
+cmp "$work/expected-args" "$work/args"
+cmp "$work/expected-env" "$work/env"
+[[ -x "$bin/vulpra-launch" ]]
+[[ -d "$HOME/.local/share/vulpra/default" ]]
+grep -Fxq 'unchanged Firefox profile' "$HOME/.mozilla/firefox/sentinel"
+printf 'dogfooding marker\n' > "$HOME/.local/share/vulpra/default/sentinel"
+
+# QA mode: existing build-local profile stays separate from dogfooding data.
+bash "$repo/nix/vulpra" qa
 printf '%s\n' --no-remote --new-instance --profile \
   "$repo/obj-vulpra-main-160/profile-data/vulpra/default" > "$work/expected-args"
 printf '%s\n' "$HOME" "$repo/obj-vulpra-main-160/profile-data" > "$work/expected-env"
 cmp "$work/expected-args" "$work/args"
 cmp "$work/expected-env" "$work/env"
-[[ -x "$bin/vulpra-launch" ]]
 [[ -d "$repo/obj-vulpra-main-160/profile-data/vulpra/default" ]]
-grep -Fxq 'unchanged Firefox profile' "$HOME/.mozilla/firefox/sentinel"
+grep -Fxq 'dogfooding marker' "$HOME/.local/share/vulpra/default/sentinel"
 
-# A caller cannot redirect the isolated launcher to an existing profile.
-if bash "$repo/nix/vulpra" run --profile "$HOME/.mozilla/firefox" >/dev/null 2>&1; then
-  echo 'ERROR: main launcher accepted a profile-selection override' >&2
-  exit 1
-fi
+# No caller can override the mode-specific profile selection.
+for mode in run qa; do
+  if bash "$repo/nix/vulpra" "$mode" --profile "$HOME/.mozilla/firefox" >/dev/null 2>&1; then
+    echo "ERROR: $mode accepted a profile-selection override" >&2
+    exit 1
+  fi
+done
 grep -Fxq 'unchanged Firefox profile' "$HOME/.mozilla/firefox/sentinel"
+grep -Fxq 'dogfooding marker' "$HOME/.local/share/vulpra/default/sentinel"
 
-# No local executable means fail closed; do not fetch or build a replacement.
+# No local binary means fail closed; do not fetch or build a replacement.
 rm -- "$bin/vulpra"
-if bash "$repo/nix/vulpra" run >/dev/null 2>&1; then
-  echo 'ERROR: main launcher ran without a compiled executable' >&2
-  exit 1
-fi
-echo 'PASS: direct main run uses local binary, isolated profile, no Nix and fails closed'
+for mode in run qa; do
+  if bash "$repo/nix/vulpra" "$mode" >/dev/null 2>&1; then
+    echo "ERROR: $mode ran without a compiled executable" >&2
+    exit 1
+  fi
+done
+echo 'PASS: dogfooding and QA profiles isolated; local launcher bypasses Nix and fails closed'
