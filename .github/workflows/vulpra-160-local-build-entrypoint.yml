@@ -58,9 +58,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # shellcheck disable=SC2016
           grep -Fq 'bash "$repo/scripts/vulpra-build-160.sh" --preflight "$@"' nix/vulpra
+          # shellcheck disable=SC2016
           grep -Fq 'command_args=(vulpra-dev build "$@")' nix/vulpra
+          # shellcheck disable=SC2016
           grep -Fq 'bash "$repo/scripts/vulpra-package-160.sh" --preflight' nix/vulpra
+          # shellcheck disable=SC2016
           grep -Fq 'exec bash "$root/scripts/vulpra-build-160.sh" "$@"' nix/vulpra-dev.sh
           if grep -Fq 'source checkout independently' scripts/vulpra-build-160.sh; then
             echo 'Unexpected legacy secondary source build path' >&2
