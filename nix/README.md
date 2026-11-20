@@ -42,8 +42,19 @@ Other commands:
 ./nix/vulpra configure
 ./nix/vulpra build --jobs 8
 ./nix/vulpra run
+./nix/vulpra qa
 ./nix/vulpra package
 ```
+
+**Dogfooding versus QA:** `./nix/vulpra run` starts the already-compiled
+native browser directly, with its persistent profile at
+`~/.local/share/vulpra/default`. This lives outside `obj-vulpra-main-160/`
+and persists across normal local rebuilds. `./nix/vulpra qa` uses the
+separate build-local profile at
+`obj-vulpra-main-160/profile-data/vulpra/default` for manual QA. Neither
+mode launches Nix, recompiles, installs a browser, or uses the Firefox
+Developer Edition profile. No profile is automatically migrated between
+modes; select `run` for everyday dogfooding.
 
 The first build can still cause **Nix and Mozilla build tools** to obtain
 missing toolchain/build dependencies; that is distinct from downloading a
@@ -54,8 +65,10 @@ obsolete. `status` and `run` do not enter Nix.
 The Vulpra-specific project directories `ci/`, `nix/`, `scripts/`,
 `packaging/`, and `docs/vulpra/` are retained on `main`. Native
 compilation on the EndeavourOS/Hyprland workstation **passed on 2026-11-20**,
-producing `obj-vulpra-main-160/dist/bin/vulpra`. Packaging and GUI runtime
-acceptance remain unverified.
+producing `obj-vulpra-main-160/dist/bin/vulpra`. The owner subsequently
+confirmed a real Vulpra 160.0.1 Hyprland window displaying the browser chrome,
+tabs, and branded new-tab page. Packaging, interactive browsing/input,
+WebExtension, and wider GUI/security acceptance remain unverified.
 
 ## Enter the toolchain with Nix Output Monitor
 
