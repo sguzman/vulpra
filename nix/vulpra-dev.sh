@@ -10,12 +10,11 @@ Vulpra Nix developer commands
   vulpra-dev doctor       Read-only toolchain/checkout/mozconfig inspection
   vulpra-dev source       Read-only tracked-source completeness check
   vulpra-dev check        Syntax-check existing guarded shell workflows
-  vulpra-dev configure    Run ./mach configure (requires Nix devShell)
-  vulpra-dev build        Build verified Firefox 160.0.1 in separate source tree
-  vulpra-dev build --fetch-source  Explicitly permit first Mozilla source download
+  vulpra-dev configure    Configure committed Firefox 160.0.1 on main
+  vulpra-dev build        Compile committed Firefox 160.0.1 directly from main
   vulpra-dev run          Launch local Firefox 160.0.1 with private profile
-  vulpra-dev package      Package and smoke the same compiled Firefox 160.0.1 tree
-    vulpra-dev smoke        Private headless native executable smoke
+  vulpra-dev package      Package and smoke the native Firefox 160.0.1 main build
+  vulpra-dev smoke        Private headless native executable smoke
   vulpra-dev wayland      Private Weston/Wayland packaged smoke
   vulpra-dev accept       Offline localhost JS/redirect/package test
   vulpra-dev webext       Private packaged WebExtension lifecycle test
@@ -64,28 +63,25 @@ root="$(cd "$root" && pwd -P)"
 
 local_mozconfig="${MOZCONFIG:-$HOME/.mozbuild/vulpra-local.mozconfig}"
 
-# Default local build now targets the exact Firefox 160.0.1 Vulpra candidate,
-# not the tracked historical Firefox 159 files in repository main. Preserve
-# their source and objdir: prepare/build the 160 tree independently.
-if [[ "$command_name" == build || "$command_name" == run || "$command_name" == package ]]; then
+# The source in this checkout's main branch IS Firefox 160.0.1.
+# Never fetch a second Mozilla source tree or switch to another branch.
+if [[ "$command_name" == build || "$command_name" == run || "$command_name" == package || "$command_name" == configure ]]; then
   [[ "${VULPRA_NIX_DEV:-}" == 1 ]] ||
     error "use ./nix/vulpra $command_name; requires pinned Nix devShell"
-  [[ -f "$root/scripts/vulpra-build-160.sh" ]] ||
-    error "missing main-branch source-first 160 local build entrypoint"
-  if [[ "$command_name" == run ]]; then
-    exec bash "$root/scripts/vulpra-build-160.sh" --run "$@"
-  elif [[ "$command_name" == package ]]; then
+  if [[ "$command_name" == package ]]; then
     (($# == 0)) || error "package takes no arguments"
     exec bash "$root/scripts/vulpra-package-160.sh"
+  elif [[ "$command_name" == run ]]; then
+    exec bash "$root/scripts/vulpra-build-160.sh" --run "$@"
+  elif [[ "$command_name" == configure ]]; then
+    (($# == 0)) || error "configure takes no arguments"
+    exec bash "$root/scripts/vulpra-build-160.sh" --configure
   fi
   exec bash "$root/scripts/vulpra-build-160.sh" "$@"
 fi
 
 
 case "$command_name" in
-  configure)
-    error "standalone configure targets the historical Firefox 159 checkout; use './nix/vulpra build' to configure and compile the verified Firefox 160 source"
-    ;;
   doctor)
     printf 'Vulpra root: %s\n' "$root"
     printf 'Commit: %s\n' "$(git -C "$root" rev-parse --short=12 HEAD)"
