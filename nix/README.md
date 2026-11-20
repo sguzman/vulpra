@@ -2,12 +2,15 @@
 
 **Scope:** repeatable Linux x86-64 developer tools and wrappers for the existing Mozilla
 `mach` build and isolated Vulpra QA. **Not** a system-wide Nix migration, an
-already-verified native browser build, an installation method, or a Firefox release.
+browser installer, system-level Nix migration, or an official Firefox release.
 
-The flake deliberately lives in `nix/` rather than in the Firefox source root.
-An ordinary `nix develop ./nix` therefore does **not** copy the enormous
-Firefox source tree into the Nix store. No Nix operation here deletes or
-reconfigures the existing `obj-vulpra-linux` build directory.
+The flake lives in `nix/`, but plain `nix develop ./nix` is implicitly a
+`git+file:` reference to the **entire Firefox Git checkout**. Always use the
+versioned `./nix/vulpra` launcher, which now passes an explicit
+`path:<absolute-checkout>/nix` flake reference and sends **only `nix/`**
+to the Nix store. Native compilation still runs in the live checkout on
+`main`. No Nix operation deletes or reconfigures the historical
+`obj-vulpra-linux/` build directory.
 
 ## Current local Vulpra build on main (Firefox 160.0.1)
 
@@ -50,8 +53,9 @@ obsolete. `status` and `run` do not enter Nix.
 
 The Vulpra-specific project directories `ci/`, `nix/`, `scripts/`,
 `packaging/`, and `docs/vulpra/` are retained on `main`. Native
-compilation on the intended EndeavourOS/Hyprland host, packaging and runtime
-acceptance remain **unverified until actually run there**.
+compilation on the EndeavourOS/Hyprland workstation **passed on 2026-11-20**,
+producing `obj-vulpra-main-160/dist/bin/vulpra`. Packaging and GUI runtime
+acceptance remain unverified.
 
 ## Enter the toolchain with Nix Output Monitor
 
@@ -60,12 +64,12 @@ Nix/Lix is installed separately on the workstation. Enable `nix-command` and
 
 **Preferred route:** run the versioned nom-first Vulpra launcher from a
 complete checkout. The launcher uses a `nom` already on PATH or automatically
-obtains the pinned `./nix#nom` via `nix shell` if missing; no user-profile
+obtains the pinned `path:<checkout>/nix#nom` via `nix shell` if missing; no user-profile
 installation is required. Only the very first `nom` bootstrap necessarily
 uses Nix's default output.
 
 To make `nom` available outside Vulpra as well, you **may optionally** install
-it once into your user profile with `nix profile install ./nix#nom`.
+it once into your user profile with `nix profile install "path:$PWD/nix#nom"` from the repository root.
 
 Run:
 
@@ -82,7 +86,7 @@ To perform a native build directly through the launcher:
 ./nix/vulpra build
 ```
 
-The launcher delegates to `nom develop ./nix --command ...`, monitors Nix's
+The launcher delegates to `nom develop "path:<checkout>/nix" --command ...`, monitors Nix's
 dependency realization, preserves Nix error codes, and forwards native tasks
 to the guarded `vulpra-dev` CLI. `nom develop` can evaluate the Nix shell
 twice; it does **not** execute the native command twice. It cannot monitor
@@ -92,10 +96,12 @@ ordinary native build log and one-build-per-workspace locking.
 **Do not interrupt an active Nix realization or Firefox build just to switch
 to the launcher.** The launcher takes effect on the next invocation and does
 not change any global shell aliases or overwrite personal Nix configuration.
-The plain `nix develop ./nix --command fish` route remains available if
-you want to bypass `nom` entirely.
+If bypassing `nom`, use `nix develop "path:$PWD/nix" --command fish`
+from the repository root. Using `nix develop ./nix` directly will again
+copy the large Git checkout into the store.
 
-`nix run ./nix#vulpra-dev -- help` remains available as well, but mutating
+`nix run "path:$PWD/nix#vulpra-dev" -- help` works from the repository root,
+but mutating
 native workflows refuse to execute unless `VULPRA_NIX_DEV=1` was set by the
 developer shell. Do not set it manually to bypass the guard.
 
@@ -107,7 +113,7 @@ developer shell. Do not set it manually to bypass the guard.
 | `vulpra-dev source` | Check the historical imported source checkout (not the 160 build) |
 | `vulpra-dev check` | Syntax-check existing guarded CI/local shell workflows |
 | `vulpra-dev configure` | Configures the committed Firefox 160.0.1 source on `main` in its separate new object directory |
-| `vulpra-dev build` | Prepare/authenticate and incrementally compile the separate Firefox 160.0.1 source tree |
+| `vulpra-dev build` | Configure and incrementally compile committed Firefox 160.0.1 source directly on `main` |
 | `vulpra-dev package` | Package the same locally compiled Firefox 160.0.1 and smoke-test its private profile |
 | `vulpra-dev smoke` | Existing private native headless test |
 | `vulpra-dev wayland` | Existing private Weston/Wayland QA |
@@ -185,14 +191,14 @@ WASI sysroot, mach bootstrap, dynamic libraries, host graphics and full native
 tests. Do not use a green flake evaluation or a shell test to close a Vulpra
 product/security milestone.
 
-CI must check `nix flake check ./nix`, realize the dev shell and validate
+CI must check `nix flake check "path:$PWD/nix"`, realize the dev shell and validate
 `vulpra-dev doctor` and shell guards. Separate **real native build,
 package, WebDriver and target EndeavourOS/Hyprland runtime** gates are tracked
 in [issue #10](https://github.com/sguzman/vulpra/issues/10). These cannot be
 replaced with synthetic fixtures.
 
 To deliberately update dependencies: review changes to `nix/flake.lock`,
-run `nix flake update ./nix` with the intended maintenance window, then
+run `nix flake update "path:$PWD/nix"` with the intended maintenance window, then
 re-run all Nix checks and native acceptance before calling the upgrade safe.
 
 ## Why not nix-build the entire Firefox tree immediately?
