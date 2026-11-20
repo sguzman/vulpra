@@ -1,7 +1,7 @@
 # Nix development environment for Vulpra
 
 **Scope:** repeatable Linux x86-64 developer tools and wrappers for the existing Mozilla
-`mach` build and isolated Vulpra QA. **Not** a system-wide Nix migration, an
+`mach` build and isolated Vulpra QA. **Not** a system-wide Nix migration, a
 browser installer, system-level Nix migration, or an official Firefox release.
 
 The flake lives in `nix/`, but plain `nix develop ./nix` is implicitly a
@@ -134,7 +134,7 @@ has a workstation WASI override) nor writes to the old Firefox159 object
 directory. The historical `./nix/vulpra mach ...` command still uses the
 tracked `nix/mozconfig-overlay.sh` shim with your unchanged original
 mozconfig. Nix's developer shell supplies the WASI toolchain for both.
-An actual on-workstation 160 build remains to be verified.
+An actual on-workstation Firefox 160.0.1 native build passed on 2026-11-20; packaging, headless smoke, and Hyprland GUI runtime acceptance for that build remain pending.
 
 This shim is needed because Mozilla's
 `build/moz.configure/bindgen.configure` doesn't automatically discover
