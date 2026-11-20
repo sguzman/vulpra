@@ -1,6 +1,6 @@
 # Vulpra security acceptance — Firefox 160.0.1 dogfooding to release
 **Started:** 2026-11-20 (America/Mexico_City)
-**Current target:** `main` at `f8fd382fe95b9afd0a1d19795c91c7ebb39b6df8`, with Firefox 160.0.1 source and the locally compiled `obj-vulpra-main-160` browser.
+**Verified native-code baseline:** `f8fd382fe95b9afd0a1d19795c91c7ebb39b6df8` on `main` (later documentation-only commits do not change compiled browser code), with Firefox 160.0.1 source and the locally compiled `obj-vulpra-main-160` browser.
 **Owner's work order:** security acceptance first; next [typing/rendering lag #7](https://github.com/sguzman/vulpra/issues/7); only after that, local-disk-only Edge-like persistent workspaces (no cloud account/sync).
 **Status:** IN PROGRESS, **not accepted for security-current public release**. This is a gate checklist, not a percentage or claim of exploit resistance.
 
