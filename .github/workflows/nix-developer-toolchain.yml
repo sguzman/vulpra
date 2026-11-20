@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - nix/**
+      - scripts/vulpra-build-160.sh
+      - packaging/vulpra
       - js/src/xsum/moz.build
       - js/src/xsum/xsum.cpp
       - js/src/xsum/xsum.h
@@ -27,6 +29,7 @@ jobs:
             nix/flake.lock
             nix/vulpra
             nix/test-vulpra-launcher.sh
+            nix/test-main-launch-runtime.sh
             nix/mozconfig-overlay.sh
             nix/test-mozconfig-overlay.sh
             nix/test-wasm-compiler.sh
@@ -57,6 +60,13 @@ jobs:
             ci/accept-native-package-local.py
             ci/smoke-webextension-package-local.py
             packaging/stage.sh
+            packaging/vulpra
+      - name: Test native main launcher without Nix or compiled Firefox
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n nix/test-main-launch-runtime.sh
+          bash nix/test-main-launch-runtime.sh
       - name: Install Nix in the disposable runner only
         uses: cachix/install-nix-action@v31
         with:
