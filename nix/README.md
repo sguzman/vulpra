@@ -106,7 +106,7 @@ developer shell. Do not set it manually to bypass the guard.
 | `vulpra-dev doctor` | Inventory basic local toolchain and preserve-only local mozconfig status |
 | `vulpra-dev source` | Check the historical imported source checkout (not the 160 build) |
 | `vulpra-dev check` | Syntax-check existing guarded CI/local shell workflows |
-| `vulpra-dev configure` | Refuses the old Firefox 159 configure path; the current 160 build configures automatically |
+| `vulpra-dev configure` | Configures the committed Firefox 160.0.1 source on `main` in its separate new object directory |
 | `vulpra-dev build` | Prepare/authenticate and incrementally compile the separate Firefox 160.0.1 source tree |
 | `vulpra-dev package` | Package the same locally compiled Firefox 160.0.1 and smoke-test its private profile |
 | `vulpra-dev smoke` | Existing private native headless test |
