@@ -9,7 +9,8 @@ REPO=$(pwd -P)
 [[ "$(git config --bool core.sparseCheckout || true)" != true ]] || {
   echo 'ERROR: Source checkout still sparse.' >&2; exit 3;
 }
-OBJ="$REPO/obj-vulpra-linux"
+OBJ="${VULPRA_OBJDIR:-$REPO/obj-vulpra-linux}"
+[[ "$OBJ" == /* && ! -L "$OBJ" ]] || { echo 'ERROR: Invalid native object directory.' >&2; exit 4; }
 BIN="$OBJ/dist/bin"
 [[ -s "$BIN/application.ini" ]] && grep -Fxq 'Name=Vulpra' "$BIN/application.ini" || {
   echo 'ERROR: Native Vulpra application.ini missing or incorrect.' >&2; exit 4;
