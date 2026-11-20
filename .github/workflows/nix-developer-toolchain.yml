@@ -68,7 +68,8 @@ jobs:
         run: |
           set -euo pipefail
           nix --version
-          nix flake lock ./nix
+          flake_ref="path:$PWD/nix"
+          nix flake lock "$flake_ref"
           test -s nix/flake.lock
           # Newly generated lock must be staged locally to participate in
           # Git-based flake evaluation; no Git push/commit from CI.
@@ -82,22 +83,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          nix flake show ./nix --no-write-lock-file
-          nix flake check ./nix --no-write-lock-file --show-trace
+          flake_ref="path:$PWD/nix"
+          # The Nix flake input MUST contain only nix/, not Firefox's Git root.
+          flake_source="$(nix flake metadata "$flake_ref" --json --no-write-lock-file | jq -r .path)"
+          test -f "$flake_source/flake.nix"
+          test ! -e "$flake_source/browser"
+          test ! -e "$flake_source/js"
+          test ! -e "$flake_source/ci"
+          test ! -e "$flake_source/.git"
+          echo 'PASS: explicit path: flake imports only the small nix/ directory'
+          nix flake show "$flake_ref" --no-write-lock-file
+          nix flake check "$flake_ref" --no-write-lock-file --show-trace
       - name: Realize developer shell and run read-only environment and code checks
         shell: bash
         timeout-minutes: 25
         run: |
           set -euo pipefail
-          nix develop ./nix --no-write-lock-file --command vulpra-dev doctor
-          nix develop ./nix --no-write-lock-file --command bash nix/test-wasm-compiler.sh
-          nix develop ./nix --no-write-lock-file --command bash nix/test-native-assembler.sh
-          nix develop ./nix --no-write-lock-file --command bash nix/test-native-linker.sh
-          nix develop ./nix --no-write-lock-file --command bash nix/test-fontconfig-compat.sh
-          nix develop ./nix --no-write-lock-file --command bash nix/test-xsum-warning-flags.sh
-          nix develop ./nix --no-write-lock-file --command vulpra-dev check
-          nix run ./nix#vulpra-dev --no-write-lock-file -- help
-          if nix run ./nix#vulpra-dev --no-write-lock-file -- build; then
+          flake_ref="path:$PWD/nix"
+          nix develop "$flake_ref" --no-write-lock-file --command vulpra-dev doctor
+          nix develop "$flake_ref" --no-write-lock-file --command bash nix/test-wasm-compiler.sh
+          nix develop "$flake_ref" --no-write-lock-file --command bash nix/test-native-assembler.sh
+          nix develop "$flake_ref" --no-write-lock-file --command bash nix/test-native-linker.sh
+          nix develop "$flake_ref" --no-write-lock-file --command bash nix/test-fontconfig-compat.sh
+          nix develop "$flake_ref" --no-write-lock-file --command bash nix/test-xsum-warning-flags.sh
+          nix develop "$flake_ref" --no-write-lock-file --command vulpra-dev check
+          nix run "${flake_ref}#vulpra-dev" --no-write-lock-file -- help
+          if nix run "${flake_ref}#vulpra-dev" --no-write-lock-file -- build; then
             echo 'Unexpected unguarded native build outside Nix devShell' >&2
             exit 1
           fi
