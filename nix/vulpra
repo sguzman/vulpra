@@ -10,13 +10,12 @@ Vulpra Nix launcher (Nix Output Monitor)
   ./nix/vulpra doctor          Run the read-only toolchain preflight via nom
   ./nix/vulpra source          Inspect source checkout completeness
   ./nix/vulpra check           Syntax-check native build scripts
-  ./nix/vulpra configure       Run the native mach configure
-  ./nix/vulpra status          Read-only local Firefox 160 source/build status (no Nix/download)
-  ./nix/vulpra build           Build Firefox 160 locally; refuse Nix downloads if source absent
-  ./nix/vulpra build --fetch-source  Approve a one-time official Mozilla SOURCE download
+  ./nix/vulpra configure       Configure Firefox 160.0.1 directly from main
+  ./nix/vulpra status          Read-only main source/build status (no Nix/download)
+  ./nix/vulpra build           Compile committed Firefox 160.0.1 source on main
   ./nix/vulpra run             Launch local Vulpra with private profile (no Nix evaluation)
   ./nix/vulpra build --jobs 8  Override local native build parallelism
-  ./nix/vulpra package         Package and privately smoke the same locally built Firefox 160
+  ./nix/vulpra package         Package and privately smoke the native main build
   ./nix/vulpra smoke|wayland|accept|webext|input
   ./nix/vulpra mach ARGS       Delegate mach commands inside the devShell
   ./nix/vulpra help            Show this message
@@ -54,20 +53,19 @@ case "$action" in
       error "missing local Vulpra browser launcher"
     exec bash "$repo/scripts/vulpra-build-160.sh" --run "$@"
     ;;
-  build)
+  build|configure)
     repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
     [[ -f "$repo/scripts/vulpra-build-160.sh" ]] ||
-      error "missing local Firefox 160 source builder"
-    approved_source_fetch=0
-    for item in "$@"; do
-      if [[ "$item" == --fetch-source ]]; then approved_source_fetch=1; fi
-    done
-    # Validate cached source BEFORE any nom/nix command can fetch toolchains.
-    # Only the user's explicit --fetch-source opts into upstream acquisition.
-    if ((approved_source_fetch == 0)); then
+      error "missing native main source build entrypoint"
+    if [[ "$action" == build ]]; then
+      # Validate the committed main source before any Nix realization.
+      bash "$repo/scripts/vulpra-build-160.sh" --preflight "$@"
+      command_args=(vulpra-dev build "$@")
+    else
+      (($# == 0)) || error "'configure' takes no arguments"
       bash "$repo/scripts/vulpra-build-160.sh" --preflight
+      command_args=(vulpra-dev configure)
     fi
-    command_args=(vulpra-dev build "$@")
     ;;
   package)
     (($# == 0)) || error "'package' takes no extra arguments"
@@ -82,7 +80,7 @@ case "$action" in
     (($# == 0)) || error "'shell' takes no extra arguments"
     command_args=(fish)
     ;;
-  doctor|source|check|configure|smoke|wayland|accept|webext|input|mach)
+  doctor|source|check|smoke|wayland|accept|webext|input|mach)
     command_args=(vulpra-dev "$action" "$@")
     ;;
   *) error "unknown action '$action'; use ./nix/vulpra help" ;;
