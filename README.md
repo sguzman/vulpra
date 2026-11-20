@@ -8,10 +8,10 @@ The complete upgraded browser source and Vulpra changes are committed to
 is required for the default native build. `./nix/vulpra build` compiles the
 checked-out `main` source using Nix/nom and an isolated
 `obj-vulpra-main-160/` output directory. See [Nix build instructions](nix/README.md).
-Native workstation compilation/runtime remain acceptance gates, not yet proven.
+The owner verified **native workstation compilation and graphical launch** on November 20, 2026. Current-main package provenance, TLS/sandbox/security and public-release acceptance remain separate, unpassed gates.
 
 
-**Current project snapshot (2026-11-17):** [What is complete, what was actually pruned, remaining blockers, and next work](docs/vulpra/STATUS.md). The longer November 8 milestone summary below is historical and should not override this newer status page.
+**Current project snapshot (2026-11-20):** [What is complete, what was actually pruned, remaining blockers, and next work](docs/vulpra/STATUS.md). The [active security acceptance roadmap](docs/vulpra/SECURITY-ACCEPTANCE-ROADMAP-20261120.md) lists the current gates. The November 8 milestone and November 6 security callouts below are historical, not claims about the present Firefox 160.0.1 source.
 
 > **Status (2026-11-08):** 🦊 **M2 working Linux browser: 100% (5/5 gates). M3 debloating: 83% (5/6 gates). Overall product roadmap: 61%.** M2 passed native startup, Wayland, localhost JavaScript and WebExtension/profile-isolation tests on the original target workstation. M3 has verified source-only non-Linux pruning and bounded opt-in omissions, with security, extension and account foundations retained. The sixth M3 gate remains open: complete feature-oriented native dependency, conditional loader, FFI and protected-fallback closure is not established. Full current Linux builds, packaging and bounded browser runtime checks passed in CI; an [independently reconciled current compiled Rust archive/ELF report](docs/vulpra/M3-REAL-CURRENT-GKRUST-ARCHIVE-ELF-FFI-20261108.json) confirms two named gkrust FFI definitions, **not** all Rust/C++ call edges or linker-member selections. [Native three-call branch acceptance](https://github.com/sguzman/vulpra/actions/runs/42491120174) remains pending. This is neither an Arch/Hyprland current-build acceptance nor a public release, security-current certification, or Rust-only browser.
 
