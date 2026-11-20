@@ -1,5 +1,21 @@
 # Vulpra — current project snapshot
 
+## Current update — November 20, 2026
+
+**Active source:** `main` now contains **Firefox 160.0.1** (tracked `browser/config/version.txt`), and the owner successfully built and launched the native `obj-vulpra-main-160` browser on EndeavourOS/Hyprland with a separate persistent Vulpra profile. The older Firefox 159 and draft Firefox 160 statements below are **historical** and must not be used as today's source or runtime status.
+
+**Security state:** Experimental dogfooding is in progress; **security-current/release-ready: unverified / not accepted**. Passing GUI startup, logins and extension use is functional evidence, not full browser security acceptance. The 160/160.0 candidate CI witnesses in the historical snapshot cannot be credited automatically to the current `main` 160.0.1 binary.
+
+**First verified 160.0.1 source check (2026-11-20):** the official Mozilla `FIREFOX_160_0_1_RELEASE` commit is `58fed86b1b6864ad71b83c910a879d6f1a6b678b`; exact official/current-main Git blob parity was independently checked for `dom/media/ChannelMediaDecoder.cpp`, `gfx/gl/GLBlitHelper.cpp` and `browser/config/version.txt` (3/3 matched). Full Git-tree, binary/sandbox, live Safe Browsing and updater acceptance remain open.
+
+**Active engineering order:** [Firefox 160.0.1 security acceptance roadmap](SECURITY-ACCEPTANCE-ROADMAP-20261120.md) → [typing and rendering lag #7](https://github.com/sguzman/vulpra/issues/7) → local-disk-only persistent browser workspaces. No cloud-workspace implementation currently authorized.
+
+**Progress:** Existing formal overall ledger **61% (Δ +0 pp)**; documentation and narrow source-spotchecks do not earn milestone credit. Historical M3 pruning remains deferred.
+
+---
+
+## Archived snapshot — November 18, 2026 (superseded by current update)
+
 **As of:** 2026-11-18 (America/Mexico_City)  
 **Source:** `main` on Firefox **159.0b5**; original comparison branch `upstream-base` is frozen.  
 **Release status:** **Experimental. Do not treat as security-current or use for routine/sensitive browsing.**
