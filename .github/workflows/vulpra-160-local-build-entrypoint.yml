@@ -1,21 +1,22 @@
-name: Vulpra 160 Local Nix Build Entrypoint Contract (No Source Download)
+name: Vulpra 160 Native Main Build Contract (No Mozilla Source Download)
 on:
   push:
     branches: [main]
     paths:
       - .github/workflows/vulpra-160-local-build-entrypoint.yml
       - scripts/vulpra-build-160.sh
-      - scripts/fetch-mozilla-release.sh
-      - ci/test-fetch-mozilla-release.sh
-      - scripts/build-firefox160-local.sh
       - scripts/vulpra-package-160.sh
+      - ci/package-smoke-local.sh
+      - ci/test-direct-main-build.sh
       - nix/vulpra
       - nix/vulpra-dev.sh
+      - ci/mozconfig-linux
+      - packaging/vulpra
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  verify-local-entrypoint-no-network:
+  verify-direct-main-native-build:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
@@ -26,158 +27,49 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             .github/workflows/vulpra-160-local-build-entrypoint.yml
+            browser/config/version.txt
             scripts/vulpra-build-160.sh
-            scripts/fetch-mozilla-release.sh
-            ci/test-fetch-mozilla-release.sh
-            scripts/build-firefox160-local.sh
             scripts/vulpra-package-160.sh
+            ci/package-smoke-local.sh
+            ci/test-direct-main-build.sh
+            ci/mozconfig-linux
+            packaging/vulpra
             nix/vulpra
             nix/vulpra-dev.sh
-            ci/security-160-stage-overlay.sh
-            ci/security-160-stage-byob-branding.sh
-            ci/security-160-hotfix-assemble-tree.sh
-      - name: Validate source builder and existing Nix dispatch syntax
+      - name: Syntax and actual main source version
         shell: bash
         run: |
           set -euo pipefail
           bash -n scripts/vulpra-build-160.sh
-          bash -n scripts/fetch-mozilla-release.sh
-          bash -n ci/test-fetch-mozilla-release.sh
-          bash -n scripts/build-firefox160-local.sh
           bash -n scripts/vulpra-package-160.sh
+          bash -n ci/test-direct-main-build.sh
+          bash -n ci/package-smoke-local.sh
           bash -n nix/vulpra
           bash -n nix/vulpra-dev.sh
-          bash -n ci/security-160-stage-overlay.sh
-          bash -n ci/security-160-stage-byob-branding.sh
-          bash -n ci/security-160-hotfix-assemble-tree.sh
-          # shellcheck disable=SC2016
+          test "$(cat browser/config/version.txt)" = '160.0.1'
+          test "$(git show HEAD:browser/config/version.txt)" = '160.0.1'
+          echo 'PASS: main contains real Firefox160.0.1 and native scripts parse'
+      - name: Exercise direct main build through an offline fake mach
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ci/test-direct-main-build.sh
+      - name: Default Nix commands route to main instead of a source downloader
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'bash "$repo/scripts/vulpra-build-160.sh" --preflight "$@"' nix/vulpra
+          grep -Fq 'command_args=(vulpra-dev build "$@")' nix/vulpra
+          grep -Fq 'bash "$repo/scripts/vulpra-package-160.sh" --preflight' nix/vulpra
           grep -Fq 'exec bash "$root/scripts/vulpra-build-160.sh" "$@"' nix/vulpra-dev.sh
-          # shellcheck disable=SC2016
-          grep -Fq 'case "$command_name" in' nix/vulpra-dev.sh
-          grep -Fq 'old_sha=2887d9de1f69c0e9776413da80e7ba0d1225dd9b' scripts/vulpra-build-160.sh
-          grep -Fq 'new_sha=58fed86b1b6864ad71b83c910a879d6f1a6b678b' scripts/vulpra-build-160.sh
-          echo 'PASS: launcher, Nix dispatch, and authenticated source scripts parse'
-      - name: Verify safe no-download preflight and one-command build interface
-        shell: bash
-        run: |
-          set -euo pipefail
-          t="$(mktemp -d)"
-          trap 'rm -rf -- "$t"' EXIT
-          export VULPRA_SOURCE_CACHE="$t/cache"
-          export VULPRA_BUILD_DIR="$t/build"
-          bash scripts/vulpra-build-160.sh --help > "$t/help"
-          grep -Fq './nix/vulpra build --fetch-source' "$t/help"
-          bash scripts/vulpra-build-160.sh --status > "$t/status"
-          grep -Fq 'Official Firefox 160.0.1 source: missing' "$t/status"
-          set +e
-          VULPRA_NIX_DEV=1 bash scripts/vulpra-build-160.sh > "$t/out" 2>&1
-          code="$?"
-          set -e
-          test "$code" -eq 3
-          grep -Fq './nix/vulpra build --fetch-source' "$t/out"
-          test ! -e "$t/build"
-          test ! -e "$t/cache/firefox-160.0"
-          test ! -e "$t/cache/firefox-160.0.1"
-          if grep -R -q 'github.com' "$t/cache"; then
-            echo 'FAIL: unexpected source network metadata in no-download test' >&2
+          if grep -Fq 'source checkout independently' scripts/vulpra-build-160.sh; then
+            echo 'Unexpected legacy secondary source build path' >&2
             exit 1
           fi
-          echo 'PASS: no source/artifact download or build without explicit source permission'
-      - name: Verify no-download status and package fail closed without a build
-        shell: bash
-        run: |
-          set -euo pipefail
-          t="$(mktemp -d)"
-          trap 'rm -rf -- "$t"' EXIT
-          export VULPRA_SOURCE_CACHE="$t/cache"
-          export VULPRA_BUILD_DIR="$t/build"
-          bash nix/vulpra status > "$t/status"
-          grep -Fq 'Official Firefox 160.0.1 source: missing' "$t/status"
-          test ! -e "$t/cache" && test ! -e "$t/build"
-          set +e
-          VULPRA_NIX_DEV=1 bash scripts/vulpra-package-160.sh > "$t/package" 2>&1
-          code="$?"
-          set -e
-          test "$code" -eq 2
-          grep -Fq 'verified source/config absent' "$t/package"
-          test ! -e "$t/cache" && test ! -e "$t/build"
-          echo 'PASS: status never enters Nix or fetches source; package refuses absent local build'
-      - name: Prove build, run and package never realize Nix when required artifacts are missing
-        shell: bash
-        run: |
-          set -euo pipefail
-          t="$(mktemp -d)"
-          trap 'rm -rf -- "$t"' EXIT
-          export VULPRA_SOURCE_CACHE="$t/cache"
-          export VULPRA_BUILD_DIR="$t/build"
-          mkdir -p "$t/bin"
-          for command_name in nix nom; do
-            # shellcheck disable=SC2016
-            printf '#!/usr/bin/env bash\\nprintf "unexpected Nix realization\\n" >> "$VULPRA_BUILD_DIR-nix-called"\\nexit 99\\n' > "$t/bin/$command_name"
-            chmod +x "$t/bin/$command_name"
-          done
-          set +e
-          PATH="$t/bin:$PATH" bash nix/vulpra build > "$t/build-out" 2>&1
-          build_code="$?"
-          PATH="$t/bin:$PATH" bash nix/vulpra run > "$t/run-out" 2>&1
-          run_code="$?"
-          PATH="$t/bin:$PATH" bash nix/vulpra package > "$t/package-out" 2>&1
-          package_code="$?"
-          set -e
-          test "$build_code" -eq 3
-          test "$run_code" -eq 1
-          test "$package_code" -eq 2
-          grep -Fq 'No Nix evaluation, source fetch, binary download or compilation was started' "$t/build-out"
-          grep -Fq 'work-dir has no verified prepared source' "$t/run-out"
-          grep -Fq 'verified source/config absent' "$t/package-out"
-          grep -Fq 'exec 8>' scripts/vulpra-package-160.sh
-          grep -Fq 'flock -n 8' scripts/vulpra-package-160.sh
-          test ! -e "$t/build-nix-called"
-          test ! -e "$t/build"
-          test ! -e "$t/cache"
-          echo 'PASS: build, run and package fail safely without Nix, source fetch or filesystem writes; package shares build lock'
-      - name: Reproduce and prevent shallow Mozilla local-clone failure offline
-        shell: bash
-        run: |
-          set -euo pipefail
-          t="$(mktemp -d)"
-          trap 'rm -rf -- "$t"' EXIT
-          git init -q "$t/origin"
-          git -C "$t/origin" config user.name "Vulpra CI"
-          git -C "$t/origin" config user.email "ci@example.invalid"
-          git -C "$t/origin" config uploadpack.allowFilter true
-          mkdir -p "$t/origin/source"
-          echo 'Mozilla source object' > "$t/origin/source/test.txt"
-          git -C "$t/origin" add .
-          git -C "$t/origin" commit -qm 'fixture'
-          git -c protocol.file.allow=always clone -q --depth=1 --filter=blob:none \
-            "file://$t/origin" "$t/cache"
-          test "$(git -C "$t/cache" rev-parse --is-shallow-repository)" = true
-          test "$(git -C "$t/cache" config --get remote.origin.promisor)" = true
-          # A Git worktree reuses the existing shallow/partial source object
-          # database; no second download or new standalone clone is required.
-          GIT_NO_LAZY_FETCH=1 git -C "$t/cache" worktree add --detach "$t/work" HEAD
-          test -f "$t/work/.git"
-          test -f "$t/work/source/test.txt"
-          cmp "$t/cache/source/test.txt" "$t/work/source/test.txt"
-          test -z "$(git -C "$t/cache" status --porcelain)"
-          test -z "$(git -C "$t/work" status --porcelain)"
-          # shellcheck disable=SC2016
-          grep -Fq 'GIT_NO_LAZY_FETCH=1 git -C "$hotfix" worktree add' \
-            scripts/build-firefox160-local.sh
-          if grep -Fq 'git clone --local --no-checkout' scripts/build-firefox160-local.sh; then
-            echo 'FAIL: old shallow-clone bug returned' >&2
-            exit 1
-          fi
-          echo 'PASS: detached source worktree reuses shallow Git objects without network'
-      - name: Verify failed Mozilla transfer recovers without deleting cached source
-        shell: bash
-        run: |
-          set -euo pipefail
-          VULPRA_TEST_REPO="$GITHUB_WORKSPACE" bash ci/test-fetch-mozilla-release.sh
-      - name: Verify source and workflow were not modified
+          echo 'PASS: source is compiled from current main, not a secondary checkout'
+      - name: Verify workflow left main checkout unchanged
         shell: bash
         run: |
           set -euo pipefail
           test -z "$(git status --porcelain)"
-          echo 'PASS: source checkout remained unchanged; no remote binary used'
+          echo 'PASS: source checkout unchanged, no remote browser or Mozilla source downloaded'
