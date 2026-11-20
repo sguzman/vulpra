@@ -30,16 +30,16 @@ export NOM_TEST_PWD="$tmp/pwd" NOM_TEST_ARGS="$tmp/args"
 export NIX_TEST_PWD="$tmp/nix-pwd" NIX_TEST_ARGS="$tmp/nix-args"
 
 bash "$repo/nix/vulpra" doctor
-printf '%s\n' develop ./nix --no-write-lock-file --command vulpra-dev doctor > "$tmp/expected"
+printf '%s\n' develop "path:$repo/nix" --no-write-lock-file --command vulpra-dev doctor > "$tmp/expected"
 cmp "$tmp/expected" "$tmp/args"
 [[ "$(cat "$tmp/pwd")" == "$repo" ]]
 
 (cd / && bash "$repo/nix/vulpra" shell)
-printf '%s\n' develop ./nix --no-write-lock-file --command fish > "$tmp/expected"
+printf '%s\n' develop "path:$repo/nix" --no-write-lock-file --command fish > "$tmp/expected"
 cmp "$tmp/expected" "$tmp/args"
 
 bash "$repo/nix/vulpra" mach configure --verbose
-printf '%s\n' develop ./nix --no-write-lock-file --command vulpra-dev mach configure --verbose > "$tmp/expected"
+printf '%s\n' develop "path:$repo/nix" --no-write-lock-file --command vulpra-dev mach configure --verbose > "$tmp/expected"
 cmp "$tmp/expected" "$tmp/args"
 
 if bash "$repo/nix/vulpra" shell extra > /dev/null 2>&1; then
@@ -63,9 +63,17 @@ set -e
 unset NOM_TEST_EXIT
 rm "$tmp/nom"
 bash "$repo/nix/vulpra" source
-printf '%s\n' shell ./nix#nom --no-write-lock-file --command nom develop ./nix --no-write-lock-file --command vulpra-dev source > "$tmp/expected"
+printf '%s\n' shell "path:$repo/nix#nom" --no-write-lock-file --command nom develop "path:$repo/nix" --no-write-lock-file --command vulpra-dev source > "$tmp/expected"
 cmp "$tmp/expected" "$tmp/nix-args"
 [[ "$(cat "$tmp/nix-pwd")" == "$repo" ]]
+# Neither Nix nor nom may receive an implicit git+file source reference.
+# The flake input must remain scoped to the tiny nix/ subdirectory.
+if grep -Eq '^\\./nix(#|$)' "$tmp/nix-args" "$tmp/args"; then
+  echo 'ERROR: launcher regressed to Git-root flake input' >&2
+  exit 1
+fi
+grep -Fxq "path:$repo/nix" "$tmp/nix-args"
+grep -Fxq "path:$repo/nix#nom" "$tmp/nix-args"
 
 export NIX_TEST_EXIT=23
 set +e
@@ -77,4 +85,4 @@ set -e
   exit 1
 }
 
-echo 'PASS: nom-first launcher, auto-bootstrap fallback, forwarding, cwd, guards and exit statuses'
+echo 'PASS: isolated path: flake, nom bootstrap, forwarding, cwd, guards and exit statuses'
