@@ -21,7 +21,8 @@ Vulpra Nix launcher (Nix Output Monitor)
   ./nix/vulpra help            Show this message
 
 The launcher uses an existing nom from PATH, or obtains a pinned nom
-with 'nix shell ./nix#nom' when missing (no profile installation required).
+with 'nix shell path:<checkout>/nix#nom' when missing (no profile installation required).
+Only nix/ enters the flake store input; Firefox source stays in the checkout.
 The first bootstrap of nom itself still uses Nix's native output.
 
 The launcher uses nom to monitor Nix's dependency/download/build phase.
@@ -94,13 +95,17 @@ repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
   error "missing pinned Nix flake: $repo/nix"
 cd "$repo"
 
+# Explicit path: avoids Nix's implicit git+file:// fetch of the entire
+# Firefox checkout. Only repo/nix is copied to /nix/store as the flake source.
+# The build still runs against the live source checkout in $repo, not the store.
+flake_ref="path:$repo/nix"
 # nom's develop shim forwards the interactive/native command once and
 # monitors the Nix realization separately. No piped process status is lost.
 if command -v nom >/dev/null 2>&1; then
-  exec nom develop ./nix --no-write-lock-file --command "${command_args[@]}"
+  exec nom develop "$flake_ref" --no-write-lock-file --command "${command_args[@]}"
 fi
 
-printf 'Vulpra: nom is not on PATH; obtaining pinned nom from ./nix#nom without installing it into your user profile.\n' >&2
+printf 'Vulpra: nom is not on PATH; obtaining pinned nom from the isolated nix/ flake without installing it into your user profile.\n' >&2
 # The very first nom bootstrap is necessarily displayed by Nix itself.
 # Once realized, nom monitors the developer shell's dependencies as normal.
-exec nix shell ./nix#nom --no-write-lock-file --command nom develop ./nix --no-write-lock-file --command "${command_args[@]}"
+exec nix shell "$flake_ref#nom" --no-write-lock-file --command nom develop "$flake_ref" --no-write-lock-file --command "${command_args[@]}"
