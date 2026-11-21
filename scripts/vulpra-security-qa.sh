@@ -174,7 +174,18 @@ case "$action" in
     # The trap is limited to a fresh QA-only staging directory.
     cleanup() { if [[ -n "${tmp:-}" && -d "$tmp" ]]; then rm -rf -- "$tmp"; fi; }
     trap cleanup EXIT
-    cp -aL -- "$compiled" "$tmp/app"
+    # Firefox/Gecko can create a transient dist/bin/lock symlink while the
+    # daily browser is running; it is normally dangling as a filesystem path.
+    # Do not follow or copy process-lock entries into an independent runtime.
+    # GNU tar dereferences legitimate build symlinks (including application.ini)
+    # without requiring rsync, and pipefail rejects incomplete snapshots.
+    mkdir -p -m 0700 -- "$tmp/app"
+    tar -C "$compiled" --dereference \
+      --exclude='./lock' --exclude='./.parentlock' --exclude='./parent.lock' \
+      -cf - . | tar -C "$tmp/app" -xf -
+    [[ ! -e "$tmp/app/lock" && ! -L "$tmp/app/lock" &&
+       ! -e "$tmp/app/.parentlock" && ! -L "$tmp/app/.parentlock" ]] ||
+      die 'QA copy unexpectedly included daily browser runtime lock state'
     valid_app "$tmp/app" || die 'copied QA binary was incomplete'
     [[ "$(sha256sum "$tmp/app/vulpra" | cut -d' ' -f1)" == "$binary_sha" ]] ||
       die 'copied QA executable checksum changed during snapshot'
