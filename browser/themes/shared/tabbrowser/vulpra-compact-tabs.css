@@ -1,0 +1,155 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* Vulpra's built-in vertical tab appearance mirrors the user's Firefox chrome
+ * styling without adding or changing anything in their browsing profile.
+ * Horizontal tab layout remains under the unmodified Firefox rules.
+ */
+
+/* Firefox vertical tabs: compact rows with visible outlines.
+ * Keep system/theme colors intact so Darkman-driven appearance can switch.
+ * Reduce only vertical-tab padding; do not move the entire sidebar.
+ */
+#tabbrowser-tabs[orient="vertical"] {
+  --tab-min-height: 27px !important;
+  --tab-block-margin: 1px !important;
+  --tab-inline-padding: 4px !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tabbrowser-tab {
+  min-height: 0 !important;
+  padding-block: 0 !important;
+  padding-inline: 0 !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tab-content {
+  min-height: var(--tab-min-height) !important;
+  padding-block: 0 !important;
+  /* Keep favicon entirely inside the border, with a small left gap. */
+  padding-inline-start: 7px !important;
+}
+
+#tabbrowser-tabs[orient="vertical"] .tab-background {
+  min-height: var(--tab-min-height) !important;
+  margin-block: 0 !important;
+  margin-inline: 2px !important;
+  border: 1px solid color-mix(in srgb, currentColor 38%, transparent) !important;
+  border-radius: 5px !important;
+}
+
+#tabbrowser-tabs[orient="vertical"]
+.tabbrowser-tab[selected] .tab-background {
+  border-color: AccentColor !important;
+  box-shadow: inset 0 0 0 1px AccentColor !important;
+}
+
+/* Match group label, group marker and grouped tab left edges
+ * with the ungrouped tab outlines, without changing collapsed sidebar.
+ * Firefox normally adds a --space-medium indent to these group children.
+ */
+#tabbrowser-tabs[orient="vertical"][expanded] tab-group >
+  :is(.tab-group-label-container, .tabbrowser-tab) {
+  margin-inline-start: 0 !important;
+}
+
+/* Keep the space above each group label, but remove Firefox's
+ * extra padding below it so the first tab sits directly beneath the bubble. */
+#tabbrowser-tabs[orient="vertical"][expanded]
+tab-group:not([collapsed]) > .tab-group-label-container {
+  padding-block-end: 0 !important;
+}
+
+/* The collapsed sidebar still centers 24px group badges inside the wider
+ * normal tab width, even though our tab outlines start at 2px. That produces
+ * the conspicuous extra left gutter shown when the sidebar is minimized.
+ * Match the badge and overflow counter to the exact tab-background inset.
+ * Do not alter expanded groups or the group toggle/drag behavior.
+ */
+#tabbrowser-tabs[orient="vertical"]:not([expanded])
+tab-group > .tab-group-label-container > .tab-group-label-hover-highlight {
+  margin-inline-start: 2px !important;
+  margin-inline-end: 0 !important;
+}
+
+#tabbrowser-tabs[orient="vertical"]:not([expanded])
+tab-group > .tab-group-overflow-count-container .tab-group-overflow-count {
+  margin-inline-start: 2px !important;
+  margin-inline-end: 0 !important;
+}
+
+/* Keep the title at the same X position when Firefox mounts/unmounts
+ * the audio/mute control. The overlaid control is 16px wide and starts 13px
+ * into tab content, so reserve a 16px icon slot and a further 11px boundary
+ * before text; this leaves ~5px between the audio overlay and the emoji.
+ * The relative containing block prevents audio positioning from drifting.
+ * Expanded, unpinned vertical tabs only; mute controls remain clickable.
+ */
+#tabbrowser-tabs[orient="vertical"][expanded]
+.tabbrowser-tab:not([pinned]) > .tab-stack > .tab-content {
+  position: relative !important;
+}
+
+#tabbrowser-tabs[orient="vertical"][expanded]
+.tabbrowser-tab:not([pinned]) .tab-content > .tab-icon-stack {
+  flex: 0 0 16px !important;
+  width: 16px !important;
+  min-width: 16px !important;
+  margin-inline-end: 11px !important;
+}
+
+/* Align small tab-status indicators with the compact favicon position.
+ * These rules affect expanded vertical tabs only.
+ */
+#tabbrowser-tabs[orient="vertical"][expanded]
+.tabbrowser-tab:not([pinned]) > .tab-stack >
+.tab-content:is([attention], [titlechanged]):not([selected]) {
+  /* Firefox normally computes the activity dot from its original padding.
+   * Our actual favicon starts 7px from the tab content's left edge. */
+  background-position-x: left 19px !important;
+}
+
+#tabbrowser-tabs[orient="vertical"][expanded]
+.tabbrowser-tab:not([pinned]) > .tab-stack >
+.tab-content:is([attention], [titlechanged]):not([selected]):-moz-locale-dir(rtl) {
+  background-position-x: right 19px !important;
+}
+
+#tabbrowser-tabs[orient="vertical"][expanded]
+.tabbrowser-tab:not([pinned], [crashed]) .tab-content >
+.tab-audio-button:is([soundplaying], [muted], [activemedia-blocked]) {
+  /* Park the media status at the favicon's lower-right, not in the
+   * flex row between favicon and title. */
+  position: absolute !important;
+  inset-inline-start: 13px !important;
+  inset-block-start: 9px !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  --button-size-icon-small: 16px;
+  --button-min-height-small: 16px;
+  margin: 0 !important;
+  z-index: 2 !important;
+}
+
+/* Make every tab-group name badge rectangular, including hover states,
+ * collapsed groups and overflow counters. Leave ordinary tab corners alone.
+ */
+#tabbrowser-tabs tab-group :is(
+  .tab-group-label-container,
+  .tab-group-label-hover-highlight,
+  .tab-group-label,
+  .tab-group-overflow-count-container,
+  .tab-group-overflow-count
+) {
+  border-radius: 0 !important;
+}
+
+/* Tab titles: strong, readable text without forcing page fonts to change.
+ * Fallbacks work when Lexica Ultralegible is not installed locally.
+ */
+#tabbrowser-tabs[orient="vertical"] .tab-label {
+  font-family: "Lexica Ultralegible", "Luciole", "Atkinson Hyperlegible", sans-serif !important;
+  font-weight: 700 !important;
+}
