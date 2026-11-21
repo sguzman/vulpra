@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - scripts/vulpra-security-qa.sh
+      - scripts/vulpra-security-qa-build.sh
       - nix/vulpra
       - ci/test-vulpra-security-qa.sh
       - .github/workflows/security-qa-worktree-fixtures.yml
@@ -22,6 +23,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             scripts/vulpra-security-qa.sh
+            scripts/vulpra-security-qa-build.sh
             nix/vulpra
             ci/test-vulpra-security-qa.sh
       - name: Verify no-Nix, detached, disposable QA safety contract
@@ -29,6 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/vulpra-security-qa.sh
+          bash -n scripts/vulpra-security-qa-build.sh
           bash -n nix/vulpra
           bash -n ci/test-vulpra-security-qa.sh
           bash ci/test-vulpra-security-qa.sh
