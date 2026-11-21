@@ -328,6 +328,7 @@
   skin/classic/browser/tabbrowser/tab.tokens.css               (../shared/tabbrowser/tab.tokens.css)
   skin/classic/browser/tabbrowser/tabs-navbar.tokens.css       (../shared/tabbrowser/tabs-navbar.tokens.css)
   skin/classic/browser/tabbrowser/tabs.css                     (../shared/tabbrowser/tabs.css)
+  skin/classic/browser/tabbrowser/vulpra-compact-tabs.css      (../shared/tabbrowser/vulpra-compact-tabs.css)
 
   skin/classic/browser/update-badge.svg                        (../shared/update-badge.svg)
   skin/classic/browser/profiler-popup-backdrop.png             (../shared/profiler-popup-backdrop.png)
