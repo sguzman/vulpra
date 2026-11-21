@@ -1,6 +1,6 @@
 # Vulpra: isolated security QA while dogfooding
 
-**Status:** Source-worktree, QA binary-copy, independent native QA-build path and isolated headless-smoke infrastructure are implemented. Offline synthetic CI validates the separation contract, including a fake `mach configure/build`. **No actual QA worktree has been created on the user's workstation, no separate Firefox 160.0.1 QA build has run, and no sandbox/TLS/extension security acceptance is claimed.**
+**Status:** Source-worktree, QA binary-copy, independent native QA-build path and isolated headless-smoke infrastructure are implemented. Offline synthetic CI validates the separation contract, including a fake `mach configure/build`. **The user confirmed the detached QA worktree and checksum-verified snapshot on their workstation on 2026-11-20. A separate Firefox 160.0.1 QA source build has NOT run; no real headless/sandbox/TLS/extension acceptance is claimed.**
 
 ## The two environments
 
