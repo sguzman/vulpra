@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - ci/security-159-upstream-version-guard.sh
+      - ci/security-160-upstream-version-guard.sh
       - .github/workflows/security-159-upstream-release-drift.yml
   schedule:
     - cron: '17 10 * * *'
@@ -25,16 +25,17 @@ jobs:
           fetch-depth: 1
           filter: blob:none
           sparse-checkout: |
-            ci/security-159-upstream-version-guard.sh
+            ci/security-160-upstream-version-guard.sh
       - name: Reject eight misleading official release states
         shell: bash
         run: |
           set -euo pipefail
-          bash -n ci/security-159-upstream-version-guard.sh
-          bash ci/security-159-upstream-version-guard.sh --self-test
+          test "$(git show HEAD:browser/config/version.txt)" = 160.0.1
+          bash -n ci/security-160-upstream-version-guard.sh
+          bash ci/security-160-upstream-version-guard.sh --self-test
       - name: Fetch Mozilla official desktop Firefox release version
         shell: bash
         run: |
           set -euo pipefail
-          bash ci/security-159-upstream-version-guard.sh --check-live
+          bash ci/security-160-upstream-version-guard.sh --check-live
           echo "LIMIT: source patch audit, native vulnerability QA and security release acceptance are separate gates"
