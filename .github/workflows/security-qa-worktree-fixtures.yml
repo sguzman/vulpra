@@ -41,4 +41,5 @@ jobs:
           python3 ci/smoke-webextension-package-local.py --self-test-synthetic-extension-fixture
           python3 ci/smoke-webextension-package-local.py --self-test-byob-assertions
           python3 ci/smoke-webextension-package-local.py --self-test-user-agent-parser
+          python3 ci/smoke-webextension-package-local.py --self-test-style-geometry
           echo 'LIMIT: synthetic mock only; real Gecko QA is separate'
