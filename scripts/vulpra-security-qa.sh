@@ -124,8 +124,7 @@ case "$action" in
     valid_app "$tmp/app" || die 'copied QA binary was incomplete'
     [[ "$(sha256sum "$tmp/app/vulpra" | cut -d' ' -f1)" == "$binary_sha" ]] ||
       die 'copied QA executable checksum changed during snapshot'
-    [[ "$(sha256sum "$tmp/app/application.ini" | cut -d' ' -f1)" ==
-       "$(sha256sum "$compiled/application.ini" | cut -d' ' -f1)" ]] ||
+    [[ "$(sha256sum "$tmp/app/application.ini" | cut -d' ' -f1)" == "$(sha256sum "$compiled/application.ini" | cut -d' ' -f1)" ]] ||
       die 'QA application identity changed during snapshot'
     printf 'source_commit=%s\nbinary_sha256=%s\n' \
       "$source_commit" "$binary_sha" > "$tmp/manifest.txt"
