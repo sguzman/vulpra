@@ -15,7 +15,9 @@ Vulpra Nix launcher (Nix Output Monitor)
   ./nix/vulpra build           Compile committed Firefox 160.0.1 source on main
   ./nix/vulpra run             Dogfood local Vulpra with permanent ~/.local/share/vulpra/default profile
   ./nix/vulpra qa              Run local Vulpra with a separate build QA profile
-  ./nix/vulpra security-qa status|setup|snapshot|headless  Isolated QA worktree, no Nix
+  ./nix/vulpra security-qa status|setup|sync|snapshot|headless
+  ./nix/vulpra security-qa build [--jobs 2]  Explicit separate Nix QA native compile
+  ./nix/vulpra security-qa headless-build    Offline smoke of compiled QA binary
   ./nix/vulpra build --jobs 8  Override local native build parallelism
   ./nix/vulpra package         Package and privately smoke the native main build
   ./nix/vulpra smoke|wayland|accept|webext|input
