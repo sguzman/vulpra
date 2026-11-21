@@ -73,6 +73,19 @@ All the following operations **except the explicitly named build** bypass Nix an
 - **headless** runs only the selected copied QA executable under a new `HOME`, `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` and `--profile`. It loads only a synthetic local `file://` HTML fixture, requires a PNG screenshot, leaves a local QA-only log, and does not open a graphical window. It does not navigate to any real site, use real credentials or alter the active browser.
 - **sync** (as source changes accumulate): when invoked from **QA**, it explicitly fetches latest `origin/main` and advances **only a clean detached QA source worktree**; when invoked from main, it advances QA to local main HEAD without fetching. It refuses modified or untracked QA source, never replaces existing snapshots, and never launches a browser.
 
+## Browser styling QA, separate from security acceptance
+
+To verify compact vertical tabs in **Vulpra** without rebuilding or restarting
+the daily browser, use the detached QA checkout's `security-qa style-preview`
+command after `security-qa sync`. It loads the new QA source CSS **only inside
+a disposable copied-browser process** and measures native chrome group badge
+alignment. A separate `security-qa style` tests whether a later **QA-native
+build** actually packages the same styling; that native build is optional,
+explicit and expensive. [Detailed steps and evidence limits](VERTICAL-TABS-STYLE-QA.md).
+
+Neither style command reads the daily Firefox/Vulpra profile, and passing
+source preview does not mean that the daily Vulpra executable was rebuilt.
+
 ## Security and scope limits
 
 1. No automatic promotion to daily Vulpra: the active daily executable/profile are never switched by this script. Changes to `main` remain ordinary source commits until the owner explicitly rebuilds their browser.
