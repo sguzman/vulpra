@@ -17,6 +17,8 @@ mkdir -p "$repo/scripts" "$repo/nix" "$repo/browser/config" \
 cp -- "$root/scripts/vulpra-security-qa.sh" "$repo/scripts/vulpra-security-qa.sh"
 cp -- "$root/scripts/vulpra-security-qa-build.sh" "$repo/scripts/vulpra-security-qa-build.sh"
 mkdir -p "$repo/ci"
+# Track the QA harness before creating the worktree: QA executes its own copy.
+printf '# Synthetic QA-only WebDriver harness placeholder\n' > "$repo/ci/smoke-webextension-package-local.py"
 cp -- "$root/nix/vulpra" "$repo/nix/vulpra"
 printf '# Vulpra synthetic fixture\n' > "$repo/AGENTS.md"
 cat > "$repo/mach" <<'MACH'
@@ -101,6 +103,16 @@ bash "$repo/nix/vulpra" security-qa setup > "$work/setup"
 [[ -f "$qa/.git" ]] || die 'registered QA Git worktree missing'
 [[ "$(git -C "$qa" rev-parse HEAD)" == "$original" ]] ||
   die 'QA pinned to wrong commit'
+# QA scripts are actual detached-worktree files, never forwarded from main.
+[[ -f "$qa/scripts/vulpra-security-qa.sh" &&
+   -f "$qa/ci/smoke-webextension-package-local.py" ]] ||
+  die 'QA own launcher and WebDriver harness were not checked out'
+if bash "$qa/nix/vulpra" security-qa setup >/dev/null 2>&1; then
+  die 'QA-local setup should refuse mutating the main/worktree topology'
+fi
+if bash "$qa/nix/vulpra" security-qa sync >/dev/null 2>&1; then
+  die 'QA-local sync should refuse source revision changes'
+fi
 [[ -z "$(git -C "$qa" symbolic-ref --short -q HEAD || :)" ]] ||
   die 'QA should be detached, not main'
 if bash "$repo/nix/vulpra" security-qa setup >/dev/null 2>&1; then
@@ -139,12 +151,11 @@ cmp "$app" "$repo/obj-vulpra-main-160/dist/bin/vulpra"
 manifest="$qa/obj-vulpra-security-qa/snapshots/$name/manifest.txt"
 grep -Eq '^application_ini_sha256=[0-9a-f]{64}$' "$manifest" ||
   die 'snapshot did not record application.ini digest'
-bash "$repo/nix/vulpra" security-qa verify > "$work/verify"
+bash "$qa/nix/vulpra" security-qa verify > "$work/verify"
 grep -Fq 'PASS: independent QA executable' "$work/verify"
 # Synthetic acceptance dispatch: the real Python WebDriver harness has its own
 # parser/fixture self-tests. Here a fake Python executable checks that the shell
 # passes only QA-local paths and that the report must contain actual booleans.
-printf '# Synthetic WebDriver harness placeholder\n' > "$repo/ci/smoke-webextension-package-local.py"
 cat > "$work/bin/geckodriver" <<'DRIVER'
 #!/usr/bin/env bash
 echo 'FAIL: synthetic dispatcher unexpectedly launched geckodriver' >&2
@@ -154,7 +165,7 @@ chmod 0755 "$work/bin/geckodriver"
 cat > "$work/bin/python3" <<'PYTHON'
 #!/usr/bin/env bash
 set -Eeuo pipefail
-[[ "$#" == 5 && "$1" == */ci/smoke-webextension-package-local.py &&
+[[ "$#" == 5 && "$1" == */vulpra-security-qa/ci/smoke-webextension-package-local.py &&
    "$2" == --qa-appdir && "$3" == */snapshots/*/app &&
    "$4" == --qa-output-dir && "$5" == */runtime/accept.* ]] ||
   { echo 'FAIL: QA acceptance args are not isolated' >&2; exit 91; }
@@ -183,7 +194,7 @@ cat > "$5/webextension-smoke-synthetic.json" <<JSON
 JSON
 PYTHON
 chmod 0755 "$work/bin/python3"
-bash "$repo/nix/vulpra" security-qa accept > "$work/accept"
+bash "$qa/nix/vulpra" security-qa accept > "$work/accept"
 grep -Fq 'PASS: copied QA Gecko real-browser' "$work/accept" ||
   die 'synthetic acceptance did not pass strict report checks'
 shopt -s nullglob
@@ -191,44 +202,44 @@ accepts=("$qa/obj-vulpra-security-qa/runtime"/accept.*)
 [[ "${#accepts[@]}" -eq 1 && -f "${accepts[0]}/mock-python-called" ]] ||
   die 'acceptance test did not run inside private QA directory'
 touch "$work/bin/accept-false-report"
-if bash "$repo/nix/vulpra" security-qa accept > "$work/accept-invalid" 2>&1; then
+if bash "$qa/nix/vulpra" security-qa accept > "$work/accept-invalid" 2>&1; then
   die 'QA acceptance accepted a false TLS security result'
 fi
 rm -- "$work/bin/accept-false-report"
-if bash "$repo/nix/vulpra" security-qa accept --profile \
+if bash "$qa/nix/vulpra" security-qa accept --profile \
   "$work/home/.mozilla/firefox" > /dev/null 2>&1; then
   die 'QA acceptance accepted personal Firefox profile override'
 fi
 # Tampered copied ELF must fail closed without launching.
 printf '\n# corrupt only the copied QA executable\n' >> "$app"
-if bash "$repo/nix/vulpra" security-qa verify >/dev/null 2>&1; then
+if bash "$qa/nix/vulpra" security-qa verify >/dev/null 2>&1; then
   die 'verify accepted modified QA executable'
 fi
-if bash "$repo/nix/vulpra" security-qa headless >/dev/null 2>&1; then
+if bash "$qa/nix/vulpra" security-qa headless >/dev/null 2>&1; then
   die 'headless started a modified QA executable'
 fi
-if bash "$repo/nix/vulpra" security-qa accept >/dev/null 2>&1; then
+if bash "$qa/nix/vulpra" security-qa accept >/dev/null 2>&1; then
   die 'QA acceptance launched a modified copied browser'
 fi
 cp -- "$repo/obj-vulpra-main-160/dist/bin/vulpra" "$app"
-bash "$repo/nix/vulpra" security-qa verify > "$work/verify-restored"
+bash "$qa/nix/vulpra" security-qa verify > "$work/verify-restored"
 # Tampered copied application.ini must fail closed even if still Version=160.0.1.
 printf '\n# invalid added ini line\n' >> "$qa/obj-vulpra-security-qa/snapshots/$name/app/application.ini"
-if bash "$repo/nix/vulpra" security-qa verify >/dev/null 2>&1; then
+if bash "$qa/nix/vulpra" security-qa verify >/dev/null 2>&1; then
   die 'verify accepted modified QA application.ini'
 fi
 cp -- "$repo/obj-vulpra-main-160/dist/bin/application.ini" \
   "$qa/obj-vulpra-security-qa/snapshots/$name/app/application.ini"
-bash "$repo/nix/vulpra" security-qa verify > "$work/verify-ini-restored"
+bash "$qa/nix/vulpra" security-qa verify > "$work/verify-ini-restored"
 # Legacy snapshots created before INI digest support remain usable.
 sed -i '/^application_ini_sha256=/d' "$manifest"
-bash "$repo/nix/vulpra" security-qa verify > "$work/verify-legacy"
+bash "$qa/nix/vulpra" security-qa verify > "$work/verify-legacy"
 grep -Fq 'LIMIT: legacy snapshot' "$work/verify-legacy"
 
 if bash "$repo/nix/vulpra" security-qa snapshot >/dev/null 2>&1; then
   die 'duplicate snapshot unexpectedly overwrote files'
 fi
-bash "$repo/nix/vulpra" security-qa headless > "$work/out"
+bash "$qa/nix/vulpra" security-qa headless > "$work/out"
 grep -Fq 'PASS: isolated Vulpra QA headless screenshot' "$work/out"
 shopt -s nullglob
 runs=("$qa/obj-vulpra-security-qa/runtime"/run.*)
@@ -282,9 +293,9 @@ native="$qa/obj-vulpra-security-qa-build/dist/bin"
 grep -Fq 'obj-vulpra-security-qa-build' "$qa/obj-vulpra-security-qa/native.mozconfig"
 [[ ! -d "$repo/obj-vulpra-security-qa-build" ]] ||
   die 'QA build created output inside daily source'
-bash "$repo/nix/vulpra" security-qa headless-build > "$work/headless-build"
+bash "$qa/nix/vulpra" security-qa headless-build > "$work/headless-build"
 grep -Fq 'PASS: isolated Vulpra QA headless screenshot' "$work/headless-build"
-if bash "$repo/nix/vulpra" security-qa headless --profile \
+if bash "$qa/nix/vulpra" security-qa headless --profile \
   "$work/home/.mozilla/firefox" >/dev/null 2>&1; then
   die 'QA accepted profile override'
 fi
