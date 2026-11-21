@@ -82,7 +82,7 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
   esac
   printf '%s\t%s\n' "$status" "$path" >> "$changes"
   case "$path" in
-    browser/*|caps/*|dom/*|gfx/*|ipc/*|js/*|netwerk/*|security/*|toolkit/*|widget/*|xpcom/*|modules/libpref/*)
+    browser/*|caps/*|dom/*|gfx/*|ipc/*|js/*|netwerk/*|security/*|toolkit/*|widget/*|xpcom/*|modules/libpref/*|python/mozbuild/*|taskcluster/kinds/toolchain/*)
       printf '%s\t%s\n' "$status" "$path" >> "$critical"
       sensitive=$((sensitive+1)) ;;
   esac
