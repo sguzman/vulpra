@@ -11,6 +11,7 @@ Vulpra security QA, separate from the everyday Vulpra profile and executable
 
   ./nix/vulpra security-qa status    Read-only QA worktree/snapshot status
   ./nix/vulpra security-qa setup     Create detached sibling source worktree
+  ./nix/vulpra security-qa sync      Advance clean detached QA worktree to main HEAD
   ./nix/vulpra security-qa snapshot  Copy built Vulpra binary into QA worktree
   ./nix/vulpra security-qa headless  Offline temporary-profile screenshot smoke
 
@@ -22,11 +23,11 @@ No automatic switching/promotion to the daily browser is performed.
 HELP
 }
 
-[[ "$#" -le 1 ]] || die 'expected one subcommand: status|setup|snapshot|headless'
+[[ "$#" -le 1 ]] || die 'expected one subcommand: status|setup|sync|snapshot|headless'
 action="${1:-status}"
 case "$action" in
   help|-h|--help) usage; exit 0 ;;
-  status|setup|snapshot|headless) ;;
+  status|setup|sync|snapshot|headless) ;;
   *) die "unknown action: $action" ;;
 esac
 
@@ -94,6 +95,25 @@ case "$action" in
     valid_worktree || die 'worktree registry verification failed'
     printf 'PASS: detached QA source worktree created at %s\n' "$worktree"
     echo 'LIMIT: no QA executable, separate build or browser runtime was created'
+    exit 0
+    ;;
+  sync)
+    valid_worktree || die 'QA worktree missing or invalid; run security-qa setup'
+    # Never discard any source edits or untracked files in the QA worktree.
+    git -C "$worktree" diff --quiet &&
+      git -C "$worktree" diff --cached --quiet &&
+      [[ -z "$(git -C "$worktree" ls-files --others --exclude-standard)" ]] ||
+      die 'QA source is modified; refusing to change its checked-out commit'
+    commit="$(git -C "$source_repo" rev-parse HEAD)"
+    [[ "$(cat "$source_repo/browser/config/version.txt")" == 160.0.1 ]] ||
+      die 'main working source version is not Firefox 160.0.1'
+    if [[ "$(git -C "$worktree" rev-parse HEAD)" == "$commit" ]]; then
+      printf 'PASS: QA source already matches current main commit %s\n' "${commit:0:12}"
+      exit 0
+    fi
+    git -C "$worktree" checkout --detach "$commit"
+    printf 'PASS: QA source advanced to main commit %s without touching daily checkout\n' "${commit:0:12}"
+    echo 'LIMIT: existing independent QA binary snapshots are not rebuilt or replaced'
     exit 0
     ;;
   snapshot)
