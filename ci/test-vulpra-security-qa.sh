@@ -17,6 +17,8 @@ mkdir -p "$repo/scripts" "$repo/nix" "$repo/browser/config" \
 cp -- "$root/scripts/vulpra-security-qa.sh" "$repo/scripts/vulpra-security-qa.sh"
 cp -- "$root/scripts/vulpra-security-qa-build.sh" "$repo/scripts/vulpra-security-qa-build.sh"
 mkdir -p "$repo/ci"
+mkdir -p "$repo/browser/themes/shared/tabbrowser"
+printf '/* synthetic local source CSS for geometry dispatch */\n' > "$repo/browser/themes/shared/tabbrowser/vulpra-compact-tabs.css"
 # Track the QA harness before creating the worktree: QA executes its own copy.
 printf '# Synthetic QA-only WebDriver harness placeholder\n' > "$repo/ci/smoke-webextension-package-local.py"
 cp -- "$root/nix/vulpra" "$repo/nix/vulpra"
@@ -166,6 +168,28 @@ chmod 0755 "$work/bin/geckodriver"
 cat > "$work/bin/python3" <<'PYTHON'
 #!/usr/bin/env bash
 set -Eeuo pipefail
+if [[ "$#" == 5 && "$1" == */vulpra-security-qa/ci/smoke-webextension-package-local.py &&
+      "$2" == --qa-style-preview && "$3" == */snapshots/*/app &&
+      "$4" == */obj-vulpra-security-qa/runtime/style.* &&
+      "$5" == */vulpra-security-qa/browser/themes/shared/tabbrowser/vulpra-compact-tabs.css ]]; then
+  [[ "$HOME" == "$4/home" && "$XDG_DATA_HOME" == "$4/data" &&
+     "$XDG_CACHE_HOME" == "$4/cache" && "$XDG_CONFIG_HOME" == "$4/config" &&
+     "$MOZ_HEADLESS" == 1 && "$TMPDIR" == "$4" ]] ||
+    { echo 'FAIL: QA preview did not use private profile/tmp' >&2; exit 95; }
+  echo 'synthetic QA snapshot CSS overlay dispatched' > "$4/mock-preview-python-called"
+  aligned=true
+  [[ ! -e "$(dirname -- "$0")/style-misaligned" ]] || aligned=false
+  cat > "$4/style-result.json" <<PREVIEWJSON
+{
+ "schema_version": 1, "status": "pass", "source": "qa_snapshot_css_overlay",
+ "expanded": {"vertical": true, "group_label_square": true,
+   "compact_27px_tabs": true},
+ "collapsed": {"vertical": true, "group_label_square": true,
+   "compact_27px_tabs": true, "group_alignment_within_px": $aligned}
+}
+PREVIEWJSON
+  exit 0
+fi
 if [[ "$#" == 4 && "$1" == */vulpra-security-qa/ci/smoke-webextension-package-local.py &&
       "$2" == --qa-vertical-style && "$3" == */obj-vulpra-security-qa-build/dist/bin &&
       "$4" == */obj-vulpra-security-qa/runtime/style.* ]]; then
@@ -219,6 +243,29 @@ chmod 0755 "$work/bin/python3"
 bash "$qa/nix/vulpra" security-qa accept > "$work/accept"
 grep -Fq 'PASS: copied QA Gecko real-browser' "$work/accept" ||
   die 'synthetic acceptance did not pass strict report checks'
+# QA source CSS can be previewed on existing copied Gecko without building.
+[[ ! -d "$qa/obj-vulpra-security-qa-build" ]] ||
+  die 'preview fixture unexpectedly has native QA build'
+if bash "$repo/nix/vulpra" security-qa style-preview > /dev/null 2>&1; then
+  die 'main runner accepted a QA-only visual CSS preview'
+fi
+bash "$qa/nix/vulpra" security-qa style-preview > "$work/preview"
+grep -Fq 'PASS: previewed QA source CSS' "$work/preview" ||
+  die 'QA source CSS preview did not return aligned geometry'
+shopt -s nullglob
+previews=("$qa/obj-vulpra-security-qa/runtime"/style.*)
+[[ "${#previews[@]}" -eq 1 && -f "${previews[0]}/mock-preview-python-called" ]] ||
+  die 'CSS preview did not execute QA-owned runtime'
+touch "$work/bin/style-misaligned"
+if bash "$qa/nix/vulpra" security-qa style-preview > "$work/preview-invalid" 2>&1; then
+  die 'QA source CSS preview accepted a misaligned badge'
+fi
+rm -- "$work/bin/style-misaligned"
+if bash "$qa/nix/vulpra" security-qa style-preview --profile \
+    "$work/home/.mozilla/firefox" > /dev/null 2>&1; then
+  die 'CSS preview accepted user profile override'
+fi
+
 shopt -s nullglob
 accepts=("$qa/obj-vulpra-security-qa/runtime"/accept.*)
 [[ "${#accepts[@]}" -eq 1 && -f "${accepts[0]}/mock-python-called" ]] ||
@@ -331,8 +378,14 @@ grep -Fq 'PASS: independent QA-native Vulpra vertical tab compact geometry' "$wo
   die 'QA geometry did not validate native build'
 shopt -s nullglob
 styles=("$qa/obj-vulpra-security-qa/runtime"/style.*)
-[[ "${#styles[@]}" -eq 1 && -f "${styles[0]}/mock-style-python-called" ]] ||
-  die 'QA-only style probe did not run inside disposable runtime'
+[[ "${#styles[@]}" -eq 3 ]] ||
+  die 'native geometry fixture should coexist with two CSS-only previews without overwriting'
+native_style_found=false
+for item in "${styles[@]}"; do
+  [[ ! -f "$item/mock-style-python-called" ]] || native_style_found=true
+done
+[[ "$native_style_found" == true ]] ||
+  die 'QA-only native style probe did not run in disposable runtime'
 touch "$work/bin/style-misaligned"
 if bash "$qa/nix/vulpra" security-qa style > "$work/style-invalid" 2>&1; then
   die 'QA geometry accepted a misaligned group badge'
@@ -387,6 +440,7 @@ echo 'PASS: detached QA source, checksum copied browser, private HOME/XDG/profil
 echo 'PASS: copied snapshot verification rejects tampered ELF/INI and blocks headless/WebDriver acceptance'
 echo 'PASS: synthetic QA accept enforces temporary HOME/XDG, rejected false TLS result and profile override'
 echo 'PASS: QA native CSS geometry dispatcher, internal Gecko ini symlink, incorrect badge/unsafe profile refusal'
+echo 'PASS: CSS source preview on old QA snapshot requires no native rebuild, uses QA-only profile and rejects misalignment'
 echo 'PASS: dirty worktree sync rejected, clean detached sync to newer main accepted; daily sentinels preserved'
 echo 'PASS: QA-only local-origin fetch advanced detached source without changing daily checkout or snapshot'
 echo 'LIMIT: synthetic executable, not an actual Gecko browser security result'
