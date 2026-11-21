@@ -19,8 +19,9 @@
   - `dom/media/ChannelMediaDecoder.cpp`: **`d688d7ec968395490c84c308eb0ddc241a7ba2ea`** (media security hotfix path);
   - `gfx/gl/GLBlitHelper.cpp`: **`0fb43a1429ef359313ebae7873ac3b2cd20fea64`** (Linux Wayland graphics hotfix path);
   - `browser/config/version.txt`: **`9aab5b81294c1aeb29b4b926c76bb1e52c617cd6`** (`160.0.1`).
-- [ ] Reconcile **full** current-`main` Git-tree delta against authenticated Mozilla 160.0.1, including source changes, removals and build wiring, instead of importing the earlier 28-overlay candidate proof as though it describes `main`.
-- [ ] Inspect security advisory applicability/patch retention for the exact current build, identify any new Mozilla release before acceptance, and ensure future upstream security refreshes have a repeatable check.
+- [x] **Complete current-`main` Git-tree path inventory PASS:** [CI #44841349242](https://github.com/sguzman/vulpra/actions/runs/44841349242) independently authenticated Mozilla's 160.0.1 release and compared full Git trees without source blobs or browser builds. **952 changed paths: 921 added, 29 modified, 2 deleted, 0 type changes**; the 2 deletions are solely `.github/workflows/README` and `.github/workflows/pr-handler.yml` (no browser-engine source path deleted relative to official 160.0.1). **29 changes** occur in browser/engine/build/toolchain path families requiring content review; [bounded source-path artifact #14681535677](https://github.com/sguzman/vulpra/actions/runs/44841349242/artifacts/14681535677). Exact 3/3 hotfix/version blobs also rechecked in the current full trees. A path inventory is **not** a completed source-security review.
+- [ ] Review the **contents and security implications of the 29 modified/added code and build paths**, including Firefox preference/actor/Nimbus/Normandy/JS build changes and Gecko Python/toolchain modifications; confirm all applicable upstream advisory patch paths and runtime contracts. The 952-path inventory alone does not accept these changes.
+- [ ] Inspect security advisory applicability/patch retention for the exact current build and identify newer Mozilla releases before acceptance; maintain the independent daily live-release drift monitor.
 **Evidence limit:** three identical source blobs do not establish full-source equivalence, compiled binary retention or vulnerability mitigation. See [#13](https://github.com/sguzman/vulpra/issues/13) and [Mozilla MFSA 2026-130](https://www.mozilla.org/en-US/security/advisories/mfsa2026-130/).
 
 ### S1 — Exact current-`main` binary, build and package provenance: OPEN
@@ -55,7 +56,7 @@
 **Owner decision 2026-11-19:** do not require a Google account, key, subscription or provider integration merely to dogfood. **Do not weaken existing security defaults** to hide this gap.
 
 ## Immediate next execution
-1. Preserve the verified S0 three-blob source check. Expand to a full `main` vs official Firefox 160.0.1 path-by-path provenance report before considering that gate accepted.
+1. Complete the **content-level** review of the 29 changed engine/build/toolchain paths flagged by the now-passing full-tree source audit; reconcile relevant Mozilla security advisories. The complete Git-tree path inventory is accepted, but S0 overall is still partial.
 2. Reuse current packaging and disposable WebDriver/security harness to run S1/S2/S3 on the **already compiled** current native binary; do not order a needless full recompile.
 3. Record exact executable hash, test command/commit, date, run/platform and bounded pass/fail. Update this checklist on **actual evidence only**, never automatically mark a gate complete for added scaffolding.
 4. Return to [#7 typing/frame lag](https://github.com/sguzman/vulpra/issues/7) once the security acceptance workstream is addressed; then work on local-disk-only persistent workspaces. Workspaces must not require Mozilla/Google account sync or a cloud service.
