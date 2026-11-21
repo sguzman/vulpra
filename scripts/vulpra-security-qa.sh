@@ -164,8 +164,7 @@ HTML
     [[ "$result" -eq 0 ]] || die "QA browser exited $result; private log: $run/browser.log"
     [[ -s "$run/result.png" ]] ||
       die 'QA browser did not generate a screenshot'
-    [[ "$(head -c 8 "$run/result.png" | od -An -tx1 | tr -d ' \n')" ==
-       89504e470d0a1a0a ]] ||
+    [[ "$(head -c 8 "$run/result.png" | od -An -tx1 | tr -d ' \n')" == 89504e470d0a1a0a ]] ||
       die 'QA screenshot is not PNG'
     printf 'PASS: isolated Vulpra QA headless screenshot (%s)\n' "$run/result.png"
     echo 'LIMIT: smoke is not a sandbox, TLS or Safe Browsing security acceptance'
