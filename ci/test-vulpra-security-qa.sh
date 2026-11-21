@@ -310,6 +310,15 @@ git -C "$repo" add AGENTS.md
 git -C "$repo" -c user.name='QA Fixture' \
   -c user.email='qa-fixture@example.invalid' commit -qm 'new test source for QA-only fetch'
 git -C "$repo" push -q origin main
+# The mock native builder copied a synthetic missing Breakpad header into
+# the QA source checkout. Remove only this known synthetic fixture file:
+# real QA sync correctly refuses untracked source inputs instead of deleting.
+mock_header="$qa/toolkit/crashreporter/google-breakpad/src/third_party/lss/linux_syscall_support.h"
+[[ -f "$mock_header" && ! -L "$mock_header" ]] ||
+  die 'expected generated synthetic QA header missing'
+grep -Fxq '/* synthetic Breakpad header */' "$mock_header" ||
+  die 'refusing to remove non-fixture QA source'
+rm -- "$mock_header"
 main_before_qa_sync="$(git -C "$repo" rev-parse HEAD)"
 qa_before_qa_sync="$(git -C "$qa" rev-parse HEAD)"
 [[ "$main_before_qa_sync" != "$qa_before_qa_sync" ]] ||
