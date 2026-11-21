@@ -112,12 +112,23 @@ if bash "$repo/nix/vulpra" security-qa snapshot >/dev/null 2>&1; then
 fi
 ln -sfn "$repo/obj-vulpra-main-160/build/application.ini" \
   "$repo/obj-vulpra-main-160/dist/bin/application.ini"
+# A live Gecko browser may leave a hostname:PID 'lock' symlink with no
+# readable target. A naïve cp -aL fails while copying the executable tree.
+ln -s 'host.example.invalid:+12345' "$repo/obj-vulpra-main-160/dist/bin/lock"
+printf 'runtime lock fixture\n' > "$repo/obj-vulpra-main-160/dist/bin/.parentlock"
 bash "$repo/nix/vulpra" security-qa snapshot > "$work/snapshot"
 
 name="$(cat "$qa/obj-vulpra-security-qa/active-snapshot")"
 [[ "$name" =~ ^[0-9a-f]{12}-[0-9a-f]{12}$ ]] || die 'invalid snapshot identifier'
 app="$qa/obj-vulpra-security-qa/snapshots/$name/app/vulpra"
 [[ -x "$app" ]] || die 'snapshot executable missing'
+[[ ! -e "$qa/obj-vulpra-security-qa/snapshots/$name/app/lock" &&
+   ! -L "$qa/obj-vulpra-security-qa/snapshots/$name/app/lock" &&
+   ! -e "$qa/obj-vulpra-security-qa/snapshots/$name/app/.parentlock" ]] ||
+  die 'snapshot included live browser runtime lock state'
+[[ -L "$repo/obj-vulpra-main-160/dist/bin/lock" &&
+   -f "$repo/obj-vulpra-main-160/dist/bin/.parentlock" ]] ||
+  die 'snapshot mutated the running browser lock entries'
 [[ -f "$qa/obj-vulpra-security-qa/snapshots/$name/app/application.ini" &&
    ! -L "$qa/obj-vulpra-security-qa/snapshots/$name/app/application.ini" ]] ||
   die 'snapshot did not dereference the internal Gecko application.ini symlink'
