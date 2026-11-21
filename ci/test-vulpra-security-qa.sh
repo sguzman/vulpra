@@ -47,6 +47,13 @@ cat > "$repo/obj-vulpra-main-160/dist/bin/application.ini" <<'INI'
 Name=Vulpra
 Version=160.0.1
 INI
+# Gecko's real dist/bin/application.ini is an absolute link to obj*/build.
+# Exercise that real layout instead of incorrectly testing only regular files.
+mkdir -p "$repo/obj-vulpra-main-160/build"
+mv -- "$repo/obj-vulpra-main-160/dist/bin/application.ini" \
+  "$repo/obj-vulpra-main-160/build/application.ini"
+ln -s "$repo/obj-vulpra-main-160/build/application.ini" \
+  "$repo/obj-vulpra-main-160/dist/bin/application.ini"
 cat > "$repo/obj-vulpra-main-160/dist/bin/vulpra" <<'BROWSER'
 #!/usr/bin/env bash
 # Test-only browser substitute, producing a valid PNG header.
@@ -96,11 +103,24 @@ bash "$repo/nix/vulpra" security-qa setup > "$work/setup"
 if bash "$repo/nix/vulpra" security-qa setup >/dev/null 2>&1; then
   die 'duplicate setup unexpectedly overwrote a worktree'
 fi
+# A plausible application.ini outside the native object directory must fail
+# even when it claims to be Vulpra 160.0.1.
+cp -- "$repo/obj-vulpra-main-160/build/application.ini" "$work/outside.ini"
+ln -sfn "$work/outside.ini" "$repo/obj-vulpra-main-160/dist/bin/application.ini"
+if bash "$repo/nix/vulpra" security-qa snapshot >/dev/null 2>&1; then
+  die 'snapshot accepted application.ini escaping the native object directory'
+fi
+ln -sfn "$repo/obj-vulpra-main-160/build/application.ini" \
+  "$repo/obj-vulpra-main-160/dist/bin/application.ini"
 bash "$repo/nix/vulpra" security-qa snapshot > "$work/snapshot"
+
 name="$(cat "$qa/obj-vulpra-security-qa/active-snapshot")"
 [[ "$name" =~ ^[0-9a-f]{12}-[0-9a-f]{12}$ ]] || die 'invalid snapshot identifier'
 app="$qa/obj-vulpra-security-qa/snapshots/$name/app/vulpra"
 [[ -x "$app" ]] || die 'snapshot executable missing'
+[[ -f "$qa/obj-vulpra-security-qa/snapshots/$name/app/application.ini" &&
+   ! -L "$qa/obj-vulpra-security-qa/snapshots/$name/app/application.ini" ]] ||
+  die 'snapshot did not dereference the internal Gecko application.ini symlink'
 cmp "$app" "$repo/obj-vulpra-main-160/dist/bin/vulpra"
 if bash "$repo/nix/vulpra" security-qa snapshot >/dev/null 2>&1; then
   die 'duplicate snapshot unexpectedly overwrote files'
