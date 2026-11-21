@@ -15,6 +15,7 @@ Vulpra Nix launcher (Nix Output Monitor)
   ./nix/vulpra build           Compile committed Firefox 160.0.1 source on main
   ./nix/vulpra run             Dogfood local Vulpra with permanent ~/.local/share/vulpra/default profile
   ./nix/vulpra qa              Run local Vulpra with a separate build QA profile
+  ./nix/vulpra security-qa status|setup|snapshot|headless  Isolated QA worktree, no Nix
   ./nix/vulpra build --jobs 8  Override local native build parallelism
   ./nix/vulpra package         Package and privately smoke the native main build
   ./nix/vulpra smoke|wayland|accept|webext|input
@@ -40,6 +41,13 @@ if (($#)); then shift; fi
 
 case "$action" in
   help|-h|--help) usage; exit 0 ;;
+  security-qa)
+    # Worktree/snapshot controls never evaluate Nix or run the daily browser.
+    repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+    [[ -f "$repo/scripts/vulpra-security-qa.sh" ]] ||
+      error 'security QA setup script is missing'
+    exec bash "$repo/scripts/vulpra-security-qa.sh" "$@"
+    ;;
   status)
     (($# == 0)) || error "'status' takes no extra arguments"
     here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
