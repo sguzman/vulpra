@@ -299,7 +299,11 @@ grep -Fq 'PASS: isolated Vulpra QA headless screenshot' "$work/headless-build"
 # QA-only source sync follows a local bare origin without running any script
 # from main or changing its checked-out HEAD. No network or personal files.
 git init -q --bare "$work/remote.git"
-git -C "$repo" remote add origin "$work/remote.git"
+if git -C "$repo" remote get-url origin >/dev/null 2>&1; then
+  git -C "$repo" remote set-url origin "$work/remote.git"
+else
+  git -C "$repo" remote add origin "$work/remote.git"
+fi
 git -C "$repo" push -q origin main
 printf '\n# synthetic remote revision\n' >> "$repo/AGENTS.md"
 git -C "$repo" add AGENTS.md
