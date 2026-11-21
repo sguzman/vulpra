@@ -5,6 +5,7 @@ umask 077
 die() { echo "FAIL: $*" >&2; exit 1; }
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 bash -n "$root/scripts/vulpra-security-qa.sh"
+bash -n "$root/scripts/vulpra-security-qa-build.sh"
 bash -n "$root/nix/vulpra"
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
@@ -14,8 +15,29 @@ mkdir -p "$repo/scripts" "$repo/nix" "$repo/browser/config" \
   "$repo/obj-vulpra-main-160/dist/bin" "$work/home/.mozilla/firefox" \
   "$work/home/.local/share/vulpra/default" "$work/bin"
 cp -- "$root/scripts/vulpra-security-qa.sh" "$repo/scripts/vulpra-security-qa.sh"
+cp -- "$root/scripts/vulpra-security-qa-build.sh" "$repo/scripts/vulpra-security-qa-build.sh"
+mkdir -p "$repo/ci"
 cp -- "$root/nix/vulpra" "$repo/nix/vulpra"
 printf '# Vulpra synthetic fixture\n' > "$repo/AGENTS.md"
+cat > "$repo/mach" <<'MACH'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+[[ "$MOZCONFIG" == "$PWD/obj-vulpra-security-qa/native.mozconfig" ]] || exit 91
+grep -Fq 'obj-vulpra-security-qa-build' "$MOZCONFIG" || exit 92
+case "$1" in
+  configure) : ;;
+  build)
+    out="$PWD/obj-vulpra-security-qa-build/dist/bin"
+    mkdir -p "$out"
+    cp -- "$PWD/../vulpra/obj-vulpra-main-160/dist/bin/vulpra" "$out/vulpra"
+    cp -- "$PWD/../vulpra/obj-vulpra-main-160/dist/bin/application.ini" "$out/application.ini"
+    ;;
+  *) exit 93 ;;
+esac
+MACH
+chmod 0755 "$repo/mach"
+printf 'mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-vulpra-linux\n' > "$repo/ci/mozconfig-linux"
+
 printf '160.0.1\n' > "$repo/browser/config/version.txt"
 printf '/obj*/\n' > "$repo/.gitignore"
 printf 'Firefox sentinel\n' > "$work/home/.mozilla/firefox/sentinel"
@@ -119,6 +141,26 @@ bash "$repo/nix/vulpra" security-qa sync > "$work/sync"
 [[ -x "$app" ]] || die 'sync removed existing QA binary snapshot'
 grep -Fxq 'Firefox sentinel' "$work/home/.mozilla/firefox/sentinel"
 grep -Fxq 'Dogfood sentinel' "$work/home/.local/share/vulpra/default/sentinel"
+# Source can be rebuilt in the detached worktree only, in a separate object
+# directory. These fake mach invocations validate paths, not Firefox compile.
+builder="$qa/scripts/vulpra-security-qa-build.sh"
+[[ -f "$builder" ]] || die 'native QA build script missing from detached worktree'
+bash "$builder" --preflight > "$work/build-preflight"
+[[ ! -e "$qa/obj-vulpra-security-qa/native.mozconfig" ]] ||
+  die 'QA preflight unexpectedly generated a mozconfig'
+mkdir -p "$work/mock-libclang"
+mkdir -p "$repo/toolkit/crashreporter/google-breakpad/src/third_party/lss"
+printf '/* synthetic Breakpad header */\n' > "$repo/toolkit/crashreporter/google-breakpad/src/third_party/lss/linux_syscall_support.h"
+export VULPRA_NIX_DEV=1 VULPRA_NIX_LIBCLANG_PATH="$work/mock-libclang"
+bash "$builder" --build --jobs 2 > "$work/build"
+native="$qa/obj-vulpra-security-qa-build/dist/bin"
+[[ -x "$native/vulpra" && -f "$native/application.ini" ]] ||
+  die 'mock native output was not built in detached QA tree'
+grep -Fq 'obj-vulpra-security-qa-build' "$qa/obj-vulpra-security-qa/native.mozconfig"
+[[ ! -d "$repo/obj-vulpra-security-qa-build" ]] ||
+  die 'QA build created output inside daily source'
+bash "$repo/nix/vulpra" security-qa headless-build > "$work/headless-build"
+grep -Fq 'PASS: isolated Vulpra QA headless screenshot' "$work/headless-build"
 if bash "$repo/nix/vulpra" security-qa headless --profile \
   "$work/home/.mozilla/firefox" >/dev/null 2>&1; then
   die 'QA accepted profile override'
