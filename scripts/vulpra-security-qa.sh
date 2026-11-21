@@ -15,6 +15,7 @@ Vulpra security QA, separate from the everyday Vulpra profile and executable
   ./nix/vulpra security-qa snapshot  Copy built Vulpra binary into QA worktree
   ./nix/vulpra security-qa verify    Verify active copied QA runtime without launching
   ./nix/vulpra security-qa headless  Offline temporary-profile screenshot smoke
+  ./nix/vulpra security-qa accept    Real copied-browser localhost TLS/WebExtension test
   ./nix/vulpra security-qa build [--jobs N]  Explicit separate native QA build
   ./nix/vulpra security-qa headless-build  Test compiled QA executable privately
 
@@ -31,7 +32,7 @@ action="${1:-status}"
 if (($#)); then shift; fi
 case "$action" in
   help|-h|--help) usage; exit 0 ;;
-  status|setup|sync|snapshot|verify|headless|headless-build)
+  status|setup|sync|snapshot|verify|headless|headless-build|accept)
     (($# == 0)) || die "$action takes no extra arguments" ;;
   build)
     jobs=2
@@ -266,6 +267,59 @@ case "$action" in
     exec nix shell "$qa_flake#nom" --no-write-lock-file --command \
       nom develop "$qa_flake" --no-write-lock-file --command \
       bash "$builder" --build --jobs "$jobs"
+    ;;
+  accept)
+    # Explicit local-only acceptance run; never touch the user's browser,
+    # personal profiles, hosted credentials, installed extensions, or CA store.
+    verify_snapshot
+    app="$(snapshot_path)"
+    probe="$source_repo/ci/smoke-webextension-package-local.py"
+    [[ -f "$probe" && ! -L "$probe" ]] ||
+      die 'existing WebDriver security probe missing from daily source checkout'
+    for tool in python3 geckodriver openssl jq timeout; do
+      command -v "$tool" >/dev/null ||
+        die "security QA acceptance requires $tool; no automatic installation"
+    done
+    runtime="$state/runtime"
+    [[ ! -L "$runtime" ]] || die 'QA runtime must not be a symlink'
+    mkdir -p -m 0700 -- "$runtime"
+    run="$(mktemp -d "$runtime/accept.XXXXXXXX")"
+    mkdir -p -m 0700 -- "$run/home" "$run/data" "$run/cache" "$run/config"
+    # Retain only safe command/environment inputs. No Firefox/Gecko profile
+    # variables from the interactive desktop are inherited by the subprocess.
+    set +e
+    timeout 240 env -i PATH="$PATH" HOME="$run/home" LANG=C.UTF-8 \
+      XDG_DATA_HOME="$run/data" XDG_CACHE_HOME="$run/cache" \
+      XDG_CONFIG_HOME="$run/config" \
+      MOZ_HEADLESS=1 NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
+      VULPRA_VERIFY_BYOB_DEFAULTS=1 VULPRA_VERIFY_UA_COMPAT=1 \
+      python3 "$probe" --qa-appdir "$app" --qa-output-dir "$run" \
+      > "$run/accept.log" 2>&1
+    result=$?
+    set -e
+    [[ "$result" -eq 0 ]] ||
+      die "isolated WebDriver acceptance failed (exit $result); QA-only log: $run/accept.log"
+    shopt -s nullglob
+    reports=("$run"/webextension-smoke-*.json)
+    [[ "${#reports[@]}" -eq 1 && -f "${reports[0]}" && ! -L "${reports[0]}" ]] ||
+      die "WebDriver acceptance returned without exactly one QA report: $run"
+    jq -e '
+      .schema_version == 1 and .status == "pass" and
+      .runtime_source == "copied_qa_snapshot" and
+      .security.temporary_home == true and
+      .security.local_untrusted_tls_denial.verified == true and
+      .security.local_untrusted_tls_denial.webdriver_accept_insecure_certs == false and
+      .webextension.temporary_unsigned_install == true and
+      .webextension.content_scripts == true and
+      .webextension.background_messaging == true and
+      .webextension.storage_local == true and
+      .webextension.uninstall == true and
+      .byob_default_preferences.verified == true
+    ' "${reports[0]}" > /dev/null ||
+      die "QA acceptance report lacks required real-browser security assertions: ${reports[0]}"
+    echo 'PASS: copied QA Gecko real-browser localhost TLS + extension + BYOB checks'
+    printf 'QA evidence: %s\n' "${reports[0]}"
+    echo 'LIMIT: no target sandbox syscalls, live Safe Browsing provider or external egress audit'
     ;;
   headless|headless-build)
     valid_worktree || die 'QA worktree missing or invalid'
