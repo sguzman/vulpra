@@ -777,7 +777,8 @@ def verify_uninstall_stays_uninstalled(proof, seconds: float = 2.0) -> int:
 
 
 
-def verify_vertical_style_geometry(expanded: object, collapsed: object) -> dict:
+def verify_vertical_style_geometry(expanded: object, collapsed: object,
+                                   source: str = "qa_native_compiled") -> dict:
     """Pure, fail-closed check of real Firefox chrome layout coordinates.
 
     Browser chrome must be instrumented by WebDriver; source-only CSS text is
@@ -830,7 +831,7 @@ def verify_vertical_style_geometry(expanded: object, collapsed: object) -> dict:
 
     return {
         "schema_version": 1, "status": "pass",
-        "source": "qa_native_compiled",
+        "source": source,
         "expanded": inspect(expanded, True),
         "collapsed": inspect(collapsed, False),
         "limits": [
@@ -877,7 +878,8 @@ def self_test_vertical_style_geometry() -> None:
     print(f"PASS: QA vertical sidebar rectangle validator rejects {cases} forged/absent styles")
 
 
-def run_qa_vertical_style(appdir_text: str, output_text: str) -> int:
+def run_qa_vertical_style(appdir_text: str, output_text: str,
+                          preview_css_text: str | None = None) -> int:
     """Chrome DOM-only layout QA against an independently built QA browser.
 
     This mode has no permanent browser profiles, network sites, TLS bypasses,
@@ -890,9 +892,22 @@ def run_qa_vertical_style(appdir_text: str, output_text: str) -> int:
     out = out_arg.resolve(strict=True)
     if appdir_arg != appdir or out_arg != out or not out.is_dir():
         raise RuntimeError("QA CSS paths cannot use symlinked aliases")
-    if appdir.parts[-3:] != ("obj-vulpra-security-qa-build", "dist", "bin"):
-        raise RuntimeError("QA visual test refuses a main or packaged executable")
-    qa_root = appdir.parents[2]
+    if preview_css_text:
+        if (appdir.name != "app" or appdir.parent.parent.name != "snapshots" or
+                appdir.parent.parent.parent.name != "obj-vulpra-security-qa"):
+            raise RuntimeError("CSS preview requires an existing copied QA snapshot")
+        qa_root = appdir.parents[3]
+        if not Path(preview_css_text).is_absolute():
+            raise RuntimeError("Preview CSS path must be absolute")
+        preview_css = Path(preview_css_text).resolve(strict=True)
+        expected_css = qa_root / "browser/themes/shared/tabbrowser/vulpra-compact-tabs.css"
+        if preview_css != expected_css or not preview_css.is_file():
+            raise RuntimeError("CSS preview must use the detached QA source stylesheet")
+    else:
+        if appdir.parts[-3:] != ("obj-vulpra-security-qa-build", "dist", "bin"):
+            raise RuntimeError("QA native style check refuses a main or packaged executable")
+        qa_root = appdir.parents[2]
+        preview_css = None
     if qa_root.name != "vulpra-security-qa" or not (qa_root / ".git").is_file():
         raise RuntimeError("QA visual test requires registered detached source worktree")
     if out.parent != qa_root / "obj-vulpra-security-qa" / "runtime" or not out.name.startswith("style."):
@@ -950,6 +965,24 @@ def run_qa_vertical_style(appdir_text: str, output_text: str) -> int:
             base = "/session/" + str(session)
             request(port, "POST", base + "/moz/context", {"context": "chrome"})
             try:
+                if preview_css:
+                    # Load from QA source only, into the disposable browser
+                    # process. This previews CSS without building Firefox and
+                    # does NOT prove packaging or change any real profile.
+                    loaded = request(port, "POST", base + "/execute/sync", {
+                        "script": """
+                          const svc = Cc["@mozilla.org/content/style-sheet-service;1"]
+                            .getService(Ci.nsIStyleSheetService);
+                          const uri = Services.io.newURI(arguments[0]);
+                          if (!svc.sheetRegistered(uri, svc.USER_SHEET)) {
+                            svc.loadAndRegisterSheet(uri, svc.USER_SHEET);
+                          }
+                          return {registered: svc.sheetRegistered(uri, svc.USER_SHEET)};
+                        """,
+                        "args": [preview_css.as_uri()],
+                    })
+                    if not isinstance(loaded, dict) or loaded.get("registered") is not True:
+                        raise RuntimeError("QA source CSS was not registered in disposable chrome")
                 request(port, "POST", base + "/execute/sync", {"script": """
                   if (!window.gBrowser || !window.SidebarController?._state) {
                     throw new Error("Sidebar chrome controller is unavailable");
@@ -1035,7 +1068,10 @@ def run_qa_vertical_style(appdir_text: str, output_text: str) -> int:
                     request(port, "POST", base + "/moz/context", {"context": "content"})
                 except RuntimeError:
                     pass
-            result = verify_vertical_style_geometry(expanded, collapsed)
+            result = verify_vertical_style_geometry(
+                expanded, collapsed,
+                source="qa_snapshot_css_overlay" if preview_css else "qa_native_compiled"
+            )
             (out / "style-result.json").write_text(json.dumps(result, indent=2) + "\n")
     finally:
         if session:
@@ -1053,7 +1089,7 @@ def run_qa_vertical_style(appdir_text: str, output_text: str) -> int:
                     os.killpg(proc.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-    print("PASS: QA-native Firefox chrome group badge and tab outline alignment")
+    print("PASS: QA Firefox chrome group badge and tab outline alignment")
     print("Geometry report: " + str(out / "style-result.json"))
     return 0
 
@@ -1064,8 +1100,12 @@ def main() -> int:
         return 0
     if len(sys.argv) == 4 and sys.argv[1] == "--qa-vertical-style":
         return run_qa_vertical_style(sys.argv[2], sys.argv[3])
+    if len(sys.argv) == 5 and sys.argv[1] == "--qa-style-preview":
+        return run_qa_vertical_style(sys.argv[2], sys.argv[3], sys.argv[4])
     if sys.argv[1:2] == ["--qa-vertical-style"]:
         raise RuntimeError("Usage: --qa-vertical-style ABSOLUTE_QA_BIN_DIR ABSOLUTE_QA_OUTPUT_DIR")
+    if sys.argv[1:2] == ["--qa-style-preview"]:
+        raise RuntimeError("Usage: --qa-style-preview ABSOLUTE_QA_SNAPSHOT_DIR ABSOLUTE_QA_OUTPUT_DIR ABSOLUTE_QA_CSS")
     if sys.argv[1:] == ["--self-test-cert-parser"]:
         test_certificate_denial_parser()
         return 0
