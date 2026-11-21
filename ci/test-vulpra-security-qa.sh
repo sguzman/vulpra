@@ -97,6 +97,26 @@ mapfile -t proof < "$run/home/env-proof"
 [[ "$(git -C "$repo" rev-parse HEAD)" == "$original" &&
    "$(git -C "$repo" symbolic-ref --short HEAD)" == main ]] ||
   die 'daily main source branch altered'
+# A dirty QA checkout must not be reset/silently discarded.
+printf '\n# temporary QA source change\n' >> "$qa/AGENTS.md"
+if bash "$repo/nix/vulpra" security-qa sync >/dev/null 2>&1; then
+  die 'sync unexpectedly discarded changes from QA worktree'
+fi
+git -C "$qa" checkout -- AGENTS.md
+# A new main commit must not silently combine old QA source with a new binary.
+printf '\n# revised synthetic source\n' >> "$repo/AGENTS.md"
+git -C "$repo" add AGENTS.md
+git -C "$repo" -c user.name='QA Fixture' -c user.email='qa-fixture@example.invalid' \
+  commit -qm 'next synthetic main source'
+latest="$(git -C "$repo" rev-parse HEAD)"
+if bash "$repo/nix/vulpra" security-qa snapshot >/dev/null 2>&1; then
+  die 'snapshot accepted source commit mismatch'
+fi
+bash "$repo/nix/vulpra" security-qa sync > "$work/sync"
+[[ "$(git -C "$qa" rev-parse HEAD)" == "$latest" &&
+   "$(git -C "$repo" symbolic-ref --short HEAD)" == main ]] ||
+  die 'safe detached QA source sync did not preserve main'
+[[ -x "$app" ]] || die 'sync removed existing QA binary snapshot'
 grep -Fxq 'Firefox sentinel' "$work/home/.mozilla/firefox/sentinel"
 grep -Fxq 'Dogfood sentinel' "$work/home/.local/share/vulpra/default/sentinel"
 if bash "$repo/nix/vulpra" security-qa headless --profile \
@@ -104,5 +124,5 @@ if bash "$repo/nix/vulpra" security-qa headless --profile \
   die 'QA accepted profile override'
 fi
 echo 'PASS: detached QA source, checksum copied browser, private HOME/XDG/profile and test screenshot'
-echo 'PASS: daily main + Firefox/Vulpra sentinels unchanged; duplicate writes rejected'
+echo 'PASS: dirty worktree sync rejected, clean detached sync to newer main accepted; daily sentinels preserved'
 echo 'LIMIT: synthetic executable, not an actual Gecko browser security result'
