@@ -74,6 +74,9 @@ if [[ ! -s "$repo/$header" ]]; then
   [[ ! -e "$repo/$header" && ! -L "$repo/$header" &&
      -s "$main/$header" && ! -L "$main/$header" ]] ||
     die 'missing QA Breakpad header and no safe local source for it'
+  [[ "$(realpath -m -- "$repo/$header")" == "$repo/$header" ]] ||
+    die 'Breakpad header destination escapes QA source tree through a symlink'
+  mkdir -p -- "$(dirname -- "$repo/$header")"
   install -m 0644 -- "$main/$header" "$repo/$header"
 fi
 mkdir -p -m 0700 -- "$state"
