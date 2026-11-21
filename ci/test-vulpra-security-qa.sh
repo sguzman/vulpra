@@ -166,6 +166,27 @@ chmod 0755 "$work/bin/geckodriver"
 cat > "$work/bin/python3" <<'PYTHON'
 #!/usr/bin/env bash
 set -Eeuo pipefail
+if [[ "$#" == 4 && "$1" == */vulpra-security-qa/ci/smoke-webextension-package-local.py &&
+      "$2" == --qa-vertical-style && "$3" == */obj-vulpra-security-qa-build/dist/bin &&
+      "$4" == */obj-vulpra-security-qa/runtime/style.* ]]; then
+  [[ "$HOME" == "$4/home" && "$XDG_DATA_HOME" == "$4/data" &&
+     "$XDG_CACHE_HOME" == "$4/cache" && "$XDG_CONFIG_HOME" == "$4/config" &&
+     "$MOZ_HEADLESS" == 1 ]] ||
+    { echo 'FAIL: style QA inherited profile or unsafe environment' >&2; exit 95; }
+  echo 'synthetic style harness invoked' > "$4/mock-style-python-called"
+  aligned=true
+  [[ ! -e "$(dirname -- "$0")/style-misaligned" ]] || aligned=false
+  cat > "$4/style-result.json" <<STYLEJSON
+{
+ "schema_version": 1, "status": "pass", "source": "qa_native_compiled",
+ "expanded": {"vertical": true, "group_label_square": true,
+   "compact_27px_tabs": true},
+ "collapsed": {"vertical": true, "group_label_square": true,
+   "compact_27px_tabs": true, "group_alignment_within_px": $aligned}
+}
+STYLEJSON
+  exit 0
+fi
 [[ "$#" == 5 && "$1" == */vulpra-security-qa/ci/smoke-webextension-package-local.py &&
    "$2" == --qa-appdir && "$3" == */snapshots/*/app &&
    "$4" == --qa-output-dir && "$5" == */runtime/accept.* ]] ||
@@ -296,6 +317,32 @@ grep -Fq 'obj-vulpra-security-qa-build' "$qa/obj-vulpra-security-qa/native.mozco
   die 'QA build created output inside daily source'
 bash "$qa/nix/vulpra" security-qa headless-build > "$work/headless-build"
 grep -Fq 'PASS: isolated Vulpra QA headless screenshot' "$work/headless-build"
+# Gecko normally places a symlinked INI inside its native QA objdir.
+# Verify that QA-built runtime accepts it but snapshot-only guards remain strict.
+mkdir -p -- "$qa/obj-vulpra-security-qa-build/build"
+mv -- "$native/application.ini" "$qa/obj-vulpra-security-qa-build/build/application.ini"
+ln -s "$qa/obj-vulpra-security-qa-build/build/application.ini" "$native/application.ini"
+bash "$qa/nix/vulpra" security-qa headless-build > "$work/headless-build-linked"
+if bash "$repo/nix/vulpra" security-qa style > /dev/null 2>&1; then
+  die 'QA visual geometry was allowed through the daily main runner'
+fi
+bash "$qa/nix/vulpra" security-qa style > "$work/style"
+grep -Fq 'PASS: independent QA-native Vulpra vertical tab compact geometry' "$work/style" ||
+  die 'QA geometry did not validate native build'
+shopt -s nullglob
+styles=("$qa/obj-vulpra-security-qa/runtime"/style.*)
+[[ "${#styles[@]}" -eq 1 && -f "${styles[0]}/mock-style-python-called" ]] ||
+  die 'QA-only style probe did not run inside disposable runtime'
+touch "$work/bin/style-misaligned"
+if bash "$qa/nix/vulpra" security-qa style > "$work/style-invalid" 2>&1; then
+  die 'QA geometry accepted a misaligned group badge'
+fi
+rm -- "$work/bin/style-misaligned"
+if bash "$qa/nix/vulpra" security-qa style --profile \
+    "$work/home/.mozilla/firefox" > /dev/null 2>&1; then
+  die 'QA visual geometry accepted personal profile override'
+fi
+
 # QA-only source sync follows a local bare origin without running any script
 # from main or changing its checked-out HEAD. No network or personal files.
 git init -q --bare "$work/remote.git"
@@ -339,6 +386,7 @@ fi
 echo 'PASS: detached QA source, checksum copied browser, private HOME/XDG/profile and test screenshot'
 echo 'PASS: copied snapshot verification rejects tampered ELF/INI and blocks headless/WebDriver acceptance'
 echo 'PASS: synthetic QA accept enforces temporary HOME/XDG, rejected false TLS result and profile override'
+echo 'PASS: QA native CSS geometry dispatcher, internal Gecko ini symlink, incorrect badge/unsafe profile refusal'
 echo 'PASS: dirty worktree sync rejected, clean detached sync to newer main accepted; daily sentinels preserved'
 echo 'PASS: QA-only local-origin fetch advanced detached source without changing daily checkout or snapshot'
 echo 'LIMIT: synthetic executable, not an actual Gecko browser security result'
