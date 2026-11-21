@@ -8,6 +8,7 @@ die() { printf 'Vulpra security QA: %s\n' "$*" >&2; exit 2; }
 usage() {
   cat <<'HELP'
 Vulpra security QA, separate from the everyday Vulpra profile and executable
+QA-only tests: run ~/Code/Apps/vulpra-security-qa/nix/vulpra security-qa accept
 
   ./nix/vulpra security-qa status    Read-only QA worktree/snapshot status
   ./nix/vulpra security-qa setup     Create detached sibling source worktree
@@ -44,24 +45,51 @@ case "$action" in
   *) die "unknown action: $action" ;;
 esac
 
-source_repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-[[ -d "$source_repo/.git" && -f "$source_repo/AGENTS.md" &&
-   -f "$source_repo/browser/config/version.txt" ]] ||
-  die 'must start from the regular Vulpra source checkout, not a QA worktree'
-[[ "$(git -C "$source_repo" rev-parse --show-toplevel)" == "$source_repo" ]] ||
-  die 'source directory is not the expected Git checkout'
-[[ "$(git -C "$source_repo" symbolic-ref -q --short HEAD || :)" == main ]] ||
-  die 'source checkout must remain on main; no branch switching allowed'
-worktree="$(dirname -- "$source_repo")/vulpra-security-qa"
+# The QA worktree is a first-class execution root. Its test commands resolve
+# scripts, binary snapshots, and outputs under QA -- not under daily main.
+# Only source bootstrap/sync/snapshot ever require the main checkout's runner.
+checkout="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+case "$(basename -- "$checkout")" in
+  vulpra)
+    source_repo="$checkout"
+    worktree="$(dirname -- "$source_repo")/vulpra-security-qa"
+    launcher_mode=main
+    [[ -d "$source_repo/.git" && ! -L "$source_repo/.git" &&
+       -f "$source_repo/AGENTS.md" &&
+       -f "$source_repo/browser/config/version.txt" ]] ||
+      die 'missing ordinary Vulpra main source checkout'
+    [[ "$(git -C "$source_repo" symbolic-ref -q --short HEAD || :)" == main ]] ||
+      die 'source checkout must remain on main; no branch switching allowed'
+    ;;
+  vulpra-security-qa)
+    worktree="$checkout"
+    source_repo="$(dirname -- "$worktree")/vulpra"
+    launcher_mode=qa
+    [[ -f "$worktree/.git" && ! -L "$worktree/.git" &&
+       -d "$source_repo/.git" ]] ||
+      die 'expected a registered detached QA worktree and sibling main Git metadata'
+    [[ -z "$(git -C "$worktree" symbolic-ref -q --short HEAD || :)" ]] ||
+      die 'QA source must stay detached; do not use the daily main branch here'
+    ;;
+  *)
+    die 'security QA must be run from the Vulpra main or its detached sibling QA worktree'
+    ;;
+esac
+[[ "$(git -C "$checkout" rev-parse --show-toplevel)" == "$checkout" ]] ||
+  die 'source directory is not the expected Git checkout root'
 state="$worktree/obj-vulpra-security-qa"
 compiled="$source_repo/obj-vulpra-main-160/dist/bin"
 
 valid_worktree() {
-  [[ -d "$worktree" && ! -L "$worktree" ]] || return 1
+  [[ -d "$worktree" && ! -L "$worktree" &&
+     -f "$worktree/.git" && ! -L "$worktree/.git" ]] || return 1
   [[ "$(git -C "$worktree" rev-parse --show-toplevel 2>/dev/null || :)" == "$worktree" ]] || return 1
-  # Detached QA worktree is registered in the SAME repo but cannot alter main's index.
+  # The detached worktree shares Git objects, but no source checkout,
+  # profile, executable or command entrypoint with daily main.
   [[ -z "$(git -C "$worktree" symbolic-ref -q --short HEAD 2>/dev/null || :)" ]] || return 1
-  git -C "$source_repo" worktree list --porcelain |
+  [[ "$(realpath -e -- "$(git -C "$worktree" rev-parse --git-common-dir)")" ==
+     "$(realpath -e -- "$source_repo/.git")" ]] || return 1
+  git -C "$worktree" worktree list --porcelain |
     grep -Fxq "worktree $worktree" || return 1
 }
 snapshot_path() {
@@ -137,6 +165,13 @@ valid_compiled_app() {
   grep -Fxq 'Name=Vulpra' "$resolved_ini" &&
     grep -Fxq 'Version=160.0.1' "$resolved_ini"
 }
+case "$action" in
+  setup|sync|snapshot)
+    [[ "$launcher_mode" == main ]] ||
+      die "$action changes the source/copy setup and must be invoked from the main Git checkout; QA test commands are independent"
+    ;;
+esac
+
 case "$action" in
   status)
     printf 'Daily Vulpra checkout: %s\n' "$source_repo"
@@ -273,9 +308,9 @@ case "$action" in
     # personal profiles, hosted credentials, installed extensions, or CA store.
     verify_snapshot
     app="$(snapshot_path)"
-    probe="$source_repo/ci/smoke-webextension-package-local.py"
+    probe="$worktree/ci/smoke-webextension-package-local.py"
     [[ -f "$probe" && ! -L "$probe" ]] ||
-      die 'existing WebDriver security probe missing from daily source checkout'
+      die 'QA worktree WebDriver security probe missing; sync the detached QA source (never use daily main tests)'
     for tool in python3 geckodriver openssl jq timeout; do
       command -v "$tool" >/dev/null ||
         die "security QA acceptance requires $tool; no automatic installation"
