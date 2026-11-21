@@ -19,6 +19,7 @@ QA-only tests: run ~/Code/Apps/vulpra-security-qa/nix/vulpra security-qa accept
   ./nix/vulpra security-qa accept    Real copied-browser localhost TLS/WebExtension test
   ./nix/vulpra security-qa build [--jobs N]  Explicit separate native QA build
   ./nix/vulpra security-qa headless-build  Test compiled QA executable privately
+  ./nix/vulpra security-qa style     Inspect collapsed/expanded tab group geometry in QA build
 
 Setup does NOT compile, download, install, stop, restart or launch a browser.
 Only the explicit 'build' operation enters Nix and compiles; default jobs=2.
@@ -34,7 +35,7 @@ action="${1:-status}"
 if (($#)); then shift; fi
 case "$action" in
   help|-h|--help) usage; exit 0 ;;
-  status|setup|sync|snapshot|verify|headless|headless-build|accept)
+  status|setup|sync|snapshot|verify|headless|headless-build|accept|style)
     (($# == 0)) || die "$action takes no extra arguments" ;;
   build)
     jobs=2
@@ -150,6 +151,21 @@ verify_snapshot() {
     echo 'LIMIT: legacy snapshot records only ELF checksum; application.ini validated by name/version'
   fi
   echo 'LIMIT: copy integrity is not build-to-source reproducibility or security acceptance'
+}
+valid_qa_build_app() {
+  # Native Gecko dist/bin/application.ini is usually a symlink back into the
+  # same QA objdir. The copied snapshot still requires a regular file.
+  local dir="$1" obj_root="$worktree/obj-vulpra-security-qa-build" resolved_ini
+  [[ "$dir" == "$obj_root/dist/bin" &&
+     -d "$dir" && ! -L "$dir" && -x "$dir/vulpra" &&
+     ! -L "$dir/vulpra" && -f "$dir/application.ini" ]] || return 1
+  resolved_ini="$(realpath -e -- "$dir/application.ini")" || return 1
+  case "$resolved_ini" in
+    "$obj_root/"*) ;;
+    *) return 1 ;;
+  esac
+  grep -Fxq 'Name=Vulpra' "$resolved_ini" &&
+    grep -Fxq 'Version=160.0.1' "$resolved_ini"
 }
 valid_compiled_app() {
   # Gecko normally symlinks dist/bin/application.ini to obj*/build/application.ini.
@@ -371,6 +387,49 @@ case "$action" in
     printf 'QA evidence: %s\n' "${reports[0]}"
     echo 'LIMIT: no target sandbox syscalls, live Safe Browsing provider or external egress audit'
     ;;
+  style)
+    [[ "$launcher_mode" == qa ]] ||
+      die 'style must be launched from the detached QA checkout, not from daily main'
+    valid_worktree || die 'detached QA source worktree missing or invalid'
+    app="$worktree/obj-vulpra-security-qa-build/dist/bin"
+    valid_qa_build_app "$app" ||
+      die 'no independently compiled QA Vulpra; use QA security-qa build first'
+    probe="$worktree/ci/smoke-webextension-package-local.py"
+    [[ -f "$probe" && ! -L "$probe" ]] ||
+      die 'QA-local browser geometry probe missing'
+    for tool in python3 geckodriver timeout jq; do
+      command -v "$tool" >/dev/null ||
+        die "QA sidebar geometry check needs $tool; no automatic installation"
+    done
+    runtime="$state/runtime"
+    [[ ! -L "$runtime" ]] || die 'QA runtime must not be linked'
+    mkdir -p -m 0700 -- "$runtime"
+    run="$(mktemp -d "$runtime/style.XXXXXXXX")"
+    mkdir -p -m 0700 -- "$run/home" "$run/data" "$run/cache" "$run/config"
+    set +e
+    timeout 180 env -i PATH="$PATH" HOME="$run/home" LANG=C.UTF-8 \
+      XDG_DATA_HOME="$run/data" XDG_CACHE_HOME="$run/cache" \
+      XDG_CONFIG_HOME="$run/config" MOZ_HEADLESS=1 \
+      NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
+      python3 "$probe" --qa-vertical-style "$app" "$run" \
+      > "$run/style.log" 2>&1
+    result=$?
+    set -e
+    [[ "$result" == 0 ]] ||
+      die "QA CSS geometry test failed (exit $result); QA-only log: $run/style.log"
+    [[ -f "$run/style-result.json" && ! -L "$run/style-result.json" ]] ||
+      die "QA CSS geometry test returned no report: $run/style.log"
+    jq -e '.status == "pass" and .source == "qa_native_compiled" and
+      .expanded.vertical == true and .collapsed.vertical == true and
+      .expanded.group_label_square == true and
+      .collapsed.group_label_square == true and
+      .collapsed.group_alignment_within_px == true and
+      .expanded.compact_27px_tabs == true and
+      .collapsed.compact_27px_tabs == true' "$run/style-result.json" > /dev/null ||
+      die "QA geometry report lacks required live layout evidence: $run/style-result.json"
+    printf 'PASS: independent QA-native Vulpra vertical tab compact geometry: %s\n' "$run/style-result.json"
+    echo 'LIMIT: headless measured chrome geometry, not a visual human review on Hyprland'
+    ;;
   headless|headless-build)
     valid_worktree || die 'QA worktree missing or invalid'
     if [[ "$action" == headless-build ]]; then
@@ -379,7 +438,12 @@ case "$action" in
       verify_snapshot
       app="$(snapshot_path)"
     fi
-    valid_app "$app" || die 'selected QA executable missing or invalid'
+    if [[ "$action" == headless-build ]]; then
+      valid_qa_build_app "$app" ||
+        die 'QA-native built Vulpra executable or application.ini missing or invalid'
+    else
+      valid_app "$app" || die 'selected QA executable missing or invalid'
+    fi
     [[ -L "$state" || -L "$state/snapshots" || -L "$app/vulpra" ]] &&
       die 'symbolic-link path in QA executable selection'
     runtime="$state/runtime"
