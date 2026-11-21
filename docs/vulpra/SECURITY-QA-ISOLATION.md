@@ -1,6 +1,6 @@
 # Vulpra: isolated security QA while dogfooding
 
-**Status:** Source-worktree, QA binary-copy, independent native QA-build path and isolated headless-smoke infrastructure are implemented. Offline synthetic CI validates the separation contract, including a fake `mach configure/build`. **The user confirmed the detached QA worktree and checksum-verified snapshot on their workstation on 2026-11-20. A separate Firefox 160.0.1 QA source build has NOT run; no real headless/sandbox/TLS/extension acceptance is claimed.**
+**Status:** Source-worktree, QA binary-copy, independent native QA-build path, isolated headless smoke and WebDriver real-browser acceptance entrypoint are implemented. Offline synthetic CI validates the separation contract (including mocked `mach configure/build` and mocked QA `accept` dispatcher), WebDriver certificate parser and local extension fixtures. **The user confirmed the detached QA worktree and checksum-verified snapshot on their workstation on 2026-11-20. A separate Firefox 160.0.1 QA source build has NOT run; no real headless/sandbox/TLS/extension acceptance is claimed.**
 
 ## The two environments
 
@@ -25,6 +25,7 @@ All the following operations **except the explicitly named build** bypass Nix an
 ./nix/vulpra security-qa snapshot
 ./nix/vulpra security-qa verify
 ./nix/vulpra security-qa headless
+./nix/vulpra security-qa accept
 ./nix/vulpra security-qa sync
 ./nix/vulpra security-qa build --jobs 2
 ./nix/vulpra security-qa headless-build
@@ -36,6 +37,7 @@ All the following operations **except the explicitly named build** bypass Nix an
 - **build** (explicitly opt-in) enters the pinned `path:<QA worktree>/nix` Nix shell with `nom`, derives an isolated mozconfig under `obj-vulpra-security-qa/native.mozconfig`, and runs `mach configure` + `mach build` with outputs under `obj-vulpra-security-qa-build/`. It never changes the live `main` build scripts, their object directory or any browser profile. Default parallelism is **2** to reduce interference during dogfooding. A separate full Firefox build consumes substantial CPU, memory, disk and time; **it has not been executed on the real workstation**.
 - **headless-build** runs only the already compiled QA worktree executable in the same private per-run environment used by `headless`, failing closed when the QA binary is absent.
 - **verify** is read-only and checks the selected QA snapshot's copied executable SHA-256 against its manifest and source-commit-based snapshot ID; new copies also carry an `application.ini` SHA-256. Older snapshots remain valid after checking ELF hash and application identity/version. The `headless` command calls this check before launching; it refuses altered copies and never touches the original compiled browser or any daily profile.
+- **accept** (explicit, real QA run) verifies the selected snapshot digest, requires existing `python3`, `geckodriver`, `openssl`, `jq`, and `timeout`, and reuses `ci/smoke-webextension-package-local.py` **directly against the copied QA ELF**. The command does **not** package, compile, replace, or launch the daily browser. It creates private `obj-vulpra-security-qa/runtime/accept.*` HOME/XDG/log directories, passes no inherited desktop profile variables to the browser, starts only a local WebDriver endpoint and loopback HTTP/HTTPS fixtures, and runs certificate-rejection, extension install/content/background/storage/uninstall, BYOB defaults, and JavaScript/UA checks with a strict JSON pass report. It does not change the workstation trust store or use any live vault/passwords. It can still consume some CPU and disk while running, but never opens a visible window. If geckodriver is not already installed, it **stops without installing anything**. Logs/evidence are saved only in the QA runtime directory. This is not a sandbox-role denial test, provider-backed Safe Browsing readiness check, or proof of zero browser background egress.
 - **headless** runs only the selected copied QA executable under a new `HOME`, `XDG_DATA_HOME`, `XDG_CONFIG_HOME`, `XDG_CACHE_HOME` and `--profile`. It loads only a synthetic local `file://` HTML fixture, requires a PNG screenshot, leaves a local QA-only log, and does not open a graphical window. It does not navigate to any real site, use real credentials or alter the active browser.
 - **sync** (later, as new `main` changes accumulate): `./nix/vulpra security-qa sync` advances **only a clean detached QA source worktree** to the current committed `main` commit. It refuses to discard edited or untracked QA source and never replaces an existing binary snapshot or launches a browser.
 
@@ -49,6 +51,7 @@ All the following operations **except the explicitly named build** bypass Nix an
 
 ## Evidence
 
+- [QA WebDriver dispatch and security parser fixtures — CI PASS](https://github.com/sguzman/vulpra/actions/runs/44915322512). Exercises false TLS report rejection, checksum mismatch refusal, no profile override, disposable HOME/XDG, and pre-existing certificate/extension/parser self-tests. **Not a real Gecko acceptance run.**
 - Offline synthetic QA infrastructure fixtures: [GitHub Actions worktree-isolation test](https://github.com/sguzman/vulpra/actions/workflows/security-qa-worktree-fixtures.yml). This checks source separation, no-Nix dispatch for non-build actions, copied test executable, clean source sync, **mocked QA-only build output and mozconfig**, temporary HOME/XDG/profile, and refusal to overwrite existing state. It is not a real Gecko/browser security pass.
 - Security gate order and release holds: [Firefox 160.0.1 acceptance roadmap](SECURITY-ACCEPTANCE-ROADMAP-20261120.md).
 - Formal progress baseline unchanged: **61% overall, Δ 0 percentage points**; security gates remain open until current real compiled/runtime evidence passes.
