@@ -44,6 +44,7 @@
 **Acceptance:** disposable current-binary tests pass, no TLS or extension safety regression, no live user credential in fixtures. See [#12](https://github.com/sguzman/vulpra/issues/12).
 
 ### S4 — Network/service behavior and ongoing security updates: OPEN
+- [x] **Current-version drift monitor PASS:** the existing daily GitHub Actions monitor now uses the new `ci/security-160-upstream-version-guard.sh`, independently checks official Mozilla desktop stable-release feed against committed 160.0.1, and rejects eight stale/altered/missing/malformed fixtures. [Real live CI #44841471967 SUCCESS](https://github.com/sguzman/vulpra/actions/runs/44841471967) on 2026-11-20 reported official Firefox stable **160.0.1**. This only detects version changes; it does not fetch, review, integrate, install or release browser patches.
 - [ ] Inspect effective Remote Settings and threat-list freshness/update behavior using actual current-`main` runtime evidence, not only absence of startup errors in a brief offline smoke.
 - [ ] Check outbound update/telemetry/Sync/Push behaviors with explicit service-specific assertions, while preserving normal Web Push/notifications; avoid unsound conclusions from short no-route tests.
 - [ ] Specify automatic/verified upstream security-rebase cadence, source review, package signing/integrity, update distribution and rollback for public use. Local `git pull && rebuild` is **manual maintenance**, not an automatic security updater.
