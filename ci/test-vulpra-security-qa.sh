@@ -141,6 +141,64 @@ grep -Eq '^application_ini_sha256=[0-9a-f]{64}$' "$manifest" ||
   die 'snapshot did not record application.ini digest'
 bash "$repo/nix/vulpra" security-qa verify > "$work/verify"
 grep -Fq 'PASS: independent QA executable' "$work/verify"
+# Synthetic acceptance dispatch: the real Python WebDriver harness has its own
+# parser/fixture self-tests. Here a fake Python executable checks that the shell
+# passes only QA-local paths and that the report must contain actual booleans.
+printf '# Synthetic WebDriver harness placeholder\n' > "$repo/ci/smoke-webextension-package-local.py"
+cat > "$work/bin/geckodriver" <<'DRIVER'
+#!/usr/bin/env bash
+echo 'FAIL: synthetic dispatcher unexpectedly launched geckodriver' >&2
+exit 97
+DRIVER
+chmod 0755 "$work/bin/geckodriver"
+cat > "$work/bin/python3" <<'PYTHON'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+[[ "$#" == 5 && "$1" == */ci/smoke-webextension-package-local.py &&
+   "$2" == --qa-appdir && "$3" == */snapshots/*/app &&
+   "$4" == --qa-output-dir && "$5" == */runtime/accept.* ]] ||
+  { echo 'FAIL: QA acceptance args are not isolated' >&2; exit 91; }
+[[ "$HOME" == "$5/home" &&
+   "$XDG_DATA_HOME" == "$5/data" &&
+   "$XDG_CACHE_HOME" == "$5/cache" &&
+   "$XDG_CONFIG_HOME" == "$5/config" &&
+   "$MOZ_HEADLESS" == 1 &&
+   "$VULPRA_VERIFY_BYOB_DEFAULTS" == 1 &&
+   "$VULPRA_VERIFY_UA_COMPAT" == 1 ]] ||
+  { echo 'FAIL: QA acceptance inherited profile or unsafe environment' >&2; exit 92; }
+echo 'synthetic acceptance invoked' > "$5/mock-python-called"
+valid=true
+[[ ! -e "$(dirname -- "$0")/accept-false-report" ]] || valid=false
+cat > "$5/webextension-smoke-synthetic.json" <<JSON
+{
+ "schema_version": 1, "status": "pass",
+ "runtime_source": "copied_qa_snapshot",
+ "security": {"temporary_home": true, "local_untrusted_tls_denial": {
+   "verified": $valid, "webdriver_accept_insecure_certs": false
+ }},
+ "webextension": {"temporary_unsigned_install": true, "content_scripts": true,
+   "background_messaging": true, "storage_local": true, "uninstall": true},
+ "byob_default_preferences": {"verified": true}
+}
+JSON
+PYTHON
+chmod 0755 "$work/bin/python3"
+bash "$repo/nix/vulpra" security-qa accept > "$work/accept"
+grep -Fq 'PASS: copied QA Gecko real-browser' "$work/accept" ||
+  die 'synthetic acceptance did not pass strict report checks'
+shopt -s nullglob
+accepts=("$qa/obj-vulpra-security-qa/runtime"/accept.*)
+[[ "${#accepts[@]}" -eq 1 && -f "${accepts[0]}/mock-python-called" ]] ||
+  die 'acceptance test did not run inside private QA directory'
+touch "$work/bin/accept-false-report"
+if bash "$repo/nix/vulpra" security-qa accept > "$work/accept-invalid" 2>&1; then
+  die 'QA acceptance accepted a false TLS security result'
+fi
+rm -- "$work/bin/accept-false-report"
+if bash "$repo/nix/vulpra" security-qa accept --profile \
+  "$work/home/.mozilla/firefox" > /dev/null 2>&1; then
+  die 'QA acceptance accepted personal Firefox profile override'
+fi
 # Tampered copied ELF must fail closed without launching.
 printf '\n# corrupt only the copied QA executable\n' >> "$app"
 if bash "$repo/nix/vulpra" security-qa verify >/dev/null 2>&1; then
@@ -148,6 +206,9 @@ if bash "$repo/nix/vulpra" security-qa verify >/dev/null 2>&1; then
 fi
 if bash "$repo/nix/vulpra" security-qa headless >/dev/null 2>&1; then
   die 'headless started a modified QA executable'
+fi
+if bash "$repo/nix/vulpra" security-qa accept >/dev/null 2>&1; then
+  die 'QA acceptance launched a modified copied browser'
 fi
 cp -- "$repo/obj-vulpra-main-160/dist/bin/vulpra" "$app"
 bash "$repo/nix/vulpra" security-qa verify > "$work/verify-restored"
@@ -228,6 +289,7 @@ if bash "$repo/nix/vulpra" security-qa headless --profile \
   die 'QA accepted profile override'
 fi
 echo 'PASS: detached QA source, checksum copied browser, private HOME/XDG/profile and test screenshot'
-echo 'PASS: copied snapshot verification rejects tampered ELF/INI, blocks headless, accepts legacy snapshots'
+echo 'PASS: copied snapshot verification rejects tampered ELF/INI and blocks headless/WebDriver acceptance'
+echo 'PASS: synthetic QA accept enforces temporary HOME/XDG, rejected false TLS result and profile override'
 echo 'PASS: dirty worktree sync rejected, clean detached sync to newer main accepted; daily sentinels preserved'
 echo 'LIMIT: synthetic executable, not an actual Gecko browser security result'
