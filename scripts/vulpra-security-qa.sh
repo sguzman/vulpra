@@ -12,7 +12,7 @@ QA-only tests: run ~/Code/Apps/vulpra-security-qa/nix/vulpra security-qa accept
 
   ./nix/vulpra security-qa status    Read-only QA worktree/snapshot status
   ./nix/vulpra security-qa setup     Create detached sibling source worktree
-  ./nix/vulpra security-qa sync      Advance clean detached QA worktree to main HEAD
+  ./nix/vulpra security-qa sync      From QA: fetch+pin latest origin/main without changing daily checkout
   ./nix/vulpra security-qa snapshot  Copy built Vulpra binary into QA worktree
   ./nix/vulpra security-qa verify    Verify active copied QA runtime without launching
   ./nix/vulpra security-qa headless  Offline temporary-profile screenshot smoke
@@ -22,6 +22,7 @@ QA-only tests: run ~/Code/Apps/vulpra-security-qa/nix/vulpra security-qa accept
 
 Setup does NOT compile, download, install, stop, restart or launch a browser.
 Only the explicit 'build' operation enters Nix and compiles; default jobs=2.
+Only QA's explicit 'sync' fetches Git data; test commands do not download source.
 Snapshot can use substantial disk space, but never writes into the live
 obj-vulpra-main-160 directory. Headless is opt-in and never opens a GUI window.
 QA snapshots have independent HOME, XDG data/cache/config and Firefox profile.
@@ -168,9 +169,9 @@ valid_compiled_app() {
     grep -Fxq 'Version=160.0.1' "$resolved_ini"
 }
 case "$action" in
-  setup|sync|snapshot)
+  setup|snapshot)
     [[ "$launcher_mode" == main ]] ||
-      die "$action changes the source/copy setup and must be invoked from the main Git checkout; QA test commands are independent"
+      die "$action copies from or creates the main checkout; use main once for bootstrap/snapshots, QA for testing"
     ;;
 esac
 
@@ -216,9 +217,21 @@ case "$action" in
       git -C "$worktree" diff --cached --quiet &&
       [[ -z "$(git -C "$worktree" ls-files --others --exclude-standard)" ]] ||
       die 'QA source is modified; refusing to change its checked-out commit'
-    commit="$(git -C "$source_repo" rev-parse HEAD)"
-    [[ "$(cat "$source_repo/browser/config/version.txt")" == 160.0.1 ]] ||
-      die 'main working source version is not Firefox 160.0.1'
+    if [[ "$launcher_mode" == qa ]]; then
+      # Network access is explicit and scoped to source updates. Fetch into
+      # shared Git objects/refs without modifying the daily main worktree,
+      # installed browser, current QA snapshots or user profile.
+      git -C "$worktree" -c http.version=HTTP/1.1 fetch --no-tags \
+        --filter=blob:none origin main ||
+        die 'QA source fetch failed; no source checkout changed'
+      commit="$(git -C "$worktree" rev-parse 'FETCH_HEAD^{commit}')"
+      [[ "$(git -C "$worktree" show "$commit:browser/config/version.txt")" == 160.0.1 ]] ||
+        die 'fetched QA source is not Firefox 160.0.1'
+    else
+      commit="$(git -C "$source_repo" rev-parse HEAD)"
+      [[ "$(cat "$source_repo/browser/config/version.txt")" == 160.0.1 ]] ||
+        die 'main working source version is not Firefox 160.0.1'
+    fi
     if [[ "$(git -C "$worktree" rev-parse HEAD)" == "$commit" ]]; then
       printf 'PASS: QA source already matches current main commit %s\n' "${commit:0:12}"
       exit 0
