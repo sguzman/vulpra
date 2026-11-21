@@ -1,0 +1,35 @@
+name: Vulpra Security QA Worktree Isolation Fixtures
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/vulpra-security-qa.sh
+      - nix/vulpra
+      - ci/test-vulpra-security-qa.sh
+      - .github/workflows/security-qa-worktree-fixtures.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-qa-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated QA source files only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            scripts/vulpra-security-qa.sh
+            nix/vulpra
+            ci/test-vulpra-security-qa.sh
+      - name: Verify no-Nix, detached, disposable QA safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/vulpra-security-qa.sh
+          bash -n nix/vulpra
+          bash -n ci/test-vulpra-security-qa.sh
+          bash ci/test-vulpra-security-qa.sh
+          echo 'LIMIT: synthetic mock only; real Gecko QA is separate'
