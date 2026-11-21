@@ -14,8 +14,11 @@ Vulpra security QA, separate from the everyday Vulpra profile and executable
   ./nix/vulpra security-qa sync      Advance clean detached QA worktree to main HEAD
   ./nix/vulpra security-qa snapshot  Copy built Vulpra binary into QA worktree
   ./nix/vulpra security-qa headless  Offline temporary-profile screenshot smoke
+  ./nix/vulpra security-qa build [--jobs N]  Explicit separate native QA build
+  ./nix/vulpra security-qa headless-build  Test compiled QA executable privately
 
 Setup does NOT compile, download, install, stop, restart or launch a browser.
+Only the explicit 'build' operation enters Nix and compiles; default jobs=2.
 Snapshot can use substantial disk space, but never writes into the live
 obj-vulpra-main-160 directory. Headless is opt-in and never opens a GUI window.
 QA snapshots have independent HOME, XDG data/cache/config and Firefox profile.
@@ -23,11 +26,19 @@ No automatic switching/promotion to the daily browser is performed.
 HELP
 }
 
-[[ "$#" -le 1 ]] || die 'expected one subcommand: status|setup|sync|snapshot|headless'
 action="${1:-status}"
+if (($#)); then shift; fi
 case "$action" in
   help|-h|--help) usage; exit 0 ;;
-  status|setup|sync|snapshot|headless) ;;
+  status|setup|sync|snapshot|headless|headless-build)
+    (($# == 0)) || die "$action takes no extra arguments" ;;
+  build)
+    jobs=2
+    if (($#)); then
+      [[ "$#" -eq 2 && "$1" == --jobs && "$2" =~ ^[1-9][0-9]?$ ]] ||
+        die 'usage: security-qa build [--jobs 1..99]'
+      jobs="$2"
+    fi ;;
   *) die "unknown action: $action" ;;
 esac
 
@@ -76,6 +87,11 @@ case "$action" in
       printf 'QA source commit: %s\n' "$(git -C "$worktree" rev-parse --short=12 HEAD)"
     else
       printf 'QA worktree: not set up\n'
+    fi
+    if valid_app "$worktree/obj-vulpra-security-qa-build/dist/bin"; then
+      echo 'QA native build: available (separate object directory)'
+    else
+      echo 'QA native build: not compiled'
     fi
     if [[ -f "$state/active-snapshot" ]]; then
       printf 'QA snapshot: %s\n' "$(cat -- "$state/active-snapshot")"
@@ -156,10 +172,34 @@ case "$action" in
     echo 'LIMIT: copied native binary is NOT proof of build-to-source reproducibility'
     exit 0
     ;;
-  headless)
+  build)
+    valid_worktree || die 'QA worktree missing or invalid; run security-qa setup'
+    builder="$worktree/scripts/vulpra-security-qa-build.sh"
+    [[ -f "$builder" ]] ||
+      die 'QA worktree does not yet contain the guarded native QA builder; sync a clean QA worktree'
+    # Run all source/path checks BEFORE Nix can evaluate or download tools.
+    bash "$builder" --preflight --jobs "$jobs"
+    command -v nix >/dev/null ||
+      die 'Nix/Lix unavailable; no unpinned host compiler fallback'
+    [[ -f "$worktree/nix/flake.nix" && -f "$worktree/nix/flake.lock" ]] ||
+      die 'QA worktree has no pinned Nix toolchain'
+    qa_flake="path:$worktree/nix"
+    if command -v nom >/dev/null; then
+      exec nom develop "$qa_flake" --no-write-lock-file --command \
+        bash "$builder" --build --jobs "$jobs"
+    fi
+    exec nix shell "$qa_flake#nom" --no-write-lock-file --command \
+      nom develop "$qa_flake" --no-write-lock-file --command \
+      bash "$builder" --build --jobs "$jobs"
+    ;;
+  headless|headless-build)
     valid_worktree || die 'QA worktree missing or invalid'
-    app="$(snapshot_path)"
-    valid_app "$app" || die 'QA runtime missing or invalid'
+    if [[ "$action" == headless-build ]]; then
+      app="$worktree/obj-vulpra-security-qa-build/dist/bin"
+    else
+      app="$(snapshot_path)"
+    fi
+    valid_app "$app" || die 'selected QA executable missing or invalid'
     [[ -L "$state" || -L "$state/snapshots" || -L "$app/vulpra" ]] &&
       die 'symbolic-link path in QA executable selection'
     runtime="$state/runtime"
