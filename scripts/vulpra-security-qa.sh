@@ -87,8 +87,10 @@ valid_worktree() {
   # The detached worktree shares Git objects, but no source checkout,
   # profile, executable or command entrypoint with daily main.
   [[ -z "$(git -C "$worktree" symbolic-ref -q --short HEAD 2>/dev/null || :)" ]] || return 1
-  [[ "$(realpath -e -- "$(git -C "$worktree" rev-parse --git-common-dir)")" ==
-     "$(realpath -e -- "$source_repo/.git")" ]] || return 1
+  local shared_git main_git
+  shared_git="$(realpath -e -- "$(git -C "$worktree" rev-parse --git-common-dir)")" || return 1
+  main_git="$(realpath -e -- "$source_repo/.git")" || return 1
+  [[ "$shared_git" == "$main_git" ]] || return 1
   git -C "$worktree" worktree list --porcelain |
     grep -Fxq "worktree $worktree" || return 1
 }
