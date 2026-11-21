@@ -7,6 +7,7 @@ on:
       - scripts/vulpra-security-qa-build.sh
       - nix/vulpra
       - ci/test-vulpra-security-qa.sh
+      - ci/smoke-webextension-package-local.py
       - .github/workflows/security-qa-worktree-fixtures.yml
   workflow_dispatch:
 permissions:
@@ -26,6 +27,7 @@ jobs:
             scripts/vulpra-security-qa-build.sh
             nix/vulpra
             ci/test-vulpra-security-qa.sh
+            ci/smoke-webextension-package-local.py
       - name: Verify no-Nix, detached, disposable QA safety contract
         shell: bash
         run: |
@@ -35,4 +37,8 @@ jobs:
           bash -n nix/vulpra
           bash -n ci/test-vulpra-security-qa.sh
           bash ci/test-vulpra-security-qa.sh
+          python3 ci/smoke-webextension-package-local.py --self-test-cert-parser
+          python3 ci/smoke-webextension-package-local.py --self-test-synthetic-extension-fixture
+          python3 ci/smoke-webextension-package-local.py --self-test-byob-assertions
+          python3 ci/smoke-webextension-package-local.py --self-test-user-agent-parser
           echo 'LIMIT: synthetic mock only; real Gecko QA is separate'
