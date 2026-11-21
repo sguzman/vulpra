@@ -110,8 +110,9 @@ bash "$repo/nix/vulpra" security-qa setup > "$work/setup"
 if bash "$qa/nix/vulpra" security-qa setup >/dev/null 2>&1; then
   die 'QA-local setup should refuse mutating the main/worktree topology'
 fi
+# No remote exists yet: an isolated QA fetch must fail closed.
 if bash "$qa/nix/vulpra" security-qa sync >/dev/null 2>&1; then
-  die 'QA-local sync should refuse source revision changes'
+  die 'QA-local sync unexpectedly advanced with no configured remote'
 fi
 [[ -z "$(git -C "$qa" symbolic-ref --short -q HEAD || :)" ]] ||
   die 'QA should be detached, not main'
@@ -295,6 +296,29 @@ grep -Fq 'obj-vulpra-security-qa-build' "$qa/obj-vulpra-security-qa/native.mozco
   die 'QA build created output inside daily source'
 bash "$qa/nix/vulpra" security-qa headless-build > "$work/headless-build"
 grep -Fq 'PASS: isolated Vulpra QA headless screenshot' "$work/headless-build"
+# QA-only source sync follows a local bare origin without running any script
+# from main or changing its checked-out HEAD. No network or personal files.
+git init -q --bare "$work/remote.git"
+git -C "$repo" remote add origin "$work/remote.git"
+git -C "$repo" push -q origin main
+printf '\n# synthetic remote revision\n' >> "$repo/AGENTS.md"
+git -C "$repo" add AGENTS.md
+git -C "$repo" -c user.name='QA Fixture' \
+  -c user.email='qa-fixture@example.invalid' commit -qm 'new test source for QA-only fetch'
+git -C "$repo" push -q origin main
+main_before_qa_sync="$(git -C "$repo" rev-parse HEAD)"
+qa_before_qa_sync="$(git -C "$qa" rev-parse HEAD)"
+[[ "$main_before_qa_sync" != "$qa_before_qa_sync" ]] ||
+  die 'QA sync fixture source not ahead of detached QA checkout'
+bash "$qa/nix/vulpra" security-qa sync > "$work/qa-only-sync"
+[[ "$(git -C "$qa" rev-parse HEAD)" == "$main_before_qa_sync" &&
+   "$(git -C "$repo" rev-parse HEAD)" == "$main_before_qa_sync" &&
+   "$(git -C "$repo" symbolic-ref --short HEAD)" == main ]] ||
+  die 'QA source fetch changed the daily source or failed to update detached QA'
+bash "$qa/nix/vulpra" security-qa verify > "$work/verify-post-qa-sync"
+# The old QA snapshot must remain independent of source revision advances.
+[[ -x "$app" ]] || die 'QA-only sync deleted the previous executable copy'
+
 if bash "$qa/nix/vulpra" security-qa headless --profile \
   "$work/home/.mozilla/firefox" >/dev/null 2>&1; then
   die 'QA accepted profile override'
@@ -303,4 +327,5 @@ echo 'PASS: detached QA source, checksum copied browser, private HOME/XDG/profil
 echo 'PASS: copied snapshot verification rejects tampered ELF/INI and blocks headless/WebDriver acceptance'
 echo 'PASS: synthetic QA accept enforces temporary HOME/XDG, rejected false TLS result and profile override'
 echo 'PASS: dirty worktree sync rejected, clean detached sync to newer main accepted; daily sentinels preserved'
+echo 'PASS: QA-only local-origin fetch advanced detached source without changing daily checkout or snapshot'
 echo 'LIMIT: synthetic executable, not an actual Gecko browser security result'
