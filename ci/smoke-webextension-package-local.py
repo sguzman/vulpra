@@ -789,7 +789,35 @@ def main() -> int:
     if sys.argv[1:] == ["--self-test-synthetic-extension-fixture"]:
         self_test_synthetic_extension_fixture()
         return 0
-    repo = Path(sys.argv[1] if len(sys.argv) > 1 else Path.home() / "Code/Apps/vulpra").resolve()
+    # Opt-in isolated QA mode reuses the SAME WebDriver/TLS/WebExtension
+    # checks against a verified copied binary, without requiring mach package
+    # or unpacking a second Gecko runtime. The shell wrapper validates the
+    # snapshot manifest before entering this mode.
+    qa_mode = (len(sys.argv) == 5 and sys.argv[1] == "--qa-appdir"
+               and sys.argv[3] == "--qa-output-dir")
+    if sys.argv[1:] and sys.argv[1] == "--qa-appdir" and not qa_mode:
+        raise RuntimeError(
+            "Usage: --qa-appdir ABSOLUTE_APPDIR --qa-output-dir ABSOLUTE_DIRECTORY"
+        )
+    qa_appdir = None
+    qa_output_dir = None
+    if qa_mode:
+        if not Path(sys.argv[2]).is_absolute() or not Path(sys.argv[4]).is_absolute():
+            raise RuntimeError("QA paths must be absolute")
+        qa_appdir = Path(sys.argv[2]).resolve(strict=True)
+        qa_output_dir = Path(sys.argv[4]).resolve(strict=True)
+        if (not qa_appdir.is_dir() or not qa_output_dir.is_dir() or
+                not (qa_appdir / "application.ini").is_file() or
+                not (qa_appdir / "vulpra").is_file()):
+            raise RuntimeError("QA runtime/output directory is absent")
+        if qa_output_dir == qa_appdir or qa_appdir in qa_output_dir.parents:
+            raise RuntimeError("QA evidence must be outside the copied browser directory")
+        repo = Path.cwd()
+    else:
+        if len(sys.argv) > 2:
+            raise RuntimeError("Usage: [repository directory]")
+        repo = Path(sys.argv[1] if len(sys.argv) > 1 else
+                    Path.home() / "Code/Apps/vulpra").resolve()
     gecko = shutil.which("geckodriver")
     if not gecko:
         candidate = repo / "obj-vulpra-linux/dist/bin/geckodriver"
@@ -805,22 +833,34 @@ def main() -> int:
     adsfeed_check = os.environ.get("VULPRA_M3_VERIFY_NO_NEWTAB_ADSFEED", "0") == "1"
     ua_check = os.environ.get("VULPRA_VERIFY_UA_COMPAT", "0") == "1"
     byob_check = os.environ.get("VULPRA_VERIFY_BYOB_DEFAULTS", "0") == "1"
-    archive = verified_archive(repo)
-    print(f"PASS: Verified existing archive {archive.name}", flush=True)
-    logdir = repo / ".git/vulpra-native-build"
+    archive = None if qa_mode else verified_archive(repo)
+    if archive is not None:
+        print(f"PASS: Verified existing archive {archive.name}", flush=True)
+    else:
+        print("PASS: QA mode selected independently copied browser runtime", flush=True)
+    logdir = qa_output_dir if qa_mode else repo / ".git/vulpra-native-build"
     stamp = time.strftime("%Y%m%d-%H%M%S")
     output = logdir / f"webextension-smoke-{stamp}.json"
     gecko_log = logdir / f"webextension-geckodriver-{stamp}.log"
     token = secrets.token_hex(16)
-    with tempfile.TemporaryDirectory(prefix="vulpra-ext-smoke-") as temp:
+    with tempfile.TemporaryDirectory(prefix="vulpra-ext-smoke-",
+                                     dir=str(logdir) if qa_mode else None) as temp:
         work = Path(temp)
-        app = work / "app"
-        app.mkdir()
-        subprocess.run(["tar", "-xf", str(archive), "-C", str(app)], check=True)
-        ini_files = list(app.rglob("application.ini"))
-        if len(ini_files) != 1 or "Name=Vulpra" not in ini_files[0].read_text().splitlines():
-            raise RuntimeError("Package identity is missing or not Vulpra")
-        appdir = ini_files[0].parent
+        if qa_mode:
+            appdir = qa_appdir
+            if not appdir or not (appdir / "application.ini").is_file():
+                raise RuntimeError("QA Vulpra application.ini missing")
+            if not {"Name=Vulpra", "Version=160.0.1"}.issubset(
+                    set((appdir / "application.ini").read_text().splitlines())):
+                raise RuntimeError("QA binary is not Vulpra 160.0.1")
+        else:
+            app = work / "app"
+            app.mkdir()
+            subprocess.run(["tar", "-xf", str(archive), "-C", str(app)], check=True)
+            ini_files = list(app.rglob("application.ini"))
+            if len(ini_files) != 1 or "Name=Vulpra" not in ini_files[0].read_text().splitlines():
+                raise RuntimeError("Package identity is missing or not Vulpra")
+            appdir = ini_files[0].parent
         browser = select_binary(appdir)
         home = work / "home"
         home.mkdir()
@@ -1000,7 +1040,8 @@ def main() -> int:
                 print("PASS: Temporary HOME and existing Firefox profile preserved", flush=True)
                 report = {
                     "schema_version": 1, "status": "pass",
-                    "package": archive.name,
+                    "package": archive.name if archive else None,
+                    "runtime_source": "copied_qa_snapshot" if qa_mode else "verified_package",
                     "javascript_navigation": js_result,
                     "user_agent_compatibility": ua_result,
                     "byob_default_preferences": byob_result,
@@ -1037,7 +1078,7 @@ def main() -> int:
                         pass
             server.shutdown()
             server.server_close()
-    print(f"PASS: Real packaged Vulpra WebExtension runtime acceptance: {output}")
+    print(f"PASS: Real Vulpra WebDriver TLS/WebExtension runtime checks: {output}")
     print(f"Driver log: {gecko_log}")
     return 0
 
