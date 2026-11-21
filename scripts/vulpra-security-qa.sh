@@ -13,6 +13,7 @@ Vulpra security QA, separate from the everyday Vulpra profile and executable
   ./nix/vulpra security-qa setup     Create detached sibling source worktree
   ./nix/vulpra security-qa sync      Advance clean detached QA worktree to main HEAD
   ./nix/vulpra security-qa snapshot  Copy built Vulpra binary into QA worktree
+  ./nix/vulpra security-qa verify    Verify active copied QA runtime without launching
   ./nix/vulpra security-qa headless  Offline temporary-profile screenshot smoke
   ./nix/vulpra security-qa build [--jobs N]  Explicit separate native QA build
   ./nix/vulpra security-qa headless-build  Test compiled QA executable privately
@@ -30,7 +31,7 @@ action="${1:-status}"
 if (($#)); then shift; fi
 case "$action" in
   help|-h|--help) usage; exit 0 ;;
-  status|setup|sync|snapshot|headless|headless-build)
+  status|setup|sync|snapshot|verify|headless|headless-build)
     (($# == 0)) || die "$action takes no extra arguments" ;;
   build)
     jobs=2
@@ -77,6 +78,46 @@ valid_app() {
      -f "$dir/application.ini" && ! -L "$dir/application.ini" ]] || return 1
   grep -Fxq 'Name=Vulpra' "$dir/application.ini" &&
     grep -Fxq 'Version=160.0.1' "$dir/application.ini"
+}
+verify_snapshot() {
+  # Existing copies remain useful even after main/worktree move forward.
+  # Check actual bytes and the identity recorded WHEN that copy was taken.
+  valid_worktree || die 'registered security QA worktree not available'
+  [[ ! -L "$state" && ! -L "$state/snapshots" ]] ||
+    die 'linked QA state is not accepted'
+  local app manifest ident commit binary_sha observed_sha ini_sha observed_ini
+  app="$(snapshot_path)"
+  valid_app "$app" || die 'QA copied Vulpra runtime missing or invalid'
+  [[ ! -L "$app" && ! -L "$app/vulpra" ]] ||
+    die 'linked QA executable or snapshot is not accepted'
+  manifest="${app%/app}/manifest.txt"
+  [[ -f "$manifest" && ! -L "$manifest" ]] ||
+    die 'QA snapshot lacks its regular manifest'
+  ident="$(cat -- "$state/active-snapshot")"
+  commit="$(sed -n 's/^source_commit=//p' "$manifest")"
+  binary_sha="$(sed -n 's/^binary_sha256=//p' "$manifest")"
+  [[ "$commit" =~ ^[0-9a-f]{40}$ && "$binary_sha" =~ ^[0-9a-f]{64}$ ]] ||
+    die 'malformed QA snapshot source or executable digest'
+  [[ "$ident" == "${commit:0:12}-${binary_sha:0:12}" ]] ||
+    die 'QA snapshot directory does not match recorded source and binary'
+  observed_sha="$(sha256sum -- "$app/vulpra" | cut -d' ' -f1)"
+  [[ "$observed_sha" == "$binary_sha" ]] ||
+    die 'QA executable changed since its checksum-verified copy'
+  ini_sha="$(sed -n 's/^application_ini_sha256=//p' "$manifest")"
+  # Snapshots made before this check recorded only the ELF hash. Accept
+  # their version-checked regular INI, but require the INI hash for new ones.
+  if [[ -n "$ini_sha" ]]; then
+    [[ "$ini_sha" =~ ^[0-9a-f]{64}$ ]] ||
+      die 'malformed QA application.ini digest'
+    observed_ini="$(sha256sum -- "$app/application.ini" | cut -d' ' -f1)"
+    [[ "$observed_ini" == "$ini_sha" ]] ||
+      die 'QA application.ini changed since snapshot'
+  fi
+  echo 'PASS: independent QA executable and manifest identity checksum verified'
+  if [[ -z "$ini_sha" ]]; then
+    echo 'LIMIT: legacy snapshot records only ELF checksum; application.ini validated by name/version'
+  fi
+  echo 'LIMIT: copy integrity is not build-to-source reproducibility or security acceptance'
 }
 valid_compiled_app() {
   # Gecko normally symlinks dist/bin/application.ini to obj*/build/application.ini.
@@ -191,14 +232,19 @@ case "$action" in
       die 'copied QA executable checksum changed during snapshot'
     [[ "$(sha256sum "$tmp/app/application.ini" | cut -d' ' -f1)" == "$(sha256sum "$compiled/application.ini" | cut -d' ' -f1)" ]] ||
       die 'QA application identity changed during snapshot'
-    printf 'source_commit=%s\nbinary_sha256=%s\n' \
-      "$source_commit" "$binary_sha" > "$tmp/manifest.txt"
+    ini_sha="$(sha256sum -- "$tmp/app/application.ini" | cut -d' ' -f1)"
+    printf 'source_commit=%s\nbinary_sha256=%s\napplication_ini_sha256=%s\n' \
+      "$source_commit" "$binary_sha" "$ini_sha" > "$tmp/manifest.txt"
     mv -- "$tmp" "$target"
     tmp=""
     printf '%s\n' "$identifier" > "$state/active-snapshot.new"
     mv -- "$state/active-snapshot.new" "$state/active-snapshot"
     printf 'PASS: independent, checksum-verified QA runtime snapshot %s\n' "$identifier"
     echo 'LIMIT: copied native binary is NOT proof of build-to-source reproducibility'
+    exit 0
+    ;;
+  verify)
+    verify_snapshot
     exit 0
     ;;
   build)
@@ -226,6 +272,7 @@ case "$action" in
     if [[ "$action" == headless-build ]]; then
       app="$worktree/obj-vulpra-security-qa-build/dist/bin"
     else
+      verify_snapshot
       app="$(snapshot_path)"
     fi
     valid_app "$app" || die 'selected QA executable missing or invalid'
