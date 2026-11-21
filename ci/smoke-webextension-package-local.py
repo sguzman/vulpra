@@ -776,7 +776,296 @@ def verify_uninstall_stays_uninstalled(proof, seconds: float = 2.0) -> int:
         time.sleep(min(0.25, remaining))
 
 
+
+def verify_vertical_style_geometry(expanded: object, collapsed: object) -> dict:
+    """Pure, fail-closed check of real Firefox chrome layout coordinates.
+
+    Browser chrome must be instrumented by WebDriver; source-only CSS text is
+    never accepted as geometry evidence. Rectangles are CSS pixels.
+    """
+    if not isinstance(expanded, dict) or not isinstance(collapsed, dict):
+        raise RuntimeError("Missing measured browser chrome layout states")
+
+    def inspect(value: dict, is_expanded: bool) -> dict:
+        if value.get("orientation") != "vertical" or value.get("expanded") is not is_expanded:
+            raise RuntimeError("Sidebar did not enter requested real vertical layout state")
+        def finite(key: str) -> float:
+            try:
+                x = float(value[key])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise RuntimeError(f"Missing/invalid measured CSS value {key}") from exc
+            if not (abs(x) < 100000):
+                raise RuntimeError(f"Nonfinite/out-of-range CSS value {key}")
+            return x
+        minheight = finite("tab_min_height")
+        tabheight = finite("tab_background_height")
+        background_left = finite("tab_background_left")
+        badge_left = finite("group_badge_left")
+        badge_height = finite("group_badge_height")
+        if abs(minheight - 27) > 0.51 or not (26.5 <= tabheight <= 34):
+            raise RuntimeError("QA browser did not render expected 27px compact tabs")
+        if not (16 <= badge_height <= 40):
+            raise RuntimeError("Group badge is hidden or distorted")
+        if value.get("badge_radius") not in ("0px", "0"):
+            raise RuntimeError("QA group badge did not retain square corners")
+        if value.get("label_radius") not in ("0px", "0"):
+            raise RuntimeError("QA group label did not retain square corners")
+        if value.get("stylesheet_loaded") is not True:
+            raise RuntimeError("Vulpra compact stylesheet is not loaded in browser chrome")
+        delta = badge_left - background_left
+        # A small difference is expected for the native group marker/outline.
+        # Anything materially larger is the extra-left-gutter regression.
+        if not is_expanded and abs(delta) > 6.0:
+            raise RuntimeError(f"Collapsed group badge is misaligned by {delta:.2f}px")
+        return {
+            "vertical": True,
+            "compact_27px_tabs": True,
+            "group_label_square": True,
+            "tab_background_left_px": round(background_left, 2),
+            "group_badge_left_px": round(badge_left, 2),
+            "group_badge_delta_px": round(delta, 2),
+            "group_alignment_within_px": (abs(delta) <= 6.0),
+            "tab_height_px": round(tabheight, 2),
+        }
+
+    return {
+        "schema_version": 1, "status": "pass",
+        "source": "qa_native_compiled",
+        "expanded": inspect(expanded, True),
+        "collapsed": inspect(collapsed, False),
+        "limits": [
+            "Measures actual Firefox chrome rectangles in a disposable headless QA browser",
+            "No Hyprland/NVIDIA GUI or screenshot visual acceptance",
+            "No security sandbox, TLS, provider or public-release acceptance"
+        ],
+    }
+
+
+def self_test_vertical_style_geometry() -> None:
+    def sample(expanded: bool, badge_offset: float = 2.0) -> dict:
+        return {
+            "orientation": "vertical", "expanded": expanded,
+            "tab_min_height": 27, "tab_background_height": 27,
+            "tab_background_left": 11.0, "group_badge_left": 11 + badge_offset,
+            "group_badge_height": 24, "badge_radius": "0px",
+            "label_radius": "0px", "stylesheet_loaded": True,
+        }
+    assert verify_vertical_style_geometry(sample(True), sample(False))["status"] == "pass"
+    cases = 0
+    for field, bad in [
+        ("orientation", "horizontal"), ("tab_min_height", 32),
+        ("tab_background_height", 44), ("group_badge_height", 0),
+        ("badge_radius", "6px"), ("label_radius", "5px"),
+        ("stylesheet_loaded", False), ("group_badge_left", 31.0),
+        ("tab_background_left", None)
+    ]:
+        changed = sample(False)
+        changed[field] = bad
+        try:
+            verify_vertical_style_geometry(sample(True), changed)
+        except RuntimeError:
+            cases += 1
+        else:
+            raise AssertionError(f"Style validator accepted invalid {field}")
+    for invalid in (None, {}, [], "pass"):
+        try:
+            verify_vertical_style_geometry(sample(True), invalid)
+        except RuntimeError:
+            cases += 1
+        else:
+            raise AssertionError("Style validator accepted missing chrome geometry")
+    print(f"PASS: QA vertical sidebar rectangle validator rejects {cases} forged/absent styles")
+
+
+def run_qa_vertical_style(appdir_text: str, output_text: str) -> int:
+    """Chrome DOM-only layout QA against an independently built QA browser.
+
+    This mode has no permanent browser profiles, network sites, TLS bypasses,
+    external extension installation, font installation, or display windows.
+    """
+    appdir_arg, out_arg = Path(appdir_text), Path(output_text)
+    if not appdir_arg.is_absolute() or not out_arg.is_absolute():
+        raise RuntimeError("QA style paths must be absolute")
+    appdir = appdir_arg.resolve(strict=True)
+    out = out_arg.resolve(strict=True)
+    if appdir_arg != appdir or out_arg != out or not out.is_dir():
+        raise RuntimeError("QA CSS paths cannot use symlinked aliases")
+    if appdir.parts[-3:] != ("obj-vulpra-security-qa-build", "dist", "bin"):
+        raise RuntimeError("QA visual test refuses a main or packaged executable")
+    qa_root = appdir.parents[2]
+    if qa_root.name != "vulpra-security-qa" or not (qa_root / ".git").is_file():
+        raise RuntimeError("QA visual test requires registered detached source worktree")
+    if out.parent != qa_root / "obj-vulpra-security-qa" / "runtime" or not out.name.startswith("style."):
+        raise RuntimeError("QA visual output must be in a fresh QA-only runtime")
+    if os.environ.get("HOME") != str(out / "home") or os.environ.get("MOZ_HEADLESS") != "1":
+        raise RuntimeError("QA visual test requires a disposable HOME and headless browser")
+    ini = appdir / "application.ini"
+    if not ini.is_file() or not {"Name=Vulpra", "Version=160.0.1"}.issubset(set(ini.read_text().splitlines())):
+        raise RuntimeError("Missing QA-native Vulpra 160.0.1 application.ini")
+    binary = select_binary(appdir)
+    gecko = shutil.which("geckodriver")
+    if not gecko:
+        raise RuntimeError("QA style test requires existing geckodriver; no automatic install")
+    host = "127.0.0.1"
+    port = find_port()
+    proc = None
+    session = None
+    log = out / "geckodriver.log"
+    expanded = None
+    collapsed = None
+    try:
+        with log.open("wb") as sink:
+            proc = subprocess.Popen(
+                [gecko, "--host", host, "--port", str(port), "--allow-system-access"],
+                env=os.environ.copy(), stdout=sink, stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+            wait_ready(port, proc)
+            value = request(port, "POST", "/session", {
+                "capabilities": {"alwaysMatch": {
+                    "browserName": "firefox",
+                    "acceptInsecureCerts": False,
+                    "moz:firefoxOptions": {
+                        "binary": str(binary), "args": ["-headless", "-no-remote"],
+                        "prefs": {
+                            "sidebar.revamp": True,
+                            "sidebar.verticalTabs": True,
+                            "sidebar.visibility": "always-show",
+                            "browser.tabs.groups.enabled": True,
+                            "browser.shell.checkDefaultBrowser": False,
+                            "app.update.enabled": False,
+                            "extensions.update.enabled": False,
+                        },
+                    },
+                }}
+            })
+            session = value.get("sessionId") if isinstance(value, dict) else None
+            if not session:
+                raise RuntimeError("Geckodriver did not create a browser style QA session")
+            caps = value.get("capabilities", {})
+            if caps.get("acceptInsecureCerts") is not False:
+                raise RuntimeError("Geckodriver did not keep strict certificate mode")
+            if caps.get("browserVersion") != "160.0.1":
+                raise RuntimeError("QA visual test started a different browser version")
+            base = "/session/" + str(session)
+            request(port, "POST", base + "/moz/context", {"context": "chrome"})
+            try:
+                request(port, "POST", base + "/execute/sync", {"script": """
+                  if (!window.gBrowser || !window.SidebarController?._state) {
+                    throw new Error("Sidebar chrome controller is unavailable");
+                  }
+                  if (!gBrowser.tabContainer || !gBrowser.addTabGroup) {
+                    throw new Error("Real Gecko tab groups unavailable");
+                  }
+                  const principal = Services.scriptSecurityManager.getSystemPrincipal();
+                  const a = gBrowser.addTab("about:blank", {
+                    inBackground: true, skipAnimation: true, triggeringPrincipal: principal,
+                  });
+                  const b = gBrowser.addTab("about:blank", {
+                    inBackground: true, skipAnimation: true, triggeringPrincipal: principal,
+                  });
+                  const group = gBrowser.addTabGroup([a,b], {
+                    label: "QA Layout", color: "purple",
+                  });
+                  if (!group) throw new Error("Failed to create temporary QA group");
+                  window.__vulpraQAStyle = {group, reference: gBrowser.selectedTab};
+                  return {created: true, group: group.label};
+                """, "args": []})
+                script = """
+                  const state = window.__vulpraQAStyle;
+                  if (!state) throw new Error("QA group missing");
+                  const tabs = document.getElementById("tabbrowser-tabs");
+                  const group = state.group;
+                  const badge = group.querySelector(".tab-group-label-hover-highlight");
+                  const label = group.querySelector(".tab-group-label");
+                  const background = state.reference.querySelector(".tab-background");
+                  if (!tabs || !badge || !label || !background) {
+                    throw new Error("Expected native tab/group DOM elements are missing");
+                  }
+                  const badgeStyle = getComputedStyle(badge);
+                  const labelStyle = getComputedStyle(label);
+                  const tabStyle = getComputedStyle(tabs);
+                  const bgStyle = getComputedStyle(background);
+                  const rect = el => el.getBoundingClientRect();
+                  return {
+                    orientation: tabs.getAttribute("orient"),
+                    expanded: tabs.hasAttribute("expanded"),
+                    tab_min_height: parseFloat(tabStyle.getPropertyValue("--tab-min-height")),
+                    tab_background_height: rect(background).height,
+                    tab_background_left: rect(background).left,
+                    group_badge_left: rect(badge).left,
+                    group_badge_height: rect(badge).height,
+                    badge_radius: badgeStyle.borderTopLeftRadius,
+                    label_radius: labelStyle.borderTopLeftRadius,
+                    stylesheet_loaded:
+                      parseFloat(tabStyle.getPropertyValue("--tab-min-height")) === 27 &&
+                      bgStyle.borderTopWidth === "1px" &&
+                      labelStyle.borderTopLeftRadius === "0px",
+                  };
+                """
+                def set_and_measure(expand: bool) -> dict:
+                    request(port, "POST", base + "/execute/sync", {
+                        "script": "SidebarController._state.launcherExpanded = arguments[0]; return true;",
+                        "args": [expand]
+                    })
+                    # Sidebar animation/layout may be asynchronous. Take several
+                    # measurements and require two matching layouts (not timing alone).
+                    previous = None
+                    for _ in range(30):
+                        result = request(port, "POST", base + "/execute/sync", {
+                            "script": script, "args": []
+                        })
+                        if not isinstance(result, dict):
+                            raise RuntimeError("No chrome geometry returned by WebDriver")
+                        if (result.get("expanded") is expand and
+                                result.get("orientation") == "vertical" and
+                                previous is not None and
+                                abs(float(result["group_badge_left"]) -
+                                    float(previous["group_badge_left"])) < 0.25 and
+                                abs(float(result["tab_background_left"]) -
+                                    float(previous["tab_background_left"])) < 0.25):
+                            return result
+                        previous = result
+                        time.sleep(0.15)
+                    raise RuntimeError("Sidebar never reached stable requested layout state")
+                expanded = set_and_measure(True)
+                collapsed = set_and_measure(False)
+            finally:
+                try:
+                    request(port, "POST", base + "/moz/context", {"context": "content"})
+                except RuntimeError:
+                    pass
+            result = verify_vertical_style_geometry(expanded, collapsed)
+            (out / "style-result.json").write_text(json.dumps(result, indent=2) + "\n")
+    finally:
+        if session:
+            try:
+                request(port, "DELETE", "/session/" + str(session))
+            except RuntimeError:
+                pass
+        if proc is not None and proc.poll() is None:
+            try:
+                import signal
+                os.killpg(proc.pid, signal.SIGTERM)
+                proc.wait(timeout=5)
+            except (ProcessLookupError, subprocess.TimeoutExpired):
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+    print("PASS: QA-native Firefox chrome group badge and tab outline alignment")
+    print("Geometry report: " + str(out / "style-result.json"))
+    return 0
+
+
 def main() -> int:
+    if sys.argv[1:] == ["--self-test-style-geometry"]:
+        self_test_vertical_style_geometry()
+        return 0
+    if len(sys.argv) == 4 and sys.argv[1] == "--qa-vertical-style":
+        return run_qa_vertical_style(sys.argv[2], sys.argv[3])
+    if sys.argv[1:2] == ["--qa-vertical-style"]:
+        raise RuntimeError("Usage: --qa-vertical-style ABSOLUTE_QA_BIN_DIR ABSOLUTE_QA_OUTPUT_DIR")
     if sys.argv[1:] == ["--self-test-cert-parser"]:
         test_certificate_denial_parser()
         return 0
