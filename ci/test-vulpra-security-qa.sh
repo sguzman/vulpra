@@ -137,75 +137,7 @@ app="$qa/obj-vulpra-security-qa/snapshots/$name/app/vulpra"
   die 'snapshot did not dereference the internal Gecko application.ini symlink'
 cmp "$app" "$repo/obj-vulpra-main-160/dist/bin/vulpra"
 manifest="$qa/obj-vulpra-security-qa/snapshots/$name/manifest.txt"
-grep -Eq '^application_ini_sha256=[0-9a-f]{64}
-if bash "$repo/nix/vulpra" security-qa snapshot >/dev/null 2>&1; then
-  die 'duplicate snapshot unexpectedly overwrote files'
-fi
-bash "$repo/nix/vulpra" security-qa headless > "$work/out"
-grep -Fq 'PASS: isolated Vulpra QA headless screenshot' "$work/out"
-shopt -s nullglob
-runs=("$qa/obj-vulpra-security-qa/runtime"/run.*)
-[[ "${#runs[@]}" -eq 1 ]] || die 'unexpected QA run count'
-run="${runs[0]}"
-mapfile -t proof < "$run/home/env-proof"
-[[ "${proof[0]}" == "$run/home" && "${proof[1]}" == "$run/data" &&
-   "${proof[2]}" == "$run/cache" && "${proof[3]}" == "$run/config" &&
-   "${proof[4]}" == "$run/profile" ]] ||
-  die 'browser environment escaped disposable QA paths'
-[[ "$(git -C "$repo" rev-parse HEAD)" == "$original" &&
-   "$(git -C "$repo" symbolic-ref --short HEAD)" == main ]] ||
-  die 'daily main source branch altered'
-# A dirty QA checkout must not be reset/silently discarded.
-printf '\n# temporary QA source change\n' >> "$qa/AGENTS.md"
-if bash "$repo/nix/vulpra" security-qa sync >/dev/null 2>&1; then
-  die 'sync unexpectedly discarded changes from QA worktree'
-fi
-git -C "$qa" checkout -- AGENTS.md
-# A new main commit must not silently combine old QA source with a new binary.
-printf '\n# revised synthetic source\n' >> "$repo/AGENTS.md"
-git -C "$repo" add AGENTS.md
-git -C "$repo" -c user.name='QA Fixture' -c user.email='qa-fixture@example.invalid' \
-  commit -qm 'next synthetic main source'
-latest="$(git -C "$repo" rev-parse HEAD)"
-if bash "$repo/nix/vulpra" security-qa snapshot >/dev/null 2>&1; then
-  die 'snapshot accepted source commit mismatch'
-fi
-bash "$repo/nix/vulpra" security-qa sync > "$work/sync"
-[[ "$(git -C "$qa" rev-parse HEAD)" == "$latest" &&
-   "$(git -C "$repo" symbolic-ref --short HEAD)" == main ]] ||
-  die 'safe detached QA source sync did not preserve main'
-[[ -x "$app" ]] || die 'sync removed existing QA binary snapshot'
-grep -Fxq 'Firefox sentinel' "$work/home/.mozilla/firefox/sentinel"
-grep -Fxq 'Dogfood sentinel' "$work/home/.local/share/vulpra/default/sentinel"
-# Source can be rebuilt in the detached worktree only, in a separate object
-# directory. These fake mach invocations validate paths, not Firefox compile.
-builder="$qa/scripts/vulpra-security-qa-build.sh"
-[[ -f "$builder" ]] || die 'native QA build script missing from detached worktree'
-bash "$builder" --preflight > "$work/build-preflight"
-[[ ! -e "$qa/obj-vulpra-security-qa/native.mozconfig" ]] ||
-  die 'QA preflight unexpectedly generated a mozconfig'
-mkdir -p "$work/mock-libclang"
-mkdir -p "$repo/toolkit/crashreporter/google-breakpad/src/third_party/lss"
-printf '/* synthetic Breakpad header */\n' > "$repo/toolkit/crashreporter/google-breakpad/src/third_party/lss/linux_syscall_support.h"
-export VULPRA_NIX_DEV=1 VULPRA_NIX_LIBCLANG_PATH="$work/mock-libclang"
-bash "$builder" --build --jobs 2 > "$work/build"
-native="$qa/obj-vulpra-security-qa-build/dist/bin"
-[[ -x "$native/vulpra" && -f "$native/application.ini" ]] ||
-  die 'mock native output was not built in detached QA tree'
-grep -Fq 'obj-vulpra-security-qa-build' "$qa/obj-vulpra-security-qa/native.mozconfig"
-[[ ! -d "$repo/obj-vulpra-security-qa-build" ]] ||
-  die 'QA build created output inside daily source'
-bash "$repo/nix/vulpra" security-qa headless-build > "$work/headless-build"
-grep -Fq 'PASS: isolated Vulpra QA headless screenshot' "$work/headless-build"
-if bash "$repo/nix/vulpra" security-qa headless --profile \
-  "$work/home/.mozilla/firefox" >/dev/null 2>&1; then
-  die 'QA accepted profile override'
-fi
-echo 'PASS: detached QA source, checksum copied browser, private HOME/XDG/profile and test screenshot'
-echo 'PASS: copied snapshot verification rejects tampered ELF/INI, blocks headless, accepts legacy snapshots'
-echo 'PASS: dirty worktree sync rejected, clean detached sync to newer main accepted; daily sentinels preserved'
-echo 'LIMIT: synthetic executable, not an actual Gecko browser security result'
- "$manifest" ||
+grep -Eq '^application_ini_sha256=[0-9a-f]{64}$' "$manifest" ||
   die 'snapshot did not record application.ini digest'
 bash "$repo/nix/vulpra" security-qa verify > "$work/verify"
 grep -Fq 'PASS: independent QA executable' "$work/verify"
@@ -296,5 +228,6 @@ if bash "$repo/nix/vulpra" security-qa headless --profile \
   die 'QA accepted profile override'
 fi
 echo 'PASS: detached QA source, checksum copied browser, private HOME/XDG/profile and test screenshot'
+echo 'PASS: copied snapshot verification rejects tampered ELF/INI, blocks headless, accepts legacy snapshots'
 echo 'PASS: dirty worktree sync rejected, clean detached sync to newer main accepted; daily sentinels preserved'
 echo 'LIMIT: synthetic executable, not an actual Gecko browser security result'
