@@ -19,7 +19,8 @@ QA-only tests: run ~/Code/Apps/vulpra-security-qa/nix/vulpra security-qa accept
   ./nix/vulpra security-qa accept    Real copied-browser localhost TLS/WebExtension test
   ./nix/vulpra security-qa build [--jobs N]  Explicit separate native QA build
   ./nix/vulpra security-qa headless-build  Test compiled QA executable privately
-  ./nix/vulpra security-qa style     Inspect collapsed/expanded tab group geometry in QA build
+  ./nix/vulpra security-qa style     Check compiled QA browser tab group layout
+  ./nix/vulpra security-qa style-preview  Preview current QA CSS on copied snapshot (no build)
 
 Setup does NOT compile, download, install, stop, restart or launch a browser.
 Only the explicit 'build' operation enters Nix and compiles; default jobs=2.
@@ -35,7 +36,7 @@ action="${1:-status}"
 if (($#)); then shift; fi
 case "$action" in
   help|-h|--help) usage; exit 0 ;;
-  status|setup|sync|snapshot|verify|headless|headless-build|accept|style)
+  status|setup|sync|snapshot|verify|headless|headless-build|accept|style|style-preview)
     (($# == 0)) || die "$action takes no extra arguments" ;;
   build)
     jobs=2
@@ -387,6 +388,50 @@ case "$action" in
     printf 'QA evidence: %s\n' "${reports[0]}"
     echo 'LIMIT: no target sandbox syscalls, live Safe Browsing provider or external egress audit'
     ;;
+  style-preview)
+    [[ "$launcher_mode" == qa ]] ||
+      die 'style-preview must run from the detached QA checkout, never daily main'
+    verify_snapshot
+    app="$(snapshot_path)"
+    probe="$worktree/ci/smoke-webextension-package-local.py"
+    css="$worktree/browser/themes/shared/tabbrowser/vulpra-compact-tabs.css"
+    [[ -f "$probe" && ! -L "$probe" && -f "$css" && ! -L "$css" ]] ||
+      die 'QA-local browser geometry harness or compact CSS missing'
+    git -C "$worktree" diff --quiet -- browser/themes/shared/tabbrowser/vulpra-compact-tabs.css &&
+      git -C "$worktree" diff --cached --quiet -- browser/themes/shared/tabbrowser/vulpra-compact-tabs.css ||
+      die 'QA stylesheet has local modifications; do not silently preview uncommitted CSS'
+    for tool in python3 geckodriver timeout jq; do
+      command -v "$tool" >/dev/null ||
+        die "QA CSS preview requires $tool; no automatic installation"
+    done
+    runtime="$state/runtime"
+    [[ ! -L "$runtime" ]] || die 'QA runtime must not be linked'
+    mkdir -p -m 0700 -- "$runtime"
+    run="$(mktemp -d "$runtime/style.XXXXXXXX")"
+    mkdir -p -m 0700 -- "$run/home" "$run/data" "$run/cache" "$run/config"
+    set +e
+    timeout 180 env -i PATH="$PATH" HOME="$run/home" LANG=C.UTF-8 \
+      XDG_DATA_HOME="$run/data" XDG_CACHE_HOME="$run/cache" \
+      XDG_CONFIG_HOME="$run/config" MOZ_HEADLESS=1 TMPDIR="$run" \
+      NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
+      python3 "$probe" --qa-style-preview "$app" "$run" "$css" \
+      > "$run/style.log" 2>&1
+    result=$?
+    set -e
+    [[ "$result" == 0 ]] ||
+      die "QA CSS preview failed (exit $result); private QA log: $run/style.log"
+    [[ -f "$run/style-result.json" && ! -L "$run/style-result.json" ]] ||
+      die "QA CSS preview produced no geometry report: $run/style.log"
+    jq -e '.status == "pass" and .source == "qa_snapshot_css_overlay" and
+      .expanded.vertical == true and .collapsed.vertical == true and
+      .expanded.group_label_square == true and .collapsed.group_label_square == true and
+      .collapsed.group_alignment_within_px == true and
+      .expanded.compact_27px_tabs == true and .collapsed.compact_27px_tabs == true' \
+      "$run/style-result.json" >/dev/null ||
+      die "QA CSS preview report lacks real aligned geometry: $run/style-result.json"
+    printf 'PASS: previewed QA source CSS in disposable copied-Vulpra chrome: %s\n' "$run/style-result.json"
+    echo 'LIMIT: validates source CSS selector/layout only; QA-native packaging and Hyprland GUI appearance unverified'
+    ;;
   style)
     [[ "$launcher_mode" == qa ]] ||
       die 'style must be launched from the detached QA checkout, not from daily main'
@@ -409,7 +454,7 @@ case "$action" in
     set +e
     timeout 180 env -i PATH="$PATH" HOME="$run/home" LANG=C.UTF-8 \
       XDG_DATA_HOME="$run/data" XDG_CACHE_HOME="$run/cache" \
-      XDG_CONFIG_HOME="$run/config" MOZ_HEADLESS=1 \
+      XDG_CONFIG_HOME="$run/config" MOZ_HEADLESS=1 TMPDIR="$run" \
       NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost \
       python3 "$probe" --qa-vertical-style "$app" "$run" \
       > "$run/style.log" 2>&1
