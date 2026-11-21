@@ -1,0 +1,94 @@
+# Source-only full Git-tree comparison. No browser build or user profile access.
+name: Vulpra Main Firefox 160.0.1 Source Security Inventory
+on:
+  push:
+    branches: [main]
+    paths:
+      - ci/security-160-main-source-audit.sh
+      - .github/workflows/security-160-main-source-audit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  full-main-to-upstream-git-tree:
+    if: github.repository == 'sguzman/vulpra' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Sparse checkout audit script with Git-tree metadata
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            ci/security-160-main-source-audit.sh
+      - name: Syntax and pinned-main preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/security-160-main-source-audit.sh
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git show HEAD:browser/config/version.txt)" = 160.0.1
+          echo 'PASS: exact main source revision and committed Firefox 160.0.1 version'
+      - name: Authenticated full-tree Git-only source comparison
+        id: audit
+        shell: bash
+        timeout-minutes: 27
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/vulpra-main-160-source-audit"
+          bash ci/security-160-main-source-audit.sh --audit "$out"
+          test -s "$out/source-audit-summary.json"
+          test -s "$out/all-changed-paths.tsv"
+          test -s "$out/reviewed-source-blobs.tsv"
+          jq -e --arg sha "$GITHUB_SHA" '
+            .current_main_commit==$sha and
+            .official_release_commit=="58fed86b1b6864ad71b83c910a879d6f1a6b678b" and
+            .full_tree_diff_enumerated==true and
+            .reviewed_hotfix_source_blobs_identical==3 and
+            .counts.total>0 and
+            .all_changes_reviewed_for_security==false and
+            .native_browser_compiled_or_tested==false and
+            .security_current==false and .release_ready==false
+          ' "$out/source-audit-summary.json" >/dev/null
+          test "$(wc -l < "$out/reviewed-source-blobs.tsv")" -eq 4
+          test "$(wc -l < "$out/all-changed-paths.tsv")" -eq \
+            "$(($(jq -r '.counts.total' "$out/source-audit-summary.json")+1))"
+          if bash ci/security-160-main-source-audit.sh --audit "$out" >/dev/null 2>&1; then
+            echo 'FAIL: audit accepted preexisting output directory' >&2
+            exit 1
+          fi
+          {
+            echo '## Current main vs Mozilla Firefox 160.0.1 full Git tree'
+            jq -r '.counts | "Added: \(.added); deleted: \(.deleted); modified: \(.modified); type changed: \(.typechanged); total: \(.total); security-sensitive path changes: \(.security_sensitive_paths)"' "$out/source-audit-summary.json"
+            echo 'Reviewed Mozilla hotfix/version blobs identical: 3/3.'
+            echo 'Security release approval: NO. Binary and target-host sandbox not tested.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload complete source-path inventory (not a browser build)
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulpra-main-firefox160-0-1-full-tree-source-only-inventory
+          path: |
+            ${{ runner.temp }}/vulpra-main-160-source-audit/source-audit-summary.json
+            ${{ runner.temp }}/vulpra-main-160-source-audit/all-changed-paths.tsv
+            ${{ runner.temp }}/vulpra-main-160-source-audit/security-sensitive-changed-paths.tsv
+            ${{ runner.temp }}/vulpra-main-160-source-audit/source-root-counts.tsv
+            ${{ runner.temp }}/vulpra-main-160-source-audit/reviewed-source-blobs.tsv
+          if-no-files-found: error
+          retention-days: 14
+      - name: Fail closed if audit or evidence upload skipped
+        if: always()
+        shell: bash
+        env:
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$AUDIT_OUTCOME" != success || "$UPLOAD_OUTCOME" != success ]]; then
+            echo 'FAIL: current main Firefox 160.0.1 full-tree source inventory incomplete' >&2
+            exit 1
+          fi
+          echo 'PASS: source-only tree inventory uploaded; runtime/security release remain unaccepted'
