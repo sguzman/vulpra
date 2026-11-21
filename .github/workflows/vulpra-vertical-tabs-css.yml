@@ -1,0 +1,35 @@
+name: Vulpra Compact Vertical Tabs CSS Contract
+on:
+  push:
+    branches: [main]
+    paths:
+      - browser/themes/shared/tabbrowser/vulpra-compact-tabs.css
+      - browser/themes/shared/browser-shared.css
+      - browser/themes/shared/jar.inc.mn
+      - ci/test-vulpra-vertical-tab-css.sh
+      - .github/workflows/vulpra-vertical-tabs-css.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  css-packaging-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout only tab CSS and packaging fixtures
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            browser/themes/shared/tabbrowser/vulpra-compact-tabs.css
+            browser/themes/shared/browser-shared.css
+            browser/themes/shared/jar.inc.mn
+            ci/test-vulpra-vertical-tab-css.sh
+      - name: Verify CSS import, packaged resource and collapsed group layout selectors
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/test-vulpra-vertical-tab-css.sh
+          bash ci/test-vulpra-vertical-tab-css.sh
+          echo 'LIMIT: actual browser styling QA requires new Vulpra native build'
