@@ -11,7 +11,7 @@ checked-out `main` source using Nix/nom and an isolated
 The owner verified **native workstation compilation and graphical launch** on November 20, 2026. Current-main package provenance, TLS/sandbox/security and public-release acceptance remain separate, unpassed gates.
 
 
-**Non-interrupting security QA:** [Isolated worktree and copied-browser test setup](docs/vulpra/SECURITY-QA-ISOLATION.md) is available via `./nix/vulpra security-qa status|setup|sync|snapshot|headless`. It runs without Nix realization, never changes the main browser/profile and only creates a worktree/copy upon explicit command. The initial QA mock CI passed; real Gecko security acceptance is separate.
+**Non-interrupting security QA:** [Isolated worktree and copied-browser test setup](docs/vulpra/SECURITY-QA-ISOLATION.md) is available via `./nix/vulpra security-qa status|setup|sync|snapshot|headless`. Worktree setup, snapshots and headless checks bypass Nix; only the explicit QA `build` command enters Nix and compiles into a separate QA object directory. No command replaces the daily browser/profile. The QA build/isolation mock CI passed; real Gecko security acceptance is separate.
 
 **Current project snapshot (2026-11-20):** [What is complete, what was actually pruned, remaining blockers, and next work](docs/vulpra/STATUS.md). The [active security acceptance roadmap](docs/vulpra/SECURITY-ACCEPTANCE-ROADMAP-20261120.md) lists the current gates. The November 8 milestone and November 6 security callouts below are historical, not claims about the present Firefox 160.0.1 source.
 
