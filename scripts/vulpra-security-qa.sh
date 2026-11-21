@@ -78,6 +78,23 @@ valid_app() {
   grep -Fxq 'Name=Vulpra' "$dir/application.ini" &&
     grep -Fxq 'Version=160.0.1' "$dir/application.ini"
 }
+valid_compiled_app() {
+  # Gecko normally symlinks dist/bin/application.ini to obj*/build/application.ini.
+  # Accept that source build link only when its canonical target remains inside
+  # our main native object directory; QA copies must have their own regular ini.
+  local dir="$1" obj_root="$source_repo/obj-vulpra-main-160" resolved_ini
+  [[ "$dir" == "$obj_root/dist/bin" &&
+     -d "$dir" && ! -L "$dir" && -x "$dir/vulpra" &&
+     ! -L "$dir/vulpra" && -f "$dir/application.ini" ]] || return 1
+  resolved_ini="$(realpath -e -- "$dir/application.ini")" || return 1
+  case "$resolved_ini" in
+    "$obj_root/"*) ;;
+    *) return 1 ;;
+  esac
+  [[ -f "$resolved_ini" ]] || return 1
+  grep -Fxq 'Name=Vulpra' "$resolved_ini" &&
+    grep -Fxq 'Version=160.0.1' "$resolved_ini"
+}
 case "$action" in
   status)
     printf 'Daily Vulpra checkout: %s\n' "$source_repo"
@@ -137,7 +154,8 @@ case "$action" in
     [[ ! -L "$state" && ! -L "$state/snapshots" &&
        ! -L "$state/active-snapshot" ]] ||
       die 'QA state must not contain symbolic-link entrypoints'
-    valid_app "$compiled" || die 'current native compiled Vulpra 160.0.1 is missing'
+    valid_compiled_app "$compiled" ||
+      die 'main Vulpra binary or application.ini is invalid, or application.ini resolves outside its object directory'
     [[ ! -L "$compiled" && ! -L "$compiled/vulpra" ]] ||
       die 'refusing linked source executable or binary directory'
     # Require exact committed code/QA baseline alignment. This proves source
